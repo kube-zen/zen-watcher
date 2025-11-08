@@ -3,9 +3,9 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://go.dev/)
 
-> **Universal Kubernetes Security & Compliance Event Aggregator**
+> **Kubernetes Security & Compliance Event Aggregator**
 
-Zen Watcher is an open-source Kubernetes operator that aggregates security and compliance events from multiple tools into unified CRDs. Perfect for teams who want centralized event management with Kubernetes-native storage.
+Zen Watcher is an open-source Kubernetes operator that aggregates security and compliance events from multiple tools into unified CRDs. Simple, standalone, and useful on its own.
 
 ---
 
@@ -14,7 +14,7 @@ Zen Watcher is an open-source Kubernetes operator that aggregates security and c
 ### Multi-Source Event Aggregation
 Collects events from popular security and compliance tools:
 - 🛡️ **Trivy** - Container vulnerabilities
-- 🚨 **Falco** - Runtime threat detection
+- 🚨 **Falco** - Runtime threat detection  
 - 📋 **Kyverno** - Policy violations
 - 🔍 **Kubernetes Audit Logs** - API server audit events
 - ✅ **Kube-bench** - CIS benchmark compliance
@@ -27,17 +27,16 @@ Collects events from popular security and compliance tools:
 - No external dependencies
 
 ### Comprehensive Observability
-- 📊 20+ Prometheus metrics
+- 📊 20+ Prometheus metrics on :9090
 - 🎨 Pre-built Grafana dashboard
-- 📝 Structured logging with levels (DEBUG, INFO, WARN, ERROR, CRIT)
+- 📝 Structured logging: `2025-11-08T16:30:00.000Z [INFO] zen-watcher: message`
 - 🏥 Health and readiness probes
 
 ### Production-Ready
 - Non-privileged containers
 - Read-only filesystem
-- NetworkPolicy support
-- Pod Security Standards (restricted)
 - Minimal footprint (~15MB image, <10m CPU, <50MB RAM)
+- Pod Security Standards (restricted)
 
 ---
 
@@ -77,7 +76,7 @@ kubectl get zenagentevents -n zen-system
 | `TRIVY_NAMESPACE` | Trivy operator namespace | `trivy-system` |
 | `FALCO_NAMESPACE` | Falco namespace | `falco` |
 | `BEHAVIOR_MODE` | Watching behavior | `all` |
-| `LOG_LEVEL` | Log level | `INFO` |
+| `LOG_LEVEL` | Log level (DEBUG/INFO/WARN/ERROR/CRIT) | `INFO` |
 | `METRICS_PORT` | Prometheus metrics port | `9090` |
 
 ### Behavior Modes
@@ -92,30 +91,30 @@ kubectl get zenagentevents -n zen-system
 ## Architecture
 
 ```
-┌─────────────────────────────────────────┐
-│ Kubernetes Cluster                      │
-│                                         │
-│  Security Tools                         │
-│    ├─ Trivy                            │
-│    ├─ Falco                            │
-│    ├─ Kyverno                          │
-│    ├─ Audit Logs                       │
-│    └─ Kube-bench                       │
-│         ↓                               │
-│  zen-watcher (watches all)              │
-│         ↓                               │
-│  ZenAgentEvent CRDs (etcd storage)      │
-│         ↓                               │
-│  [Your integration here]                │
-│    ├─ kubectl get zenagentevents       │
-│    ├─ Custom controller                │
-│    ├─ Export to external system        │
-│    └─ Analytics/dashboards              │
-│                                         │
-└─────────────────────────────────────────┘
+┌──────────────────────────────────┐
+│ Kubernetes                       │
+│                                  │
+│  Security Tools                  │
+│    ├─ Trivy                     │
+│    ├─ Falco                     │
+│    ├─ Kyverno                   │
+│    ├─ Audit Logs                │
+│    └─ Kube-bench                │
+│         ↓                        │
+│  zen-watcher (watches all)       │
+│         ↓                        │
+│  ZenAgentEvent CRDs (etcd)       │
+│         ↓                        │
+│  [Your integration]              │
+│    ├─ kubectl get zenagentevents│
+│    ├─ Custom controller          │
+│    ├─ Export to external system  │
+│    └─ Analytics/dashboards       │
+│                                  │
+└──────────────────────────────────┘
 ```
 
-**Key Design:**
+**Design:**
 - **Independent** - No external services required
 - **Kubernetes-native** - Uses CRDs for storage
 - **Extensible** - Add your own integrations
@@ -177,10 +176,10 @@ curl http://localhost:9090/metrics
 
 ## Integration Examples
 
-### Export to External System
+### Watch Events in Your Code
 
 ```go
-// Watch ZenAgentEvent CRDs and forward to your system
+// Watch ZenAgentEvent CRDs and process them
 func watchEvents(ctx context.Context) {
     watch, err := k8sClient.Resource(zenAgentEventGVR).
         Namespace("zen-system").
@@ -189,8 +188,10 @@ func watchEvents(ctx context.Context) {
     for event := range watch.ResultChan() {
         zenEvent := event.Object.(*ZenAgentEvent)
         
-        // Send to your system
-        sendToMySystem(zenEvent)
+        // Process event
+        fmt.Printf("New event: %s (severity: %s)\n", 
+            zenEvent.Spec.EventType, 
+            zenEvent.Spec.Severity)
     }
 }
 ```
@@ -219,37 +220,13 @@ kubectl get zenagentevents -n zen-system -o json > events.json
 - **CPU:** <10m average
 - **Memory:** <50MB
 - **Storage:** ~2MB in etcd
-- **Network:** Minimal (local only)
+- **Network:** None (local only)
 
 ### Heavy Load (10,000 events/day):
 - **CPU:** <20m average
 - **Memory:** <80MB
 - **Storage:** ~20MB in etcd
-- **Network:** Minimal (local only)
-
----
-
-## Deployment Models
-
-### Standalone
-Deploy zen-watcher by itself for local event aggregation:
-```bash
-kubectl apply -f deployments/
-```
-
-### With Custom Integration
-Deploy zen-watcher + your custom controller:
-```bash
-kubectl apply -f deployments/
-kubectl apply -f my-integration.yaml
-```
-
-### Multi-Cluster
-Deploy one zen-watcher per cluster, aggregate externally:
-```bash
-# Each cluster runs independent zen-watcher
-# Export events to central system via custom controller
-```
+- **Network:** None (local only)
 
 ---
 
@@ -304,4 +281,4 @@ Apache License 2.0 - See [LICENSE](LICENSE) for details.
 
 **Repository:** github.com/kube-zen/zen-watcher  
 **Go Version:** 1.24.0  
-**Status:** ✅ Production-ready, independently useful
+**Status:** ✅ Production-ready, standalone, independently useful
