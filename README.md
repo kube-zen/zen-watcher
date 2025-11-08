@@ -9,7 +9,7 @@ Zen Watcher is an open-source Kubernetes operator that aggregates security and c
 
 ---
 
-## Features
+## 🎯 Features
 
 ### Multi-Source Event Aggregation
 Collects events from popular security and compliance tools:
@@ -40,7 +40,66 @@ Collects events from popular security and compliance tools:
 
 ---
 
-## Quick Start
+## 🏗️ Architecture
+
+```mermaid
+graph TB
+    subgraph "Security Tools"
+        A[Trivy<br/>Vulnerabilities]
+        B[Falco<br/>Runtime Security]
+        C[Kyverno<br/>Policy Violations]
+    end
+    
+    subgraph "Compliance Tools"
+        D[Audit Logs<br/>K8s Events]
+        E[Kube-bench<br/>CIS Benchmarks]
+    end
+    
+    subgraph "Zen Watcher"
+        F[Watchers]
+        G[CRD Writer]
+        H[Metrics Exporter]
+    end
+    
+    subgraph "Storage"
+        I[ZenAgentEvent CRDs<br/>• category<br/>• source<br/>• eventType<br/>• severity]
+    end
+    
+    subgraph "Your Integration"
+        J[Custom Controller<br/>Watch CRDs]
+        K[Export to System<br/>SIEM, Dashboard, etc]
+        L[kubectl<br/>Query Events]
+    end
+    
+    A --> F
+    B --> F
+    C --> F
+    D --> F
+    E --> F
+    F --> G
+    G --> I
+    F --> H
+    I --> J
+    I --> K
+    I --> L
+    
+    style I fill:#e1f5ff
+    style F fill:#fff3e0
+    style J fill:#f3e5f5
+    style K fill:#f3e5f5
+    style L fill:#f3e5f5
+```
+
+**Key Design:**
+- **Watches** multiple security tools
+- **Aggregates** into unified CRD format
+- **Stores** in Kubernetes etcd (no external database)
+- **Exposes** via standard Kubernetes API
+- **Integrates** with anything that can watch CRDs
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
 - Kubernetes 1.28+
@@ -66,7 +125,7 @@ kubectl get zenagentevents -n zen-system
 
 ---
 
-## Configuration
+## ⚙️ Configuration
 
 ### Environment Variables
 
@@ -88,67 +147,40 @@ kubectl get zenagentevents -n zen-system
 
 ---
 
-## Architecture
-
-```
-┌──────────────────────────────────┐
-│ Kubernetes                       │
-│                                  │
-│  Security Tools                  │
-│    ├─ Trivy                     │
-│    ├─ Falco                     │
-│    ├─ Kyverno                   │
-│    ├─ Audit Logs                │
-│    └─ Kube-bench                │
-│         ↓                        │
-│  zen-watcher (watches all)       │
-│         ↓                        │
-│  ZenAgentEvent CRDs (etcd)       │
-│         ↓                        │
-│  [Your integration]              │
-│    ├─ kubectl get zenagentevents│
-│    ├─ Custom controller          │
-│    ├─ Export to external system  │
-│    └─ Analytics/dashboards       │
-│                                  │
-└──────────────────────────────────┘
-```
-
-**Design:**
-- **Independent** - No external services required
-- **Kubernetes-native** - Uses CRDs for storage
-- **Extensible** - Add your own integrations
-- **Observable** - Metrics and structured logs
-
----
-
-## Observability
+## 📊 Observability
 
 ### Prometheus Metrics (:9090/metrics)
 
 **Core Metrics:**
-- `zen_watcher_up` - Watcher is running
-- `zen_watcher_events_total` - Total events created
-- `zen_watcher_tools_active` - Active security tools detected
+```
+zen_watcher_up 1
+zen_watcher_events_total 150
+zen_watcher_tools_active 5
+```
 
 **Per-Tool Metrics:**
-- `zen_watcher_trivy_events_total`
-- `zen_watcher_falco_events_total`
-- `zen_watcher_kyverno_events_total`
-- `zen_watcher_audit_events_total`
-- `zen_watcher_kubebench_events_total`
+```
+zen_watcher_trivy_events_total 45
+zen_watcher_falco_events_total 23
+zen_watcher_kyverno_events_total 67
+zen_watcher_audit_events_total 12
+zen_watcher_kubebench_events_total 3
+```
 
 **Performance:**
-- `zen_watcher_crd_write_duration_seconds`
-- `zen_watcher_watch_errors_total`
+```
+zen_watcher_crd_write_duration_seconds{quantile="0.5"} 0.012
+zen_watcher_crd_write_duration_seconds{quantile="0.99"} 0.045
+zen_watcher_watch_errors_total 2
+```
 
 ### Structured Logging
 
 **Format:**
 ```
-2025-11-08T16:30:00.000Z [INFO] zen-watcher: Trivy watcher started
+2025-11-08T16:30:00.000Z [INFO ] zen-watcher: Trivy watcher started
 2025-11-08T16:30:01.000Z [DEBUG] zen-watcher: Processing vulnerability CVE-2024-001
-2025-11-08T16:30:02.000Z [WARN] zen-watcher: Falco not detected (skipping)
+2025-11-08T16:30:02.000Z [WARN ] zen-watcher: Falco not detected (skipping)
 2025-11-08T16:30:03.000Z [ERROR] zen-watcher: Failed to create CRD (will retry)
 ```
 
@@ -156,42 +188,47 @@ kubectl get zenagentevents -n zen-system
 
 **Configuration:**
 ```bash
-LOG_LEVEL=INFO  # DEBUG, INFO, WARN, ERROR, CRIT
+export LOG_LEVEL=INFO  # DEBUG, INFO, WARN, ERROR, CRIT
+export LOG_PREFIX=zen-watcher
 ```
 
 ### Health Endpoints
 
 ```bash
-# Health check
-curl http://localhost:8080/health
-
-# Readiness check  
-curl http://localhost:8080/ready
-
-# Metrics
-curl http://localhost:9090/metrics
+curl http://localhost:8080/health    # Health check
+curl http://localhost:8080/ready     # Readiness probe  
+curl http://localhost:9090/metrics   # Prometheus metrics
 ```
 
 ---
 
-## Integration Examples
+## 🔌 Integration Examples
 
 ### Watch Events in Your Code
 
 ```go
 // Watch ZenAgentEvent CRDs and process them
-func watchEvents(ctx context.Context) {
-    watch, err := k8sClient.Resource(zenAgentEventGVR).
+package main
+
+import (
+    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+    "k8s.io/client-go/dynamic"
+)
+
+func watchEvents(ctx context.Context, client dynamic.Interface) {
+    gvr := schema.GroupVersionResource{
+        Group:    "zen.kube-zen.io",
+        Version:  "v1",
+        Resource: "zenagentevents",
+    }
+    
+    watch, err := client.Resource(gvr).
         Namespace("zen-system").
         Watch(ctx, metav1.ListOptions{})
     
     for event := range watch.ResultChan() {
-        zenEvent := event.Object.(*ZenAgentEvent)
-        
-        // Process event
-        fmt.Printf("New event: %s (severity: %s)\n", 
-            zenEvent.Spec.EventType, 
-            zenEvent.Spec.Severity)
+        // Process each event
+        fmt.Printf("Event: %v\n", event.Object)
     }
 }
 ```
@@ -203,18 +240,37 @@ func watchEvents(ctx context.Context) {
 kubectl get zenagentevents -n zen-system
 
 # High severity only
-kubectl get zenagentevents -n zen-system -l severity=high
+kubectl get zenagentevents -n zen-system -o json | \
+  jq '.items[] | select(.spec.severity == "high")'
 
 # From specific source
-kubectl get zenagentevents -n zen-system -l source=trivy
+kubectl get zenagentevents -n zen-system -o json | \
+  jq '.items[] | select(.spec.source == "trivy")'
 
-# Export to JSON
+# Last 24 hours
+kubectl get zenagentevents -n zen-system -o json | \
+  jq '.items[] | select(.spec.detectedAt > "2025-11-07T00:00:00Z")'
+```
+
+### Export to External System
+
+```bash
+# Export all events
 kubectl get zenagentevents -n zen-system -o json > events.json
+
+# Stream to external API
+kubectl get zenagentevents -n zen-system -o json | \
+  jq -c '.items[]' | \
+  while read event; do
+    curl -X POST https://your-api.com/events \
+      -H "Content-Type: application/json" \
+      -d "$event"
+  done
 ```
 
 ---
 
-## Resource Usage
+## 📈 Resource Usage
 
 ### Typical Load (1000 events/day):
 - **CPU:** <10m average
@@ -230,13 +286,13 @@ kubectl get zenagentevents -n zen-system -o json > events.json
 
 ---
 
-## Building
+## 🔧 Building
 
 ```bash
 # Standard build
 go build -o zen-watcher ./cmd/zen-watcher
 
-# Optimized build
+# Optimized build (production)
 go build -ldflags="-w -s" -trimpath -o zen-watcher ./cmd/zen-watcher
 
 # Docker image
@@ -245,7 +301,7 @@ docker build -f build/Dockerfile -t zen-watcher:latest .
 
 ---
 
-## Troubleshooting
+## 🐛 Troubleshooting
 
 ### Enable Debug Logging
 ```bash
@@ -255,8 +311,14 @@ kubectl logs -n zen-system deployment/zen-watcher -f
 
 ### Check CRDs
 ```bash
+# List all events
 kubectl get zenagentevents -n zen-system
+
+# Describe specific event
 kubectl describe zenagentevents <name> -n zen-system
+
+# Watch for new events
+kubectl get zenagentevents -n zen-system -w
 ```
 
 ### View Metrics
@@ -265,15 +327,27 @@ kubectl port-forward -n zen-system deployment/zen-watcher 9090:9090
 curl http://localhost:9090/metrics
 ```
 
+### Common Issues
+
+**No events being created:**
+- Check if security tools are installed: `kubectl get pods -n trivy-system -n falco`
+- Enable debug logging: `LOG_LEVEL=DEBUG`
+- Check watcher logs for tool detection
+
+**High memory usage:**
+- Adjust watch interval: `WATCH_INTERVAL=60s`
+- Enable conservative mode: `BEHAVIOR_MODE=conservative`
+- Cleanup old events: `kubectl delete zenagentevents --field-selector metadata.creationTimestamp<2025-10-01`
+
 ---
 
-## Contributing
+## 🤝 Contributing
 
 Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
-## License
+## 📄 License
 
 Apache License 2.0 - See [LICENSE](LICENSE) for details.
 
