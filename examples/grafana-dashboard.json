@@ -1,0 +1,55 @@
+{
+  "dashboard": {
+    "title": "Zen Watcher - Security & Compliance Events",
+    "tags": ["security", "compliance", "kubernetes"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "title": "Total Events by Category",
+        "type": "stat",
+        "targets": [
+          {
+            "datasource": "Kubernetes",
+            "query": "/apis/zen.kube-zen.com/v1/namespaces/zen-system/zenrecommendations"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [],
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [
+                { "value": 0, "color": "green" },
+                { "value": 10, "color": "yellow" },
+                { "value": 50, "color": "red" }
+              ]
+            }
+          }
+        }
+      },
+      {
+        "title": "Events by Severity",
+        "type": "piechart",
+        "description": "Distribution of events by severity level"
+      },
+      {
+        "title": "Security Events Timeline",
+        "type": "timeseries",
+        "description": "Security events over time"
+      },
+      {
+        "title": "Critical Events",
+        "type": "table",
+        "description": "List of critical security events",
+        "targets": [
+          {
+            "datasource": "Kubernetes",
+            "query": "/apis/zen.kube-zen.com/v1/namespaces/zen-system/zenrecommendations?labelSelector=severity=critical"
+          }
+        ]
+      }
+    ]
+  }
+}
+
+

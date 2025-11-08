@@ -1,0 +1,51 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: zen-watcher
+  namespace: zen-system
+  labels:
+    app: zen-watcher
+    prometheus: kube-prometheus
+spec:
+  selector:
+    matchLabels:
+      app: zen-watcher
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+    scheme: http
+---
+# Example: Create a PrometheusRule for alerting
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zen-watcher-alerts
+  namespace: zen-system
+  labels:
+    app: zen-watcher
+    prometheus: kube-prometheus
+spec:
+  groups:
+  - name: zen-watcher
+    interval: 30s
+    rules:
+    - alert: HighNumberOfCriticalEvents
+      expr: count(kube_customresource_zenrecommendation{severity="critical"}) > 10
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "High number of critical security events detected"
+        description: "{{ $value }} critical security events detected in the cluster"
+    
+    - alert: ZenWatcherDown
+      expr: up{job="zen-watcher"} == 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Zen Watcher is down"
+        description: "Zen Watcher has been down for more than 5 minutes"
+
+

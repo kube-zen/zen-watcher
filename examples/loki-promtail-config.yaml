@@ -1,0 +1,55 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: promtail-config
+  namespace: zen-system
+data:
+  promtail.yaml: |
+    server:
+      http_listen_port: 9080
+      grpc_listen_port: 0
+
+    positions:
+      filename: /tmp/positions.yaml
+
+    clients:
+      - url: http://loki:3100/loki/api/v1/push
+
+    scrape_configs:
+      # Scrape zen-watcher logs
+      - job_name: zen-watcher
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - zen-system
+        relabel_configs:
+          - source_labels:
+              - __meta_kubernetes_pod_label_app
+            action: keep
+            regex: zen-watcher
+          - source_labels:
+              - __meta_kubernetes_namespace
+            target_label: namespace
+          - source_labels:
+              - __meta_kubernetes_pod_name
+            target_label: pod
+          - source_labels:
+              - __meta_kubernetes_container_name
+            target_label: container
+        pipeline_stages:
+          - json:
+              expressions:
+                level: level
+                msg: msg
+                category: category
+                source: source
+          - labels:
+              level:
+              category:
+              source:
+          - timestamp:
+              source: timestamp
+              format: RFC3339
+
+
