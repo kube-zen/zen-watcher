@@ -24,10 +24,11 @@ type CRDWriter struct {
 
 // NewCRDWriter creates a new CRD writer
 func NewCRDWriter(zenClient *types.ZenClient, namespace, clusterID string) *CRDWriter {
+	// Note: clusterID is ignored - zen-watcher is cluster-agnostic
 	return &CRDWriter{
 		zenClient: zenClient,
 		namespace: namespace,
-		clusterID: clusterID,
+		clusterID: "", // Always empty - we're independent
 	}
 }
 
