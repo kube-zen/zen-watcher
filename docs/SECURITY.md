@@ -102,7 +102,7 @@ All official images are signed with Cosign:
 
 ```bash
 # Verify image signature
-cosign verify --key cosign.pub corbe/zen-watcher:1.0.0
+cosign verify --key cosign.pub zubezen/zen-watcher:1.0.0
 ```
 
 #### SBOM (Software Bill of Materials)
@@ -110,7 +110,7 @@ Every release includes an SBOM:
 
 ```bash
 # Generate SBOM
-syft corbe/zen-watcher:1.0.0 -o spdx-json > sbom.json
+syft zubezen/zen-watcher:1.0.0 -o spdx-json > sbom.json
 
 # Scan SBOM for vulnerabilities
 grype sbom:sbom.json
@@ -197,10 +197,10 @@ Uses Kubernetes Secrets for:
 2. **Verify Updates**
    ```bash
    # Verify new image signature
-   cosign verify --key cosign.pub corbe/zen-watcher:1.1.0
+   cosign verify --key cosign.pub zubezen/zen-watcher:1.1.0
    
    # Check for vulnerabilities
-   trivy image corbe/zen-watcher:1.1.0
+   trivy image zubezen/zen-watcher:1.1.0
    ```
 
 ## Security Scanning
@@ -209,13 +209,13 @@ Uses Kubernetes Secrets for:
 
 ```bash
 # Trivy
-trivy image corbe/zen-watcher:1.0.0
+trivy image zubezen/zen-watcher:1.0.0
 
 # Grype
-grype corbe/zen-watcher:1.0.0
+grype zubezen/zen-watcher:1.0.0
 
 # Snyk (if you have access)
-snyk container test corbe/zen-watcher:1.0.0
+snyk container test zubezen/zen-watcher:1.0.0
 ```
 
 ### Scan the Deployment

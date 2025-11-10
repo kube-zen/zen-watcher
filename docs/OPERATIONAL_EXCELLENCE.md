@@ -385,13 +385,13 @@ resources:
 **Pre-deployment**:
 ```bash
 # Scan image
-trivy image corbe/zen-watcher:1.0.0
+trivy image zubezen/zen-watcher:1.0.0
 
 # Verify signature
-cosign verify --key cosign.pub corbe/zen-watcher:1.0.0
+cosign verify --key cosign.pub zubezen/zen-watcher:1.0.0
 
 # Check SBOM
-syft corbe/zen-watcher:1.0.0 -o spdx-json | grype
+syft zubezen/zen-watcher:1.0.0 -o spdx-json | grype
 ```
 
 **Post-deployment**:
@@ -712,10 +712,10 @@ histogram_quantile(0.95, rate(zen_watcher_http_request_duration_seconds_bucket[5
 - name: Deploy to Production
   run: |
     # Scan image
-    trivy image corbe/zen-watcher:${{ github.sha }}
+    trivy image zubezen/zen-watcher:${{ github.sha }}
     
     # Verify signature
-    cosign verify --key cosign.pub corbe/zen-watcher:${{ github.sha }}
+    cosign verify --key cosign.pub zubezen/zen-watcher:${{ github.sha }}
     
     # Deploy
     helm upgrade --install zen-watcher ./charts/zen-watcher \

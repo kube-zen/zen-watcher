@@ -22,13 +22,13 @@ Syft generates SBOMs for container images:
 curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh
 
 # Generate SBOM in SPDX format
-syft corbe/zen-watcher:1.0.0 -o spdx-json > sbom.spdx.json
+syft zubezen/zen-watcher:1.0.0 -o spdx-json > sbom.spdx.json
 
 # Generate SBOM in CycloneDX format
-syft corbe/zen-watcher:1.0.0 -o cyclonedx-json > sbom.cyclonedx.json
+syft zubezen/zen-watcher:1.0.0 -o cyclonedx-json > sbom.cyclonedx.json
 
 # Generate SBOM in Syft native format
-syft corbe/zen-watcher:1.0.0 -o json > sbom.syft.json
+syft zubezen/zen-watcher:1.0.0 -o json > sbom.syft.json
 ```
 
 ### Using Docker SBOM
@@ -37,7 +37,7 @@ Docker Desktop includes SBOM generation:
 
 ```bash
 # Generate SBOM
-docker sbom corbe/zen-watcher:1.0.0 > sbom.spdx.json
+docker sbom zubezen/zen-watcher:1.0.0 > sbom.spdx.json
 ```
 
 ### During Build
@@ -48,8 +48,8 @@ Include SBOM generation in your CI/CD:
 # .github/workflows/build.yml
 - name: Generate SBOM
   run: |
-    syft corbe/zen-watcher:${{ github.sha }} -o spdx-json > sbom.spdx.json
-    syft corbe/zen-watcher:${{ github.sha }} -o cyclonedx-json > sbom.cyclonedx.json
+    syft zubezen/zen-watcher:${{ github.sha }} -o spdx-json > sbom.spdx.json
+    syft zubezen/zen-watcher:${{ github.sha }} -o cyclonedx-json > sbom.cyclonedx.json
     
 - name: Upload SBOM
   uses: actions/upload-artifact@v3
@@ -67,7 +67,7 @@ Include SBOM generation in your CI/CD:
 Industry standard, ISO/IEC 5962:2021:
 
 ```bash
-syft corbe/zen-watcher:1.0.0 -o spdx-json
+syft zubezen/zen-watcher:1.0.0 -o spdx-json
 ```
 
 ### CycloneDX
@@ -75,7 +75,7 @@ syft corbe/zen-watcher:1.0.0 -o spdx-json
 OWASP standard for SBOM and VEX:
 
 ```bash
-syft corbe/zen-watcher:1.0.0 -o cyclonedx-json
+syft zubezen/zen-watcher:1.0.0 -o cyclonedx-json
 ```
 
 ## Vulnerability Scanning with SBOM
@@ -104,7 +104,7 @@ grype sbom:sbom.spdx.json -o sarif
 trivy sbom sbom.spdx.json
 
 # Scan image directly
-trivy image corbe/zen-watcher:1.0.0
+trivy image zubezen/zen-watcher:1.0.0
 ```
 
 ## SBOM Attestation
@@ -113,12 +113,12 @@ trivy image corbe/zen-watcher:1.0.0
 
 ```bash
 # Generate SBOM
-syft corbe/zen-watcher:1.0.0 -o spdx-json > sbom.spdx.json
+syft zubezen/zen-watcher:1.0.0 -o spdx-json > sbom.spdx.json
 
 # Attach as attestation with Cosign
 cosign attest --predicate sbom.spdx.json \
   --key cosign.key \
-  corbe/zen-watcher:1.0.0
+  zubezen/zen-watcher:1.0.0
 ```
 
 ### Verify SBOM Attestation
@@ -127,7 +127,7 @@ cosign attest --predicate sbom.spdx.json \
 # Verify and retrieve SBOM
 cosign verify-attestation \
   --key cosign.pub \
-  corbe/zen-watcher:1.0.0 | jq -r .payload | base64 -d | jq .predicate
+  zubezen/zen-watcher:1.0.0 | jq -r .payload | base64 -d | jq .predicate
 ```
 
 ## SBOM in CI/CD
@@ -152,7 +152,7 @@ jobs:
       - name: Generate SBOM
         uses: anchore/sbom-action@v0
         with:
-          image: corbe/zen-watcher:${{ github.ref_name }}
+          image: zubezen/zen-watcher:${{ github.ref_name }}
           format: spdx-json
           output-file: sbom.spdx.json
       
@@ -167,7 +167,7 @@ jobs:
         run: |
           cosign attest --predicate sbom.spdx.json \
             --key ${{ secrets.COSIGN_KEY }} \
-            corbe/zen-watcher:${{ github.ref_name }}
+            zubezen/zen-watcher:${{ github.ref_name }}
       
       - name: Upload SBOM
         uses: actions/upload-artifact@v3
@@ -269,7 +269,7 @@ Compliant with NTIA minimum elements:
     "created": "2024-11-04T00:00:00Z",
     "creators": ["Tool: syft-0.98.0"]
   },
-  "name": "corbe/zen-watcher:1.0.0",
+  "name": "zubezen/zen-watcher:1.0.0",
   "dataLicense": "CC0-1.0",
   "packages": [
     {
