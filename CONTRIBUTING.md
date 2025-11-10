@@ -77,7 +77,6 @@ go test ./...
 
 ```bash
 export KUBECONFIG=~/.kube/config
-export CLUSTER_ID=local-dev
 export WATCH_NAMESPACE=zen-system
 ./zen-watcher
 ```

@@ -115,7 +115,6 @@ Edit the dashboard JSON and add new panels:
   "id": 17,
   "targets": [
     {
-      "expr": "your_custom_query{cluster_id=\"$cluster\"}",
       "legendFormat": "{{label}}",
       "refId": "A"
     }
@@ -165,7 +164,6 @@ Edit the dashboard JSON and add new panels:
 | `zen_watcher_health_status` | Gauge | - | Health status (0/1) |
 | `zen_watcher_readiness_status` | Gauge | - | Readiness status (0/1) |
 | `zen_watcher_goroutines` | Gauge | - | Number of goroutines |
-| `zen_watcher_build_info` | Gauge | version, cluster_id, mode | Build information |
 
 ## Query Examples
 
@@ -238,7 +236,6 @@ Example alerts based on dashboard metrics:
 
 ## Tips
 
-1. **Use Variables**: Filter by cluster_id for multi-cluster setups
 2. **Set Refresh**: Dashboard auto-refreshes every 10s
 3. **Time Range**: Adjust time range for historical analysis
 4. **Annotations**: Add annotations for deployments and incidents

@@ -19,7 +19,6 @@ type SecurityEvent struct {
 
 // SecurityEventsRequest represents a request to send security events
 type SecurityEventsRequest struct {
-	ClusterID string          `json:"clusterId"`
 	Timestamp time.Time       `json:"timestamp"`
 	Events    []SecurityEvent `json:"events"`
 	Context   SecurityContext `json:"context"`
@@ -27,7 +26,6 @@ type SecurityEventsRequest struct {
 
 // SecurityContext provides context about the security state
 type SecurityContext struct {
-	ClusterID      string    `json:"clusterId"`
 	Timestamp      time.Time `json:"timestamp"`
 	TotalEvents    int       `json:"totalEvents"`
 	HighPriority   int       `json:"highPriority"`

@@ -129,7 +129,6 @@ helm install zen-watcher ./charts/zen-watcher \
 
 ```yaml
 global:
-  clusterID: prod-us-east-1
   
 image:
   repository: your-registry.io/zen-watcher
@@ -287,7 +286,6 @@ helm install zen-watcher ./charts/zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --values eks-values.yaml \
-  --set global.clusterID=eks-prod-us-east-1
 ```
 
 **EKS-specific values** (`eks-values.yaml`):

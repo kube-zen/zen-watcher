@@ -64,7 +64,6 @@ func (kbh *KubeBenchActionHandler) createSecurityEvent(finding watcher.KubeBench
 		"level":       finding.Level,
 		"scored":      finding.Scored,
 		"node_name":   finding.NodeName,
-		"cluster_id":  finding.ClusterID,
 		"remediation": finding.Remediation,
 		"status":      finding.Status,
 	}

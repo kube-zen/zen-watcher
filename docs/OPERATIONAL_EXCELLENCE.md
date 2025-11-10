@@ -32,7 +32,6 @@ livenessProbe:
   "service": "zen-watcher",
   "version": "1.0.0",
   "mode": "independent",
-  "cluster_id": "my-cluster",
   "timestamp": "2024-11-04T10:00:00Z"
 }
 ```

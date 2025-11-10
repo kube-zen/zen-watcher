@@ -54,7 +54,6 @@ See `../dashboards/zen-watcher-dashboard.json`
 helm install zen-watcher ../charts/zen-watcher \
   --namespace zen-system \
   --create-namespace \
-  --set global.clusterID=my-cluster \
   --set serviceMonitor.enabled=true
 
 # 2. Deploy alerts

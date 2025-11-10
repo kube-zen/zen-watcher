@@ -22,7 +22,6 @@ Get Zen Watcher up and running in 5 minutes!
 helm install zen-watcher ./charts/zen-watcher \
   --namespace zen-system \
   --create-namespace \
-  --set global.clusterID=my-cluster
 
 # Verify
 kubectl get pods -n zen-system

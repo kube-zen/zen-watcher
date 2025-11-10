@@ -19,16 +19,12 @@ import (
 type CRDWriter struct {
 	zenClient *types.ZenClient
 	namespace string
-	clusterID string
 }
 
 // NewCRDWriter creates a new CRD writer
-func NewCRDWriter(zenClient *types.ZenClient, namespace, clusterID string) *CRDWriter {
-	// Note: clusterID is ignored - zen-watcher is cluster-agnostic
 	return &CRDWriter{
 		zenClient: zenClient,
 		namespace: namespace,
-		clusterID: "", // Always empty - we're independent
 	}
 }
 
@@ -158,7 +154,6 @@ func (cw *CRDWriter) writeSecurityEvent(ctx context.Context, event models.Securi
 
 	// Build metadata for observability
 	metadata := make(map[string]string)
-	metadata["cluster_id"] = cw.clusterID
 	metadata["event_id"] = event.ID
 	metadata["source"] = source
 	metadata["category"] = category
@@ -199,7 +194,6 @@ func (cw *CRDWriter) writeSecurityEvent(ctx context.Context, event models.Securi
 				"severity":   strings.ToLower(event.Severity),
 			},
 			Annotations: map[string]string{
-				"zen.kube-zen.com/cluster-id": cw.clusterID,
 				"zen.kube-zen.com/event-id":   event.ID,
 			},
 		},

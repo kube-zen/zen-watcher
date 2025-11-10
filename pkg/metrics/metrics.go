@@ -116,7 +116,6 @@ var (
 			Name: "zen_watcher_build_info",
 			Help: "Build information",
 		},
-		[]string{"version", "cluster_id", "mode"},
 	)
 
 	// Health metrics
@@ -189,8 +188,6 @@ var (
 )
 
 // SetBuildInfo sets the build information metric
-func SetBuildInfo(version, clusterID, mode string) {
-	BuildInfo.WithLabelValues(version, clusterID, mode).Set(1)
 }
 
 // SetHealthStatus sets the health status metric

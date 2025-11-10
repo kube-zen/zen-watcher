@@ -222,7 +222,6 @@ The Zen Watcher dashboard provides comprehensive visibility into your security a
 
 ### cluster
 **Type**: Query variable  
-**Query**: `label_values(zen_watcher_build_info, cluster_id)`  
 **Multi-select**: No  
 **Include All**: Yes
 
@@ -277,7 +276,6 @@ The Zen Watcher dashboard provides comprehensive visibility into your security a
 2. Select visualization type
 3. Add query:
    ```promql
-   your_custom_metric{cluster_id="$cluster"}
    ```
 4. Configure legend, colors, thresholds
 5. Save dashboard

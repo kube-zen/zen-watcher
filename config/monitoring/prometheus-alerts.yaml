@@ -20,7 +20,6 @@ spec:
         component: zen-watcher
       annotations:
         summary: "Zen Watcher is unhealthy"
-        description: "Zen Watcher health check has failed for more than 2 minutes. Cluster: {{ $labels.cluster_id }}"
         runbook_url: "https://github.com/your-org/zen-watcher/wiki/Runbook-ZenWatcherDown"
     
     - alert: ZenWatcherNotReady
@@ -31,7 +30,6 @@ spec:
         component: zen-watcher
       annotations:
         summary: "Zen Watcher is not ready"
-        description: "Zen Watcher readiness probe has been failing for 5 minutes. Cluster: {{ $labels.cluster_id }}"
     
     - alert: ZenWatcherHighMemoryUsage
       expr: process_resident_memory_bytes{job="zen-watcher"} / 1024 / 1024 > 512
@@ -41,7 +39,6 @@ spec:
         component: zen-watcher
       annotations:
         summary: "Zen Watcher high memory usage"
-        description: "Zen Watcher is using {{ $value }}MB of memory (threshold: 512MB). Cluster: {{ $labels.cluster_id }}"
     
     - alert: ZenWatcherHighCPUUsage
       expr: rate(process_cpu_seconds_total{job="zen-watcher"}[5m]) > 0.9
@@ -51,7 +48,6 @@ spec:
         component: zen-watcher
       annotations:
         summary: "Zen Watcher high CPU usage"
-        description: "Zen Watcher CPU usage is at {{ $value | humanizePercentage }}. Cluster: {{ $labels.cluster_id }}"
     
     - alert: ZenWatcherTooManyGoroutines
       expr: zen_watcher_goroutines > 1000
@@ -61,7 +57,6 @@ spec:
         component: zen-watcher
       annotations:
         summary: "Zen Watcher has too many goroutines"
-        description: "Zen Watcher has {{ $value }} goroutines, possible goroutine leak. Cluster: {{ $labels.cluster_id }}"
 
   - name: zen-watcher-events
     interval: 30s
@@ -75,7 +70,6 @@ spec:
         category: events
       annotations:
         summary: "High rate of critical security events"
-        description: "Detecting {{ $value }} critical events per second. Source: {{ $labels.source }}. Cluster: {{ $labels.cluster_id }}"
         runbook_url: "https://github.com/your-org/zen-watcher/wiki/Runbook-HighCriticalEventRate"
     
     - alert: TooManyCriticalEvents
@@ -87,7 +81,6 @@ spec:
         category: events
       annotations:
         summary: "Too many unresolved critical events"
-        description: "There are {{ $value }} active critical events. Immediate attention required. Cluster: {{ $labels.cluster_id }}"
     
     - alert: TooManyHighSeverityEvents
       expr: sum(zen_watcher_active_events{severity="HIGH"}) > 500
@@ -98,7 +91,6 @@ spec:
         category: events
       annotations:
         summary: "Too many high severity events"
-        description: "There are {{ $value }} active high severity events. Review required. Cluster: {{ $labels.cluster_id }}"
     
     - alert: EventWriteFailures
       expr: rate(zen_watcher_events_failures_total[5m]) > 1
@@ -109,7 +101,6 @@ spec:
         category: events
       annotations:
         summary: "High rate of event write failures"
-        description: "Failing to write events at {{ $value }}/sec. Source: {{ $labels.source }}, Reason: {{ $labels.reason }}. Cluster: {{ $labels.cluster_id }}"
 
   - name: zen-watcher-watchers
     interval: 30s
@@ -123,7 +114,6 @@ spec:
         category: watchers
       annotations:
         summary: "Watcher is disabled"
-        description: "Watcher {{ $labels.watcher }} is disabled. This may be intentional. Cluster: {{ $labels.cluster_id }}"
     
     - alert: WatcherErrors
       expr: rate(zen_watcher_watcher_errors_total[5m]) > 0.1
@@ -134,7 +124,6 @@ spec:
         category: watchers
       annotations:
         summary: "Watcher experiencing errors"
-        description: "Watcher {{ $labels.watcher }} is experiencing {{ $value }} errors/sec. Error type: {{ $labels.error_type }}. Cluster: {{ $labels.cluster_id }}"
     
     - alert: SlowWatcherScrape
       expr: histogram_quantile(0.95, sum(rate(zen_watcher_scrape_duration_seconds_bucket[5m])) by (le, watcher)) > 30
@@ -145,7 +134,6 @@ spec:
         category: performance
       annotations:
         summary: "Watcher scrape is slow"
-        description: "Watcher {{ $labels.watcher }} p95 scrape duration is {{ $value }}s (threshold: 30s). Cluster: {{ $labels.cluster_id }}"
 
   - name: zen-watcher-operations
     interval: 30s
@@ -159,7 +147,6 @@ spec:
         category: operations
       annotations:
         summary: "High CRD operation failure rate"
-        description: "{{ $value | humanizePercentage }} of CRD operations are failing. Operation: {{ $labels.operation }}. Cluster: {{ $labels.cluster_id }}"
         runbook_url: "https://github.com/your-org/zen-watcher/wiki/Runbook-CRDOperationFailures"
     
     - alert: SlowCRDOperations
@@ -171,7 +158,6 @@ spec:
         category: performance
       annotations:
         summary: "CRD operations are slow"
-        description: "CRD operation {{ $labels.operation }} p95 latency is {{ $value }}s (threshold: 5s). Cluster: {{ $labels.cluster_id }}"
     
     - alert: HTTPErrorRate
       expr: rate(zen_watcher_http_requests_total{status=~"5.."}[5m]) > 0.1
@@ -182,7 +168,6 @@ spec:
         category: operations
       annotations:
         summary: "High HTTP error rate"
-        description: "HTTP endpoint {{ $labels.endpoint }} experiencing {{ $value }} errors/sec. Cluster: {{ $labels.cluster_id }}"
     
     - alert: SlowHTTPRequests
       expr: histogram_quantile(0.95, sum(rate(zen_watcher_http_request_duration_seconds_bucket[5m])) by (le, endpoint)) > 1
@@ -193,7 +178,6 @@ spec:
         category: performance
       annotations:
         summary: "Slow HTTP requests"
-        description: "HTTP endpoint {{ $labels.endpoint }} p95 latency is {{ $value }}s. Cluster: {{ $labels.cluster_id }}"
 
   - name: zen-watcher-kubernetes
     interval: 30s
@@ -207,7 +191,6 @@ spec:
         category: kubernetes
       annotations:
         summary: "Kubernetes API errors"
-        description: "Experiencing {{ $value }} Kubernetes API errors/sec. Resource: {{ $labels.resource }}. Cluster: {{ $labels.cluster_id }}"
     
     - alert: SlowKubernetesAPIRequests
       expr: histogram_quantile(0.95, sum(rate(zen_watcher_k8s_api_request_duration_seconds_bucket[5m])) by (le, resource)) > 10
@@ -218,7 +201,6 @@ spec:
         category: performance
       annotations:
         summary: "Slow Kubernetes API requests"
-        description: "Kubernetes API requests for {{ $labels.resource }} are slow: {{ $value }}s p95 latency. Cluster: {{ $labels.cluster_id }}"
 
   - name: zen-watcher-slo
     interval: 1m
@@ -237,7 +219,6 @@ spec:
         category: slo
       annotations:
         summary: "Event processing SLO violation"
-        description: "99th percentile event processing duration is {{ $value }}s (SLO: 5s). Cluster: {{ $labels.cluster_id }}"
     
     # Availability SLO: 99.9% uptime
     - alert: AvailabilitySLOViolation
@@ -254,6 +235,5 @@ spec:
         category: slo
       annotations:
         summary: "Availability SLO violation"
-        description: "Zen Watcher availability is {{ $value | humanizePercentage }} (SLO: 99.9%). Cluster: {{ $labels.cluster_id }}"
 
 
