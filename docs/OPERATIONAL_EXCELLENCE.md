@@ -293,7 +293,7 @@ affinity:
 
 ## Backup and Recovery ✅
 
-### Backup ZenEvent CRDs
+### Backup ZenAgentEvent CRDs
 
 ```bash
 # Export all events
@@ -508,7 +508,7 @@ kubectl get zenevents -n zen-system -o json | \
 
 ```bash
 # Estimate CRD storage
-# Average ZenEvent size: ~2-5KB
+# Average ZenAgentEvent size: ~2-5KB
 # 10,000 events = ~50MB in etcd
 
 # Check etcd size
@@ -626,7 +626,7 @@ strategy:
 
 **What to Backup**:
 1. ✅ CRD definitions
-2. ✅ ZenEvent resources
+2. ✅ ZenAgentEvent resources
 3. ✅ Helm values
 4. ✅ Configuration
 

@@ -33,7 +33,7 @@ Provide a **central event aggregation hub** for Kubernetes clusters that:
 
 **Components**:
 1. **Watchers** - Monitor security tools (Trivy, Falco, Kyverno, Audit, Kube-bench)
-2. **CRD Writer** - Converts events to ZenEvent CRDs
+2. **CRD Writer** - Converts events to ZenAgentEvent CRDs
 3. **Metrics Exporter** - Exposes Prometheus metrics
 4. **API Server** - Health checks and status endpoints
 
@@ -41,7 +41,7 @@ Provide a **central event aggregation hub** for Kubernetes clusters that:
 
 ## 📦 Key Components
 
-### ZenEvent CRD
+### ZenAgentEvent CRD
 
 The core data model - stores all events as Kubernetes resources:
 

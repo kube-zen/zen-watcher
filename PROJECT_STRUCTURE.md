@@ -122,7 +122,7 @@ zen-watcher/
 ### `/pkg/types`
 **Purpose**: CRD type definitions and client
 
-- ZenEvent CRD types
+- ZenAgentEvent CRD types
 - CRD client implementation
 - Type constants
 - **Note**: For simple projects like this, types belong in pkg/ not a separate api/ directory
