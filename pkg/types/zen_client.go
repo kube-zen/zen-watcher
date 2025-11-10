@@ -44,7 +44,7 @@ func (c *ZenClient) CreateZenEvent(ctx context.Context, event *ZenEvent) (*ZenEv
 	}
 
 	// Create the resource
-	created, err := c.dynamicClient.Resource(c.eventGVR).Namespace(event.Namespace).Create(ctx, &unstructured.Unstructured{Object: unstructuredObj}, metav1."CreateOptions{})
+	created, err := c.dynamicClient.Resource(c.eventGVR).Namespace(event.Namespace).Create(ctx, &unstructured.Unstructured{Object: unstructuredObj}, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ZenEvent: %v", err)
 	}
@@ -61,7 +61,7 @@ func (c *ZenClient) CreateZenEvent(ctx context.Context, event *ZenEvent) (*ZenEv
 
 // GetZenEvent retrieves a ZenEvent by name
 func (c *ZenClient) GetZenEvent(ctx context.Context, name, namespace string) (*ZenEvent, error) {
-	obj, err := c.dynamicClient.Resource(c.eventGVR).Namespace(namespace).Get(ctx, name, metav1."GetOptions{})
+	obj, err := c.dynamicClient.Resource(c.eventGVR).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +77,7 @@ func (c *ZenClient) GetZenEvent(ctx context.Context, name, namespace string) (*Z
 
 // ListZenEvents lists all ZenEvents in a namespace
 func (c *ZenClient) ListZenEvents(ctx context.Context, namespace string) (*ZenEventList, error) {
-	list, err := c.dynamicClient.Resource(c.eventGVR).Namespace(namespace).List(ctx, metav1."ListOptions{})
+	list, err := c.dynamicClient.Resource(c.eventGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return nil, err
 	}
@@ -134,6 +134,6 @@ func (c *ZenClient) DeleteZenEvent(ctx context.Context, name, namespace string) 
 }
 
 // WatchZenEvents watches for changes to ZenEvents
-func (c *ZenClient) WatchZenEvents(ctx context.Context, namespace string, options metav1."ListOptions) (watch.Interface, error) {
+func (c *ZenClient) WatchZenEvents(ctx context.Context, namespace string, options metav1.ListOptions) (watch.Interface, error) {
 	return c.dynamicClient.Resource(c.eventGVR).Namespace(namespace).Watch(ctx, options)
 }
