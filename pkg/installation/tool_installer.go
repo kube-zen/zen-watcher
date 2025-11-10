@@ -54,7 +54,7 @@ func (ti *ToolInstaller) InstallTrivy() (*InstallationResult, error) {
 	}
 
 	// Check if Trivy is already installed
-	_, err := ti.clientSet.CoreV1().Namespaces().Get(context.TODO(), "trivy", metav1."GetOptions{})
+	_, err := ti.clientSet.CoreV1().Namespaces().Get(context.TODO(), "trivy", metav1.GetOptions{})
 	if err == nil {
 		result.Success = false
 		result.Message = "Trivy is already installed"
@@ -117,7 +117,7 @@ func (ti *ToolInstaller) InstallTrivy() (*InstallationResult, error) {
 // createTrivyNamespace creates the Trivy namespace
 func (ti *ToolInstaller) createTrivyNamespace() error {
 	namespace := &corev1."Namespace{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "trivy",
 			Labels: map[string]string{
 				"app.kubernetes.io/name":     "trivy",
@@ -127,7 +127,7 @@ func (ti *ToolInstaller) createTrivyNamespace() error {
 		},
 	}
 
-	_, err := ti.clientSet.CoreV1().Namespaces().Create(context.TODO(), namespace, metav1."CreateOptions{})
+	_, err := ti.clientSet.CoreV1().Namespaces().Create(context.TODO(), namespace, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create namespace: %w", err)
 	}
@@ -142,7 +142,7 @@ func (ti *ToolInstaller) installTrivyOperator() error {
 	// In production, you would use Helm or apply the official Trivy operator manifests
 
 	deployment := &appsv1."Deployment{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "trivy-operator",
 			Namespace: "trivy",
 			Labels: map[string]string{
@@ -153,14 +153,14 @@ func (ti *ToolInstaller) installTrivyOperator() error {
 		},
 		Spec: appsv1."DeploymentSpec{
 			Replicas: int32Ptr(1),
-			Selector: &metav1."LabelSelector{
+			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app.kubernetes.io/name":     "trivy-operator",
 					"app.kubernetes.io/instance": "trivy",
 				},
 			},
 			Template: corev1."PodTemplateSpec{
-				ObjectMeta: metav1."ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app.kubernetes.io/name":     "trivy-operator",
 						"app.kubernetes.io/instance": "trivy",
@@ -201,7 +201,7 @@ func (ti *ToolInstaller) installTrivyOperator() error {
 		},
 	}
 
-	_, err := ti.clientSet.AppsV1().Deployments("trivy").Create(context.TODO(), deployment, metav1."CreateOptions{})
+	_, err := ti.clientSet.AppsV1().Deployments("trivy").Create(context.TODO(), deployment, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create operator deployment: %w", err)
 	}
@@ -214,7 +214,7 @@ func (ti *ToolInstaller) installTrivyOperator() error {
 func (ti *ToolInstaller) installTrivyScanner() error {
 	// Create Trivy scanner daemonset
 	daemonset := &appsv1."DaemonSet{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "trivy-scanner",
 			Namespace: "trivy",
 			Labels: map[string]string{
@@ -224,14 +224,14 @@ func (ti *ToolInstaller) installTrivyScanner() error {
 			},
 		},
 		Spec: appsv1."DaemonSetSpec{
-			Selector: &metav1."LabelSelector{
+			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app.kubernetes.io/name":     "trivy-scanner",
 					"app.kubernetes.io/instance": "trivy",
 				},
 			},
 			Template: corev1."PodTemplateSpec{
-				ObjectMeta: metav1."ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app.kubernetes.io/name":     "trivy-scanner",
 						"app.kubernetes.io/instance": "trivy",
@@ -272,7 +272,7 @@ func (ti *ToolInstaller) installTrivyScanner() error {
 		},
 	}
 
-	_, err := ti.clientSet.AppsV1().DaemonSets("trivy").Create(context.TODO(), daemonset, metav1."CreateOptions{})
+	_, err := ti.clientSet.AppsV1().DaemonSets("trivy").Create(context.TODO(), daemonset, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create scanner daemonset: %w", err)
 	}
@@ -295,7 +295,7 @@ func (ti *ToolInstaller) verifyTrivyInstallation() error {
 			return fmt.Errorf("timeout waiting for Trivy to be ready")
 		case <-ticker.C:
 			// Check operator deployment
-			deployment, err := ti.clientSet.AppsV1().Deployments("trivy").Get(context.TODO(), "trivy-operator", metav1."GetOptions{})
+			deployment, err := ti.clientSet.AppsV1().Deployments("trivy").Get(context.TODO(), "trivy-operator", metav1.GetOptions{})
 			if err != nil {
 				continue
 			}
@@ -312,7 +312,7 @@ func (ti *ToolInstaller) verifyTrivyInstallation() error {
 	}
 
 	// Check daemonset
-	daemonset, err := ti.clientSet.AppsV1().DaemonSets("trivy").Get(context.TODO(), "trivy-scanner", metav1."GetOptions{})
+	daemonset, err := ti.clientSet.AppsV1().DaemonSets("trivy").Get(context.TODO(), "trivy-scanner", metav1.GetOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to verify scanner daemonset: %w", err)
 	}
@@ -338,7 +338,7 @@ func (ti *ToolInstaller) InstallFalco() (*InstallationResult, error) {
 	}
 
 	// Check if Falco is already installed
-	_, err := ti.clientSet.CoreV1().Namespaces().Get(context.TODO(), "falco", metav1."GetOptions{})
+	_, err := ti.clientSet.CoreV1().Namespaces().Get(context.TODO(), "falco", metav1.GetOptions{})
 	if err == nil {
 		result.Success = false
 		result.Message = "Falco is already installed"
@@ -401,7 +401,7 @@ func (ti *ToolInstaller) InstallFalco() (*InstallationResult, error) {
 // createFalcoNamespace creates the Falco namespace
 func (ti *ToolInstaller) createFalcoNamespace() error {
 	namespace := &corev1."Namespace{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "falco",
 			Labels: map[string]string{
 				"app.kubernetes.io/name":     "falco",
@@ -411,7 +411,7 @@ func (ti *ToolInstaller) createFalcoNamespace() error {
 		},
 	}
 
-	_, err := ti.clientSet.CoreV1().Namespaces().Create(context.TODO(), namespace, metav1."CreateOptions{})
+	_, err := ti.clientSet.CoreV1().Namespaces().Create(context.TODO(), namespace, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create namespace: %w", err)
 	}
@@ -423,7 +423,7 @@ func (ti *ToolInstaller) createFalcoNamespace() error {
 // installFalcoDaemonset installs the Falco daemonset
 func (ti *ToolInstaller) installFalcoDaemonset() error {
 	daemonset := &appsv1."DaemonSet{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "falco",
 			Namespace: "falco",
 			Labels: map[string]string{
@@ -433,14 +433,14 @@ func (ti *ToolInstaller) installFalcoDaemonset() error {
 			},
 		},
 		Spec: appsv1."DaemonSetSpec{
-			Selector: &metav1."LabelSelector{
+			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app.kubernetes.io/name":     "falco",
 					"app.kubernetes.io/instance": "falco",
 				},
 			},
 			Template: corev1."PodTemplateSpec{
-				ObjectMeta: metav1."ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app.kubernetes.io/name":     "falco",
 						"app.kubernetes.io/instance": "falco",
@@ -527,7 +527,7 @@ func (ti *ToolInstaller) installFalcoDaemonset() error {
 		},
 	}
 
-	_, err := ti.clientSet.AppsV1().DaemonSets("falco").Create(context.TODO(), daemonset, metav1."CreateOptions{})
+	_, err := ti.clientSet.AppsV1().DaemonSets("falco").Create(context.TODO(), daemonset, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create daemonset: %w", err)
 	}
@@ -539,7 +539,7 @@ func (ti *ToolInstaller) installFalcoDaemonset() error {
 // installFalcoConfigMap installs the Falco ConfigMap
 func (ti *ToolInstaller) installFalcoConfigMap() error {
 	configMap := &corev1."ConfigMap{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "falco-config",
 			Namespace: "falco",
 			Labels: map[string]string{
@@ -565,7 +565,7 @@ http_output:
 		},
 	}
 
-	_, err := ti.clientSet.CoreV1().ConfigMaps("falco").Create(context.TODO(), configMap, metav1."CreateOptions{})
+	_, err := ti.clientSet.CoreV1().ConfigMaps("falco").Create(context.TODO(), configMap, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create ConfigMap: %w", err)
 	}
@@ -587,7 +587,7 @@ func (ti *ToolInstaller) verifyFalcoInstallation() error {
 			return fmt.Errorf("timeout waiting for Falco to be ready")
 		case <-ticker.C:
 			// Check daemonset
-			daemonset, err := ti.clientSet.AppsV1().DaemonSets("falco").Get(context.TODO(), "falco", metav1."GetOptions{})
+			daemonset, err := ti.clientSet.AppsV1().DaemonSets("falco").Get(context.TODO(), "falco", metav1.GetOptions{})
 			if err != nil {
 				continue
 			}
@@ -716,7 +716,7 @@ func (ti *ToolInstaller) InstallKubernetesAudit() (*InstallationResult, error) {
 // createAuditPolicyConfigMap creates the audit policy ConfigMap
 func (ti *ToolInstaller) createAuditPolicyConfigMap() error {
 	configMap := &corev1."ConfigMap{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "audit-policy",
 			Namespace: "kube-system",
 			Labels: map[string]string{
@@ -783,7 +783,7 @@ rules:
 		},
 	}
 
-	_, err := ti.clientSet.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), configMap, metav1."CreateOptions{})
+	_, err := ti.clientSet.CoreV1().ConfigMaps("kube-system").Create(context.TODO(), configMap, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create audit policy ConfigMap: %w", err)
 	}
@@ -795,7 +795,7 @@ rules:
 // createAuditWebhookService creates the audit webhook service
 func (ti *ToolInstaller) createAuditWebhookService() error {
 	service := &corev1."Service{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "audit-webhook",
 			Namespace: "kube-system",
 			Labels: map[string]string{
@@ -820,7 +820,7 @@ func (ti *ToolInstaller) createAuditWebhookService() error {
 		},
 	}
 
-	_, err := ti.clientSet.CoreV1().Services("kube-system").Create(context.TODO(), service, metav1."CreateOptions{})
+	_, err := ti.clientSet.CoreV1().Services("kube-system").Create(context.TODO(), service, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create audit webhook service: %w", err)
 	}
@@ -832,7 +832,7 @@ func (ti *ToolInstaller) createAuditWebhookService() error {
 // createAuditWebhookDeployment creates the audit webhook deployment
 func (ti *ToolInstaller) createAuditWebhookDeployment() error {
 	deployment := &appsv1."Deployment{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "audit-webhook",
 			Namespace: "kube-system",
 			Labels: map[string]string{
@@ -843,14 +843,14 @@ func (ti *ToolInstaller) createAuditWebhookDeployment() error {
 		},
 		Spec: appsv1."DeploymentSpec{
 			Replicas: int32Ptr(1),
-			Selector: &metav1."LabelSelector{
+			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{
 					"app.kubernetes.io/name":     "audit-webhook",
 					"app.kubernetes.io/instance": "kubernetes-audit",
 				},
 			},
 			Template: corev1."PodTemplateSpec{
-				ObjectMeta: metav1."ObjectMeta{
+				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
 						"app.kubernetes.io/name":     "audit-webhook",
 						"app.kubernetes.io/instance": "kubernetes-audit",
@@ -899,7 +899,7 @@ func (ti *ToolInstaller) createAuditWebhookDeployment() error {
 		},
 	}
 
-	_, err := ti.clientSet.AppsV1().Deployments("kube-system").Create(context.TODO(), deployment, metav1."CreateOptions{})
+	_, err := ti.clientSet.AppsV1().Deployments("kube-system").Create(context.TODO(), deployment, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create audit webhook deployment: %w", err)
 	}
@@ -912,7 +912,7 @@ func (ti *ToolInstaller) createAuditWebhookDeployment() error {
 func (ti *ToolInstaller) createAuditLogVolume() error {
 	// Create a PersistentVolume for audit logs
 	pv := &corev1."PersistentVolume{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "audit-logs-pv",
 			Labels: map[string]string{
 				"app.kubernetes.io/name":     "audit-logs",
@@ -935,14 +935,14 @@ func (ti *ToolInstaller) createAuditLogVolume() error {
 		},
 	}
 
-	_, err := ti.clientSet.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1."CreateOptions{})
+	_, err := ti.clientSet.CoreV1().PersistentVolumes().Create(context.TODO(), pv, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create audit log persistent volume: %w", err)
 	}
 
 	// Create a PersistentVolumeClaim
 	pvc := &corev1."PersistentVolumeClaim{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      "audit-logs-pvc",
 			Namespace: "kube-system",
 			Labels: map[string]string{
@@ -964,7 +964,7 @@ func (ti *ToolInstaller) createAuditLogVolume() error {
 		},
 	}
 
-	_, err = ti.clientSet.CoreV1().PersistentVolumeClaims("kube-system").Create(context.TODO(), pvc, metav1."CreateOptions{})
+	_, err = ti.clientSet.CoreV1().PersistentVolumeClaims("kube-system").Create(context.TODO(), pvc, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create audit log persistent volume claim: %w", err)
 	}
@@ -986,7 +986,7 @@ func (ti *ToolInstaller) verifyAuditConfiguration() error {
 			return fmt.Errorf("timeout waiting for audit webhook to be ready")
 		case <-ticker.C:
 			// Check deployment
-			deployment, err := ti.clientSet.AppsV1().Deployments("kube-system").Get(context.TODO(), "audit-webhook", metav1."GetOptions{})
+			deployment, err := ti.clientSet.AppsV1().Deployments("kube-system").Get(context.TODO(), "audit-webhook", metav1.GetOptions{})
 			if err != nil {
 				continue
 			}

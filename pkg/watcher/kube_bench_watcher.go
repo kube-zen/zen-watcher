@@ -115,7 +115,7 @@ func (kbw *KubeBenchWatcher) runKubeBenchScan(ctx context.Context) error {
 	log.Println("🔍 Running kube-bench security scan...")
 
 	// Get cluster nodes
-	nodes, err := kbw.clientSet.CoreV1().Nodes().List(ctx, metav1."ListOptions{})
+	nodes, err := kbw.clientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list nodes: %w", err)
 	}
@@ -151,7 +151,7 @@ func (kbw *KubeBenchWatcher) scanNode(ctx context.Context, nodeName string) ([]K
 	job := kbw.createKubeBenchJob(nodeName)
 
 	// Create the job
-	createdJob, err := kbw.clientSet.BatchV1().Jobs(kbw.namespace).Create(ctx, job, metav1."CreateOptions{})
+	createdJob, err := kbw.clientSet.BatchV1().Jobs(kbw.namespace).Create(ctx, job, metav1.CreateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create kube-bench job: %w", err)
 	}
@@ -168,7 +168,7 @@ func (kbw *KubeBenchWatcher) scanNode(ctx context.Context, nodeName string) ([]K
 	}
 
 	// Clean up the job
-	if err := kbw.clientSet.BatchV1().Jobs(kbw.namespace).Delete(ctx, createdJob.Name, metav1."DeleteOptions{}); err != nil {
+	if err := kbw.clientSet.BatchV1().Jobs(kbw.namespace).Delete(ctx, createdJob.Name, metav1.DeleteOptions{}); err != nil {
 		log.Printf("⚠️ Failed to delete kube-bench job: %v", err)
 	}
 
@@ -178,7 +178,7 @@ func (kbw *KubeBenchWatcher) scanNode(ctx context.Context, nodeName string) ([]K
 // createKubeBenchJob creates a Kubernetes job to run kube-bench
 func (kbw *KubeBenchWatcher) createKubeBenchJob(nodeName string) *batchv1."Job {
 	return &batchv1."Job{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      fmt.Sprintf("kube-bench-%s-%d", nodeName, time.Now().Unix()),
 			Namespace: kbw.namespace,
 			Labels: map[string]string{
@@ -309,7 +309,7 @@ func (kbw *KubeBenchWatcher) waitForJobCompletion(ctx context.Context, jobName s
 	deadline := time.Now().Add(timeout)
 
 	for time.Now().Before(deadline) {
-		pod, err := kbw.clientSet.CoreV1().Pods(kbw.namespace).Get(ctx, jobName, metav1."GetOptions{})
+		pod, err := kbw.clientSet.CoreV1().Pods(kbw.namespace).Get(ctx, jobName, metav1.GetOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to get pod: %w", err)
 		}

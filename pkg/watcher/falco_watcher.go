@@ -39,7 +39,7 @@ func NewFalcoWatcher(clientSet *kubernetes.Clientset, namespace string, actionHa
 // WatchFalcoPods watches for Falco pods and their security events
 func (fw *FalcoWatcher) WatchFalcoPods(ctx context.Context) error {
 	// List all pods in the Falco namespace first
-	allPods, err := fw.clientSet.CoreV1().Pods(fw.namespace).List(ctx, metav1."ListOptions{})
+	allPods, err := fw.clientSet.CoreV1().Pods(fw.namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list pods in namespace %s: %v", fw.namespace, err)
 	}

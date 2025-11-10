@@ -62,7 +62,7 @@ func (aw *AuditWatcher) WatchAuditLogs(ctx context.Context) error {
 // watchAPIServerLogs watches API server logs for security-relevant events
 func (aw *AuditWatcher) watchAPIServerLogs(ctx context.Context) error {
 	// Get API server pods
-	pods, err := aw.clientSet.CoreV1().Pods("kube-system").List(ctx, metav1."ListOptions{
+	pods, err := aw.clientSet.CoreV1().Pods("kube-system").List(ctx, metav1.ListOptions{
 		LabelSelector: "component=kube-apiserver",
 	})
 	if err != nil {

@@ -95,7 +95,7 @@ func (kw *KyvernoWatcher) watchPolicyReports(ctx context.Context) {
 		Resource: "policyreports",
 	}
 
-	watcher, err := kw.dynamicClient.Resource(gvr).Watch(ctx, metav1."ListOptions{})
+	watcher, err := kw.dynamicClient.Resource(gvr).Watch(ctx, metav1.ListOptions{})
 	if err != nil {
 		log.Printf("❌ [KYVERNO-WATCHER] Failed to watch PolicyReports: %v", err)
 		return
@@ -128,7 +128,7 @@ func (kw *KyvernoWatcher) watchClusterPolicyReports(ctx context.Context) {
 		Resource: "clusterpolicyreports",
 	}
 
-	watcher, err := kw.dynamicClient.Resource(gvr).Watch(ctx, metav1."ListOptions{})
+	watcher, err := kw.dynamicClient.Resource(gvr).Watch(ctx, metav1.ListOptions{})
 	if err != nil {
 		log.Printf("❌ [KYVERNO-WATCHER] Failed to watch ClusterPolicyReports: %v", err)
 		return
@@ -162,7 +162,7 @@ func (kw *KyvernoWatcher) watchKyvernoPolicies(ctx context.Context) {
 		Resource: "clusterpolicies",
 	}
 
-	watcher, err := kw.dynamicClient.Resource(clusterPolicyGVR).Watch(ctx, metav1."ListOptions{})
+	watcher, err := kw.dynamicClient.Resource(clusterPolicyGVR).Watch(ctx, metav1.ListOptions{})
 	if err != nil {
 		log.Printf("❌ [KYVERNO-WATCHER] Failed to watch ClusterPolicies: %v", err)
 		return

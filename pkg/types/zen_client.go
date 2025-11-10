@@ -93,11 +93,11 @@ func (c *ZenClient) ListZenEvents(ctx context.Context, namespace string) (*ZenEv
 	}
 
 	return &ZenEventList{
-		TypeMeta: metav1."TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			APIVersion: "zen.kube-zen.com/v1",
 			Kind:       "ZenEventList",
 		},
-		ListMeta: metav1."ListMeta{
+		ListMeta: metav1.ListMeta{
 			ResourceVersion: list.GetResourceVersion(),
 		},
 		Items: events,
@@ -113,7 +113,7 @@ func (c *ZenClient) UpdateZenEvent(ctx context.Context, event *ZenEvent) (*ZenEv
 	}
 
 	// Update the resource
-	updated, err := c.dynamicClient.Resource(c.eventGVR).Namespace(event.Namespace).Update(ctx, &unstructured.Unstructured{Object: unstructuredObj}, metav1."UpdateOptions{})
+	updated, err := c.dynamicClient.Resource(c.eventGVR).Namespace(event.Namespace).Update(ctx, &unstructured.Unstructured{Object: unstructuredObj}, metav1.UpdateOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to update ZenEvent: %v", err)
 	}
@@ -130,7 +130,7 @@ func (c *ZenClient) UpdateZenEvent(ctx context.Context, event *ZenEvent) (*ZenEv
 
 // DeleteZenEvent deletes a ZenEvent
 func (c *ZenClient) DeleteZenEvent(ctx context.Context, name, namespace string) error {
-	return c.dynamicClient.Resource(c.eventGVR).Namespace(namespace).Delete(ctx, name, metav1."DeleteOptions{})
+	return c.dynamicClient.Resource(c.eventGVR).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 }
 
 // WatchZenEvents watches for changes to ZenEvents

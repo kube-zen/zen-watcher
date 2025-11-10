@@ -35,7 +35,7 @@ func NewTrivyWatcher(clientSet *kubernetes.Clientset, namespace string, actionHa
 // WatchPods watches for Trivy pods and their logs
 func (tw *TrivyWatcher) WatchPods(ctx context.Context) error {
 	// List all pods in the Trivy namespace first
-	allPods, err := tw.clientSet.CoreV1().Pods(tw.namespace).List(ctx, metav1."ListOptions{})
+	allPods, err := tw.clientSet.CoreV1().Pods(tw.namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to list pods in namespace %s: %v", tw.namespace, err)
 	}
@@ -70,7 +70,7 @@ func (tw *TrivyWatcher) WatchVulnerabilityReports(ctx context.Context) error {
 	fmt.Printf("🔍 Watching VulnerabilityReport resources in namespace %s\n", tw.namespace)
 
 	// List existing VulnerabilityReports using the Trivy operator API
-	reports, err := tw.clientSet.CoreV1().ConfigMaps(tw.namespace).List(ctx, metav1."ListOptions{
+	reports, err := tw.clientSet.CoreV1().ConfigMaps(tw.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: "trivy-operator.resource.kind=VulnerabilityReport",
 	})
 	if err != nil {
@@ -99,7 +99,7 @@ func (tw *TrivyWatcher) WatchTrivyResources(ctx context.Context) error {
 
 	// List VulnerabilityReports
 	fmt.Printf("📊 Checking VulnerabilityReports...\n")
-	vulnReports, err := tw.clientSet.CoreV1().ConfigMaps(tw.namespace).List(ctx, metav1."ListOptions{
+	vulnReports, err := tw.clientSet.CoreV1().ConfigMaps(tw.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: "trivy-operator.resource.kind=VulnerabilityReport",
 	})
 	if err != nil {
@@ -115,7 +115,7 @@ func (tw *TrivyWatcher) WatchTrivyResources(ctx context.Context) error {
 
 	// List ClusterVulnerabilityReports
 	fmt.Printf("📊 Checking ClusterVulnerabilityReports...\n")
-	clusterVulnReports, err := tw.clientSet.CoreV1().ConfigMaps(tw.namespace).List(ctx, metav1."ListOptions{
+	clusterVulnReports, err := tw.clientSet.CoreV1().ConfigMaps(tw.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: "trivy-operator.resource.kind=ClusterVulnerabilityReport",
 	})
 	if err != nil {
@@ -131,7 +131,7 @@ func (tw *TrivyWatcher) WatchTrivyResources(ctx context.Context) error {
 
 	// List ConfigAuditReports
 	fmt.Printf("📊 Checking ConfigAuditReports...\n")
-	configAuditReports, err := tw.clientSet.CoreV1().ConfigMaps(tw.namespace).List(ctx, metav1."ListOptions{
+	configAuditReports, err := tw.clientSet.CoreV1().ConfigMaps(tw.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: "trivy-operator.resource.kind=ConfigAuditReport",
 	})
 	if err != nil {

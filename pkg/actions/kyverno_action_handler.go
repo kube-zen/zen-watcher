@@ -61,7 +61,7 @@ func (kah *KyvernoActionHandler) HandleKyvernoPolicyViolation(ctx context.Contex
 	}
 
 	configMap := &corev1."ConfigMap{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      configMapName,
 			Namespace: kah.namespace,
 			Labels: map[string]string{
@@ -81,7 +81,7 @@ func (kah *KyvernoActionHandler) HandleKyvernoPolicyViolation(ctx context.Contex
 		Data: configMapData,
 	}
 
-	_, err := kah.clientSet.CoreV1().ConfigMaps(kah.namespace).Create(ctx, configMap, metav1."CreateOptions{})
+	_, err := kah.clientSet.CoreV1().ConfigMaps(kah.namespace).Create(ctx, configMap, metav1.CreateOptions{})
 	if err != nil {
 		log.Printf("❌ [KYVERNO-ACTION] Failed to create ConfigMap for violation: %v", err)
 		return err
@@ -114,7 +114,7 @@ func (kah *KyvernoActionHandler) HandleKyvernoPolicyEvent(ctx context.Context, e
 	}
 
 	configMap := &corev1."ConfigMap{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      configMapName,
 			Namespace: kah.namespace,
 			Labels: map[string]string{
@@ -134,7 +134,7 @@ func (kah *KyvernoActionHandler) HandleKyvernoPolicyEvent(ctx context.Context, e
 		Data: configMapData,
 	}
 
-	_, err := kah.clientSet.CoreV1().ConfigMaps(kah.namespace).Create(ctx, configMap, metav1."CreateOptions{})
+	_, err := kah.clientSet.CoreV1().ConfigMaps(kah.namespace).Create(ctx, configMap, metav1.CreateOptions{})
 	if err != nil {
 		log.Printf("❌ [KYVERNO-ACTION] Failed to create ConfigMap for policy event: %v", err)
 		return err

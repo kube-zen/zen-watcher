@@ -69,7 +69,7 @@ func (td *ToolDetector) DetectTrivy() (*ToolStatus, error) {
 	var trivyNamespace string
 
 	for _, ns := range namespaces {
-		_, err := td.clientSet.CoreV1().Namespaces().Get(context.TODO(), ns, metav1."GetOptions{})
+		_, err := td.clientSet.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
 		if err == nil {
 			trivyNamespace = ns
 			break
@@ -88,7 +88,7 @@ func (td *ToolDetector) DetectTrivy() (*ToolStatus, error) {
 	log.Printf("✅ Found Trivy namespace: %s", trivyNamespace)
 
 	// Check for Trivy deployments
-	deployments, err := td.clientSet.AppsV1().Deployments(trivyNamespace).List(context.TODO(), metav1."ListOptions{})
+	deployments, err := td.clientSet.AppsV1().Deployments(trivyNamespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		status.Error = fmt.Sprintf("Failed to list deployments: %v", err)
 		return status, err
@@ -102,7 +102,7 @@ func (td *ToolDetector) DetectTrivy() (*ToolStatus, error) {
 	}
 
 	// Check for Trivy daemonsets
-	daemonsets, err := td.clientSet.AppsV1().DaemonSets(trivyNamespace).List(context.TODO(), metav1."ListOptions{})
+	daemonsets, err := td.clientSet.AppsV1().DaemonSets(trivyNamespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		status.Error = fmt.Sprintf("Failed to list daemonsets: %v", err)
 		return status, err
@@ -116,7 +116,7 @@ func (td *ToolDetector) DetectTrivy() (*ToolStatus, error) {
 	}
 
 	// Check for Trivy services
-	services, err := td.clientSet.CoreV1().Services(trivyNamespace).List(context.TODO(), metav1."ListOptions{})
+	services, err := td.clientSet.CoreV1().Services(trivyNamespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		status.Error = fmt.Sprintf("Failed to list services: %v", err)
 		return status, err
@@ -250,7 +250,7 @@ func (td *ToolDetector) detectTrivyCRDs() ([]string, error) {
 			Resource: "customresourcedefinitions",
 		}
 
-		_, err := td.dynamicClient.Resource(gvr).Get(context.TODO(), crdName, metav1."GetOptions{})
+		_, err := td.dynamicClient.Resource(gvr).Get(context.TODO(), crdName, metav1.GetOptions{})
 		if err == nil {
 			trivyCRDs = append(trivyCRDs, crdName)
 		}
@@ -304,7 +304,7 @@ func (td *ToolDetector) DetectFalco() (*ToolStatus, error) {
 	var falcoNamespace string
 
 	for _, ns := range namespaces {
-		_, err := td.clientSet.CoreV1().Namespaces().Get(context.TODO(), ns, metav1."GetOptions{})
+		_, err := td.clientSet.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
 		if err == nil {
 			falcoNamespace = ns
 			break
@@ -323,7 +323,7 @@ func (td *ToolDetector) DetectFalco() (*ToolStatus, error) {
 	log.Printf("✅ Found Falco namespace: %s", falcoNamespace)
 
 	// Check for Falco daemonsets
-	daemonsets, err := td.clientSet.AppsV1().DaemonSets(falcoNamespace).List(context.TODO(), metav1."ListOptions{})
+	daemonsets, err := td.clientSet.AppsV1().DaemonSets(falcoNamespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		status.Error = fmt.Sprintf("Failed to list daemonsets: %v", err)
 		return status, err
@@ -337,7 +337,7 @@ func (td *ToolDetector) DetectFalco() (*ToolStatus, error) {
 	}
 
 	// Check for Falco services
-	services, err := td.clientSet.CoreV1().Services(falcoNamespace).List(context.TODO(), metav1."ListOptions{})
+	services, err := td.clientSet.CoreV1().Services(falcoNamespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		status.Error = fmt.Sprintf("Failed to list services: %v", err)
 		return status, err
@@ -351,7 +351,7 @@ func (td *ToolDetector) DetectFalco() (*ToolStatus, error) {
 	}
 
 	// Check for Falco ConfigMaps
-	configmaps, err := td.clientSet.CoreV1().ConfigMaps(falcoNamespace).List(context.TODO(), metav1."ListOptions{})
+	configmaps, err := td.clientSet.CoreV1().ConfigMaps(falcoNamespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		status.Error = fmt.Sprintf("Failed to list configmaps: %v", err)
 		return status, err
@@ -464,7 +464,7 @@ func (td *ToolDetector) DetectKyverno() (*ToolStatus, error) {
 	var kyvernoNamespace string
 
 	for _, ns := range namespaces {
-		_, err := td.clientSet.CoreV1().Namespaces().Get(context.TODO(), ns, metav1."GetOptions{})
+		_, err := td.clientSet.CoreV1().Namespaces().Get(context.TODO(), ns, metav1.GetOptions{})
 		if err == nil {
 			kyvernoNamespace = ns
 			break
@@ -483,7 +483,7 @@ func (td *ToolDetector) DetectKyverno() (*ToolStatus, error) {
 	log.Printf("✅ Found Kyverno namespace: %s", kyvernoNamespace)
 
 	// Check for Kyverno deployments
-	deployments, err := td.clientSet.AppsV1().Deployments(kyvernoNamespace).List(context.TODO(), metav1."ListOptions{})
+	deployments, err := td.clientSet.AppsV1().Deployments(kyvernoNamespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		status.Error = fmt.Sprintf("Failed to list deployments: %v", err)
 		return status, err
@@ -497,7 +497,7 @@ func (td *ToolDetector) DetectKyverno() (*ToolStatus, error) {
 	}
 
 	// Check for Kyverno services
-	services, err := td.clientSet.CoreV1().Services(kyvernoNamespace).List(context.TODO(), metav1."ListOptions{})
+	services, err := td.clientSet.CoreV1().Services(kyvernoNamespace).List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		status.Error = fmt.Sprintf("Failed to list services: %v", err)
 		return status, err
@@ -612,7 +612,7 @@ func (td *ToolDetector) detectKyvernoCRDs() ([]string, error) {
 			Resource: "customresourcedefinitions",
 		}
 
-		_, err := td.dynamicClient.Resource(gvr).Get(context.TODO(), crdName, metav1."GetOptions{})
+		_, err := td.dynamicClient.Resource(gvr).Get(context.TODO(), crdName, metav1.GetOptions{})
 		if err == nil {
 			kyvernoCRDs = append(kyvernoCRDs, crdName)
 		}
@@ -649,7 +649,7 @@ func (td *ToolDetector) DetectKubeBench() (*ToolStatus, error) {
 	}
 
 	// Check for kube-bench jobs (kube-bench runs as jobs)
-	jobs, err := td.clientSet.BatchV1().Jobs("").List(context.TODO(), metav1."ListOptions{})
+	jobs, err := td.clientSet.BatchV1().Jobs("").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		status.Error = fmt.Sprintf("Failed to list jobs: %v", err)
 		return status, err
@@ -664,7 +664,7 @@ func (td *ToolDetector) DetectKubeBench() (*ToolStatus, error) {
 	}
 
 	// Check for kube-bench CronJobs
-	cronJobs, err := td.clientSet.BatchV1().CronJobs("").List(context.TODO(), metav1."ListOptions{})
+	cronJobs, err := td.clientSet.BatchV1().CronJobs("").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		log.Printf("⚠️ Failed to list cronjobs: %v", err)
 	} else {
@@ -840,7 +840,7 @@ func (td *ToolDetector) DetectKubernetesAudit() (*ToolStatus, error) {
 // checkAPIServerAuditConfig checks if API server has audit configuration
 func (td *ToolDetector) checkAPIServerAuditConfig() (*ComponentStatus, error) {
 	// Get API server pods
-	pods, err := td.clientSet.CoreV1().Pods("kube-system").List(context.TODO(), metav1."ListOptions{
+	pods, err := td.clientSet.CoreV1().Pods("kube-system").List(context.TODO(), metav1.ListOptions{
 		LabelSelector: "component=kube-apiserver",
 	})
 	if err != nil {
@@ -897,7 +897,7 @@ func (td *ToolDetector) checkAPIServerAuditConfig() (*ComponentStatus, error) {
 // checkAuditWebhookConfig checks for audit webhook configuration
 func (td *ToolDetector) checkAuditWebhookConfig() (*ComponentStatus, error) {
 	// Check for audit webhook services
-	services, err := td.clientSet.CoreV1().Services("").List(context.TODO(), metav1."ListOptions{})
+	services, err := td.clientSet.CoreV1().Services("").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list services: %v", err)
 	}
@@ -930,7 +930,7 @@ func (td *ToolDetector) checkAuditWebhookConfig() (*ComponentStatus, error) {
 // checkAuditPolicyConfig checks for audit policy configuration
 func (td *ToolDetector) checkAuditPolicyConfig() (*ComponentStatus, error) {
 	// Check for audit policy ConfigMaps
-	configmaps, err := td.clientSet.CoreV1().ConfigMaps("").List(context.TODO(), metav1."ListOptions{})
+	configmaps, err := td.clientSet.CoreV1().ConfigMaps("").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list configmaps: %v", err)
 	}
@@ -963,7 +963,7 @@ func (td *ToolDetector) checkAuditPolicyConfig() (*ComponentStatus, error) {
 // checkAuditLogConfig checks for audit log configuration
 func (td *ToolDetector) checkAuditLogConfig() (*ComponentStatus, error) {
 	// Check for audit log volumes or persistent volumes
-	pvs, err := td.clientSet.CoreV1().PersistentVolumes().List(context.TODO(), metav1."ListOptions{})
+	pvs, err := td.clientSet.CoreV1().PersistentVolumes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list persistent volumes: %v", err)
 	}
@@ -978,7 +978,7 @@ func (td *ToolDetector) checkAuditLogConfig() (*ComponentStatus, error) {
 	}
 
 	// Also check for audit-related ConfigMaps
-	configmaps, err := td.clientSet.CoreV1().ConfigMaps("").List(context.TODO(), metav1."ListOptions{})
+	configmaps, err := td.clientSet.CoreV1().ConfigMaps("").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("failed to list configmaps: %v", err)
 	}

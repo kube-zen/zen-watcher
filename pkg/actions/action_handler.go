@@ -32,7 +32,7 @@ func (h *ConfigMapActionHandler) HandleTrivyUpdate(ctx context.Context, logLine 
 	// Create a ConfigMap with Trivy event data
 	cmName := "trivy-event-" + fmt.Sprintf("%d", time.Now().Unix())
 	cm := &corev1."ConfigMap{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmName,
 			Namespace: h.namespace,
 			Labels: map[string]string{
@@ -57,7 +57,7 @@ event:
 		},
 	}
 
-	_, err := h.clientSet.CoreV1().ConfigMaps(h.namespace).Create(ctx, cm, metav1."CreateOptions{})
+	_, err := h.clientSet.CoreV1().ConfigMaps(h.namespace).Create(ctx, cm, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create Trivy ConfigMap %s: %v", cmName, err)
 	}
@@ -73,7 +73,7 @@ func (h *ConfigMapActionHandler) HandleFalcoUpdate(ctx context.Context, logLine 
 	// Create a ConfigMap with Falco event data
 	cmName := "falco-event-" + fmt.Sprintf("%d", time.Now().Unix())
 	cm := &corev1."ConfigMap{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmName,
 			Namespace: h.namespace,
 			Labels: map[string]string{
@@ -98,7 +98,7 @@ event:
 		},
 	}
 
-	_, err := h.clientSet.CoreV1().ConfigMaps(h.namespace).Create(ctx, cm, metav1."CreateOptions{})
+	_, err := h.clientSet.CoreV1().ConfigMaps(h.namespace).Create(ctx, cm, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create Falco ConfigMap %s: %v", cmName, err)
 	}
@@ -114,7 +114,7 @@ func (h *ConfigMapActionHandler) HandleAuditUpdate(ctx context.Context, logLine 
 	// Create a ConfigMap with Audit event data
 	cmName := "audit-event-" + fmt.Sprintf("%d", time.Now().Unix())
 	cm := &corev1."ConfigMap{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmName,
 			Namespace: h.namespace,
 			Labels: map[string]string{
@@ -139,7 +139,7 @@ event:
 		},
 	}
 
-	_, err := h.clientSet.CoreV1().ConfigMaps(h.namespace).Create(ctx, cm, metav1."CreateOptions{})
+	_, err := h.clientSet.CoreV1().ConfigMaps(h.namespace).Create(ctx, cm, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create Audit ConfigMap %s: %v", cmName, err)
 	}
@@ -155,7 +155,7 @@ func (h *ConfigMapActionHandler) HandleKyvernoPolicyViolation(ctx context.Contex
 	// Create a ConfigMap with Kyverno event data
 	cmName := "kyverno-violation-" + fmt.Sprintf("%d", time.Now().Unix())
 	cm := &corev1."ConfigMap{
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      cmName,
 			Namespace: h.namespace,
 			Labels: map[string]string{
@@ -184,7 +184,7 @@ event:
 		},
 	}
 
-	_, err := h.clientSet.CoreV1().ConfigMaps(h.namespace).Create(ctx, cm, metav1."CreateOptions{})
+	_, err := h.clientSet.CoreV1().ConfigMaps(h.namespace).Create(ctx, cm, metav1.CreateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to create Kyverno ConfigMap %s: %v", cmName, err)
 	}

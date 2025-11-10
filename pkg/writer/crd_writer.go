@@ -185,11 +185,11 @@ func (cw *CRDWriter) writeSecurityEvent(ctx context.Context, event models.Securi
 
 	// Create the ZenEvent CRD
 	zenEvent := &types.ZenEvent{
-		TypeMeta: metav1."TypeMeta{
+		TypeMeta: metav1.TypeMeta{
 			APIVersion: "zen.kube-zen.com/v1",
 			Kind:       "ZenEvent",
 		},
-		ObjectMeta: metav1."ObjectMeta{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: cw.namespace,
 			Labels: map[string]string{
