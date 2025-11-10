@@ -1,6 +1,6 @@
 module github.com/kube-zen/zen-watcher
 
-go 1.24
+go 1.23
 
 require (
 	k8s.io/api v0.30.0

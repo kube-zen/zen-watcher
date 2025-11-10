@@ -8,7 +8,7 @@ spec:
     kind: ZenAgentEvent
     listKind: ZenAgentEventList
     plural: zenagentevents
-    singular: zenagentev ent
+    singular: zenagentevent
     shortNames:
       - zaevent
       - zaevents
