@@ -11,7 +11,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -ldflags="-w -s" \
     -trimpath \
     -o zen-watcher \
-    ./cmd/watcher
+    ./cmd/zen-watcher
 
 # Final stage - distroless for minimal footprint
 FROM gcr.io/distroless/static:nonroot
