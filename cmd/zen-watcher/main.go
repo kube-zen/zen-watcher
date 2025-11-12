@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -21,12 +23,52 @@ import (
 
 func main() {
 	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	log.Println("🚀 zen-watcher v1.0.19 (Go 1.22, Apache 2.0)")
+	log.Println("🚀 zen-watcher v1.0.20 (Go 1.22, Apache 2.0)")
 	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	// Create cancellable context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	// Prometheus metrics
+	// Define metrics for monitoring zen-watcher performance and event processing
+	eventsTotal := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_events_total",
+			Help: "Total number of ZenAgentEvents created by source",
+		},
+		[]string{"source", "category", "severity"},
+	)
+	
+	toolsActive := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_tools_active",
+			Help: "Number of security tools currently detected (1=active, 0=inactive)",
+		},
+		[]string{"tool"},
+	)
+	
+	loopDuration := prometheus.NewHistogram(
+		prometheus.HistogramOpts{
+			Name:    "zen_watcher_loop_duration_seconds",
+			Help:    "Time taken to complete one watch loop iteration",
+			Buckets: prometheus.DefBuckets,
+		},
+	)
+	
+	webhookRequests := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_webhook_requests_total",
+			Help: "Total number of webhook requests received",
+		},
+		[]string{"endpoint", "status"},
+	)
+	
+	// Register metrics with Prometheus
+	prometheus.MustRegister(eventsTotal)
+	prometheus.MustRegister(toolsActive)
+	prometheus.MustRegister(loopDuration)
+	prometheus.MustRegister(webhookRequests)
 
 	// K8s client
 	// Initialize Kubernetes client using in-cluster configuration
@@ -140,7 +182,7 @@ func main() {
 	// Falco alerts channel (buffered for webhook)
 	// Buffer size of 100 allows handling burst traffic without blocking Falco
 	falcoAlertsChan := make(chan map[string]interface{}, 100)
-	
+
 	// Audit events channel (buffered for webhook)
 	// Larger buffer (200) for K8s audit events which can be high-volume
 	auditEventsChan := make(chan map[string]interface{}, 200)
@@ -151,24 +193,28 @@ func main() {
 	// Returns 200 OK if accepted, 503 if channel is full
 	http.HandleFunc("/falco/webhook", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
+			webhookRequests.WithLabelValues("falco", "405").Inc()
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-
+		
 		var alert map[string]interface{}
 		if err := json.NewDecoder(r.Body).Decode(&alert); err != nil {
 			log.Printf("⚠️  Failed to parse Falco alert: %v", err)
+			webhookRequests.WithLabelValues("falco", "400").Inc()
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-
+		
 		// Send to channel for processing
 		select {
 		case falcoAlertsChan <- alert:
+			webhookRequests.WithLabelValues("falco", "200").Inc()
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"status":"ok"}`))
 		default:
 			log.Println("⚠️  Falco alerts channel full, dropping alert")
+			webhookRequests.WithLabelValues("falco", "503").Inc()
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
 	})
@@ -180,24 +226,28 @@ func main() {
 	// Returns 200 OK if accepted, 503 if channel is full
 	http.HandleFunc("/audit/webhook", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
+			webhookRequests.WithLabelValues("audit", "405").Inc()
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-
+		
 		var auditEvent map[string]interface{}
 		if err := json.NewDecoder(r.Body).Decode(&auditEvent); err != nil {
 			log.Printf("⚠️  Failed to parse audit event: %v", err)
+			webhookRequests.WithLabelValues("audit", "400").Inc()
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-
+		
 		// Send to channel for processing
 		select {
 		case auditEventsChan <- auditEvent:
+			webhookRequests.WithLabelValues("audit", "200").Inc()
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"status":"ok"}`))
 		default:
 			log.Println("⚠️  Audit events channel full, dropping event")
+			webhookRequests.WithLabelValues("audit", "503").Inc()
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
 	})
@@ -217,12 +267,22 @@ func main() {
 			fmt.Fprintf(w, "not ready")
 		}
 	})
+	
+	// Prometheus metrics endpoint
+	http.Handle("/metrics", promhttp.Handler())
+	
 	go func() {
 		port := os.Getenv("WATCHER_PORT")
 		if port == "" {
 			port = "8080"
 		}
-		log.Printf("🌐 HTTP server starting on :%s", port)
+		log.Println("🌐 HTTP server starting on :8080")
+		log.Println("   Endpoints:")
+		log.Println("     - /health - Health check")
+		log.Println("     - /ready - Readiness probe")
+		log.Println("     - /metrics - Prometheus metrics")
+		log.Println("     - /falco/webhook - Falco alerts")
+		log.Println("     - /audit/webhook - Audit events")
 		if err := http.ListenAndServe(":"+port, nil); err != nil {
 			log.Fatalf("❌ HTTP server failed: %v", err)
 		}
