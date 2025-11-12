@@ -21,7 +21,7 @@ import (
 
 func main() {
 	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	log.Println("🚀 zen-watcher v1.0.18 (Go 1.22, Apache 2.0)")
+	log.Println("🚀 zen-watcher v1.0.19 (Go 1.22, Apache 2.0)")
 	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -135,6 +135,9 @@ func main() {
 
 	// Falco alerts channel (buffered for webhook)
 	falcoAlertsChan := make(chan map[string]interface{}, 100)
+	
+	// Audit events channel (buffered for webhook)
+	auditEventsChan := make(chan map[string]interface{}, 200)
 
 	// Falco webhook handler (receives JSON alerts from Falco)
 	http.HandleFunc("/falco/webhook", func(w http.ResponseWriter, r *http.Request) {
@@ -142,14 +145,14 @@ func main() {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-
+		
 		var alert map[string]interface{}
 		if err := json.NewDecoder(r.Body).Decode(&alert); err != nil {
 			log.Printf("⚠️  Failed to parse Falco alert: %v", err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-
+		
 		// Send to channel for processing
 		select {
 		case falcoAlertsChan <- alert:
@@ -157,6 +160,31 @@ func main() {
 			w.Write([]byte(`{"status":"ok"}`))
 		default:
 			log.Println("⚠️  Falco alerts channel full, dropping alert")
+			w.WriteHeader(http.StatusServiceUnavailable)
+		}
+	})
+	
+	// Audit webhook handler (receives K8s audit events)
+	http.HandleFunc("/audit/webhook", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		
+		var auditEvent map[string]interface{}
+		if err := json.NewDecoder(r.Body).Decode(&auditEvent); err != nil {
+			log.Printf("⚠️  Failed to parse audit event: %v", err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		
+		// Send to channel for processing
+		select {
+		case auditEventsChan <- auditEvent:
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"status":"ok"}`))
+		default:
+			log.Println("⚠️  Audit events channel full, dropping event")
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
 	})
@@ -965,9 +993,186 @@ func main() {
 				log.Println("  ℹ️  No Checkov ConfigMaps found (run checkov scan to generate reports)")
 			}
 
-			// 6. Audit logs - Check for audit policy violations (requires audit webhook)
-			log.Println("  → Checking Audit logs...")
-			log.Println("  ℹ️  Audit log integration requires K8s audit webhook configuration (not yet implemented)")
+			// 6. Audit logs - Process events from webhook
+			log.Println("  → Checking Audit events...")
+			
+			// Get existing ZenAgentEvents for deduplication
+			existingEvents, err := dynClient.Resource(eventGVR).Namespace("").List(ctx, metav1.ListOptions{
+				LabelSelector: "source=audit,category=compliance",
+			})
+			existingKeys := make(map[string]bool)
+			if err != nil {
+				log.Printf("  ⚠️  Cannot load existing events for dedup: %v", err)
+			} else {
+				for _, ev := range existingEvents.Items {
+					spec, _ := ev.Object["spec"].(map[string]interface{})
+					if spec != nil {
+						details, _ := spec["details"].(map[string]interface{})
+						if details != nil {
+							// Dedup by auditID
+							auditID := fmt.Sprintf("%v", details["auditID"])
+							existingKeys[auditID] = true
+						}
+					}
+				}
+			}
+			
+			// Process audit events from channel (non-blocking)
+			auditCount := 0
+			drainAuditLoop:
+			for {
+				select {
+				case auditEvent := <-auditEventsChan:
+					// Extract audit event fields
+					auditID := fmt.Sprintf("%v", auditEvent["auditID"])
+					stage := fmt.Sprintf("%v", auditEvent["stage"])
+					verb := fmt.Sprintf("%v", auditEvent["verb"])
+					
+					// Only process ResponseComplete stage
+					if stage != "ResponseComplete" {
+						continue
+					}
+					
+					// Filter for important actions: delete, create secrets/configmaps, RBAC changes
+					objectRef, _ := auditEvent["objectRef"].(map[string]interface{})
+					resource := fmt.Sprintf("%v", objectRef["resource"])
+					namespace := fmt.Sprintf("%v", objectRef["namespace"])
+					name := fmt.Sprintf("%v", objectRef["name"])
+					apiGroup := fmt.Sprintf("%v", objectRef["apiGroup"])
+					
+					// Filter logic: only important events
+					important := false
+					category := "compliance"
+					severity := "MEDIUM"
+					eventType := "audit-event"
+					
+					// Delete operations (HIGH severity)
+					if verb == "delete" {
+						important = true
+						severity = "HIGH"
+						eventType = "resource-deletion"
+					}
+					
+					// Secret/ConfigMap operations
+					if resource == "secrets" || resource == "configmaps" {
+						if verb == "create" || verb == "update" || verb == "patch" || verb == "delete" {
+							important = true
+							severity = "HIGH"
+							eventType = "secret-access"
+						}
+					}
+					
+					// RBAC changes
+					if apiGroup == "rbac.authorization.k8s.io" {
+						if verb == "create" || verb == "update" || verb == "patch" || verb == "delete" {
+							important = true
+							severity = "HIGH"
+							eventType = "rbac-change"
+						}
+					}
+					
+					// Privileged pod creation
+					if resource == "pods" && verb == "create" {
+						// Check request object for privileged
+						requestObject, _ := auditEvent["requestObject"].(map[string]interface{})
+						if requestObject != nil {
+							spec, _ := requestObject["spec"].(map[string]interface{})
+							if spec != nil {
+								containers, _ := spec["containers"].([]interface{})
+								for _, c := range containers {
+									container, _ := c.(map[string]interface{})
+									securityContext, _ := container["securityContext"].(map[string]interface{})
+									if securityContext != nil {
+										privileged, _ := securityContext["privileged"].(bool)
+										if privileged {
+											important = true
+											severity = "HIGH"
+											eventType = "privileged-pod-creation"
+											break
+										}
+									}
+								}
+							}
+						}
+					}
+					
+					if !important {
+						continue
+					}
+					
+					// Dedup check
+					if existingKeys[auditID] {
+						continue
+					}
+					
+					// Extract user info
+					user, _ := auditEvent["user"].(map[string]interface{})
+					username := fmt.Sprintf("%v", user["username"])
+					
+					// Extract response code
+					responseStatus, _ := auditEvent["responseStatus"].(map[string]interface{})
+					statusCode := fmt.Sprintf("%v", responseStatus["code"])
+					
+					if namespace == "<nil>" || namespace == "" {
+						namespace = "default"
+					}
+					
+					// Create ZenAgentEvent
+					event := &unstructured.Unstructured{
+						Object: map[string]interface{}{
+							"apiVersion": "zen.kube-zen.io/v1",
+							"kind":       "ZenAgentEvent",
+							"metadata": map[string]interface{}{
+								"generateName": "audit-",
+								"namespace":    namespace,
+								"labels": map[string]interface{}{
+									"source":   "audit",
+									"category": category,
+									"severity": severity,
+								},
+							},
+							"spec": map[string]interface{}{
+								"source":     "audit",
+								"category":   category,
+								"severity":   severity,
+								"eventType":  eventType,
+								"detectedAt": time.Now().Format(time.RFC3339),
+								"resource": map[string]interface{}{
+									"kind":      resource,
+									"name":      name,
+									"namespace": namespace,
+									"apiGroup":  apiGroup,
+								},
+								"details": map[string]interface{}{
+									"auditID":    auditID,
+									"verb":       verb,
+									"user":       username,
+									"stage":      stage,
+									"statusCode": statusCode,
+								},
+							},
+						},
+					}
+					
+					_, err := dynClient.Resource(eventGVR).Namespace(namespace).Create(ctx, event, metav1.CreateOptions{})
+					if err != nil {
+						log.Printf("  ⚠️  Failed to create Audit ZenAgentEvent: %v", err)
+					} else {
+						auditCount++
+						existingKeys[auditID] = true
+						lastLoopCount++
+					}
+					
+				default:
+					break drainAuditLoop
+				}
+			}
+			
+			if auditCount > 0 {
+				log.Printf("  ✅ Created %d NEW ZenAgentEvents from Audit logs", auditCount)
+			} else {
+				log.Println("  ℹ️  No new audit events (configure K8s audit webhook to: http://zen-agent-zen-watcher.zen-cluster.svc.cluster.local:8080/audit/webhook)")
+			}
 
 			// Update totals
 			totalEventCount += lastLoopCount
