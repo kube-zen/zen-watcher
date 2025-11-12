@@ -1,7 +1,7 @@
 # Zen Watcher
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go)](https://go.dev/)
 
 > **Kubernetes Security & Compliance Event Aggregator**
 
@@ -13,9 +13,10 @@ Zen Watcher is an open-source Kubernetes operator that aggregates security and c
 
 ### Multi-Source Event Aggregation
 Collects events from popular security and compliance tools:
-- 🛡️ **Trivy** - Container vulnerabilities
-- 🚨 **Falco** - Runtime threat detection  
-- 📋 **Kyverno** - Policy violations
+- 🛡️ **Trivy** - Container vulnerabilities (HIGH/CRITICAL)
+- 🚨 **Falco** - Runtime threat detection (Warning+)
+- 📋 **Kyverno** - Policy violations (security policies)
+- 🔐 **Checkov** - Static analysis (IaC security)
 - 🔍 **Kubernetes Audit Logs** - API server audit events
 - ✅ **Kube-bench** - CIS benchmark compliance
 
@@ -48,6 +49,7 @@ graph TB
         A[Trivy<br/>Vulnerabilities]
         B[Falco<br/>Runtime Security]
         C[Kyverno<br/>Policy Violations]
+        F1[Checkov<br/>Static Analysis]
     end
     
     subgraph "Compliance Tools"
@@ -56,13 +58,14 @@ graph TB
     end
     
     subgraph "Zen Watcher"
-        F[Watchers]
+        F[Watchers<br/>• Auto-detection<br/>• Deduplication<br/>• Category classification]
         G[CRD Writer]
-        H[Metrics Exporter]
+        H[Metrics Exporter<br/>:9090/metrics]
+        W[Webhook Server<br/>:8080/falco/webhook<br/>:8080/audit/webhook]
     end
     
     subgraph "Storage"
-        I[ZenAgentEvent CRDs<br/>• category<br/>• source<br/>• eventType<br/>• severity]
+        I[ZenAgentEvent CRDs<br/>• category: security/compliance<br/>• source: trivy/kyverno/etc<br/>• eventType: vulnerability/policy/etc<br/>• severity: HIGH/MEDIUM/LOW<br/>• detectedAt: timestamp]
     end
     
     subgraph "Your Integration"
@@ -71,11 +74,13 @@ graph TB
         L[kubectl<br/>Query Events]
     end
     
-    A --> F
-    B --> F
-    C --> F
-    D --> F
-    E --> F
+    A -->|VulnerabilityReports| F
+    B -->|HTTP Webhook| W
+    C -->|PolicyReports| F
+    D -->|HTTP Webhook| W
+    E -->|ConfigMap JSON| F
+    F1 -->|ConfigMap JSON| F
+    W --> F
     F --> G
     G --> I
     F --> H
@@ -85,6 +90,7 @@ graph TB
     
     style I fill:#e1f5ff
     style F fill:#fff3e0
+    style W fill:#fff3e0
     style J fill:#f3e5f5
     style K fill:#f3e5f5
     style L fill:#f3e5f5
@@ -354,5 +360,5 @@ Apache License 2.0 - See [LICENSE](LICENSE) for details.
 ---
 
 **Repository:** github.com/kube-zen/zen-watcher  
-**Go Version:** 1.24.0  
+**Go Version:** 1.22+  
 **Status:** ✅ Production-ready, standalone, independently useful
