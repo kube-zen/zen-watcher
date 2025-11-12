@@ -1,25 +1,80 @@
-# Build stage
+# Build stage - Use official Go image with build tools
 FROM golang:1.22-alpine AS builder
 
-RUN apk add --no-cache git ca-certificates
+# Install build dependencies
+# git: Required for go mod download with private repos
+# ca-certificates: Required for HTTPS connections during build
+RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /build
+
+# Copy go.mod and go.sum first for better layer caching
+# This allows Docker to cache dependencies if code changes but deps don't
+COPY go.mod go.sum* ./
+RUN go mod download && go mod verify
+
+# Copy source code
 COPY . .
 
-# Build with optimizations for minimal size
+# Build with aggressive optimizations for production
+# CGO_ENABLED=0: Static binary, no C dependencies
+# GOOS=linux GOARCH=amd64: Explicit target platform
+# -ldflags:
+#   -w: Strip DWARF debugging information (~30% size reduction)
+#   -s: Strip symbol table and debug info
+#   -X: Inject build-time variables (version, commit)
+# -trimpath: Remove file system paths (security + reproducible builds)
+# -tags netgo: Use pure Go network stack (no CGO)
+# -installsuffix cgo: Ensure separate output directory
+ARG VERSION=1.0.19
+ARG COMMIT=unknown
+ARG BUILD_DATE=unknown
+
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-    -ldflags="-w -s" \
+    -ldflags="-w -s -X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.BuildDate=${BUILD_DATE}" \
+    -tags netgo \
+    -installsuffix cgo \
     -trimpath \
     -o zen-watcher \
     ./cmd/zen-watcher
 
-# Final stage - distroless for minimal footprint
+# Verify binary
+RUN ./zen-watcher --version 2>&1 || true
+RUN ls -lh zen-watcher
+
+# Final stage - Distroless for minimal attack surface
+# Base image: ~2MB (vs Alpine ~5MB)
+# Contains: ca-certificates, tzdata, /etc/passwd
+# No shell, no package manager, minimal CVE exposure
 FROM gcr.io/distroless/static:nonroot
 
+# Copy CA certificates and timezone data from builder
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+
+# Copy compiled binary
 COPY --from=builder /build/zen-watcher /zen-watcher
 
-USER nonroot:nonroot
+# Use non-root user (uid=65532, gid=65532)
+# This is the 'nonroot' user from distroless
+USER 65532:65532
 
+# Expose ports
+# 8080: HTTP server (webhooks, health checks)
+# 9090: Prometheus metrics (future)
 EXPOSE 8080 9090
 
+# Health check (commented out - not supported in distroless without shell)
+# HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+#   CMD ["/zen-watcher", "health"]
+
+# Run the watcher
 ENTRYPOINT ["/zen-watcher"]
+
+# Metadata labels
+LABEL org.opencontainers.image.title="zen-watcher"
+LABEL org.opencontainers.image.description="Kubernetes security event aggregator"
+LABEL org.opencontainers.image.version="${VERSION}"
+LABEL org.opencontainers.image.source="https://github.com/kube-zen/zen-watcher"
+LABEL org.opencontainers.image.licenses="Apache-2.0"
+LABEL org.opencontainers.image.vendor="kube-zen"

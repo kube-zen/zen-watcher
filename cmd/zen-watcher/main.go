@@ -24,10 +24,13 @@ func main() {
 	log.Println("🚀 zen-watcher v1.0.19 (Go 1.22, Apache 2.0)")
 	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
+	// Create cancellable context for graceful shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// K8s client
+	// Initialize Kubernetes client using in-cluster configuration
+	// This reads the service account token and CA cert mounted by Kubernetes
 	log.Println("📡 Initializing Kubernetes client...")
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -100,11 +103,12 @@ func main() {
 	}
 	log.Printf("🔍 Auto-detect: %s", autoDetect)
 
-	// Tool detection state
+	// ToolState tracks the installation status of each security tool
+	// Used for auto-detection to avoid unnecessary API calls
 	type ToolState struct {
-		Installed bool
-		Namespace string
-		LastCheck time.Time
+		Installed bool      // Whether the tool is currently installed
+		Namespace string    // Namespace where the tool is running
+		LastCheck time.Time // Last time we checked for this tool
 	}
 
 	// Read namespaces from ENV or use defaults
@@ -134,25 +138,30 @@ func main() {
 	log.Printf("📋 Tool namespaces: Kyverno=%s, Trivy=%s, Falco=%s, kube-bench=%s", kyvernoNs, trivyNs, falcoNs, kubebenchNs)
 
 	// Falco alerts channel (buffered for webhook)
+	// Buffer size of 100 allows handling burst traffic without blocking Falco
 	falcoAlertsChan := make(chan map[string]interface{}, 100)
 	
 	// Audit events channel (buffered for webhook)
+	// Larger buffer (200) for K8s audit events which can be high-volume
 	auditEventsChan := make(chan map[string]interface{}, 200)
 
 	// Falco webhook handler (receives JSON alerts from Falco)
+	// Endpoint: POST /falco/webhook
+	// Expects Falco JSON output format with fields: priority, rule, output, k8s.*
+	// Returns 200 OK if accepted, 503 if channel is full
 	http.HandleFunc("/falco/webhook", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		
+
 		var alert map[string]interface{}
 		if err := json.NewDecoder(r.Body).Decode(&alert); err != nil {
 			log.Printf("⚠️  Failed to parse Falco alert: %v", err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		
+
 		// Send to channel for processing
 		select {
 		case falcoAlertsChan <- alert:
@@ -163,21 +172,25 @@ func main() {
 			w.WriteHeader(http.StatusServiceUnavailable)
 		}
 	})
-	
+
 	// Audit webhook handler (receives K8s audit events)
+	// Endpoint: POST /audit/webhook
+	// Expects K8s audit.k8s.io/v1 Event format
+	// Filters for important events: deletes, secret/configmap ops, RBAC changes
+	// Returns 200 OK if accepted, 503 if channel is full
 	http.HandleFunc("/audit/webhook", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		
+
 		var auditEvent map[string]interface{}
 		if err := json.NewDecoder(r.Body).Decode(&auditEvent); err != nil {
 			log.Printf("⚠️  Failed to parse audit event: %v", err)
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		
+
 		// Send to channel for processing
 		select {
 		case auditEventsChan <- auditEvent:
@@ -995,7 +1008,7 @@ func main() {
 
 			// 6. Audit logs - Process events from webhook
 			log.Println("  → Checking Audit events...")
-			
+
 			// Get existing ZenAgentEvents for deduplication
 			existingEvents, err := dynClient.Resource(eventGVR).Namespace("").List(ctx, metav1.ListOptions{
 				LabelSelector: "source=audit,category=compliance",
@@ -1016,10 +1029,10 @@ func main() {
 					}
 				}
 			}
-			
+
 			// Process audit events from channel (non-blocking)
 			auditCount := 0
-			drainAuditLoop:
+		drainAuditLoop:
 			for {
 				select {
 				case auditEvent := <-auditEventsChan:
@@ -1027,32 +1040,32 @@ func main() {
 					auditID := fmt.Sprintf("%v", auditEvent["auditID"])
 					stage := fmt.Sprintf("%v", auditEvent["stage"])
 					verb := fmt.Sprintf("%v", auditEvent["verb"])
-					
+
 					// Only process ResponseComplete stage
 					if stage != "ResponseComplete" {
 						continue
 					}
-					
+
 					// Filter for important actions: delete, create secrets/configmaps, RBAC changes
 					objectRef, _ := auditEvent["objectRef"].(map[string]interface{})
 					resource := fmt.Sprintf("%v", objectRef["resource"])
 					namespace := fmt.Sprintf("%v", objectRef["namespace"])
 					name := fmt.Sprintf("%v", objectRef["name"])
 					apiGroup := fmt.Sprintf("%v", objectRef["apiGroup"])
-					
+
 					// Filter logic: only important events
 					important := false
 					category := "compliance"
 					severity := "MEDIUM"
 					eventType := "audit-event"
-					
+
 					// Delete operations (HIGH severity)
 					if verb == "delete" {
 						important = true
 						severity = "HIGH"
 						eventType = "resource-deletion"
 					}
-					
+
 					// Secret/ConfigMap operations
 					if resource == "secrets" || resource == "configmaps" {
 						if verb == "create" || verb == "update" || verb == "patch" || verb == "delete" {
@@ -1061,7 +1074,7 @@ func main() {
 							eventType = "secret-access"
 						}
 					}
-					
+
 					// RBAC changes
 					if apiGroup == "rbac.authorization.k8s.io" {
 						if verb == "create" || verb == "update" || verb == "patch" || verb == "delete" {
@@ -1070,7 +1083,7 @@ func main() {
 							eventType = "rbac-change"
 						}
 					}
-					
+
 					// Privileged pod creation
 					if resource == "pods" && verb == "create" {
 						// Check request object for privileged
@@ -1095,28 +1108,28 @@ func main() {
 							}
 						}
 					}
-					
+
 					if !important {
 						continue
 					}
-					
+
 					// Dedup check
 					if existingKeys[auditID] {
 						continue
 					}
-					
+
 					// Extract user info
 					user, _ := auditEvent["user"].(map[string]interface{})
 					username := fmt.Sprintf("%v", user["username"])
-					
+
 					// Extract response code
 					responseStatus, _ := auditEvent["responseStatus"].(map[string]interface{})
 					statusCode := fmt.Sprintf("%v", responseStatus["code"])
-					
+
 					if namespace == "<nil>" || namespace == "" {
 						namespace = "default"
 					}
-					
+
 					// Create ZenAgentEvent
 					event := &unstructured.Unstructured{
 						Object: map[string]interface{}{
@@ -1153,7 +1166,7 @@ func main() {
 							},
 						},
 					}
-					
+
 					_, err := dynClient.Resource(eventGVR).Namespace(namespace).Create(ctx, event, metav1.CreateOptions{})
 					if err != nil {
 						log.Printf("  ⚠️  Failed to create Audit ZenAgentEvent: %v", err)
@@ -1162,12 +1175,12 @@ func main() {
 						existingKeys[auditID] = true
 						lastLoopCount++
 					}
-					
+
 				default:
 					break drainAuditLoop
 				}
 			}
-			
+
 			if auditCount > 0 {
 				log.Printf("  ✅ Created %d NEW ZenAgentEvents from Audit logs", auditCount)
 			} else {
