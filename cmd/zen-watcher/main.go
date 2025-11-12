@@ -21,7 +21,7 @@ import (
 
 func main() {
 	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	log.Println("🚀 zen-watcher v1.0.17 (Go 1.22, Apache 2.0)")
+	log.Println("🚀 zen-watcher v1.0.18 (Go 1.22, Apache 2.0)")
 	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -275,7 +275,7 @@ func main() {
 
 					// Get existing ZenAgentEvents for deduplication
 					existingEvents, err := dynClient.Resource(eventGVR).Namespace("").List(ctx, metav1.ListOptions{
-						LabelSelector: "source=kyverno,category=compliance",
+						LabelSelector: "source=kyverno,category=security",
 					})
 					existingKeys := make(map[string]bool)
 					if err != nil {
@@ -362,13 +362,13 @@ func main() {
 										"namespace":    resourceNs,
 										"labels": map[string]interface{}{
 											"source":   "kyverno",
-											"category": "compliance",
+											"category": "security",
 											"severity": mappedSeverity,
 										},
 									},
 									"spec": map[string]interface{}{
 										"source":     "kyverno",
-										"category":   "compliance",
+										"category":   "security",
 										"severity":   mappedSeverity,
 										"eventType":  "policy-violation",
 										"detectedAt": time.Now().Format(time.RFC3339),
@@ -758,7 +758,7 @@ func main() {
 										},
 										"spec": map[string]interface{}{
 											"source":     "kube-bench",
-											"category":   "compliance",
+											"category":   "security",
 											"severity":   severity,
 											"eventType":  "cis-benchmark-fail",
 											"detectedAt": time.Now().Format(time.RFC3339),
@@ -803,14 +803,14 @@ func main() {
 			if checkovNs == "" {
 				checkovNs = "checkov"
 			}
-			
+
 			// Look for checkov ConfigMaps with app=checkov label
 			checkovCMs, err := clientSet.CoreV1().ConfigMaps(checkovNs).List(ctx, metav1.ListOptions{
 				LabelSelector: "app=checkov",
 			})
 			if err == nil && len(checkovCMs.Items) > 0 {
 				log.Printf("  ✓ Found %d checkov ConfigMaps", len(checkovCMs.Items))
-				
+
 				// Get existing ZenAgentEvents for deduplication
 				existingEvents, err := dynClient.Resource(eventGVR).Namespace("").List(ctx, metav1.ListOptions{
 					LabelSelector: "source=checkov,category=security",
@@ -833,7 +833,7 @@ func main() {
 					}
 				}
 				log.Printf("  📋 Dedup: %d existing events, checking for new Checkov failures...", len(existingKeys))
-				
+
 				checkovCount := 0
 				// Parse ConfigMaps for Checkov JSON results
 				for _, cm := range checkovCMs.Items {
@@ -841,33 +841,33 @@ func main() {
 					if !found {
 						continue
 					}
-					
+
 					// Parse Checkov JSON output
 					var checkovResults map[string]interface{}
 					if err := json.Unmarshal([]byte(resultsJSON), &checkovResults); err != nil {
 						log.Printf("  ⚠️  Failed to parse Checkov JSON: %v", err)
 						continue
 					}
-					
+
 					results, found := checkovResults["results"].(map[string]interface{})
 					if !found {
 						continue
 					}
-					
+
 					failedChecks, found := results["failed_checks"].([]interface{})
 					if !found {
 						continue
 					}
-					
+
 					// Iterate through all failed checks
 					for _, fc := range failedChecks {
 						failedCheck := fc.(map[string]interface{})
-						
+
 						checkID := fmt.Sprintf("%v", failedCheck["check_id"])
 						checkName := fmt.Sprintf("%v", failedCheck["check_name"])
 						resource := fmt.Sprintf("%v", failedCheck["resource"])
 						guideline := fmt.Sprintf("%v", failedCheck["guideline"])
-						
+
 						// Parse resource (format: "Kind.namespace.name")
 						resourceParts := []string{resource}
 						if len(resource) > 0 {
@@ -883,7 +883,7 @@ func main() {
 							}
 							resourceParts = parts
 						}
-						
+
 						resourceKind := "Unknown"
 						resourceNs := checkovNs
 						resourceName := resource
@@ -892,13 +892,13 @@ func main() {
 							resourceNs = resourceParts[1]
 							resourceName = resourceParts[2]
 						}
-						
+
 						// Dedup key
 						dedupKey := fmt.Sprintf("%s/%s", checkID, resource)
 						if existingKeys[dedupKey] {
 							continue
 						}
-						
+
 						// All Checkov failures are compliance/security issues
 						// Map by check prefix
 						category := "security"
@@ -911,7 +911,7 @@ func main() {
 								severity = "HIGH"
 							}
 						}
-						
+
 						// Create ZenAgentEvent
 						event := &unstructured.Unstructured{
 							Object: map[string]interface{}{
@@ -938,15 +938,15 @@ func main() {
 										"namespace": resourceNs,
 									},
 									"details": map[string]interface{}{
-										"checkId":    checkID,
-										"checkName":  checkName,
-										"resource":   resource,
-										"guideline":  guideline,
+										"checkId":   checkID,
+										"checkName": checkName,
+										"resource":  resource,
+										"guideline": guideline,
 									},
 								},
 							},
 						}
-						
+
 						_, err := dynClient.Resource(eventGVR).Namespace(resourceNs).Create(ctx, event, metav1.CreateOptions{})
 						if err != nil {
 							log.Printf("  ⚠️  Failed to create Checkov ZenAgentEvent: %v", err)
@@ -957,14 +957,14 @@ func main() {
 						}
 					}
 				}
-				
+
 				if checkovCount > 0 {
 					log.Printf("  ✅ Created %d NEW ZenAgentEvents from Checkov static analysis failures", checkovCount)
 				}
 			} else {
 				log.Println("  ℹ️  No Checkov ConfigMaps found (run checkov scan to generate reports)")
 			}
-			
+
 			// 6. Audit logs - Check for audit policy violations (requires audit webhook)
 			log.Println("  → Checking Audit logs...")
 			log.Println("  ℹ️  Audit log integration requires K8s audit webhook configuration (not yet implemented)")
