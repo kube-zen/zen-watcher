@@ -6,7 +6,7 @@ Zen Watcher is an open-source, production-ready Kubernetes operator that aggrega
 
 **Version**: 1.0.0  
 **License**: Apache 2.0  
-**Language**: Go 1.23+  
+**Language**: Go 1.22+  
 **Platform**: Kubernetes 1.28+
 
 ---
@@ -233,7 +233,7 @@ kubectl apply -f deploy/k8s-deployment.yaml
 
 ## 🔧 Technology Stack
 
-- **Language**: Go 1.23
+- **Language**: Go 1.22
 - **Platform**: Kubernetes 1.28+
 - **Storage**: Kubernetes CRDs
 - **Metrics**: Prometheus format

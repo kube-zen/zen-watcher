@@ -56,7 +56,7 @@ We welcome feature suggestions! Please open an issue with:
 
 ### Prerequisites
 
-- Go 1.23 or later
+- Go 1.22 or later
 - Kubernetes cluster (for testing)
 - kubectl configured
 
