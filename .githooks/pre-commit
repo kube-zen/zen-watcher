@@ -87,32 +87,46 @@ echo ""
 echo "🔒 Step 3: Security Scanning"
 echo "────────────────────────────────────────────────────"
 
-# govulncheck
-if command -v govulncheck &> /dev/null; then
-    echo "  → Running 'govulncheck'..."
-    if ! govulncheck ./...; then
-        echo "⚠️  Vulnerabilities found in dependencies"
-        echo "   Review and update dependencies if necessary"
-        # Don't fail on vulnerabilities, just warn
-    else
-        echo "  ✅ No known vulnerabilities"
-    fi
-else
-    echo "  ℹ️  govulncheck not installed (install: go install golang.org/x/vuln/cmd/govulncheck@latest)"
+# govulncheck (REQUIRED)
+if ! command -v govulncheck &> /dev/null; then
+    echo "❌ govulncheck not installed (REQUIRED)"
+    echo "   Install: go install golang.org/x/vuln/cmd/govulncheck@latest"
+    exit 1
 fi
+echo "  → Running 'govulncheck'..."
+if ! govulncheck ./...; then
+    echo "❌ Vulnerabilities found in dependencies (BLOCKING)"
+    echo "   Update dependencies: go get -u ./... && go mod tidy"
+    exit 1
+fi
+echo "  ✅ No known vulnerabilities"
 
-# gosec (security linter)
-if command -v gosec &> /dev/null; then
-    echo "  → Running 'gosec'..."
-    if ! gosec -quiet ./...; then
-        echo "⚠️  Security issues found"
-        # Don't fail, just warn
-    else
-        echo "  ✅ No security issues (gosec)"
-    fi
-else
-    echo "  ℹ️  gosec not installed (install: go install github.com/securego/gosec/v2/cmd/gosec@latest)"
+# gosec (security linter) (REQUIRED)
+if ! command -v gosec &> /dev/null; then
+    echo "❌ gosec not installed (REQUIRED)"
+    echo "   Install: go install github.com/securego/gosec/v2/cmd/gosec@latest"
+    exit 1
 fi
+echo "  → Running 'gosec'..."
+if ! gosec -quiet ./...; then
+    echo "❌ Security issues found (BLOCKING)"
+    echo "   Fix security issues before committing"
+    exit 1
+fi
+echo "  ✅ No security issues (gosec)"
+
+# staticcheck (REQUIRED)
+if ! command -v staticcheck &> /dev/null; then
+    echo "❌ staticcheck not installed (REQUIRED)"
+    echo "   Install: go install honnef.co/go/tools/cmd/staticcheck@latest"
+    exit 1
+fi
+echo "  → Running 'staticcheck'..."
+if ! staticcheck ./...; then
+    echo "❌ staticcheck found issues (BLOCKING)"
+    exit 1
+fi
+echo "  ✅ staticcheck passed"
 
 # ============================================================
 # 4. DOCKER IMAGE SECURITY (if Dockerfile changed)
@@ -131,34 +145,37 @@ if git diff --cached --name-only | grep -q "Dockerfile"; then
     fi
     echo "  ✅ Docker image built"
     
-    # Trivy scan
-    if command -v trivy &> /dev/null; then
-        echo "  → Running Trivy image scan..."
-        if ! trivy image --severity HIGH,CRITICAL --exit-code 1 zen-watcher:precommit-scan; then
-            echo "❌ HIGH/CRITICAL vulnerabilities found in Docker image"
-            echo "   Fix vulnerabilities before committing"
-            docker rmi zen-watcher:precommit-scan 2>/dev/null || true
-            exit 1
-        fi
-        echo "  ✅ No HIGH/CRITICAL vulnerabilities (Trivy)"
-    else
-        echo "  ℹ️  Trivy not installed (install: brew install trivy / apt install trivy)"
+    # Trivy scan (REQUIRED for Dockerfile changes)
+    if ! command -v trivy &> /dev/null; then
+        echo "❌ Trivy not installed (REQUIRED for Docker changes)"
+        echo "   Install: https://trivy.dev/latest/getting-started/installation/"
+        docker rmi zen-watcher:precommit-scan 2>/dev/null || true
+        exit 1
     fi
+    echo "  → Running Trivy image scan..."
+    if ! trivy image --severity HIGH,CRITICAL --exit-code 1 zen-watcher:precommit-scan; then
+        echo "❌ HIGH/CRITICAL vulnerabilities found in Docker image (BLOCKING)"
+        echo "   Fix vulnerabilities before committing"
+        docker rmi zen-watcher:precommit-scan 2>/dev/null || true
+        exit 1
+    fi
+    echo "  ✅ No HIGH/CRITICAL vulnerabilities (Trivy)"
     
-    # Generate SBOM (Software Bill of Materials)
-    if command -v syft &> /dev/null; then
-        echo "  → Generating SBOM..."
-        syft zen-watcher:precommit-scan -o json > /tmp/zen-watcher-sbom.json 2>/dev/null || true
-        echo "  ✅ SBOM generated: /tmp/zen-watcher-sbom.json"
-    else
-        echo "  ℹ️  Syft not installed (install: brew install syft)"
+    # Generate SBOM (REQUIRED for Dockerfile changes)
+    if ! command -v syft &> /dev/null; then
+        echo "❌ Syft not installed (REQUIRED for Docker changes)"
+        echo "   Install: https://github.com/anchore/syft#installation"
+        docker rmi zen-watcher:precommit-scan 2>/dev/null || true
+        exit 1
     fi
-    
-    # Cosign signature verification (if enabled)
-    if command -v cosign &> /dev/null && [ -f "cosign.pub" ]; then
-        echo "  → Cosign signing..."
-        echo "  ℹ️  Skipped (sign after push to registry)"
+    echo "  → Generating SBOM..."
+    if ! syft zen-watcher:precommit-scan -o json > /tmp/zen-watcher-sbom.json 2>&1; then
+        echo "❌ SBOM generation failed (BLOCKING)"
+        docker rmi zen-watcher:precommit-scan 2>/dev/null || true
+        exit 1
     fi
+    syft zen-watcher:precommit-scan -o spdx-json > /tmp/zen-watcher-sbom.spdx.json 2>&1
+    echo "  ✅ SBOM generated: /tmp/zen-watcher-sbom.json"
     
     # Cleanup
     docker rmi zen-watcher:precommit-scan 2>/dev/null || true
