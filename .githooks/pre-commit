@@ -1,0 +1,197 @@
+#!/bin/bash
+# zen-watcher pre-commit hook
+# Runs code quality checks, security scans, and formatters before commit
+#
+# To install: ln -sf ../../.githooks/pre-commit .git/hooks/pre-commit
+# Or run: git config core.hooksPath .githooks
+
+set -e
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🔍 zen-watcher Pre-Commit Checks"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Check if Go is installed
+if ! command -v go &> /dev/null; then
+    echo "❌ Go not found. Please install Go 1.22+"
+    exit 1
+fi
+
+# Check Go version
+GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+echo "✅ Go version: $GO_VERSION"
+
+# Change to project root
+cd "$(git rev-parse --show-toplevel)"
+
+# ============================================================
+# 1. CODE FORMATTING
+# ============================================================
+echo ""
+echo "📝 Step 1: Code Formatting"
+echo "────────────────────────────────────────────────────"
+
+# go fmt
+echo "  → Running 'go fmt'..."
+UNFORMATTED=$(gofmt -l . 2>&1)
+if [ -n "$UNFORMATTED" ]; then
+    echo "❌ Code not formatted. Run:"
+    echo "   gofmt -w $UNFORMATTED"
+    exit 1
+fi
+echo "  ✅ All Go files formatted"
+
+# ============================================================
+# 2. CODE QUALITY
+# ============================================================
+echo ""
+echo "🔍 Step 2: Code Quality Checks"
+echo "────────────────────────────────────────────────────"
+
+# go vet
+echo "  → Running 'go vet'..."
+if ! go vet ./...; then
+    echo "❌ 'go vet' found issues"
+    exit 1
+fi
+echo "  ✅ go vet passed"
+
+# go mod tidy check
+echo "  → Checking 'go mod tidy'..."
+cp go.mod go.mod.bak
+cp go.sum go.sum.bak 2>/dev/null || true
+go mod tidy
+if ! diff -q go.mod go.mod.bak &>/dev/null || ! diff -q go.sum go.sum.bak &>/dev/null; then
+    echo "❌ go.mod or go.sum not tidy. Run: go mod tidy"
+    mv go.mod.bak go.mod
+    mv go.sum.bak go.sum 2>/dev/null || true
+    exit 1
+fi
+rm go.mod.bak go.sum.bak 2>/dev/null || true
+echo "  ✅ go.mod and go.sum are tidy"
+
+# go build test
+echo "  → Testing build..."
+if ! go build -o /tmp/zen-watcher-precommit ./cmd/zen-watcher; then
+    echo "❌ Build failed"
+    exit 1
+fi
+rm /tmp/zen-watcher-precommit
+echo "  ✅ Build successful"
+
+# ============================================================
+# 3. SECURITY SCANNING
+# ============================================================
+echo ""
+echo "🔒 Step 3: Security Scanning"
+echo "────────────────────────────────────────────────────"
+
+# govulncheck
+if command -v govulncheck &> /dev/null; then
+    echo "  → Running 'govulncheck'..."
+    if ! govulncheck ./...; then
+        echo "⚠️  Vulnerabilities found in dependencies"
+        echo "   Review and update dependencies if necessary"
+        # Don't fail on vulnerabilities, just warn
+    else
+        echo "  ✅ No known vulnerabilities"
+    fi
+else
+    echo "  ℹ️  govulncheck not installed (install: go install golang.org/x/vuln/cmd/govulncheck@latest)"
+fi
+
+# gosec (security linter)
+if command -v gosec &> /dev/null; then
+    echo "  → Running 'gosec'..."
+    if ! gosec -quiet ./...; then
+        echo "⚠️  Security issues found"
+        # Don't fail, just warn
+    else
+        echo "  ✅ No security issues (gosec)"
+    fi
+else
+    echo "  ℹ️  gosec not installed (install: go install github.com/securego/gosec/v2/cmd/gosec@latest)"
+fi
+
+# ============================================================
+# 4. DOCKER IMAGE SECURITY (if Dockerfile changed)
+# ============================================================
+if git diff --cached --name-only | grep -q "Dockerfile"; then
+    echo ""
+    echo "🐳 Step 4: Docker Image Security"
+    echo "────────────────────────────────────────────────────"
+    
+    # Build image for scanning
+    echo "  → Building Docker image for security scan..."
+    if ! docker build -t zen-watcher:precommit-scan -f build/Dockerfile . > /tmp/docker-build.log 2>&1; then
+        echo "❌ Docker build failed"
+        cat /tmp/docker-build.log | tail -20
+        exit 1
+    fi
+    echo "  ✅ Docker image built"
+    
+    # Trivy scan
+    if command -v trivy &> /dev/null; then
+        echo "  → Running Trivy image scan..."
+        if ! trivy image --severity HIGH,CRITICAL --exit-code 1 zen-watcher:precommit-scan; then
+            echo "❌ HIGH/CRITICAL vulnerabilities found in Docker image"
+            echo "   Fix vulnerabilities before committing"
+            docker rmi zen-watcher:precommit-scan 2>/dev/null || true
+            exit 1
+        fi
+        echo "  ✅ No HIGH/CRITICAL vulnerabilities (Trivy)"
+    else
+        echo "  ℹ️  Trivy not installed (install: brew install trivy / apt install trivy)"
+    fi
+    
+    # Generate SBOM (Software Bill of Materials)
+    if command -v syft &> /dev/null; then
+        echo "  → Generating SBOM..."
+        syft zen-watcher:precommit-scan -o json > /tmp/zen-watcher-sbom.json 2>/dev/null || true
+        echo "  ✅ SBOM generated: /tmp/zen-watcher-sbom.json"
+    else
+        echo "  ℹ️  Syft not installed (install: brew install syft)"
+    fi
+    
+    # Cosign signature verification (if enabled)
+    if command -v cosign &> /dev/null && [ -f "cosign.pub" ]; then
+        echo "  → Cosign signing..."
+        echo "  ℹ️  Skipped (sign after push to registry)"
+    fi
+    
+    # Cleanup
+    docker rmi zen-watcher:precommit-scan 2>/dev/null || true
+fi
+
+# ============================================================
+# 5. YAML VALIDATION
+# ============================================================
+if git diff --cached --name-only | grep -q "\.yaml$\|\.yml$"; then
+    echo ""
+    echo "📋 Step 5: YAML Validation"
+    echo "────────────────────────────────────────────────────"
+    
+    for file in $(git diff --cached --name-only | grep "\.yaml$\|\.yml$"); do
+        if [ -f "$file" ]; then
+            echo "  → Validating $file..."
+            if ! python3 -c "import yaml; yaml.safe_load(open('$file'))" 2>/dev/null; then
+                echo "❌ Invalid YAML: $file"
+                exit 1
+            fi
+        fi
+    done
+    echo "  ✅ All YAML files valid"
+fi
+
+# ============================================================
+# SUMMARY
+# ============================================================
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "✅ All pre-commit checks passed!"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+exit 0
+

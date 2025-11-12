@@ -1,0 +1,64 @@
+# zen-watcher pre-commit hooks
+# Runs on every git commit to ensure code quality and security
+#
+# To install:
+#   pip install pre-commit
+#   pre-commit install
+#
+# To run manually:
+#   pre-commit run --all-files
+
+repos:
+  # Go code formatting
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-fmt
+        name: go fmt
+        description: Run 'go fmt' on Go code
+        
+      - id: go-vet
+        name: go vet
+        description: Run 'go vet' to find common errors
+        
+      - id: go-mod-tidy
+        name: go mod tidy
+        description: Ensure go.mod and go.sum are tidy
+
+  # Additional Go checks
+  - repo: local
+    hooks:
+      - id: go-test
+        name: go test
+        entry: go test -v ./...
+        language: system
+        pass_filenames: false
+        files: \.go$
+        
+      - id: go-build
+        name: go build
+        entry: go build -o /tmp/zen-watcher-test ./cmd/zen-watcher
+        language: system
+        pass_filenames: false
+        files: \.go$
+
+  # General file checks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: ['--unsafe']  # Allow custom YAML tags
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: mixed-line-ending
+
+  # Markdown formatting
+  - repo: https://github.com/markdownlint/markdownlint
+    rev: v0.12.0
+    hooks:
+      - id: markdownlint
+        args: ['--fix']
