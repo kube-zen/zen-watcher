@@ -23,7 +23,7 @@ import (
 
 func main() {
 	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	log.Println("🚀 zen-watcher v1.0.20 (Go 1.22, Apache 2.0)")
+	log.Println("🚀 zen-watcher v1.0.21 (Go 1.23, Apache 2.0)")
 	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
 	// Create cancellable context for graceful shutdown
@@ -39,7 +39,7 @@ func main() {
 		},
 		[]string{"source", "category", "severity"},
 	)
-	
+
 	toolsActive := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "zen_watcher_tools_active",
@@ -47,7 +47,7 @@ func main() {
 		},
 		[]string{"tool"},
 	)
-	
+
 	loopDuration := prometheus.NewHistogram(
 		prometheus.HistogramOpts{
 			Name:    "zen_watcher_loop_duration_seconds",
@@ -55,7 +55,7 @@ func main() {
 			Buckets: prometheus.DefBuckets,
 		},
 	)
-	
+
 	webhookRequests := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "zen_watcher_webhook_requests_total",
@@ -63,7 +63,7 @@ func main() {
 		},
 		[]string{"endpoint", "status"},
 	)
-	
+
 	// Register metrics with Prometheus
 	prometheus.MustRegister(eventsTotal)
 	prometheus.MustRegister(toolsActive)
@@ -197,7 +197,7 @@ func main() {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		
+
 		var alert map[string]interface{}
 		if err := json.NewDecoder(r.Body).Decode(&alert); err != nil {
 			log.Printf("⚠️  Failed to parse Falco alert: %v", err)
@@ -205,13 +205,15 @@ func main() {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		
+
 		// Send to channel for processing
 		select {
 		case falcoAlertsChan <- alert:
 			webhookRequests.WithLabelValues("falco", "200").Inc()
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"status":"ok"}`))
+			if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
+				log.Printf("⚠️  Failed to write response: %v", err)
+			}
 		default:
 			log.Println("⚠️  Falco alerts channel full, dropping alert")
 			webhookRequests.WithLabelValues("falco", "503").Inc()
@@ -230,7 +232,7 @@ func main() {
 			w.WriteHeader(http.StatusMethodNotAllowed)
 			return
 		}
-		
+
 		var auditEvent map[string]interface{}
 		if err := json.NewDecoder(r.Body).Decode(&auditEvent); err != nil {
 			log.Printf("⚠️  Failed to parse audit event: %v", err)
@@ -238,13 +240,15 @@ func main() {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		
+
 		// Send to channel for processing
 		select {
 		case auditEventsChan <- auditEvent:
 			webhookRequests.WithLabelValues("audit", "200").Inc()
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"status":"ok"}`))
+			if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
+				log.Printf("⚠️  Failed to write response: %v", err)
+			}
 		default:
 			log.Println("⚠️  Audit events channel full, dropping event")
 			webhookRequests.WithLabelValues("audit", "503").Inc()
@@ -267,10 +271,10 @@ func main() {
 			fmt.Fprintf(w, "not ready")
 		}
 	})
-	
+
 	// Prometheus metrics endpoint
 	http.Handle("/metrics", promhttp.Handler())
-	
+
 	go func() {
 		port := os.Getenv("WATCHER_PORT")
 		if port == "" {
