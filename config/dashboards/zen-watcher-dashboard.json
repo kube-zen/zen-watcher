@@ -94,7 +94,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "zen_watcher_health_status{cluster_id=\"$cluster\"}",
+          "expr": "zen_watcher_health_status",
           "refId": "A"
         }
       ],
@@ -161,7 +161,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(zen_watcher_events_total{cluster_id=\"$cluster\"}[5m]))",
+          "expr": "sum(rate(zen_watcher_events_total{source=~\"$source\"}[5m]))",
           "refId": "A"
         }
       ],
@@ -228,7 +228,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(zen_watcher_active_events{cluster_id=\"$cluster\"})",
+          "expr": "sum(zen_watcher_active_events{source=~\"$source\"})",
           "refId": "A"
         }
       ],
@@ -295,7 +295,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(zen_watcher_active_events{cluster_id=\"$cluster\",severity=\"CRITICAL\"})",
+          "expr": "sum(zen_watcher_active_events{source=~\"$source\",severity=\"CRITICAL\"})",
           "refId": "A"
         }
       ],
@@ -382,7 +382,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(zen_watcher_events_total{cluster_id=\"$cluster\"}[5m])",
+          "expr": "rate(zen_watcher_events_total{source=~\"$source\"}[5m])",
           "legendFormat": "{{category}}/{{source}}/{{severity}}",
           "refId": "A"
         }
@@ -440,7 +440,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by(category)(zen_watcher_active_events{cluster_id=\"$cluster\"})",
+          "expr": "sum by(category)(zen_watcher_active_events{source=~\"$source\"})",
           "legendFormat": "{{category}}",
           "refId": "A"
         }
@@ -498,7 +498,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by(severity)(zen_watcher_active_events{cluster_id=\"$cluster\"})",
+          "expr": "sum by(severity)(zen_watcher_active_events{source=~\"$source\"})",
           "legendFormat": "{{severity}}",
           "refId": "A"
         }
@@ -575,7 +575,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "zen_watcher_watcher_status{cluster_id=\"$cluster\"}",
+          "expr": "zen_watcher_watcher_status",
           "legendFormat": "{{watcher}}",
           "refId": "A"
         }
@@ -666,7 +666,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(zen_watcher_scrape_duration_seconds_bucket{cluster_id=\"$cluster\"}[5m])) by (le, watcher))",
+          "expr": "histogram_quantile(0.95, sum(rate(zen_watcher_scrape_duration_seconds_bucket[5m])) by (le, watcher))",
           "legendFormat": "{{watcher}} p95",
           "refId": "A"
         }
@@ -754,7 +754,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "zen_watcher_goroutines{cluster_id=\"$cluster\"}",
+          "expr": "zen_watcher_goroutines",
           "legendFormat": "Goroutines",
           "refId": "A"
         }
@@ -845,7 +845,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "process_resident_memory_bytes{cluster_id=\"$cluster\"}",
+          "expr": "process_resident_memory_bytes{job=~\"zen-watcher.*\"}",
           "legendFormat": "RSS",
           "refId": "A"
         },
@@ -854,7 +854,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "go_memstats_heap_alloc_bytes{cluster_id=\"$cluster\"}",
+          "expr": "go_memstats_heap_alloc_bytes{job=~\"zen-watcher.*\"}",
           "legendFormat": "Heap Alloc",
           "refId": "B"
         }
@@ -945,7 +945,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(process_cpu_seconds_total{cluster_id=\"$cluster\"}[5m]) * 100",
+          "expr": "rate(process_cpu_seconds_total{job=~\"zen-watcher.*\"}[5m]) * 100",
           "legendFormat": "CPU Usage",
           "refId": "A"
         }
@@ -1035,7 +1035,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(zen_watcher_watcher_errors_total{cluster_id=\"$cluster\"}[5m])",
+          "expr": "rate(zen_watcher_watcher_errors_total[5m])",
           "legendFormat": "{{watcher}}/{{error_type}}",
           "refId": "A"
         }
@@ -1126,7 +1126,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(zen_watcher_crd_operation_duration_seconds_bucket{cluster_id=\"$cluster\"}[5m])) by (le, operation))",
+          "expr": "histogram_quantile(0.95, sum(rate(zen_watcher_crd_operation_duration_seconds_bucket[5m])) by (le, operation))",
           "legendFormat": "{{operation}} p95",
           "refId": "A"
         }
@@ -1214,7 +1214,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "rate(zen_watcher_http_requests_total{cluster_id=\"$cluster\"}[5m])",
+          "expr": "rate(zen_watcher_http_requests_total[5m])",
           "legendFormat": "{{endpoint}}/{{status}}",
           "refId": "A"
         }
@@ -1305,7 +1305,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(zen_watcher_http_request_duration_seconds_bucket{cluster_id=\"$cluster\"}[5m])) by (le, endpoint))",
+          "expr": "histogram_quantile(0.95, sum(rate(zen_watcher_http_request_duration_seconds_bucket[5m])) by (le, endpoint))",
           "legendFormat": "{{endpoint}} p95",
           "refId": "A"
         }
@@ -1357,6 +1357,33 @@
         "options": [],
         "query": {
           "query": "label_values(zen_watcher_build_info, cluster_id)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 0,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": false,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "definition": "label_values(zen_watcher_events_total, source)",
+        "hide": 0,
+        "includeAll": true,
+        "multi": true,
+        "name": "source",
+        "options": [],
+        "query": {
+          "query": "label_values(zen_watcher_events_total, source)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,

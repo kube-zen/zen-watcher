@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -40,12 +41,53 @@ func main() {
 		[]string{"source", "category", "severity"},
 	)
 
+	eventsFailures := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_events_failures_total",
+			Help: "Total number of failed event creations",
+		},
+		[]string{"source", "category", "reason"},
+	)
+
+	activeEvents := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_active_events",
+			Help: "Number of currently active events",
+		},
+		[]string{"source", "category", "severity"},
+	)
+
 	toolsActive := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "zen_watcher_tools_active",
 			Help: "Number of security tools currently detected (1=active, 0=inactive)",
 		},
 		[]string{"tool"},
+	)
+
+	watcherStatus := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_watcher_status",
+			Help: "Watcher enabled status (1=enabled, 0=disabled)",
+		},
+		[]string{"watcher"},
+	)
+
+	watcherErrors := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_watcher_errors_total",
+			Help: "Total number of watcher errors",
+		},
+		[]string{"watcher", "error_type"},
+	)
+
+	scrapeDuration := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "zen_watcher_scrape_duration_seconds",
+			Help:    "Time taken to scrape data from watcher",
+			Buckets: []float64{0.1, 0.5, 1, 2, 5, 10, 30, 60},
+		},
+		[]string{"watcher"},
 	)
 
 	loopDuration := prometheus.NewHistogram(
@@ -56,6 +98,40 @@ func main() {
 		},
 	)
 
+	crdOperations := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_crd_operations_total",
+			Help: "Total number of CRD operations",
+		},
+		[]string{"operation", "status"},
+	)
+
+	crdOperationDuration := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "zen_watcher_crd_operation_duration_seconds",
+			Help:    "Duration of CRD operations",
+			Buckets: []float64{0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5},
+		},
+		[]string{"operation"},
+	)
+
+	httpRequests := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_http_requests_total",
+			Help: "Total number of HTTP requests",
+		},
+		[]string{"endpoint", "method", "status"},
+	)
+
+	httpRequestDuration := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "zen_watcher_http_request_duration_seconds",
+			Help:    "HTTP request duration",
+			Buckets: []float64{0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2, 5},
+		},
+		[]string{"endpoint", "method"},
+	)
+
 	webhookRequests := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "zen_watcher_webhook_requests_total",
@@ -64,11 +140,62 @@ func main() {
 		[]string{"endpoint", "status"},
 	)
 
+	healthStatus := prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_health_status",
+			Help: "Health status (1=healthy, 0=unhealthy)",
+		},
+	)
+
+	readinessStatus := prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_readiness_status",
+			Help: "Readiness status (1=ready, 0=not ready)",
+		},
+	)
+
+	goroutines := prometheus.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_goroutines",
+			Help: "Number of goroutines",
+		},
+	)
+
+	buildInfo := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_build_info",
+			Help: "Build information",
+		},
+		[]string{"version", "cluster_id"},
+	)
+
 	// Register metrics with Prometheus
 	prometheus.MustRegister(eventsTotal)
+	prometheus.MustRegister(eventsFailures)
+	prometheus.MustRegister(activeEvents)
 	prometheus.MustRegister(toolsActive)
+	prometheus.MustRegister(watcherStatus)
+	prometheus.MustRegister(watcherErrors)
+	prometheus.MustRegister(scrapeDuration)
 	prometheus.MustRegister(loopDuration)
+	prometheus.MustRegister(crdOperations)
+	prometheus.MustRegister(crdOperationDuration)
+	prometheus.MustRegister(httpRequests)
+	prometheus.MustRegister(httpRequestDuration)
 	prometheus.MustRegister(webhookRequests)
+	prometheus.MustRegister(healthStatus)
+	prometheus.MustRegister(readinessStatus)
+	prometheus.MustRegister(goroutines)
+	prometheus.MustRegister(buildInfo)
+
+	// Set initial values
+	healthStatus.Set(1)
+	readinessStatus.Set(0)
+	clusterID := os.Getenv("CLUSTER_ID")
+	if clusterID == "" {
+		clusterID = "default"
+	}
+	buildInfo.WithLabelValues("1.0.21", clusterID).Set(1)
 
 	// K8s client
 	// Initialize Kubernetes client using in-cluster configuration
@@ -259,17 +386,26 @@ func main() {
 	// Start HTTP server for health/readiness checks
 	ready := false
 	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		httpRequests.WithLabelValues("/health", r.Method, "200").Inc()
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "healthy")
+		httpRequestDuration.WithLabelValues("/health", r.Method).Observe(time.Since(start).Seconds())
 	})
 	http.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
 		if ready {
+			readinessStatus.Set(1)
+			httpRequests.WithLabelValues("/ready", r.Method, "200").Inc()
 			w.WriteHeader(http.StatusOK)
 			fmt.Fprintf(w, "ready")
 		} else {
+			readinessStatus.Set(0)
+			httpRequests.WithLabelValues("/ready", r.Method, "503").Inc()
 			w.WriteHeader(http.StatusServiceUnavailable)
 			fmt.Fprintf(w, "not ready")
 		}
+		httpRequestDuration.WithLabelValues("/ready", r.Method).Observe(time.Since(start).Seconds())
 	})
 
 	// Prometheus metrics endpoint
@@ -294,6 +430,39 @@ func main() {
 
 	// Mark as ready after initialization
 	ready = true
+	readinessStatus.Set(1)
+
+	// Start goroutine tracker
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				goroutines.Set(float64(runtime.NumGoroutine()))
+			}
+		}
+	}()
+
+	// Helper function to create event with metrics
+	createEventWithMetrics := func(ctx context.Context, dynClient dynamic.Interface, eventGVR schema.GroupVersionResource, event *unstructured.Unstructured, source, category, severity string) error {
+		opStart := time.Now()
+		_, err := dynClient.Resource(eventGVR).Namespace(event.GetNamespace()).Create(ctx, event, metav1.CreateOptions{})
+		crdOperationDuration.WithLabelValues("create").Observe(time.Since(opStart).Seconds())
+		
+		if err != nil {
+			crdOperations.WithLabelValues("create", "failure").Inc()
+			eventsFailures.WithLabelValues(source, category, "create_failed").Inc()
+			return err
+		}
+		
+		crdOperations.WithLabelValues("create", "success").Inc()
+		eventsTotal.WithLabelValues(source, category, severity).Inc()
+		activeEvents.WithLabelValues(source, category, severity).Inc()
+		return nil
+	}
 
 	// Event tracking
 	totalEventCount := 0
@@ -333,12 +502,20 @@ func main() {
 					}
 				}
 				toolStates["kyverno"].LastCheck = time.Now()
+				if toolStates["kyverno"].Installed {
+					toolsActive.WithLabelValues("kyverno").Set(1)
+					watcherStatus.WithLabelValues("kyverno").Set(1)
+				} else {
+					toolsActive.WithLabelValues("kyverno").Set(0)
+					watcherStatus.WithLabelValues("kyverno").Set(0)
+				}
 
 				// Trivy - check for any pod in namespace
 				trivyPods, err := clientSet.CoreV1().Pods(toolStates["trivy"].Namespace).List(ctx, metav1.ListOptions{})
 				if err != nil {
 					log.Printf("  ⚠️  Error listing pods in namespace '%s': %v", toolStates["trivy"].Namespace, err)
 					toolStates["trivy"].Installed = false
+					watcherErrors.WithLabelValues("trivy", "list_error").Inc()
 				} else if len(trivyPods.Items) > 0 {
 					if !toolStates["trivy"].Installed {
 						log.Printf("  ✅ Trivy Operator detected in namespace '%s' (%d pods)", toolStates["trivy"].Namespace, len(trivyPods.Items))
@@ -349,12 +526,20 @@ func main() {
 					toolStates["trivy"].Installed = false
 				}
 				toolStates["trivy"].LastCheck = time.Now()
+				if toolStates["trivy"].Installed {
+					toolsActive.WithLabelValues("trivy").Set(1)
+					watcherStatus.WithLabelValues("trivy").Set(1)
+				} else {
+					toolsActive.WithLabelValues("trivy").Set(0)
+					watcherStatus.WithLabelValues("trivy").Set(0)
+				}
 
 				// Falco - check for any pod in namespace
 				falcoPods, err := clientSet.CoreV1().Pods(toolStates["falco"].Namespace).List(ctx, metav1.ListOptions{})
 				if err != nil {
 					log.Printf("  ⚠️  Error listing pods in namespace '%s': %v", toolStates["falco"].Namespace, err)
 					toolStates["falco"].Installed = false
+					watcherErrors.WithLabelValues("falco", "list_error").Inc()
 				} else if len(falcoPods.Items) > 0 {
 					if !toolStates["falco"].Installed {
 						log.Printf("  ✅ Falco detected in namespace '%s' (%d pods)", toolStates["falco"].Namespace, len(falcoPods.Items))
@@ -365,6 +550,13 @@ func main() {
 					toolStates["falco"].Installed = false
 				}
 				toolStates["falco"].LastCheck = time.Now()
+				if toolStates["falco"].Installed {
+					toolsActive.WithLabelValues("falco").Set(1)
+					watcherStatus.WithLabelValues("falco").Set(1)
+				} else {
+					toolsActive.WithLabelValues("falco").Set(0)
+					watcherStatus.WithLabelValues("falco").Set(0)
+				}
 			}
 
 			log.Println("🔍 Scanning security tool reports...")
@@ -372,9 +564,12 @@ func main() {
 			// 1. Kyverno PolicyReports
 			if toolStates["kyverno"].Installed || autoDetect != "true" {
 				log.Println("  → Checking Kyverno PolicyReports...")
+				scrapeStart := time.Now()
 				reports, err := dynClient.Resource(policyGVR).Namespace("").List(ctx, metav1.ListOptions{})
+				scrapeDuration.WithLabelValues("kyverno").Observe(time.Since(scrapeStart).Seconds())
 				if err != nil {
 					log.Printf("  ⚠️  Cannot access Kyverno PolicyReports: %v", err)
+					watcherErrors.WithLabelValues("kyverno", "access_error").Inc()
 				} else {
 					log.Printf("  ✓ Found %d PolicyReports", len(reports.Items))
 
@@ -492,7 +687,7 @@ func main() {
 								},
 							}
 
-							_, err := dynClient.Resource(eventGVR).Namespace(resourceNs).Create(ctx, event, metav1.CreateOptions{})
+							err := createEventWithMetrics(ctx, dynClient, eventGVR, event, "kyverno", "security", mappedSeverity)
 							if err != nil {
 								log.Printf("  ⚠️  Failed to create ZenAgentEvent: %v", err)
 							} else {
@@ -514,9 +709,12 @@ func main() {
 			// 2. Trivy VulnerabilityReports
 			if toolStates["trivy"].Installed || autoDetect != "true" {
 				log.Println("  → Checking Trivy VulnerabilityReports...")
+				scrapeStart := time.Now()
 				trivyReports, err := dynClient.Resource(trivyGVR).Namespace("").List(ctx, metav1.ListOptions{})
+				scrapeDuration.WithLabelValues("trivy").Observe(time.Since(scrapeStart).Seconds())
 				if err != nil {
 					log.Printf("  ⚠️  Cannot access Trivy reports: %v", err)
+					watcherErrors.WithLabelValues("trivy", "access_error").Inc()
 				} else {
 					log.Printf("  ✓ Found %d VulnerabilityReports", len(trivyReports.Items))
 
@@ -610,7 +808,8 @@ func main() {
 								},
 							}
 
-							_, err := dynClient.Resource(eventGVR).Namespace(report.GetNamespace()).Create(ctx, event, metav1.CreateOptions{})
+							severityStr := fmt.Sprintf("%v", severity)
+							err := createEventWithMetrics(ctx, dynClient, eventGVR, event, "trivy", "security", severityStr)
 							if err != nil {
 								log.Printf("  ⚠️  Failed to create ZenAgentEvent: %v", err)
 							} else {
@@ -633,6 +832,7 @@ func main() {
 			// 3. Falco - Process alerts from webhook channel
 			if toolStates["falco"].Installed {
 				log.Println("  → Checking Falco events...")
+				watcherStatus.WithLabelValues("falco").Set(1)
 
 				// Get existing ZenAgentEvents for deduplication
 				existingEvents, err := dynClient.Resource(eventGVR).Namespace("").List(ctx, metav1.ListOptions{
@@ -736,7 +936,7 @@ func main() {
 							},
 						}
 
-						_, err := dynClient.Resource(eventGVR).Namespace(k8sNs).Create(ctx, event, metav1.CreateOptions{})
+						err := createEventWithMetrics(ctx, dynClient, eventGVR, event, "falco", "security", severity)
 						if err != nil {
 							log.Printf("  ⚠️  Failed to create Falco ZenAgentEvent: %v", err)
 						} else {
@@ -759,6 +959,8 @@ func main() {
 
 			// 4. Kube-bench - Check for kube-bench job results in ConfigMaps
 			log.Println("  → Checking Kube-bench reports...")
+			watcherStatus.WithLabelValues("kube-bench").Set(1)
+			toolsActive.WithLabelValues("kube-bench").Set(1)
 			kubeBenchNs := os.Getenv("KUBE_BENCH_NAMESPACE")
 			if kubeBenchNs == "" {
 				kubeBenchNs = "kube-bench"
@@ -882,7 +1084,7 @@ func main() {
 									},
 								}
 
-								_, err := dynClient.Resource(eventGVR).Namespace(kubeBenchNs).Create(ctx, event, metav1.CreateOptions{})
+								err := createEventWithMetrics(ctx, dynClient, eventGVR, event, "kube-bench", "compliance", severity)
 								if err != nil {
 									log.Printf("  ⚠️  Failed to create ZenAgentEvent: %v", err)
 								} else {
@@ -904,6 +1106,8 @@ func main() {
 
 			// 5. Checkov - Static analysis results from ConfigMaps
 			log.Println("  → Checking Checkov reports...")
+			watcherStatus.WithLabelValues("checkov").Set(1)
+			toolsActive.WithLabelValues("checkov").Set(1)
 			checkovNs := os.Getenv("CHECKOV_NAMESPACE")
 			if checkovNs == "" {
 				checkovNs = "checkov"
@@ -1052,7 +1256,7 @@ func main() {
 							},
 						}
 
-						_, err := dynClient.Resource(eventGVR).Namespace(resourceNs).Create(ctx, event, metav1.CreateOptions{})
+						err := createEventWithMetrics(ctx, dynClient, eventGVR, event, "checkov", category, severity)
 						if err != nil {
 							log.Printf("  ⚠️  Failed to create Checkov ZenAgentEvent: %v", err)
 						} else {
@@ -1072,6 +1276,8 @@ func main() {
 
 			// 6. Audit logs - Process events from webhook
 			log.Println("  → Checking Audit events...")
+			watcherStatus.WithLabelValues("audit").Set(1)
+			toolsActive.WithLabelValues("audit").Set(1)
 
 			// Get existing ZenAgentEvents for deduplication
 			existingEvents, err := dynClient.Resource(eventGVR).Namespace("").List(ctx, metav1.ListOptions{
@@ -1231,7 +1437,7 @@ func main() {
 						},
 					}
 
-					_, err := dynClient.Resource(eventGVR).Namespace(namespace).Create(ctx, event, metav1.CreateOptions{})
+					err := createEventWithMetrics(ctx, dynClient, eventGVR, event, "audit", category, severity)
 					if err != nil {
 						log.Printf("  ⚠️  Failed to create Audit ZenAgentEvent: %v", err)
 					} else {
@@ -1266,9 +1472,10 @@ func main() {
 			}
 			recentEvents = newRecent
 
-			loopDuration := time.Since(loopStart)
+			loopDurationSeconds := time.Since(loopStart).Seconds()
+			loopDuration.Observe(loopDurationSeconds)
 			log.Printf("📊 Total ZenAgentEvents: %d. Created last 5 minutes: %d (loop took %v)",
-				totalEventCount, len(recentEvents), loopDuration.Round(time.Millisecond))
+				totalEventCount, len(recentEvents), time.Duration(loopDurationSeconds*float64(time.Second)).Round(time.Millisecond))
 		}
 	}
 }
