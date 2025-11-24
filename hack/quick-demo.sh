@@ -686,9 +686,24 @@ create_cluster() {
                 "--k3s-arg" "--disable=traefik@server:0"
             )
             
-            # Use --api-port to explicitly set the host port for the API server
-            # This prevents k3d from auto-selecting random ports when multiple clusters exist
-            if [ "${K3D_API_PORT}" != "6443" ]; then
+            # CRITICAL: When multiple k3d clusters exist, k3d may ignore --api-port and use random ports
+            # Solution: Use a different port range when other clusters exist (like zen-alpha does)
+            local existing_clusters=$(k3d cluster list 2>/dev/null | grep -v "^NAME" | wc -l || echo "0")
+            if [ "$existing_clusters" -gt 0 ] && [ "${K3D_API_PORT}" = "6443" ]; then
+                # Other clusters exist and we're using default port - use a different port to avoid conflicts
+                # Use port 6550+ range (like zen-alpha demo clusters)
+                local demo_port=6550
+                while ! check_port $demo_port "k3d API" 2>/dev/null; do
+                    demo_port=$((demo_port + 1))
+                    if [ $demo_port -gt 6560 ]; then
+                        demo_port=$(find_available_port 6443 "k3d API")
+                        break
+                    fi
+                done
+                k3d_create_args+=("--api-port" "${demo_port}")
+                K3D_API_PORT=${demo_port}
+                echo -e "${CYAN}   Multiple clusters detected, using port ${demo_port} to avoid conflicts${NC}"
+            elif [ "${K3D_API_PORT}" != "6443" ]; then
                 k3d_create_args+=("--api-port" "${K3D_API_PORT}")
                 echo -e "${CYAN}   Using custom API port: ${K3D_API_PORT}${NC}"
             elif ! check_port 6443 "k3d API"; then
@@ -698,9 +713,9 @@ create_cluster() {
                 K3D_API_PORT=${alt_port}
                 echo -e "${CYAN}   Port 6443 in use, using ${alt_port} instead${NC}"
             else
-                # Default port is free, but still specify explicitly to avoid conflicts
+                # Default port is free, use it
                 k3d_create_args+=("--api-port" "${K3D_API_PORT}")
-                echo -e "${CYAN}   Using explicit API port: ${K3D_API_PORT}${NC}"
+                echo -e "${CYAN}   Using API port: ${K3D_API_PORT}${NC}"
             fi
             
             k3d_create_args+=("--wait")
