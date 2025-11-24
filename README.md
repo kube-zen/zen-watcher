@@ -21,9 +21,9 @@ Collects events from popular security and compliance tools:
 - ✅ **Kube-bench** - CIS benchmark compliance
 
 ### CRD-Based Storage
-- All events stored as **ZenAgentEvent** Custom Resources
+- All events stored as **Observation** Custom Resources
 - Kubernetes-native (stored in etcd)
-- kubectl access: `kubectl get zenagentevents`
+- kubectl access: `kubectl get observations`
 - GitOps compatible
 - No external dependencies
 
@@ -65,7 +65,7 @@ graph TB
     end
     
     subgraph "Storage"
-        I[ZenAgentEvent CRDs<br/>• category: security/compliance<br/>• source: trivy/kyverno/etc<br/>• eventType: vulnerability/policy/etc<br/>• severity: HIGH/MEDIUM/LOW<br/>• detectedAt: timestamp]
+        I[Observation CRDs<br/>• category: security/compliance<br/>• source: trivy/kyverno/etc<br/>• eventType: vulnerability/policy/etc<br/>• severity: HIGH/MEDIUM/LOW<br/>• detectedAt: timestamp]
     end
     
     subgraph "Your Integration"
@@ -116,7 +116,7 @@ graph TB
 
 ```bash
 # 1. Apply CRDs
-kubectl apply -f deployments/crds/zenagent_event_crd.yaml
+kubectl apply -f deployments/crds/observation_crd.yaml
 
 # 2. Deploy zen-watcher
 kubectl apply -f deployments/zen-watcher.yaml
@@ -126,7 +126,7 @@ kubectl get pods -n zen-system
 kubectl logs -n zen-system deployment/zen-watcher
 
 # 4. Check events
-kubectl get zenagentevents -n zen-system
+kubectl get observations -n zen-system
 ```
 
 ---
@@ -213,7 +213,7 @@ curl http://localhost:9090/metrics   # Prometheus metrics
 ### Watch Events in Your Code
 
 ```go
-// Watch ZenAgentEvent CRDs and process them
+// Watch Observation CRDs and process them
 package main
 
 import (
@@ -225,7 +225,7 @@ func watchEvents(ctx context.Context, client dynamic.Interface) {
     gvr := schema.GroupVersionResource{
         Group:    "zen.kube-zen.io",
         Version:  "v1",
-        Resource: "zenagentevents",
+        Resource: "observations",
     }
     
     watch, err := client.Resource(gvr).
@@ -243,18 +243,18 @@ func watchEvents(ctx context.Context, client dynamic.Interface) {
 
 ```bash
 # All events
-kubectl get zenagentevents -n zen-system
+kubectl get observations -n zen-system
 
 # High severity only
-kubectl get zenagentevents -n zen-system -o json | \
+kubectl get observations -n zen-system -o json | \
   jq '.items[] | select(.spec.severity == "high")'
 
 # From specific source
-kubectl get zenagentevents -n zen-system -o json | \
+kubectl get observations -n zen-system -o json | \
   jq '.items[] | select(.spec.source == "trivy")'
 
 # Last 24 hours
-kubectl get zenagentevents -n zen-system -o json | \
+kubectl get observations -n zen-system -o json | \
   jq '.items[] | select(.spec.detectedAt > "2025-11-07T00:00:00Z")'
 ```
 
@@ -262,10 +262,10 @@ kubectl get zenagentevents -n zen-system -o json | \
 
 ```bash
 # Export all events
-kubectl get zenagentevents -n zen-system -o json > events.json
+kubectl get observations -n zen-system -o json > events.json
 
 # Stream to external API
-kubectl get zenagentevents -n zen-system -o json | \
+kubectl get observations -n zen-system -o json | \
   jq -c '.items[]' | \
   while read event; do
     curl -X POST https://your-api.com/events \
@@ -318,13 +318,13 @@ kubectl logs -n zen-system deployment/zen-watcher -f
 ### Check CRDs
 ```bash
 # List all events
-kubectl get zenagentevents -n zen-system
+kubectl get observations -n zen-system
 
 # Describe specific event
-kubectl describe zenagentevents <name> -n zen-system
+kubectl describe observations <name> -n zen-system
 
 # Watch for new events
-kubectl get zenagentevents -n zen-system -w
+kubectl get observations -n zen-system -w
 ```
 
 ### View Metrics
@@ -343,7 +343,7 @@ curl http://localhost:9090/metrics
 **High memory usage:**
 - Adjust watch interval: `WATCH_INTERVAL=60s`
 - Enable conservative mode: `BEHAVIOR_MODE=conservative`
-- Cleanup old events: `kubectl delete zenagentevents --field-selector metadata.creationTimestamp<2025-10-01`
+- Cleanup old events: `kubectl delete observations --field-selector metadata.creationTimestamp<2025-10-01`
 
 ---
 
