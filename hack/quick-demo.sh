@@ -857,10 +857,26 @@ case "$PLATFORM" in
         ;;
 esac
 
+# Helper function to retry kubectl commands
+kubectl_retry() {
+    local max_attempts=30
+    local attempt=1
+    while [ $attempt -le $max_attempts ]; do
+        if kubectl "$@" --request-timeout=5s &>/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 2
+        attempt=$((attempt + 1))
+    done
+    # Last attempt without timeout suppression to show error
+    kubectl "$@" --request-timeout=5s 2>&1 || true
+    return 1
+}
+
 # Wait for cluster to be ready (with retries and better error handling)
 echo -e "${YELLOW}→${NC} Waiting for cluster to be ready..."
 cluster_ready=false
-for i in {1..90}; do
+for i in {1..60}; do
     # Try multiple methods to check cluster readiness
     if kubectl get nodes --request-timeout=3s &>/dev/null 2>&1; then
         cluster_ready=true
@@ -870,16 +886,24 @@ for i in {1..90}; do
     fi
     
     # Check if it's a connection issue vs cluster not ready
-    if kubectl get nodes --request-timeout=3s 2>&1 | grep -q "connection refused\|dial tcp"; then
+    kubectl_output=$(kubectl get nodes --request-timeout=3s 2>&1)
+    if echo "$kubectl_output" | grep -q "connection refused\|dial tcp"; then
         # Connection issue - might be port mismatch, try to detect and fix
-        if [ "$PLATFORM" = "k3d" ]; then
-            # Try to detect actual k3d port from loadbalancer
+        if [ "$PLATFORM" = "k3d" ] && [ $i -le 20 ]; then
+            # Try multiple methods to detect actual k3d port
             lb_port=$(docker port k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | grep "6443/tcp" | cut -d: -f2 | head -1)
-            if [ -n "$lb_port" ] && [ "$lb_port" != "6443" ]; then
+            if [ -z "$lb_port" ]; then
+                lb_port=$(docker inspect k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | jq -r '.[0].NetworkSettings.Ports."6443/tcp"[0].HostPort // empty' 2>/dev/null || echo "")
+            fi
+            if [ -z "$lb_port" ]; then
+                lb_port=$(k3d cluster list ${CLUSTER_NAME} -o json 2>/dev/null | jq -r '.[0].servers[0].portMappings."6443"[0]? // empty' 2>/dev/null || echo "")
+            fi
+            
+            if [ -n "$lb_port" ] && [ "$lb_port" != "null" ] && [ "$lb_port" != "6443" ]; then
                 echo -e "${CYAN}   Detected k3d using port ${lb_port}, updating kubeconfig...${NC}"
                 kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${lb_port}" 2>/dev/null || true
-                sleep 2
-                if kubectl get nodes --request-timeout=3s &>/dev/null 2>&1; then
+                sleep 3
+                if kubectl get nodes --request-timeout=5s &>/dev/null 2>&1; then
                     cluster_ready=true
                     echo -e "${GREEN}✓${NC} Cluster is ready (after port fix)"
                     show_section_time "Cluster readiness"
@@ -889,11 +913,11 @@ for i in {1..90}; do
         fi
     fi
     
-    if [ $i -eq 90 ]; then
-        echo -e "${YELLOW}⚠${NC}  Cluster API not responding after 3 minutes"
-        echo -e "${CYAN}   This might be a port conflict issue${NC}"
-        echo -e "${CYAN}   Continuing anyway - operations will retry...${NC}"
+    if [ $i -eq 60 ]; then
+        echo -e "${YELLOW}⚠${NC}  Cluster API not responding after 2 minutes"
+        echo -e "${CYAN}   Continuing anyway - operations will retry automatically...${NC}"
         show_section_time "Cluster readiness (timeout)"
+        break
     else
         sleep 2
         if [ $((i % 10)) -eq 0 ]; then
@@ -901,6 +925,24 @@ for i in {1..90}; do
         fi
     fi
 done
+
+# Final attempt to fix port if still not ready
+if [ "$cluster_ready" = false ] && [ "$PLATFORM" = "k3d" ]; then
+    echo -e "${CYAN}   Attempting final port detection...${NC}"
+    lb_port=$(docker port k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | grep "6443/tcp" | cut -d: -f2 | head -1)
+    if [ -z "$lb_port" ]; then
+        lb_port=$(docker inspect k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | jq -r '.[0].NetworkSettings.Ports."6443/tcp"[0].HostPort // empty' 2>/dev/null || echo "")
+    fi
+    if [ -n "$lb_port" ] && [ "$lb_port" != "null" ] && [ "$lb_port" != "6443" ]; then
+        echo -e "${CYAN}   Updating kubeconfig to use port ${lb_port}...${NC}"
+        kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${lb_port}" 2>/dev/null || true
+        sleep 3
+        if kubectl get nodes --request-timeout=5s &>/dev/null 2>&1; then
+            cluster_ready=true
+            echo -e "${GREEN}✓${NC} Cluster is ready (after port fix)"
+        fi
+    fi
+fi
 
 # Validate namespace now that we have cluster access
 echo ""
@@ -1152,8 +1194,13 @@ echo -e "${GREEN}✓${NC} Grafana deployed (user: zen)"
 
 # Wait for pods
 echo -e "${YELLOW}→${NC} Waiting for monitoring stack to be ready (this takes 30-60 seconds)..."
-kubectl wait --for=condition=ready pod -l app=victoriametrics -n ${NAMESPACE} --timeout=60s > /dev/null 2>&1 || true
-kubectl wait --for=condition=ready pod -l app=grafana -n ${NAMESPACE} --timeout=60s > /dev/null 2>&1 || true
+for attempt in {1..30}; do
+    if kubectl wait --for=condition=ready pod -l app=victoriametrics -n ${NAMESPACE} --timeout=10s > /dev/null 2>&1 && \
+       kubectl wait --for=condition=ready pod -l app=grafana -n ${NAMESPACE} --timeout=10s > /dev/null 2>&1; then
+        break
+    fi
+    sleep 2
+done
 echo -e "${GREEN}✓${NC} Monitoring stack ready"
 show_section_time "Monitoring stack deployment"
 
@@ -1277,84 +1324,33 @@ else
     echo -e "${YELLOW}⚠${NC}  Dashboard file not found at config/dashboards/zen-watcher-dashboard.json"
 fi
 
-echo ""
-show_total_time
+# Calculate total time
+TOTAL_END_TIME=$(date +%s)
+TOTAL_ELAPSED=$((TOTAL_END_TIME - SCRIPT_START_TIME))
+TOTAL_MINUTES=$((TOTAL_ELAPSED / 60))
+TOTAL_SECONDS=$((TOTAL_ELAPSED % 60))
+
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  🎉 Demo Environment Ready!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${CYAN}  🔐 GRAFANA CREDENTIALS${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "  Username: ${GREEN}zen${NC}"
-echo -e "  Password: ${GREEN}${GRAFANA_PASSWORD}${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${CYAN}  📊 GRAFANA ACCESS${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "${BLUE}📊 Access URLs (copy and paste):${NC}"
+echo -e "  ${GREEN}URL:${NC}     ${CYAN}http://localhost:${GRAFANA_PORT}${NC}"
+echo -e "  ${GREEN}Username:${NC} ${CYAN}zen${NC}"
+echo -e "  ${GREEN}Password:${NC} ${CYAN}${GRAFANA_PASSWORD}${NC}"
 echo ""
-echo -e "  ${GREEN}Grafana Dashboard:${NC}"
-echo -e "    ${CYAN}http://localhost:${GRAFANA_PORT}/d/zen-watcher${NC}"
-echo ""
-echo -e "  ${GREEN}Grafana Home:${NC}"
-echo -e "    ${CYAN}http://localhost:${GRAFANA_PORT}${NC}"
-echo ""
-echo -e "  ${GREEN}VictoriaMetrics UI:${NC}"
-echo -e "    ${CYAN}http://localhost:${VICTORIA_METRICS_PORT}/vmui${NC}"
-echo ""
-echo -e "${BLUE}🔌 Port Configuration:${NC}"
-echo -e "  Grafana: ${CYAN}${GRAFANA_PORT}${NC}"
-echo -e "  VictoriaMetrics: ${CYAN}${VICTORIA_METRICS_PORT}${NC}"
-echo -e "  Zen Watcher: ${CYAN}${ZEN_WATCHER_PORT}${NC}"
-case "$PLATFORM" in
-    k3d) echo -e "  k3d API: ${CYAN}${K3D_API_PORT}${NC}" ;;
-    kind) echo -e "  kind API: ${CYAN}${KIND_API_PORT}${NC}" ;;
-    minikube) echo -e "  minikube API: ${CYAN}${MINIKUBE_API_PORT}${NC}" ;;
-esac
-echo ""
-echo -e "${YELLOW}💡 Tip:${NC} Override ports via environment variables:"
-echo -e "  ${CYAN}GRAFANA_PORT=3200 VICTORIA_METRICS_PORT=8600 ./hack/quick-demo.sh${NC}"
-echo ""
-echo -e "${YELLOW}⏳ Note:${NC} Grafana may take 10-20 seconds to fully load"
-echo -e "${YELLOW}💡 Note:${NC} Password change is optional - can be done in Grafana settings"
-echo ""
-echo -e "${BLUE}🔧 Deployed Components:${NC}"
-[ "$INSTALL_TRIVY" = true ] && echo -e "  ✓ Trivy Operator (trivy-system)"
-[ "$INSTALL_FALCO" = true ] && echo -e "  ✓ Falco (falco)"
-[ "$INSTALL_KYVERNO" = true ] && echo -e "  ✓ Kyverno (kyverno)"
-[ "$INSTALL_CHECKOV" = true ] && echo -e "  ✓ Checkov (checkov namespace)"
-[ "$INSTALL_KUBE_BENCH" = true ] && echo -e "  ✓ kube-bench (kube-bench namespace)"
-echo -e "  ✓ VictoriaMetrics (${NAMESPACE})"
-echo -e "  ✓ Grafana (${NAMESPACE})"
-echo ""
-echo -e "${BLUE}🛠  Useful Commands:${NC}"
-echo -e "  # View all pods"
-echo -e "  kubectl get pods --all-namespaces"
-echo ""
-echo -e "  # Check Zen Watcher CRDs"
-echo -e "  kubectl get observations -A"
-echo ""
-[ "$INSTALL_CHECKOV" = true ] && echo -e "  # View Checkov scan results"
-[ "$INSTALL_CHECKOV" = true ] && echo -e "  kubectl logs job/checkov-scan -n checkov"
-[ "$INSTALL_CHECKOV" = true ] && echo ""
-[ "$INSTALL_KUBE_BENCH" = true ] && echo -e "  # View kube-bench CIS benchmark results"
-[ "$INSTALL_KUBE_BENCH" = true ] && echo -e "  kubectl logs job/kube-bench -n kube-bench"
-[ "$INSTALL_KUBE_BENCH" = true ] && echo ""
-echo -e "  # Clean up everything"
-echo -e "  ./hack/cleanup-demo.sh ${PLATFORM}"
-echo -e "  # Or manually:"
-case "$PLATFORM" in
-    k3d) echo -e "  k3d cluster delete ${CLUSTER_NAME}" ;;
-    kind) echo -e "  kind delete cluster --name ${CLUSTER_NAME}" ;;
-    minikube) echo -e "  minikube delete -p ${CLUSTER_NAME}" ;;
-esac
-echo ""
-echo -e "${YELLOW}💡 Tip:${NC} Keep this terminal open to maintain port-forwards!"
-echo -e "${YELLOW}💡 Tip:${NC} Press Ctrl+C to stop port-forwards and exit"
+echo -e "  ${GREEN}Dashboard:${NC} ${CYAN}http://localhost:${GRAFANA_PORT}/d/zen-watcher${NC}"
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}✨ READY! Open your browser to:${NC}"
-echo -e "${CYAN}   http://localhost:${GRAFANA_PORT}/d/zen-watcher${NC}"
+if [ $TOTAL_MINUTES -gt 0 ]; then
+    echo -e "  ${GREEN}⏱  Deployment Time:${NC} ${CYAN}${TOTAL_MINUTES}m ${TOTAL_SECONDS}s${NC}"
+else
+    echo -e "  ${GREEN}⏱  Deployment Time:${NC} ${CYAN}${TOTAL_SECONDS}s${NC}"
+fi
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
