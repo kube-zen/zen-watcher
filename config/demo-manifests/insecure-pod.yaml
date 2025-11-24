@@ -1,0 +1,22 @@
+# DEMO ONLY - This manifest contains intentional security issues for demonstration
+# Used to demonstrate Checkov scanning and Zen Watcher observation collection
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demo-insecure-pod
+  namespace: demo-manifests
+  labels:
+    demo.zen.kube-zen.io/manifest: "true"
+    app: demo-insecure
+spec:
+  # DEMO: Privileged container (security risk)
+  containers:
+  - name: insecure-container
+    image: nginx:latest
+    securityContext:
+      privileged: true  # DEMO: Security issue
+      runAsUser: 0      # DEMO: Running as root
+    # DEMO: Missing resource limits
+  hostNetwork: true  # DEMO: Security issue
+  hostPID: true      # DEMO: Security issue
+

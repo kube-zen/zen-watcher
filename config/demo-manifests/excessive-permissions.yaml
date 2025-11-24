@@ -1,0 +1,37 @@
+# DEMO ONLY - This manifest demonstrates excessive RBAC permissions
+# Used to demonstrate Checkov scanning and Zen Watcher observation collection
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: demo-excessive-permissions
+  namespace: demo-manifests
+  labels:
+    demo.zen.kube-zen.io/manifest: "true"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: demo-excessive-clusterrole
+  labels:
+    demo.zen.kube-zen.io/manifest: "true"
+rules:
+# DEMO: Excessive permissions - cluster-admin level access
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: demo-excessive-binding
+  labels:
+    demo.zen.kube-zen.io/manifest: "true"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: demo-excessive-clusterrole
+subjects:
+- kind: ServiceAccount
+  name: demo-excessive-permissions
+  namespace: demo-manifests
+

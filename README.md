@@ -3,9 +3,15 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go)](https://go.dev/)
 
-> **Kubernetes Security & Compliance Event Aggregator**
+> **Kubernetes Observation Collector: Turn Any Signal into a CRD**
 
-Zen Watcher is an open-source Kubernetes operator that aggregates security and compliance events from multiple tools into unified CRDs. Simple, standalone, and useful on its own.
+Zen Watcher is an open-source Kubernetes operator that aggregates structured signals from security, compliance, and infrastructure tools into unified `Observation` CRDs. Lightweight, standalone, and useful on its own.
+
+---
+
+## 🚀 Quick Demo
+
+Try Zen Watcher in minutes: `./hack/quick-demo.sh --non-interactive --deploy-mock-data` creates a local cluster, deploys security tools, generates demo observations, and opens Grafana at `http://localhost:3100` (user: `zen`, password shown at end). Check observations with `kubectl get observations -n zen-system`. Cleanup: `./hack/cleanup-demo.sh`.
 
 ---
 
@@ -105,14 +111,14 @@ graph TB
 
 ---
 
-## 🚀 Quick Start
+## 📦 Installation
 
 ### Prerequisites
 - Kubernetes 1.28+
 - kubectl configured
 - Security tools installed (optional: Trivy, Falco, Kyverno, etc.)
 
-### Installation
+### Quick Install
 
 ```bash
 # 1. Apply CRDs
@@ -125,7 +131,7 @@ kubectl apply -f deployments/zen-watcher.yaml
 kubectl get pods -n zen-system
 kubectl logs -n zen-system deployment/zen-watcher
 
-# 4. Check events
+# 4. Check observations
 kubectl get observations -n zen-system
 ```
 

@@ -1,0 +1,19 @@
+# DEMO ONLY - This manifest demonstrates missing security context
+# Used to demonstrate Checkov scanning and Zen Watcher observation collection
+apiVersion: v1
+kind: Pod
+metadata:
+  name: demo-no-security-context
+  namespace: demo-manifests
+  labels:
+    demo.zen.kube-zen.io/manifest: "true"
+    app: demo-no-security
+spec:
+  containers:
+  - name: no-security
+    image: nginx:latest
+    # DEMO: Missing securityContext
+    # DEMO: Missing resource limits
+    ports:
+    - containerPort: 80
+

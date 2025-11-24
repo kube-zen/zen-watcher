@@ -1,0 +1,29 @@
+# DEMO ONLY - This manifest demonstrates public registry usage without verification
+# Used to demonstrate Checkov scanning and Zen Watcher observation collection
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-public-registry
+  namespace: demo-manifests
+  labels:
+    demo.zen.kube-zen.io/manifest: "true"
+    app: demo-public-registry
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-public-registry
+  template:
+    metadata:
+      labels:
+        app: demo-public-registry
+    spec:
+      containers:
+      - name: app
+        # DEMO: Using public registry without image verification
+        image: nginx:latest
+        # DEMO: Missing imagePullPolicy
+        # DEMO: Missing securityContext
+        ports:
+        - containerPort: 80
+
