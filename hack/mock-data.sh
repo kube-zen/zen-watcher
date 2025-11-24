@@ -51,41 +51,77 @@ spec:
     namespace: ${resource_ns}
   detectedAt: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   details:
-    ${details_json}
+${details_json}
 status:
   synced: false
 EOF
 }
 
 # Create demo observations from Trivy (vulnerabilities)
-create_observation "demo-trivy-critical-1" "trivy" "security" "critical" "vulnerability" "Pod" "demo-insecure-pod" "demo-manifests" 'cve: "CVE-2024-0001", description: "Critical vulnerability in base image", package: "openssl", version: "1.1.1"'
-create_observation "demo-trivy-critical-2" "trivy" "security" "critical" "vulnerability" "Pod" "demo-no-security-context" "demo-manifests" 'cve: "CVE-2024-0002", description: "Critical vulnerability in nginx", package: "nginx", version: "1.24.0"'
-create_observation "demo-trivy-high-1" "trivy" "security" "high" "vulnerability" "Deployment" "demo-public-registry" "demo-manifests" 'cve: "CVE-2024-0003", description: "High severity vulnerability", package: "libc", version: "2.35"'
-create_observation "demo-trivy-high-2" "trivy" "security" "high" "vulnerability" "Pod" "demo-insecure-pod" "demo-manifests" 'cve: "CVE-2024-0004", description: "High severity vulnerability", package: "curl", version: "7.85.0"'
-create_observation "demo-trivy-medium-1" "trivy" "security" "medium" "vulnerability" "Deployment" "demo-public-registry" "demo-manifests" 'cve: "CVE-2024-0005", description: "Medium severity vulnerability", package: "bash", version: "5.1.16"'
+create_observation "demo-trivy-critical-1" "trivy" "security" "critical" "vulnerability" "Pod" "demo-insecure-pod" "demo-manifests" '    cve: "CVE-2024-0001"
+    description: "Critical vulnerability in base image"
+    package: "openssl"
+    version: "1.1.1"'
+create_observation "demo-trivy-critical-2" "trivy" "security" "critical" "vulnerability" "Pod" "demo-no-security-context" "demo-manifests" '    cve: "CVE-2024-0002"
+    description: "Critical vulnerability in nginx"
+    package: "nginx"
+    version: "1.24.0"'
+create_observation "demo-trivy-high-1" "trivy" "security" "high" "vulnerability" "Deployment" "demo-public-registry" "demo-manifests" '    cve: "CVE-2024-0003"
+    description: "High severity vulnerability"
+    package: "libc"
+    version: "2.35"'
+create_observation "demo-trivy-high-2" "trivy" "security" "high" "vulnerability" "Pod" "demo-insecure-pod" "demo-manifests" '    cve: "CVE-2024-0004"
+    description: "High severity vulnerability"
+    package: "curl"
+    version: "7.85.0"'
+create_observation "demo-trivy-medium-1" "trivy" "security" "medium" "vulnerability" "Deployment" "demo-public-registry" "demo-manifests" '    cve: "CVE-2024-0005"
+    description: "Medium severity vulnerability"
+    package: "bash"
+    version: "5.1.16"'
 
 # Create demo observations from Falco (runtime threats)
-create_observation "demo-falco-critical-1" "falco" "security" "critical" "runtime-threat" "Pod" "demo-insecure-pod" "demo-manifests" 'rule: "Privileged container started", priority: "Critical", output: "Container running in privileged mode"'
-create_observation "demo-falco-high-1" "falco" "security" "high" "runtime-threat" "Pod" "demo-insecure-pod" "demo-manifests" 'rule: "Sensitive file accessed", priority: "High", output: "Access to /etc/shadow detected"'
-create_observation "demo-falco-high-2" "falco" "security" "high" "runtime-threat" "Pod" "demo-no-security-context" "demo-manifests" 'rule: "Unexpected network connection", priority: "High", output: "Connection to external IP detected"'
+create_observation "demo-falco-critical-1" "falco" "security" "critical" "runtime-threat" "Pod" "demo-insecure-pod" "demo-manifests" '    rule: "Privileged container started"
+    priority: "Critical"
+    output: "Container running in privileged mode"'
+create_observation "demo-falco-high-1" "falco" "security" "high" "runtime-threat" "Pod" "demo-insecure-pod" "demo-manifests" '    rule: "Sensitive file accessed"
+    priority: "High"
+    output: "Access to /etc/shadow detected"'
+create_observation "demo-falco-high-2" "falco" "security" "high" "runtime-threat" "Pod" "demo-no-security-context" "demo-manifests" '    rule: "Unexpected network connection"
+    priority: "High"
+    output: "Connection to external IP detected"'
 
 # Create demo observations from Kyverno (policy violations)
-create_observation "demo-kyverno-medium-1" "kyverno" "security" "medium" "policy-violation" "Pod" "demo-no-security-context" "demo-manifests" 'policy: "require-security-context", rule: "requireSecurityContext", message: "Pod missing security context"'
-create_observation "demo-kyverno-medium-2" "kyverno" "security" "medium" "policy-violation" "Pod" "demo-insecure-pod" "demo-manifests" 'policy: "disallow-privileged", rule: "disallowPrivileged", message: "Privileged containers not allowed"'
-create_observation "demo-kyverno-low-1" "kyverno" "compliance" "low" "policy-violation" "Deployment" "demo-public-registry" "demo-manifests" 'policy: "require-resource-limits", rule: "requireResourceLimits", message: "Missing resource limits"'
+create_observation "demo-kyverno-medium-1" "kyverno" "security" "medium" "policy-violation" "Pod" "demo-no-security-context" "demo-manifests" '    policy: "require-security-context"
+    rule: "requireSecurityContext"
+    message: "Pod missing security context"'
+create_observation "demo-kyverno-medium-2" "kyverno" "security" "medium" "policy-violation" "Pod" "demo-insecure-pod" "demo-manifests" '    policy: "disallow-privileged"
+    rule: "disallowPrivileged"
+    message: "Privileged containers not allowed"'
+create_observation "demo-kyverno-low-1" "kyverno" "compliance" "low" "policy-violation" "Deployment" "demo-public-registry" "demo-manifests" '    policy: "require-resource-limits"
+    rule: "requireResourceLimits"
+    message: "Missing resource limits"'
 
 # Create demo observations from Checkov (IaC scanning)
-create_observation "demo-checkov-high-1" "checkov" "security" "high" "iac-scan" "Pod" "demo-insecure-pod" "demo-manifests" 'check: "CKV_K8S_1", guideline: "Ensure that the API Server pod specification file has permissions of 644 or more restrictive"'
-create_observation "demo-checkov-medium-1" "checkov" "security" "medium" "iac-scan" "Pod" "demo-no-security-context" "demo-manifests" 'check: "CKV_K8S_24", guideline: "Ensure that the Pod Security Policy is set"'
-create_observation "demo-checkov-medium-2" "checkov" "security" "medium" "iac-scan" "ServiceAccount" "demo-excessive-permissions" "demo-manifests" 'check: "CKV_K8S_14", guideline: "Ensure that the Service Account token is not mounted"'
+create_observation "demo-checkov-high-1" "checkov" "security" "high" "iac-scan" "Pod" "demo-insecure-pod" "demo-manifests" '    check: "CKV_K8S_1"
+    guideline: "Ensure that the API Server pod specification file has permissions of 644 or more restrictive"'
+create_observation "demo-checkov-medium-1" "checkov" "security" "medium" "iac-scan" "Pod" "demo-no-security-context" "demo-manifests" '    check: "CKV_K8S_24"
+    guideline: "Ensure that the Pod Security Policy is set"'
+create_observation "demo-checkov-medium-2" "checkov" "security" "medium" "iac-scan" "ServiceAccount" "demo-excessive-permissions" "demo-manifests" '    check: "CKV_K8S_14"
+    guideline: "Ensure that the Service Account token is not mounted"'
 
 # Create demo observations from kube-bench (CIS compliance)
-create_observation "demo-kubebench-medium-1" "kube-bench" "compliance" "medium" "cis-benchmark" "Node" "demo-node" "" 'test: "1.2.1", description: "Ensure that the --anonymous-auth argument is set to false"'
-create_observation "demo-kubebench-low-1" "kube-bench" "compliance" "low" "cis-benchmark" "Node" "demo-node" "" 'test: "1.2.2", description: "Ensure that the --basic-auth-file argument is not set"'
+create_observation "demo-kubebench-medium-1" "kube-bench" "compliance" "medium" "cis-benchmark" "Node" "demo-node" "" '    test: "1.2.1"
+    description: "Ensure that the --anonymous-auth argument is set to false"'
+create_observation "demo-kubebench-low-1" "kube-bench" "compliance" "low" "cis-benchmark" "Node" "demo-node" "" '    test: "1.2.2"
+    description: "Ensure that the --basic-auth-file argument is not set"'
 
 # Create demo observations from audit logs
-create_observation "demo-audit-info-1" "audit" "compliance" "info" "audit-event" "ServiceAccount" "demo-excessive-permissions" "demo-manifests" 'action: "create", user: "system:serviceaccount:demo-manifests:demo-excessive-permissions", verb: "create"'
-create_observation "demo-audit-info-2" "audit" "compliance" "info" "audit-event" "ClusterRoleBinding" "demo-excessive-binding" "" 'action: "create", user: "admin", verb: "create"'
+create_observation "demo-audit-info-1" "audit" "compliance" "info" "audit-event" "ServiceAccount" "demo-excessive-permissions" "demo-manifests" '    action: "create"
+    user: "system:serviceaccount:demo-manifests:demo-excessive-permissions"
+    verb: "create"'
+create_observation "demo-audit-info-2" "audit" "compliance" "info" "audit-event" "ClusterRoleBinding" "demo-excessive-binding" "" '    action: "create"
+    user: "admin"
+    verb: "create"'
 
 echo "✓ Demo observations created"
 

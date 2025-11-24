@@ -72,6 +72,32 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
+# Timing tracking
+SCRIPT_START_TIME=$(date +%s)
+SECTION_START_TIME=$(date +%s)
+
+# Function to show elapsed time for a section
+show_section_time() {
+    local section_name="$1"
+    local end_time=$(date +%s)
+    local elapsed=$((end_time - SECTION_START_TIME))
+    echo -e "${CYAN}   ⏱  ${section_name} took ${elapsed} seconds${NC}"
+    SECTION_START_TIME=$(date +%s)
+}
+
+# Function to show total elapsed time
+show_total_time() {
+    local end_time=$(date +%s)
+    local total_elapsed=$((end_time - SCRIPT_START_TIME))
+    local minutes=$((total_elapsed / 60))
+    local seconds=$((total_elapsed % 60))
+    if [ $minutes -gt 0 ]; then
+        echo -e "${CYAN}⏱  Total time: ${minutes}m ${seconds}s${NC}"
+    else
+        echo -e "${CYAN}⏱  Total time: ${total_elapsed}s${NC}"
+    fi
+}
+
 # Parse arguments for flags
 NON_INTERACTIVE=false
 USE_EXISTING_CLUSTER_FLAG=false
@@ -781,25 +807,43 @@ EOF
     esac
 }
 
+SECTION_START_TIME=$(date +%s)
 create_cluster
-
-# Set kubeconfig context for the cluster
+show_section_time "Cluster creation"
 echo -e "${YELLOW}→${NC} Setting up kubeconfig..."
+SECTION_START_TIME=$(date +%s)
 case "$PLATFORM" in
     k3d)
         # Wait a moment for k3d to finish setting up
-        sleep 3
+        sleep 5
         # Merge kubeconfig (preferred method - updates default kubeconfig)
-        k3d kubeconfig merge ${CLUSTER_NAME} --kubeconfig-merge-default --kubeconfig-switch-context 2>/dev/null || {
+        if ! k3d kubeconfig merge ${CLUSTER_NAME} --kubeconfig-merge-default --kubeconfig-switch-context 2>/dev/null; then
             # Fallback: write to temp file and export
             k3d kubeconfig write ${CLUSTER_NAME} > /tmp/k3d-kubeconfig-${CLUSTER_NAME} 2>/dev/null
             export KUBECONFIG=/tmp/k3d-kubeconfig-${CLUSTER_NAME}
-        }
+        fi
+        
         # Ensure context is set
         kubectl config use-context k3d-${CLUSTER_NAME} 2>/dev/null || {
             # Try alternative context name
             kubectl config use-context k3d-${CLUSTER_NAME}@${CLUSTER_NAME} 2>/dev/null || true
         }
+        
+        # Fix kubeconfig server URL - k3d sometimes uses 0.0.0.0 which doesn't work
+        # Replace 0.0.0.0 with 127.0.0.1
+        current_server=$(kubectl config view --minify --context k3d-${CLUSTER_NAME} -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || echo "")
+        if echo "$current_server" | grep -q "0.0.0.0"; then
+            fixed_server=$(echo "$current_server" | sed 's/0\.0\.0\.0/127.0.0.1/')
+            echo -e "${CYAN}   Fixing kubeconfig server URL: ${current_server} → ${fixed_server}${NC}"
+            kubectl config set clusters.k3d-${CLUSTER_NAME}.server "$fixed_server" 2>/dev/null || true
+        fi
+        
+        # Try to detect actual port from k3d cluster info
+        k3d_port=$(k3d cluster list ${CLUSTER_NAME} -o json 2>/dev/null | jq -r '.[0].servers[0].portMappings."6443"[0]? // empty' 2>/dev/null || echo "")
+        if [ -n "$k3d_port" ] && [ "$k3d_port" != "null" ] && [ "$k3d_port" != "6443" ]; then
+            echo -e "${CYAN}   k3d is using port ${k3d_port} (updating kubeconfig)${NC}"
+            kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${k3d_port}" 2>/dev/null || true
+        fi
         ;;
     kind)
         # kind automatically updates kubeconfig, but ensure context is set
@@ -813,19 +857,46 @@ case "$PLATFORM" in
         ;;
 esac
 
-# Wait for cluster to be ready (with retries)
+# Wait for cluster to be ready (with retries and better error handling)
 echo -e "${YELLOW}→${NC} Waiting for cluster to be ready..."
-for i in {1..60}; do
-    if kubectl get nodes --request-timeout=5s &>/dev/null 2>&1; then
+cluster_ready=false
+for i in {1..90}; do
+    # Try multiple methods to check cluster readiness
+    if kubectl get nodes --request-timeout=3s &>/dev/null 2>&1; then
+        cluster_ready=true
         echo -e "${GREEN}✓${NC} Cluster is ready"
+        show_section_time "Cluster readiness"
         break
     fi
-    if [ $i -eq 60 ]; then
-        echo -e "${YELLOW}⚠${NC}  Cluster API not fully ready yet (this is normal for new clusters)"
-        echo -e "${CYAN}   Continuing with deployment (operations will retry)...${NC}"
+    
+    # Check if it's a connection issue vs cluster not ready
+    if kubectl get nodes --request-timeout=3s 2>&1 | grep -q "connection refused\|dial tcp"; then
+        # Connection issue - might be port mismatch, try to detect and fix
+        if [ "$PLATFORM" = "k3d" ]; then
+            # Try to detect actual k3d port from loadbalancer
+            lb_port=$(docker port k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | grep "6443/tcp" | cut -d: -f2 | head -1)
+            if [ -n "$lb_port" ] && [ "$lb_port" != "6443" ]; then
+                echo -e "${CYAN}   Detected k3d using port ${lb_port}, updating kubeconfig...${NC}"
+                kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${lb_port}" 2>/dev/null || true
+                sleep 2
+                if kubectl get nodes --request-timeout=3s &>/dev/null 2>&1; then
+                    cluster_ready=true
+                    echo -e "${GREEN}✓${NC} Cluster is ready (after port fix)"
+                    show_section_time "Cluster readiness"
+                    break
+                fi
+            fi
+        fi
+    fi
+    
+    if [ $i -eq 90 ]; then
+        echo -e "${YELLOW}⚠${NC}  Cluster API not responding after 3 minutes"
+        echo -e "${CYAN}   This might be a port conflict issue${NC}"
+        echo -e "${CYAN}   Continuing anyway - operations will retry...${NC}"
+        show_section_time "Cluster readiness (timeout)"
     else
         sleep 2
-        if [ $((i % 5)) -eq 0 ]; then
+        if [ $((i % 10)) -eq 0 ]; then
             echo -e "${CYAN}   ... still waiting ($((i*2)) seconds)${NC}"
         fi
     fi
@@ -842,6 +913,7 @@ if [ "$INSTALL_TRIVY" = true ] || [ "$INSTALL_FALCO" = true ] || [ "$INSTALL_KYV
     echo -e "${BLUE}  Deploying Security Tools${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
+    SECTION_START_TIME=$(date +%s)
 
     # Add Helm repositories (only if needed)
     if [ "$INSTALL_TRIVY" = true ] || [ "$INSTALL_FALCO" = true ] || [ "$INSTALL_KYVERNO" = true ]; then
@@ -1083,12 +1155,14 @@ echo -e "${YELLOW}→${NC} Waiting for monitoring stack to be ready (this takes 
 kubectl wait --for=condition=ready pod -l app=victoriametrics -n ${NAMESPACE} --timeout=60s > /dev/null 2>&1 || true
 kubectl wait --for=condition=ready pod -l app=grafana -n ${NAMESPACE} --timeout=60s > /dev/null 2>&1 || true
 echo -e "${GREEN}✓${NC} Monitoring stack ready"
+show_section_time "Monitoring stack deployment"
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BLUE}  Deploying Zen Watcher${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
+SECTION_START_TIME=$(date +%s)
 
 # Deploy Zen Watcher CRDs
 echo -e "${YELLOW}→${NC} Deploying Zen Watcher CRDs..."
@@ -1096,12 +1170,14 @@ kubectl apply -f deployments/crds/ > /dev/null 2>&1
 echo -e "${GREEN}✓${NC} CRDs deployed"
 
 # Handle mock data deployment
+SECTION_START_TIME=$(date +%s)
 if [ "$SKIP_MOCK_DATA" = true ]; then
     echo -e "${CYAN}→${NC} Skipping mock data deployment (--skip-mock-data flag)${NC}"
 elif [ "$DEPLOY_MOCK_DATA" = true ]; then
     echo -e "${YELLOW}→${NC} Deploying mock data (--deploy-mock-data flag)..."
     ./hack/mock-data.sh ${NAMESPACE} > /dev/null 2>&1 || echo -e "${YELLOW}⚠${NC}  Mock data deployment issue (continuing...)"
     echo -e "${GREEN}✓${NC} Mock data deployed"
+    show_section_time "Mock data deployment"
 elif [ "$NON_INTERACTIVE" = true ]; then
     # In non-interactive mode, skip mock data unless explicitly requested
     echo -e "${CYAN}→${NC} Non-interactive mode: skipping mock data (use --deploy-mock-data to enable)${NC}"
@@ -1114,6 +1190,7 @@ else
         echo -e "${YELLOW}→${NC} Deploying mock data..."
         ./hack/mock-data.sh ${NAMESPACE} > /dev/null 2>&1 || echo -e "${YELLOW}⚠${NC}  Mock data deployment issue (continuing...)"
         echo -e "${GREEN}✓${NC} Mock data deployed"
+        show_section_time "Mock data deployment"
     else
         echo -e "${CYAN}→${NC} Skipping mock data deployment${NC}"
     fi
@@ -1124,6 +1201,7 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo -e "${BLUE}  Configuring Grafana${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
+SECTION_START_TIME=$(date +%s)
 
 # Setup port-forwards
 echo -e "${YELLOW}→${NC} Setting up port-forwards..."
@@ -1145,16 +1223,17 @@ echo -e "${GREEN}✓${NC} Port-forwards active"
 
 # Wait for Grafana to be fully ready
 echo -e "${YELLOW}→${NC} Waiting for Grafana to be fully ready (15-30 seconds)..."
-for i in {1..30}; do
+for i in {1..60}; do
     if curl -s http://localhost:${GRAFANA_PORT}/api/health 2>/dev/null | grep -q "ok"; then
         echo -e "${GREEN}✓${NC} Grafana is ready"
         break
     fi
     sleep 1
-    if [ $((i % 5)) -eq 0 ]; then
+    if [ $((i % 10)) -eq 0 ]; then
         echo -e "${CYAN}  ... still waiting ($i seconds)${NC}"
     fi
 done
+show_section_time "Grafana configuration"
 
 # Configure Grafana datasource
 echo -e "${YELLOW}→${NC} Configuring VictoriaMetrics datasource..."
@@ -1198,6 +1277,8 @@ else
     echo -e "${YELLOW}⚠${NC}  Dashboard file not found at config/dashboards/zen-watcher-dashboard.json"
 fi
 
+echo ""
+show_total_time
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  🎉 Demo Environment Ready!${NC}"
