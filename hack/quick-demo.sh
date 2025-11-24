@@ -816,6 +816,42 @@ case "$PLATFORM" in
     k3d)
         # Wait a moment for k3d to finish setting up
         sleep 5
+        
+        # CRITICAL: Detect the ACTUAL port k3d used (it may differ from requested port when multiple clusters exist)
+        echo -e "${CYAN}   Detecting actual k3d API port...${NC}"
+        actual_port=""
+        
+        # Method 1: Check docker inspect (most reliable for k3d loadbalancer)
+        inspect_port=$(docker inspect k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | jq -r '.[0].NetworkSettings.Ports."6443/tcp"[0].HostPort // empty' 2>/dev/null || echo "")
+        if [ -n "$inspect_port" ] && [ "$inspect_port" != "null" ] && [ "$inspect_port" != "" ]; then
+            actual_port="$inspect_port"
+            echo -e "${CYAN}   Found port via docker inspect: ${actual_port}${NC}"
+        fi
+        
+        # Method 2: Check docker port command
+        if [ -z "$actual_port" ]; then
+            lb_port=$(docker port k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | grep "6443/tcp" | cut -d: -f2 | tr -d ' ' | head -1)
+            if [ -n "$lb_port" ] && [ "$lb_port" != "" ]; then
+                actual_port="$lb_port"
+                echo -e "${CYAN}   Found port via docker port: ${actual_port}${NC}"
+            fi
+        fi
+        
+        # Method 3: Check what port is actually listening (fallback)
+        if [ -z "$actual_port" ]; then
+            # Find what port k3d actually bound to by checking listening ports
+            for test_port in 6443 6444 6445 6446 6447 6448 6449 6450; do
+                if ss -tlnp 2>/dev/null | grep -q ":${test_port}"; then
+                    # Verify it's actually the k3d cluster by trying to connect
+                    if timeout 2 kubectl --server="https://127.0.0.1:${test_port}" get nodes --request-timeout=1s &>/dev/null 2>&1; then
+                        actual_port="$test_port"
+                        echo -e "${CYAN}   Found port via port scan: ${actual_port}${NC}"
+                        break
+                    fi
+                fi
+            done
+        fi
+        
         # Merge kubeconfig (preferred method - updates default kubeconfig)
         if ! k3d kubeconfig merge ${CLUSTER_NAME} --kubeconfig-merge-default --kubeconfig-switch-context 2>/dev/null; then
             # Fallback: write to temp file and export
@@ -838,11 +874,12 @@ case "$PLATFORM" in
             kubectl config set clusters.k3d-${CLUSTER_NAME}.server "$fixed_server" 2>/dev/null || true
         fi
         
-        # Try to detect actual port from k3d cluster info
-        k3d_port=$(k3d cluster list ${CLUSTER_NAME} -o json 2>/dev/null | jq -r '.[0].servers[0].portMappings."6443"[0]? // empty' 2>/dev/null || echo "")
-        if [ -n "$k3d_port" ] && [ "$k3d_port" != "null" ] && [ "$k3d_port" != "6443" ]; then
-            echo -e "${CYAN}   k3d is using port ${k3d_port} (updating kubeconfig)${NC}"
-            kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${k3d_port}" 2>/dev/null || true
+        # Update kubeconfig with actual port if we detected one
+        if [ -n "$actual_port" ] && [ "$actual_port" != "6443" ]; then
+            echo -e "${CYAN}   Updating kubeconfig to use actual port: ${actual_port}${NC}"
+            kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${actual_port}" 2>/dev/null || true
+            # Also update K3D_API_PORT for later reference
+            K3D_API_PORT="$actual_port"
         fi
         ;;
     kind)
