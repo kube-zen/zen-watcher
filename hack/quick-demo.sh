@@ -833,20 +833,33 @@ case "$PLATFORM" in
         # Wait a moment for k3d to finish setting up
         sleep 3
         
-        # Detect actual port if using existing cluster
-        if [ "${USE_EXISTING_CLUSTER:-false}" = "true" ]; then
-            echo -e "${CYAN}   [DEBUG] Detecting actual API port for existing cluster...${NC}"
-            # Try to get port from docker
-            ACTUAL_PORT=$(docker port k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | grep "6443/tcp" | cut -d: -f2 | tr -d ' ' | head -1 || echo "")
-            if [ -z "$ACTUAL_PORT" ]; then
-                ACTUAL_PORT=$(docker inspect k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | jq -r '.[0].NetworkSettings.Ports."6443/tcp"[0].HostPort // empty' 2>/dev/null || echo "")
-            fi
-            if [ -n "$ACTUAL_PORT" ] && [ "$ACTUAL_PORT" != "null" ] && [ "$ACTUAL_PORT" != "" ]; then
-                K3D_API_PORT=$ACTUAL_PORT
-                echo -e "${CYAN}   [DEBUG] Detected actual port: ${K3D_API_PORT}${NC}"
-            else
-                echo -e "${CYAN}   [DEBUG] Could not detect port, using configured: ${K3D_API_PORT}${NC}"
-            fi
+        # Detect actual port if using existing cluster or if cluster was just created
+        echo -e "${CYAN}   [DEBUG] Detecting actual API port...${NC}"
+        ACTUAL_PORT=""
+        # Method 1: Try to get port from docker port command
+        ACTUAL_PORT=$(docker port k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | grep "6443/tcp" | cut -d: -f2 | tr -d ' ' | head -1 || echo "")
+        # Method 2: Try docker inspect
+        if [ -z "$ACTUAL_PORT" ] || [ "$ACTUAL_PORT" = "" ]; then
+            ACTUAL_PORT=$(docker inspect k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | jq -r '.[0].NetworkSettings.Ports."6443/tcp"[0].HostPort // empty' 2>/dev/null || echo "")
+        fi
+        # Method 3: Check listening ports (fallback - check common k3d ports)
+        if [ -z "$ACTUAL_PORT" ] || [ "$ACTUAL_PORT" = "" ] || [ "$ACTUAL_PORT" = "null" ]; then
+            for test_port in 6550 6551 6552 6553 6554 6555 6443 6444 6445; do
+                if ss -tlnp 2>/dev/null | grep -q ":${test_port}"; then
+                    # Verify it's actually k3d by checking if kubectl can connect
+                    if timeout 2 kubectl --server="https://127.0.0.1:${test_port}" get nodes --request-timeout=1s &>/dev/null 2>&1; then
+                        ACTUAL_PORT=$test_port
+                        echo -e "${CYAN}   [DEBUG] Found port via listening port check: ${ACTUAL_PORT}${NC}"
+                        break
+                    fi
+                fi
+            done
+        fi
+        if [ -n "$ACTUAL_PORT" ] && [ "$ACTUAL_PORT" != "null" ] && [ "$ACTUAL_PORT" != "" ]; then
+            K3D_API_PORT=$ACTUAL_PORT
+            echo -e "${CYAN}   [DEBUG] Using detected port: ${K3D_API_PORT}${NC}"
+        else
+            echo -e "${CYAN}   [DEBUG] Could not detect port, using configured: ${K3D_API_PORT}${NC}"
         fi
         
         echo -e "${CYAN}   Setting up kubeconfig for port ${K3D_API_PORT}...${NC}"
