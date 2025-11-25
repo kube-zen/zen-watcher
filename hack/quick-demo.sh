@@ -924,38 +924,41 @@ case "$PLATFORM" in
         timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>/dev/null || true
         echo -e "${CYAN}   Configured kubeconfig for port ${K3D_API_PORT} (TLS verification skipped)${NC}"
         
-        # Wait for cluster to be ready - check via docker exec first (more reliable)
-        echo -e "${CYAN}   [DEBUG] Waiting for cluster to be ready (this can take 2-3 minutes)...${NC}"
+        # Wait for cluster API to be accessible (don't wait for nodes - they may take longer)
+        echo -e "${CYAN}   [DEBUG] Waiting for cluster API to be accessible...${NC}"
         CLUSTER_READY=false
-        for wait_attempt in {1..120}; do
-            # Check if nodes are ready via docker exec (bypasses kubeconfig issues)
-            if docker exec k3d-${CLUSTER_NAME}-server-0 kubectl get nodes --no-headers 2>/dev/null 2>&1 | grep -q " Ready "; then
-                echo -e "${GREEN}✓${NC} Cluster nodes are Ready (after $((wait_attempt*2)) seconds)"
+        for wait_attempt in {1..60}; do
+            # Test API access directly (more reliable than waiting for nodes)
+            if timeout 5 kubectl get --raw /api/v1 2>/dev/null | grep -q "kind\|versions"; then
+                echo -e "${GREEN}✓${NC} Cluster API is accessible (after $((wait_attempt*2)) seconds)"
                 CLUSTER_READY=true
                 break
             fi
-            if [ $((wait_attempt % 15)) -eq 0 ]; then
-                echo -e "${CYAN}   [DEBUG] Still waiting for cluster readiness... ($((wait_attempt*2)) seconds)${NC}"
-                docker exec k3d-${CLUSTER_NAME}-server-0 kubectl get nodes 2>&1 | head -3 || true
+            if [ $((wait_attempt % 10)) -eq 0 ]; then
+                echo -e "${CYAN}   [DEBUG] Still waiting for API... ($((wait_attempt*2)) seconds)${NC}"
             fi
             sleep 2
         done
         
         if [ "$CLUSTER_READY" = false ]; then
-            echo -e "${YELLOW}⚠${NC}  Cluster may not be fully ready, but continuing with authentication...${NC}"
+            echo -e "${YELLOW}⚠${NC}  Cluster API may not be fully ready, but continuing with authentication...${NC}"
         fi
         
         # Now verify connectivity with retries
         echo -e "${CYAN}   [DEBUG] Verifying cluster connectivity...${NC}"
         CLUSTER_ACCESSIBLE=false
         for retry in {1..20}; do
+            # Test API access (more reliable than checking nodes)
+            if timeout 10 kubectl get --raw /api/v1 --request-timeout=5s 2>/dev/null | grep -q "kind\|versions"; then
+                echo -e "${GREEN}✓${NC} Cluster API is accessible"
+                CLUSTER_ACCESSIBLE=true
+                break
+            fi
+            # Also try nodes as fallback
             if timeout 10 kubectl get nodes --request-timeout=5s > /dev/null 2>&1; then
-                # Verify nodes are actually ready
-                if timeout 10 kubectl get nodes --request-timeout=5s 2>&1 | grep -q " Ready "; then
-                    echo -e "${GREEN}✓${NC} Cluster is accessible and nodes are ready"
-                    CLUSTER_ACCESSIBLE=true
-                    break
-                fi
+                echo -e "${GREEN}✓${NC} Cluster is accessible"
+                CLUSTER_ACCESSIBLE=true
+                break
             fi
             
             if [ $retry -lt 20 ]; then
