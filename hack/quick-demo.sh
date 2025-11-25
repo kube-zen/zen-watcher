@@ -914,9 +914,15 @@ case "$PLATFORM" in
                 echo -e "${CYAN}   [DEBUG] Retry $retry/20: Regenerating kubeconfig...${NC}"
                 timeout 10 k3d kubeconfig write ${CLUSTER_NAME} 2>&1 | grep -v "ERRO" > /dev/null || true
                 timeout 10 k3d kubeconfig merge ${CLUSTER_NAME} --kubeconfig-merge-default --kubeconfig-switch-context 2>&1 | grep -v "ERRO" > /dev/null || true
+                # CRITICAL: Always fix 0.0.0.0 to 127.0.0.1
                 timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${K3D_API_PORT}" 2>&1 > /dev/null || true
                 timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>&1 > /dev/null || true
                 timeout 5 kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data 2>&1 > /dev/null || true
+                # Verify the fix worked
+                VERIFY_SERVER=$(timeout 5 kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || echo "")
+                if echo "$VERIFY_SERVER" | grep -q "127.0.0.1"; then
+                    echo -e "${CYAN}   [DEBUG] Kubeconfig server fixed to 127.0.0.1${NC}"
+                fi
                 sleep 2
             fi
         done
