@@ -709,11 +709,10 @@ create_cluster() {
                 echo -e "${CYAN}   Using API port: ${K3D_API_PORT}${NC}"
             fi
             
-            # CRITICAL: Don't use --wait as it can hang with multiple clusters
-            # Instead, create cluster and manually wait for readiness
-            echo -e "${CYAN}   Creating cluster (this may take 60-120 seconds)...${NC}"
-            if timeout 120 k3d "${k3d_create_args[@]}" 2>&1 | tee /tmp/k3d-create.log; then
-                echo -e "${CYAN}   Cluster creation command completed, waiting for readiness...${NC}"
+            # Create cluster - use longer timeout and let it finish
+            echo -e "${CYAN}   Creating cluster (this may take 2-3 minutes)...${NC}"
+            if timeout 240 k3d "${k3d_create_args[@]}" 2>&1 | tee /tmp/k3d-create.log; then
+                echo -e "${GREEN}✓${NC} Cluster creation completed"
             else
                 local exit_code=$?
                 # Check if cluster was actually created despite timeout
@@ -723,7 +722,7 @@ create_cluster() {
                     echo -e "${RED}✗${NC} Cluster creation failed"
                     echo -e "${YELLOW}   Check logs: cat /tmp/k3d-create.log${NC}"
                     if [ $exit_code -eq 124 ]; then
-                        echo -e "${RED}   Timeout: Cluster creation took longer than 2 minutes${NC}"
+                        echo -e "${RED}   Timeout: Cluster creation took longer than 4 minutes${NC}"
                     fi
                     if grep -q -i "port.*in use\|bind.*address\|address already in use\|failed to.*port" /tmp/k3d-create.log 2>/dev/null; then
                         echo -e "${RED}   Port conflict detected!${NC}"
