@@ -1,0 +1,23 @@
+# Zen Watcher Maintainers
+
+This file lists the maintainers of the Zen Watcher project.
+
+## Maintainers
+
+**Zen Team** - zen@kube-zen.io
+
+### Responsibilities
+
+Maintainers are responsible for:
+- Reviewing and merging pull requests
+- Triaging issues
+- Maintaining code quality and project standards
+- Releasing new versions
+- Ensuring security and compliance
+
+### Contact
+
+For questions, concerns, or to report issues, please contact:
+- Email: zen@kube-zen.io
+- GitHub Issues: https://github.com/kube-zen/zen-watcher/issues
+

@@ -114,8 +114,12 @@ func (kw *KyvernoWatcher) watchPolicyReports(ctx context.Context) {
 				continue
 			}
 
-			unstructuredObj := event.Object.(*unstructured.Unstructured)
-			kw.processPolicyReport(unstructuredObj, string(event.Type))
+			unstructuredObj, ok := event.Object.(*unstructured.Unstructured)
+			if !ok {
+				log.Printf("⚠️  [KYVERNO-WATCHER] Unexpected object type in PolicyReport event: %T", event.Object)
+				continue
+			}
+			kw.processPolicyReport(ctx, unstructuredObj, string(event.Type))
 		}
 	}
 }
@@ -147,8 +151,12 @@ func (kw *KyvernoWatcher) watchClusterPolicyReports(ctx context.Context) {
 				continue
 			}
 
-			unstructuredObj := event.Object.(*unstructured.Unstructured)
-			kw.processClusterPolicyReport(unstructuredObj, string(event.Type))
+			unstructuredObj, ok := event.Object.(*unstructured.Unstructured)
+			if !ok {
+				log.Printf("⚠️  [KYVERNO-WATCHER] Unexpected object type in ClusterPolicyReport event: %T", event.Object)
+				continue
+			}
+			kw.processClusterPolicyReport(ctx, unstructuredObj, string(event.Type))
 		}
 	}
 }
@@ -181,14 +189,18 @@ func (kw *KyvernoWatcher) watchKyvernoPolicies(ctx context.Context) {
 				continue
 			}
 
-			unstructuredObj := event.Object.(*unstructured.Unstructured)
-			kw.processKyvernoPolicy(unstructuredObj, string(event.Type), "ClusterPolicy")
+			unstructuredObj, ok := event.Object.(*unstructured.Unstructured)
+			if !ok {
+				log.Printf("⚠️  [KYVERNO-WATCHER] Unexpected object type in ClusterPolicy event: %T", event.Object)
+				continue
+			}
+			kw.processKyvernoPolicy(ctx, unstructuredObj, string(event.Type), "ClusterPolicy")
 		}
 	}
 }
 
 // processPolicyReport processes PolicyReport events
-func (kw *KyvernoWatcher) processPolicyReport(obj *unstructured.Unstructured, eventType string) {
+func (kw *KyvernoWatcher) processPolicyReport(ctx context.Context, obj *unstructured.Unstructured, eventType string) {
 	// Safely extract metadata using unstructured helpers
 	name, _, _ := unstructured.NestedString(obj.Object, "metadata", "name")
 	namespace, _, _ := unstructured.NestedString(obj.Object, "metadata", "namespace")
@@ -217,13 +229,13 @@ func (kw *KyvernoWatcher) processPolicyReport(obj *unstructured.Unstructured, ev
 		}
 		violation := kw.extractViolationFromResult(resultMap, namespace)
 		if violation != nil {
-			kw.actionHandler.HandleKyvernoPolicyViolation(context.Background(), violation)
+			kw.actionHandler.HandleKyvernoPolicyViolation(ctx, violation)
 		}
 	}
 }
 
 // processClusterPolicyReport processes ClusterPolicyReport events
-func (kw *KyvernoWatcher) processClusterPolicyReport(obj *unstructured.Unstructured, eventType string) {
+func (kw *KyvernoWatcher) processClusterPolicyReport(ctx context.Context, obj *unstructured.Unstructured, eventType string) {
 	// Safely extract metadata using unstructured helpers
 	name, _, _ := unstructured.NestedString(obj.Object, "metadata", "name")
 
@@ -248,13 +260,13 @@ func (kw *KyvernoWatcher) processClusterPolicyReport(obj *unstructured.Unstructu
 		}
 		violation := kw.extractViolationFromResult(resultMap, "")
 		if violation != nil {
-			kw.actionHandler.HandleKyvernoPolicyViolation(context.Background(), violation)
+			kw.actionHandler.HandleKyvernoPolicyViolation(ctx, violation)
 		}
 	}
 }
 
 // processKyvernoPolicy processes Kyverno policy events
-func (kw *KyvernoWatcher) processKyvernoPolicy(obj *unstructured.Unstructured, eventType, policyType string) {
+func (kw *KyvernoWatcher) processKyvernoPolicy(ctx context.Context, obj *unstructured.Unstructured, eventType, policyType string) {
 	// Safely extract metadata using unstructured helpers
 	name, _, _ := unstructured.NestedString(obj.Object, "metadata", "name")
 
@@ -279,7 +291,7 @@ func (kw *KyvernoWatcher) processKyvernoPolicy(obj *unstructured.Unstructured, e
 		},
 	}
 
-	kw.actionHandler.HandleKyvernoPolicyEvent(context.Background(), event)
+	kw.actionHandler.HandleKyvernoPolicyEvent(ctx, event)
 }
 
 // extractViolationFromResult extracts violation information from a policy result

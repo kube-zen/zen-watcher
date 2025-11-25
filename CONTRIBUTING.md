@@ -251,6 +251,168 @@ Zen Watcher is licensed under Apache 2.0. All contributions must:
 - Include appropriate license headers
 - Follow the project's coding standards
 
+## How to Run Tests Locally
+
+### Prerequisites
+- Go 1.24 or later
+- Make (optional, but recommended)
+
+### Running Tests
+
+```bash
+# Run all tests
+make test
+
+# Or directly with go
+go test -v -race ./...
+
+# Run tests with coverage
+go test -v -race -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+
+# Run specific package tests
+go test -v ./pkg/watcher/...
+
+# Run specific test
+go test -v -run TestKyvernoWatcher ./pkg/watcher
+```
+
+### Running Tests in CI Mode
+
+```bash
+# Run tests as CI would (with race detector)
+go test -v -race -coverprofile=coverage.out ./...
+```
+
+## Branching and Commit Message Guidelines
+
+### Branch Naming
+
+- `feature/` - New features (e.g., `feature/add-wiz-watcher`)
+- `fix/` - Bug fixes (e.g., `fix/kyverno-type-assertion`)
+- `docs/` - Documentation updates (e.g., `docs/update-contributing`)
+- `refactor/` - Code refactoring (e.g., `refactor/webhook-processor`)
+- `test/` - Test additions/updates (e.g., `test/add-unit-tests`)
+
+### Commit Message Format
+
+We follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+**Types:**
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `style`: Code style changes (formatting, etc.)
+- `refactor`: Code refactoring
+- `test`: Test additions or changes
+- `chore`: Maintenance tasks
+
+**Examples:**
+```
+feat(watcher): add Wiz security scanner support
+
+Adds a new watcher for Wiz security scanner that processes
+vulnerability reports and creates Observation CRDs.
+
+Fixes #123
+```
+
+```
+fix(kyverno): safe type assertion in watch loops
+
+Replaces unsafe type assertions with safe checks to prevent
+panics when unexpected object types are encountered.
+
+Closes #456
+```
+
+## How to Prepare a PR
+
+### Pre-PR Checklist
+
+Before submitting a pull request, ensure:
+
+- [ ] **Code is formatted**: Run `go fmt ./...`
+- [ ] **Code passes vet**: Run `go vet ./...`
+- [ ] **Code passes staticcheck**: Run `staticcheck ./...` (if installed)
+- [ ] **Tests pass**: Run `go test -v -race ./...`
+- [ ] **Tests added**: New features include tests
+- [ ] **Documentation updated**: README, docs, or code comments updated
+- [ ] **Commit messages follow guidelines**: See above
+- [ ] **No merge conflicts**: Rebase on latest main branch
+- [ ] **PR description is complete**: See PR template
+
+### PR Process
+
+1. **Fork the repository** (if external contributor)
+2. **Create a feature branch** from `main`
+3. **Make your changes** following the guidelines above
+4. **Run tests and linters** locally
+5. **Commit your changes** with descriptive messages
+6. **Push to your fork** and create a PR
+7. **Fill out the PR template** completely
+8. **Wait for review** from maintainers
+
+### PR Review Criteria
+
+PRs will be reviewed for:
+- Code quality and style
+- Test coverage
+- Documentation completeness
+- Backward compatibility
+- Performance implications
+- Security considerations
+
+## How to Run Linters/Staticcheck
+
+### Using Make
+
+```bash
+# Run all linters
+make lint
+
+# Individual linters
+make fmt      # Format code
+make vet      # Run go vet
+make staticcheck  # Run staticcheck
+```
+
+### Manual Commands
+
+```bash
+# Format code
+go fmt ./...
+
+# Run go vet
+go vet ./...
+
+# Install staticcheck
+go install honnef.co/go/tools/cmd/staticcheck@latest
+
+# Run staticcheck
+staticcheck ./...
+
+# Install golangci-lint (alternative)
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+# Run golangci-lint
+golangci-lint run
+```
+
+### CI Integration
+
+All linters run automatically in CI on every PR. Ensure your code passes before requesting review.
+
 ## Questions?
 
 Open an issue or check existing documentation in `docs/` for more details.
+
+For maintainer contact, see [MAINTAINERS](MAINTAINERS).
