@@ -16,13 +16,13 @@ import (
 
 // Server wraps the HTTP server and handlers
 type Server struct {
-	server           *http.Server
-	ready            bool
-	readyMu          sync.RWMutex
-	falcoAlertsChan  chan map[string]interface{}
-	auditEventsChan  chan map[string]interface{}
-	webhookMetrics   *prometheus.CounterVec
-	webhookDropped   *prometheus.CounterVec
+	server          *http.Server
+	ready           bool
+	readyMu         sync.RWMutex
+	falcoAlertsChan chan map[string]interface{}
+	auditEventsChan chan map[string]interface{}
+	webhookMetrics  *prometheus.CounterVec
+	webhookDropped  *prometheus.CounterVec
 }
 
 // NewServer creates a new HTTP server with handlers
@@ -172,7 +172,7 @@ func (s *Server) Start(ctx context.Context, wg *sync.WaitGroup) {
 	go func() {
 		<-ctx.Done()
 		log.Println("🛑 Shutting down HTTP server...")
-		
+
 		// Get shutdown timeout from env var, default to 10 seconds
 		shutdownTimeout := 10 * time.Second
 		if timeoutStr := os.Getenv("HTTP_SHUTDOWN_TIMEOUT"); timeoutStr != "" {
@@ -182,7 +182,7 @@ func (s *Server) Start(ctx context.Context, wg *sync.WaitGroup) {
 				log.Printf("⚠️  Invalid HTTP_SHUTDOWN_TIMEOUT value '%s', using default 10s", timeoutStr)
 			}
 		}
-		
+
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer shutdownCancel()
 		if err := s.server.Shutdown(shutdownCtx); err != nil {

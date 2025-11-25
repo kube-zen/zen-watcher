@@ -192,7 +192,7 @@ func (kw *KyvernoWatcher) processPolicyReport(obj *unstructured.Unstructured, ev
 	// Safely extract metadata using unstructured helpers
 	name, _, _ := unstructured.NestedString(obj.Object, "metadata", "name")
 	namespace, _, _ := unstructured.NestedString(obj.Object, "metadata", "namespace")
-	
+
 	if name == "" {
 		log.Printf("⚠️  [KYVERNO-WATCHER] PolicyReport missing name, skipping")
 		return
@@ -208,7 +208,7 @@ func (kw *KyvernoWatcher) processPolicyReport(obj *unstructured.Unstructured, ev
 	if !found {
 		return
 	}
-	
+
 	for _, result := range results {
 		resultMap, ok := result.(map[string]interface{})
 		if !ok {
@@ -226,7 +226,7 @@ func (kw *KyvernoWatcher) processPolicyReport(obj *unstructured.Unstructured, ev
 func (kw *KyvernoWatcher) processClusterPolicyReport(obj *unstructured.Unstructured, eventType string) {
 	// Safely extract metadata using unstructured helpers
 	name, _, _ := unstructured.NestedString(obj.Object, "metadata", "name")
-	
+
 	if name == "" {
 		log.Printf("⚠️  [KYVERNO-WATCHER] ClusterPolicyReport missing name, skipping")
 		return
@@ -239,7 +239,7 @@ func (kw *KyvernoWatcher) processClusterPolicyReport(obj *unstructured.Unstructu
 	if !found {
 		return
 	}
-	
+
 	for _, result := range results {
 		resultMap, ok := result.(map[string]interface{})
 		if !ok {
@@ -257,7 +257,7 @@ func (kw *KyvernoWatcher) processClusterPolicyReport(obj *unstructured.Unstructu
 func (kw *KyvernoWatcher) processKyvernoPolicy(obj *unstructured.Unstructured, eventType, policyType string) {
 	// Safely extract metadata using unstructured helpers
 	name, _, _ := unstructured.NestedString(obj.Object, "metadata", "name")
-	
+
 	if name == "" {
 		log.Printf("⚠️  [KYVERNO-WATCHER] %s missing name, skipping", policyType)
 		return
