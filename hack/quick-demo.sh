@@ -686,24 +686,60 @@ create_cluster() {
                 "--k3s-arg" "--disable=traefik@server:0"
             )
             
-            # Determine API port: ALWAYS use explicit port when other clusters exist (zen-gamma pattern)
+            # Determine API port: Find available port when other clusters exist
             # This prevents port conflicts when multiple k3d clusters run on same host
             local existing_clusters=$(k3d cluster list 2>/dev/null | grep -v "^NAME" | wc -l || echo "0")
             if [ "$existing_clusters" -gt 0 ] && [ "${K3D_API_PORT}" = "6443" ]; then
-                # Other clusters exist - ALWAYS use 6550 (zen-gamma demo pattern)
-                # Don't check if port is free - k3d will handle it or fail clearly
-                k3d_create_args+=("--api-port" "6550")
-                K3D_API_PORT=6550
-                echo -e "${CYAN}   Multiple clusters detected, using port 6550 (zen-gamma pattern)${NC}"
+                # Other clusters exist - find first available port in 6550-6560 range
+                local found_port=""
+                for test_port in {6550..6560}; do
+                    if ! ss -tlnp 2>/dev/null | grep -q ":${test_port} "; then
+                        found_port=$test_port
+                        break
+                    fi
+                done
+                if [ -z "$found_port" ]; then
+                    # Fallback: try higher range
+                    for test_port in {6561..6570}; do
+                        if ! ss -tlnp 2>/dev/null | grep -q ":${test_port} "; then
+                            found_port=$test_port
+                            break
+                        fi
+                    done
+                fi
+                if [ -n "$found_port" ]; then
+                    k3d_create_args+=("--api-port" "${found_port}")
+                    K3D_API_PORT=${found_port}
+                    echo -e "${CYAN}   Multiple clusters detected, using port ${found_port}${NC}"
+                else
+                    echo -e "${RED}✗${NC} No available ports found in 6550-6570 range"
+                    exit 1
+                fi
             elif [ "${K3D_API_PORT}" != "6443" ]; then
-                # Custom port specified
+                # Custom port specified - verify it's available
+                if ss -tlnp 2>/dev/null | grep -q ":${K3D_API_PORT} "; then
+                    echo -e "${RED}✗${NC} Port ${K3D_API_PORT} is already in use"
+                    exit 1
+                fi
                 k3d_create_args+=("--api-port" "${K3D_API_PORT}")
                 echo -e "${CYAN}   Using custom API port: ${K3D_API_PORT}${NC}"
             elif ! check_port 6443 "k3d API" 2>/dev/null; then
-                # Default port is in use, use 6550
-                k3d_create_args+=("--api-port" "6550")
-                K3D_API_PORT=6550
-                echo -e "${CYAN}   Port 6443 in use, using 6550 instead${NC}"
+                # Default port is in use, find available port
+                local found_port=""
+                for test_port in {6550..6560}; do
+                    if ! ss -tlnp 2>/dev/null | grep -q ":${test_port} "; then
+                        found_port=$test_port
+                        break
+                    fi
+                done
+                if [ -n "$found_port" ]; then
+                    k3d_create_args+=("--api-port" "${found_port}")
+                    K3D_API_PORT=${found_port}
+                    echo -e "${CYAN}   Port 6443 in use, using ${found_port} instead${NC}"
+                else
+                    echo -e "${RED}✗${NC} Port 6443 in use and no available ports found"
+                    exit 1
+                fi
             else
                 # Default port is free, use it
                 k3d_create_args+=("--api-port" "${K3D_API_PORT}")
