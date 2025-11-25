@@ -1373,8 +1373,11 @@ SECTION_START_TIME=$(date +%s)
 # Create ingress resources for Grafana, VictoriaMetrics, and Zen Watcher
 echo -e "${YELLOW}→${NC} Creating ingress resources..."
 
-# Get ingress HTTP port (should be 80)
-INGRESS_HTTP_PORT=$(timeout 10 kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || echo "80")
+# Get actual ingress HTTP port (use the one we set earlier)
+ACTUAL_INGRESS_PORT=$(timeout 10 kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || echo "${INGRESS_HTTP_PORT}")
+if [ "$ACTUAL_INGRESS_PORT" != "null" ] && [ -n "$ACTUAL_INGRESS_PORT" ] && [ "$ACTUAL_INGRESS_PORT" != "0" ]; then
+    INGRESS_HTTP_PORT=${ACTUAL_INGRESS_PORT}
+fi
 GRAFANA_ACCESS_PORT=${INGRESS_HTTP_PORT}
 
 # Create single ingress with path-based routing (no Host header needed)
