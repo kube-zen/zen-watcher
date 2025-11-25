@@ -1375,9 +1375,9 @@ if ! timeout 10 helm repo list 2>/dev/null | grep -q ingress-nginx; then
     timeout 30 helm repo update 2>&1 || true
 fi
 
-# Find available high port (8080-8090 range)
-INGRESS_HTTP_PORT=8080
-for port in {8080..8090}; do
+# Find available NodePort (must be in 30000-32767 range for Kubernetes)
+INGRESS_HTTP_PORT=30080
+for port in {30080..30090}; do
     if ! timeout 2 ss -tlnp 2>/dev/null | grep -q ":${port} "; then
         INGRESS_HTTP_PORT=${port}
         echo -e "${CYAN}   Using port ${INGRESS_HTTP_PORT} for ingress${NC}"
