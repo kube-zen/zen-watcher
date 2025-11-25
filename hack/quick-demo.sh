@@ -876,8 +876,30 @@ case "$PLATFORM" in
         timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>/dev/null || true
         echo -e "${CYAN}   Configured kubeconfig for port ${K3D_API_PORT} (TLS verification skipped)${NC}"
         
-        # Verify connectivity
+        # Verify connectivity with retries
         echo -e "${CYAN}   [DEBUG] Verifying cluster connectivity...${NC}"
+        CLUSTER_ACCESSIBLE=false
+        for retry in {1..10}; do
+            if timeout 10 kubectl get nodes --request-timeout=5s > /dev/null 2>&1; then
+                echo -e "${GREEN}✓${NC} Cluster is accessible"
+                CLUSTER_ACCESSIBLE=true
+                break
+            else
+                if [ $retry -lt 10 ]; then
+                    echo -e "${CYAN}   [DEBUG] Retry $retry/10: Regenerating kubeconfig...${NC}"
+                    timeout 10 k3d kubeconfig write ${CLUSTER_NAME} 2>&1 | grep -v "ERRO" > /dev/null || true
+                    timeout 10 k3d kubeconfig merge ${CLUSTER_NAME} --kubeconfig-merge-default --kubeconfig-switch-context 2>&1 | grep -v "ERRO" > /dev/null || true
+                    timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${K3D_API_PORT}" 2>&1 > /dev/null || true
+                    timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>&1 > /dev/null || true
+                    timeout 5 kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data 2>&1 > /dev/null || true
+                    sleep 2
+                fi
+            fi
+        done
+        if [ "$CLUSTER_ACCESSIBLE" = false ]; then
+            echo -e "${RED}✗${NC} Cannot access cluster after 10 retries"
+            exit 1
+        fi
         if timeout 5 kubectl get nodes --request-timeout=5s &>/dev/null 2>&1; then
             echo -e "${GREEN}✓${NC} Cluster connectivity verified"
         else
@@ -1238,19 +1260,30 @@ SECTION_START_TIME=$(date +%s)
 
 # Ensure kubeconfig is properly configured before installing ingress
 echo -e "${CYAN}   Ensuring kubeconfig is properly configured...${NC}"
-timeout 10 k3d kubeconfig merge ${CLUSTER_NAME} --kubeconfig-merge-default --kubeconfig-switch-context 2>&1 | grep -v "ERRO" > /dev/null || true
-timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${K3D_API_PORT}" 2>&1 > /dev/null || true
-timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>&1 > /dev/null || true
-timeout 5 kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data 2>&1 > /dev/null || true
-
-# Verify cluster access
-if ! timeout 10 kubectl get nodes --request-timeout=5s > /dev/null 2>&1; then
-    echo -e "${YELLOW}⚠${NC}  Cluster access issue detected, regenerating kubeconfig...${NC}"
-    timeout 10 k3d kubeconfig write ${CLUSTER_NAME} 2>&1 | grep -v "ERRO" > /dev/null || true
+CLUSTER_ACCESSIBLE=false
+for retry in {1..15}; do
     timeout 10 k3d kubeconfig merge ${CLUSTER_NAME} --kubeconfig-merge-default --kubeconfig-switch-context 2>&1 | grep -v "ERRO" > /dev/null || true
     timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${K3D_API_PORT}" 2>&1 > /dev/null || true
     timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>&1 > /dev/null || true
     timeout 5 kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data 2>&1 > /dev/null || true
+    
+    if timeout 10 kubectl get nodes --request-timeout=5s > /dev/null 2>&1; then
+        echo -e "${GREEN}✓${NC} Cluster is accessible"
+        CLUSTER_ACCESSIBLE=true
+        break
+    else
+        if [ $retry -lt 15 ]; then
+            echo -e "${CYAN}   [DEBUG] Retry $retry/15: Regenerating kubeconfig...${NC}"
+            timeout 10 k3d kubeconfig write ${CLUSTER_NAME} 2>&1 | grep -v "ERRO" > /dev/null || true
+            timeout 10 k3d kubeconfig merge ${CLUSTER_NAME} --kubeconfig-merge-default --kubeconfig-switch-context 2>&1 | grep -v "ERRO" > /dev/null || true
+            sleep 2
+        fi
+    fi
+done
+
+if [ "$CLUSTER_ACCESSIBLE" = false ]; then
+    echo -e "${RED}✗${NC} Cannot access cluster after 15 retries - aborting ingress installation"
+    exit 1
 fi
 
 echo -e "${YELLOW}→${NC} Installing nginx ingress controller..."
@@ -1270,37 +1303,70 @@ for port in {8080..8090}; do
     fi
 done
 
-# Install nginx ingress with NodePort on high port
-if timeout 120 helm install ingress-nginx ingress-nginx/ingress-nginx \
-    --namespace ingress-nginx \
-    --create-namespace \
-    --set controller.service.type=NodePort \
-    --set controller.service.nodePorts.http=${INGRESS_HTTP_PORT} \
-    --set controller.service.nodePorts.https=$((INGRESS_HTTP_PORT + 1)) \
-    --set controller.admissionWebhooks.enabled=false \
-    --wait --timeout=2m 2>&1 | tee /tmp/ingress-install.log; then
-    echo -e "${GREEN}✓${NC} Nginx ingress controller installed"
-else
-    # Check if already installed
+# Install nginx ingress with NodePort on high port - with retries
+INGRESS_INSTALLED=false
+for retry in {1..5}; do
     if timeout 10 helm list -n ingress-nginx 2>&1 | grep -q ingress-nginx; then
         echo -e "${GREEN}✓${NC} Nginx ingress controller already installed"
-    else
-        echo -e "${YELLOW}⚠${NC}  Ingress installation had issues (continuing...)"
-    fi
-fi
-
-# Wait for ingress controller to be ready
-echo -e "${CYAN}   Waiting for ingress controller to be ready...${NC}"
-for i in {1..30}; do
-    if timeout 10 kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=controller -n ingress-nginx --timeout=10s > /dev/null 2>&1; then
-        echo -e "${GREEN}✓${NC} Ingress controller ready"
+        INGRESS_INSTALLED=true
         break
     fi
+    
+    echo -e "${CYAN}   Installing ingress (attempt $retry/5)...${NC}"
+    if timeout 120 helm install ingress-nginx ingress-nginx/ingress-nginx \
+        --namespace ingress-nginx \
+        --create-namespace \
+        --set controller.service.type=NodePort \
+        --set controller.service.nodePorts.http=${INGRESS_HTTP_PORT} \
+        --set controller.service.nodePorts.https=$((INGRESS_HTTP_PORT + 1)) \
+        --set controller.admissionWebhooks.enabled=false \
+        --wait --timeout=2m 2>&1 | tee /tmp/ingress-install.log; then
+        echo -e "${GREEN}✓${NC} Nginx ingress controller installed"
+        INGRESS_INSTALLED=true
+        break
+    else
+        if [ $retry -lt 5 ]; then
+            echo -e "${YELLOW}⚠${NC}  Installation failed, fixing kubeconfig and retrying...${NC}"
+            timeout 10 k3d kubeconfig write ${CLUSTER_NAME} 2>&1 | grep -v "ERRO" > /dev/null || true
+            timeout 10 k3d kubeconfig merge ${CLUSTER_NAME} --kubeconfig-merge-default --kubeconfig-switch-context 2>&1 | grep -v "ERRO" > /dev/null || true
+            timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${K3D_API_PORT}" 2>&1 > /dev/null || true
+            timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>&1 > /dev/null || true
+            timeout 5 kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data 2>&1 > /dev/null || true
+            sleep 3
+        fi
+    fi
+done
+
+if [ "$INGRESS_INSTALLED" = false ]; then
+    echo -e "${RED}✗${NC} Failed to install ingress after 5 attempts"
+    exit 1
+fi
+
+# Wait for ingress controller to be ready with verification
+echo -e "${CYAN}   Waiting for ingress controller to be ready...${NC}"
+INGRESS_READY=false
+for i in {1..60}; do
+    if timeout 10 kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=controller -n ingress-nginx --timeout=10s > /dev/null 2>&1; then
+        # Verify it's actually accessible
+        ACTUAL_PORT=$(timeout 10 kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || echo "")
+        if [ -n "$ACTUAL_PORT" ] && [ "$ACTUAL_PORT" != "null" ] && [ "$ACTUAL_PORT" != "0" ]; then
+            # Test if port is actually listening
+            if timeout 2 curl -s -o /dev/null -w "%{http_code}" http://localhost:${ACTUAL_PORT} 2>/dev/null | grep -q "[234]"; then
+                echo -e "${GREEN}✓${NC} Ingress controller ready and accessible on port ${ACTUAL_PORT}"
+                INGRESS_READY=true
+                break
+            fi
+        fi
+    fi
     sleep 2
-    if [ $((i % 5)) -eq 0 ]; then
+    if [ $((i % 10)) -eq 0 ]; then
         echo -e "${CYAN}   ... still waiting ($((i*2)) seconds)${NC}"
     fi
 done
+
+if [ "$INGRESS_READY" = false ]; then
+    echo -e "${YELLOW}⚠${NC}  Ingress controller may not be fully ready, but continuing...${NC}"
+fi
 
 # Verify ingress service port
 ACTUAL_INGRESS_PORT=$(timeout 10 kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || echo "${INGRESS_HTTP_PORT}")
