@@ -57,7 +57,7 @@ func (wp *WebhookProcessor) ProcessFalcoAlert(ctx context.Context, alert map[str
 	k8sPodName := fmt.Sprintf("%v", alert["k8s.pod.name"])
 	k8sNs := fmt.Sprintf("%v", alert["k8s.ns.name"])
 	if k8sNs == "<nil>" || k8sNs == "" {
-		k8sNs = "falco"
+		k8sNs = "default"
 	}
 
 	// Dedup key: rule + pod + output (truncated)
