@@ -899,6 +899,8 @@ case "$PLATFORM" in
         
         # CRITICAL: k3d uses self-signed certificates, so we need to skip TLS verification
         # This is safe for local development clusters
+        # Remove certificate-authority-data if present (conflicts with insecure-skip-tls-verify)
+        kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data 2>/dev/null || true
         kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>/dev/null || true
         echo -e "${CYAN}   Configured k3d cluster to skip TLS verification (self-signed certs)${NC}"
         ;;
@@ -935,8 +937,8 @@ echo -e "${YELLOW}→${NC} Waiting for cluster to be ready..."
 cluster_ready=false
 for i in {1..60}; do
     # Try multiple methods to check cluster readiness
-    # Use --insecure-skip-tls-verify for k3d clusters (they use self-signed certs)
-    if kubectl get nodes --request-timeout=3s --insecure-skip-tls-verify &>/dev/null 2>&1; then
+    # TLS verification is already configured in kubeconfig, so don't use the flag
+    if kubectl get nodes --request-timeout=3s &>/dev/null 2>&1; then
         cluster_ready=true
         echo -e "${GREEN}✓${NC} Cluster is ready"
         show_section_time "Cluster readiness"
@@ -944,7 +946,7 @@ for i in {1..60}; do
     fi
     
     # Check if it's a connection issue vs cluster not ready
-    kubectl_output=$(kubectl get nodes --request-timeout=3s --insecure-skip-tls-verify 2>&1)
+    kubectl_output=$(kubectl get nodes --request-timeout=3s 2>&1)
     # TLS errors mean the cluster is accessible, just certificate issues (normal for k3d)
     if echo "$kubectl_output" | grep -q "tls\|certificate"; then
         # Cluster is accessible but cert issue - update kubeconfig to skip TLS verify for this cluster
