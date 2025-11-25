@@ -62,7 +62,7 @@
 # Note: Script validates all ports and cluster conflicts BEFORE making any changes
 #
 
-set -e
+set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -833,8 +833,22 @@ case "$PLATFORM" in
         # Wait a moment for k3d to finish setting up
         sleep 3
         
-        # Simplified approach: use the port we specified (like zen-gamma)
-        # k3d respects --api-port when specified, so we trust what we set
+        # Detect actual port if using existing cluster
+        if [ "${USE_EXISTING_CLUSTER:-false}" = "true" ]; then
+            echo -e "${CYAN}   [DEBUG] Detecting actual API port for existing cluster...${NC}"
+            # Try to get port from docker
+            ACTUAL_PORT=$(docker port k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | grep "6443/tcp" | cut -d: -f2 | tr -d ' ' | head -1 || echo "")
+            if [ -z "$ACTUAL_PORT" ]; then
+                ACTUAL_PORT=$(docker inspect k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | jq -r '.[0].NetworkSettings.Ports."6443/tcp"[0].HostPort // empty' 2>/dev/null || echo "")
+            fi
+            if [ -n "$ACTUAL_PORT" ] && [ "$ACTUAL_PORT" != "null" ] && [ "$ACTUAL_PORT" != "" ]; then
+                K3D_API_PORT=$ACTUAL_PORT
+                echo -e "${CYAN}   [DEBUG] Detected actual port: ${K3D_API_PORT}${NC}"
+            else
+                echo -e "${CYAN}   [DEBUG] Could not detect port, using configured: ${K3D_API_PORT}${NC}"
+            fi
+        fi
+        
         echo -e "${CYAN}   Setting up kubeconfig for port ${K3D_API_PORT}...${NC}"
         
         # Merge kubeconfig (preferred method - updates default kubeconfig)
@@ -850,14 +864,23 @@ case "$PLATFORM" in
             timeout 5 kubectl config use-context k3d-${CLUSTER_NAME}@${CLUSTER_NAME} 2>/dev/null || true
         }
         
-        # Fix kubeconfig server URL - always use 127.0.0.1 and the port we specified
+        # Fix kubeconfig server URL - always use 127.0.0.1 and the port we specified/detected
         timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${K3D_API_PORT}" 2>/dev/null || true
+        echo -e "${CYAN}   [DEBUG] Set kubeconfig server to: https://127.0.0.1:${K3D_API_PORT}${NC}"
         
         # CRITICAL: k3d uses self-signed certificates, so we need to skip TLS verification
         # Remove certificate-authority-data if present (conflicts with insecure-skip-tls-verify)
         timeout 5 kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data 2>/dev/null || true
         timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>/dev/null || true
         echo -e "${CYAN}   Configured kubeconfig for port ${K3D_API_PORT} (TLS verification skipped)${NC}"
+        
+        # Verify connectivity
+        echo -e "${CYAN}   [DEBUG] Verifying cluster connectivity...${NC}"
+        if timeout 5 kubectl get nodes --request-timeout=5s &>/dev/null 2>&1; then
+            echo -e "${GREEN}✓${NC} Cluster connectivity verified"
+        else
+            echo -e "${YELLOW}⚠${NC}  Cluster connectivity check failed, but continuing...${NC}"
+        fi
         ;;
     kind)
         # kind automatically updates kubeconfig, but ensure context is set
@@ -1172,34 +1195,49 @@ for i in {1..10}; do
 done
 
 # Expose Grafana as NodePort for reliable access
-# Delete existing service if it exists (might be ClusterIP)
-timeout 10 kubectl delete svc grafana -n ${NAMESPACE} 2>/dev/null || true
-sleep 1
+echo -e "${CYAN}   [DEBUG] Checking for existing Grafana service...${NC}"
+EXISTING_SVC=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.type}' 2>/dev/null || echo "none")
+if [ "$EXISTING_SVC" != "none" ]; then
+    echo -e "${CYAN}   [DEBUG] Existing service found (type: ${EXISTING_SVC}), deleting...${NC}"
+    timeout 10 kubectl delete svc grafana -n ${NAMESPACE} 2>&1 || true
+    sleep 2
+fi
 
 # Create NodePort service
 echo -e "${CYAN}   Creating Grafana NodePort service...${NC}"
-if timeout 15 kubectl expose deployment grafana \
+SVC_CREATE_OUTPUT=$(timeout 15 kubectl expose deployment grafana \
     --port=3000 --target-port=3000 \
     --type=NodePort \
     --name=grafana \
-    -n ${NAMESPACE} 2>&1 | grep -v "already exists" > /dev/null; then
-    echo -e "${CYAN}   NodePort service created${NC}"
+    -n ${NAMESPACE} 2>&1 || echo "ERROR")
+if echo "$SVC_CREATE_OUTPUT" | grep -q "service.*exposed\|already exists"; then
+    echo -e "${CYAN}   [DEBUG] Service creation output: ${SVC_CREATE_OUTPUT}${NC}"
+    echo -e "${GREEN}✓${NC} NodePort service created"
 else
-    echo -e "${YELLOW}⚠${NC}  Service creation had issues (may already exist)${NC}"
+    echo -e "${YELLOW}⚠${NC}  Service creation output: ${SVC_CREATE_OUTPUT}${NC}"
 fi
 
 # Wait for service to be ready and get NodePort (with retries)
 # Kubernetes needs a moment to assign the NodePort
+echo -e "${CYAN}   [DEBUG] Waiting for NodePort assignment...${NC}"
 GRAFANA_NODEPORT=""
-for i in {1..20}; do
+for i in {1..30}; do
     sleep 1
     # Check if service exists and is NodePort type
-    svc_type=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.type}' 2>/dev/null || echo "")
+    svc_type=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.type}' 2>/dev/null || echo "none")
+    echo -e "${CYAN}   [DEBUG] Attempt $i: Service type = ${svc_type}${NC}"
     if [ "$svc_type" = "NodePort" ]; then
         GRAFANA_NODEPORT=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
+        echo -e "${CYAN}   [DEBUG] NodePort value = '${GRAFANA_NODEPORT}'${NC}"
         if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ] && [ "$GRAFANA_NODEPORT" != "0" ]; then
+            echo -e "${GREEN}✓${NC} NodePort assigned: ${GRAFANA_NODEPORT}"
             break
         fi
+    elif [ "$svc_type" != "none" ]; then
+        echo -e "${YELLOW}⚠${NC}  Service exists but type is '${svc_type}', not NodePort${NC}"
+    fi
+    if [ $((i % 5)) -eq 0 ]; then
+        echo -e "${CYAN}   [DEBUG] Still waiting for NodePort... (${i}/30)${NC}"
     fi
 done
 
@@ -1289,17 +1327,22 @@ GRAFANA_ACCESS_PORT=${GRAFANA_PORT}
 
 # Get NodePort for Grafana (with retries and timeout)
 # k3d exposes NodePorts on localhost in the 30000-32767 range
+echo -e "${CYAN}   [DEBUG] Checking for NodePort service...${NC}"
 GRAFANA_NODEPORT=""
-for i in {1..20}; do
+for i in {1..30}; do
     # First check if service exists and is NodePort type
-    svc_type=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.type}' 2>/dev/null || echo "")
+    svc_type=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.type}' 2>/dev/null || echo "none")
     if [ "$svc_type" = "NodePort" ]; then
         GRAFANA_NODEPORT=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
+        echo -e "${CYAN}   [DEBUG] Attempt $i: Service type=${svc_type}, NodePort=${GRAFANA_NODEPORT}${NC}"
         if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ] && [ "$GRAFANA_NODEPORT" != "0" ]; then
+            echo -e "${GREEN}✓${NC} NodePort detected: ${GRAFANA_NODEPORT}"
             break
         fi
+    else
+        echo -e "${CYAN}   [DEBUG] Attempt $i: Service type=${svc_type} (not NodePort yet)${NC}"
     fi
-    if [ $i -lt 20 ]; then
+    if [ $i -lt 30 ]; then
         sleep 1
     fi
 done
@@ -1309,27 +1352,47 @@ if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFAN
     echo -e "${CYAN}   Grafana accessible via NodePort: ${GRAFANA_NODEPORT}${NC}"
     echo -e "${CYAN}   Access at: http://localhost:${GRAFANA_NODEPORT}${NC}"
     # Verify it's actually listening (k3d exposes NodePorts on localhost)
-    echo -e "${CYAN}   Verifying NodePort is accessible...${NC}"
-    for j in {1..5}; do
-        if timeout 2 nc -zv localhost ${GRAFANA_NODEPORT} 2>/dev/null || \
-           timeout 2 curl -s -o /dev/null -w "%{http_code}" http://localhost:${GRAFANA_NODEPORT}/api/health 2>/dev/null | grep -q "200\|401\|403"; then
-            echo -e "${GREEN}✓${NC} NodePort is listening and accessible"
+    echo -e "${CYAN}   [DEBUG] Verifying NodePort ${GRAFANA_NODEPORT} is accessible...${NC}"
+    NODEPORT_VERIFIED=false
+    for j in {1..10}; do
+        echo -e "${CYAN}   [DEBUG] Verification attempt $j/10...${NC}"
+        # Try nc first
+        if command -v nc &> /dev/null; then
+            if timeout 3 nc -zv localhost ${GRAFANA_NODEPORT} 2>&1 | grep -q "succeeded\|open"; then
+                echo -e "${GREEN}✓${NC} NodePort ${GRAFANA_NODEPORT} is listening (nc check)"
+                NODEPORT_VERIFIED=true
+                break
+            fi
+        fi
+        # Try curl as fallback
+        HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" http://localhost:${GRAFANA_NODEPORT}/api/health 2>/dev/null || echo "000")
+        echo -e "${CYAN}   [DEBUG] HTTP response code: ${HTTP_CODE}${NC}"
+        if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
+            echo -e "${GREEN}✓${NC} NodePort ${GRAFANA_NODEPORT} is accessible (HTTP ${HTTP_CODE})"
+            NODEPORT_VERIFIED=true
             break
         fi
-        if [ $j -lt 5 ]; then
+        if [ $j -lt 10 ]; then
             sleep 2
         fi
     done
+    if [ "$NODEPORT_VERIFIED" = false ]; then
+        echo -e "${YELLOW}⚠${NC}  NodePort ${GRAFANA_NODEPORT} not yet accessible, will verify later${NC}"
+    fi
 else
     # Fallback to port-forward if NodePort not available
     echo -e "${YELLOW}⚠${NC}  NodePort not available, using port-forward for Grafana${NC}"
+    echo -e "${CYAN}   [DEBUG] Killing any existing port-forwards...${NC}"
     pkill -f "kubectl port-forward.*grafana" 2>/dev/null || true
     sleep 2
+    echo -e "${CYAN}   [DEBUG] Starting port-forward on port ${GRAFANA_PORT}...${NC}"
     timeout 10 kubectl port-forward -n ${NAMESPACE} svc/grafana ${GRAFANA_PORT}:3000 --address=0.0.0.0 > /tmp/grafana-pf.log 2>&1 &
     GRAFANA_PF_PID=$!
     sleep 3
     GRAFANA_ACCESS_PORT=${GRAFANA_PORT}
     echo -e "${CYAN}   Port-forward active on port ${GRAFANA_PORT}${NC}"
+    echo -e "${CYAN}   [DEBUG] Port-forward PID: ${GRAFANA_PF_PID}${NC}"
+    echo -e "${CYAN}   [DEBUG] Port-forward log: $(head -5 /tmp/grafana-pf.log 2>/dev/null || echo 'no log yet')${NC}"
 fi
 
 # VictoriaMetrics can use port-forward (less critical)
@@ -1339,18 +1402,48 @@ sleep 2
 
 echo -e "${GREEN}✓${NC} Service access configured"
 
-# Wait for Grafana to be fully ready
-echo -e "${YELLOW}→${NC} Waiting for Grafana to be fully ready (15-30 seconds)..."
-for i in {1..60}; do
-    if curl -s http://localhost:${GRAFANA_ACCESS_PORT}/api/health 2>/dev/null | grep -q "ok"; then
-        echo -e "${GREEN}✓${NC} Grafana is ready"
+# Wait for Grafana to be fully ready and VERIFY it works
+echo -e "${YELLOW}→${NC} Waiting for Grafana to be fully ready and verifying access..."
+GRAFANA_READY=false
+for i in {1..90}; do
+    HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" http://localhost:${GRAFANA_ACCESS_PORT}/api/health 2>/dev/null || echo "000")
+    if [ "$HTTP_CODE" = "200" ]; then
+        HEALTH_RESPONSE=$(timeout 3 curl -s http://localhost:${GRAFANA_ACCESS_PORT}/api/health 2>/dev/null || echo "")
+        if echo "$HEALTH_RESPONSE" | grep -q "ok\|database"; then
+            echo -e "${GREEN}✓${NC} Grafana is ready and responding (HTTP ${HTTP_CODE})"
+            GRAFANA_READY=true
+            break
+        fi
+    elif [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
+        # These codes mean Grafana is up but requires auth - that's fine!
+        echo -e "${GREEN}✓${NC} Grafana is ready (HTTP ${HTTP_CODE} - auth required, which is expected)"
+        GRAFANA_READY=true
         break
     fi
-    sleep 1
     if [ $((i % 10)) -eq 0 ]; then
-        echo -e "${CYAN}  ... still waiting ($i seconds)${NC}"
+        echo -e "${CYAN}  [DEBUG] Still waiting... (${i}/90 seconds, HTTP code: ${HTTP_CODE})${NC}"
     fi
+    sleep 1
 done
+
+if [ "$GRAFANA_READY" = false ]; then
+    echo -e "${YELLOW}⚠${NC}  Grafana may not be fully ready, but continuing...${NC}"
+    echo -e "${CYAN}   [DEBUG] Last HTTP code: ${HTTP_CODE}${NC}"
+fi
+
+# Final verification - try to login to confirm credentials work
+echo -e "${CYAN}   [DEBUG] Verifying credentials work...${NC}"
+LOGIN_TEST=$(timeout 5 curl -s -X POST http://localhost:${GRAFANA_ACCESS_PORT}/api/login \
+    -H "Content-Type: application/json" \
+    -d "{\"user\":\"zen\",\"password\":\"${GRAFANA_PASSWORD}\"}" 2>/dev/null || echo "ERROR")
+if echo "$LOGIN_TEST" | grep -q "Logged in\|message.*success"; then
+    echo -e "${GREEN}✓${NC} Credentials verified - login successful"
+elif echo "$LOGIN_TEST" | grep -q "Invalid"; then
+    echo -e "${YELLOW}⚠${NC}  Login test failed - password may be incorrect${NC}"
+else
+    echo -e "${CYAN}   [DEBUG] Login test result: ${LOGIN_TEST:0:100}${NC}"
+fi
+
 show_section_time "Grafana configuration"
 
 # Configure Grafana datasource (with timeout to prevent hanging)
@@ -1414,6 +1507,24 @@ echo -e "  ${GREEN}URL:${NC}     ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}$
 echo -e "  ${GREEN}Username:${NC} ${CYAN}zen${NC}"
 echo -e "  ${GREEN}Password:${NC} ${CYAN}${GRAFANA_PASSWORD}${NC}"
 echo ""
+
+# Final verification that the URL actually works
+echo -e "${CYAN}   [DEBUG] Final verification of Grafana URL...${NC}"
+FINAL_CHECK=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" http://localhost:${GRAFANA_ACCESS_PORT}/api/health 2>/dev/null || echo "000")
+if [ "$FINAL_CHECK" = "200" ] || [ "$FINAL_CHECK" = "401" ] || [ "$FINAL_CHECK" = "403" ]; then
+    echo -e "${GREEN}✓${NC} ${CYAN}URL VERIFIED: http://localhost:${GRAFANA_ACCESS_PORT} is accessible (HTTP ${FINAL_CHECK})${NC}"
+else
+    echo -e "${RED}✗${NC} ${YELLOW}WARNING: URL may not be accessible (HTTP ${FINAL_CHECK})${NC}"
+    echo -e "${CYAN}   [DEBUG] Checking port-forward status...${NC}"
+    if [ -n "${GRAFANA_PF_PID:-}" ]; then
+        if ps -p ${GRAFANA_PF_PID} > /dev/null 2>&1; then
+            echo -e "${CYAN}   [DEBUG] Port-forward PID ${GRAFANA_PF_PID} is running${NC}"
+        else
+            echo -e "${YELLOW}⚠${NC}  Port-forward PID ${GRAFANA_PF_PID} is not running${NC}"
+        fi
+    fi
+fi
+
 echo -e "  ${GREEN}Dashboard:${NC} ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/d/zen-watcher${NC}"
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
