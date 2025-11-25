@@ -11,6 +11,7 @@ type Metrics struct {
 	InformerCacheSync       *prometheus.GaugeVec
 	EventProcessingDuration *prometheus.HistogramVec
 	WebhookRequests         *prometheus.CounterVec
+	WebhookDropped          *prometheus.CounterVec
 }
 
 // NewMetrics creates and registers all Prometheus metrics
@@ -56,12 +57,21 @@ func NewMetrics() *Metrics {
 		[]string{"endpoint", "status"},
 	)
 
+	webhookDropped := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_webhook_events_dropped_total",
+			Help: "Total number of webhook events dropped due to channel full (backpressure)",
+		},
+		[]string{"endpoint"},
+	)
+
 	// Register all metrics
 	prometheus.MustRegister(eventsTotal)
 	prometheus.MustRegister(toolsActive)
 	prometheus.MustRegister(informerCacheSync)
 	prometheus.MustRegister(eventProcessingDuration)
 	prometheus.MustRegister(webhookRequests)
+	prometheus.MustRegister(webhookDropped)
 
 	return &Metrics{
 		EventsTotal:             eventsTotal,
@@ -69,5 +79,6 @@ func NewMetrics() *Metrics {
 		InformerCacheSync:       informerCacheSync,
 		EventProcessingDuration: eventProcessingDuration,
 		WebhookRequests:         webhookRequests,
+		WebhookDropped:          webhookDropped,
 	}
 }

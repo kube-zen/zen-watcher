@@ -1693,24 +1693,61 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 echo -e "${GREEN}  🎉 Demo Environment Ready!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
+# Determine access method (ingress or port-forward)
+USE_PORT_FORWARD=false
+if ! timeout 10 kubectl get pods -n ingress-nginx -l app.kubernetes.io/component=controller --no-headers 2>&1 | grep -q " Running "; then
+    USE_PORT_FORWARD=true
+    echo -e "${YELLOW}⚠${NC}  Ingress not ready, using port-forward for service access...${NC}"
+    pkill -f "kubectl port-forward.*grafana" 2>/dev/null || true
+    pkill -f "kubectl port-forward.*victoriametrics" 2>/dev/null || true
+    timeout 10 kubectl port-forward -n ${NAMESPACE} svc/grafana ${GRAFANA_PORT}:3000 --address=0.0.0.0 > /tmp/grafana-pf.log 2>&1 &
+    GRAFANA_PF_PID=$!
+    timeout 10 kubectl port-forward -n ${NAMESPACE} svc/victoriametrics ${VICTORIA_METRICS_PORT}:8428 --address=0.0.0.0 > /tmp/vm-pf.log 2>&1 &
+    VM_PF_PID=$!
+    sleep 3
+    GRAFANA_ACCESS_PORT=${GRAFANA_PORT}
+    VM_ACCESS_PORT=${VICTORIA_METRICS_PORT}
+else
+    GRAFANA_ACCESS_PORT=${INGRESS_HTTP_PORT}
+    VM_ACCESS_PORT=${INGRESS_HTTP_PORT}
+fi
+
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${CYAN}  📊 SERVICE ACCESS (via Nginx Ingress)${NC}"
+if [ "$USE_PORT_FORWARD" = true ]; then
+    echo -e "${CYAN}  📊 SERVICE ACCESS (via Port-Forward)${NC}"
+else
+    echo -e "${CYAN}  📊 SERVICE ACCESS (via Nginx Ingress)${NC}"
+fi
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "${CYAN}  GRAFANA:${NC}"
-echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/grafana${NC}"
+if [ "$USE_PORT_FORWARD" = true ]; then
+    echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}${NC}"
+else
+    echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/grafana${NC}"
+fi
 echo -e "    ${GREEN}Username:${NC} ${CYAN}zen${NC}"
 echo -e "    ${GREEN}Password:${NC} ${CYAN}${GRAFANA_PASSWORD}${NC}"
-echo -e "    ${GREEN}Dashboard:${NC} ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/grafana/d/zen-watcher${NC}"
+if [ "$USE_PORT_FORWARD" = true ]; then
+    echo -e "    ${GREEN}Dashboard:${NC} ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/d/zen-watcher${NC}"
+else
+    echo -e "    ${GREEN}Dashboard:${NC} ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/grafana/d/zen-watcher${NC}"
+fi
 echo ""
 echo -e "${CYAN}  VICTORIAMETRICS:${NC}"
-echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/victoriametrics${NC}"
-echo -e "    ${GREEN}Metrics API:${NC} ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/victoriametrics/api/v1/query${NC}"
-echo -e "    ${GREEN}VMUI:${NC}    ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/victoriametrics/vmui${NC}"
+if [ "$USE_PORT_FORWARD" = true ]; then
+    echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${VM_ACCESS_PORT}${NC}"
+    echo -e "    ${GREEN}Metrics API:${NC} ${CYAN}http://localhost:${VM_ACCESS_PORT}/api/v1/query${NC}"
+    echo -e "    ${GREEN}VMUI:${NC}    ${CYAN}http://localhost:${VM_ACCESS_PORT}/vmui${NC}"
+else
+    echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${VM_ACCESS_PORT}/victoriametrics${NC}"
+    echo -e "    ${GREEN}Metrics API:${NC} ${CYAN}http://localhost:${VM_ACCESS_PORT}/victoriametrics/api/v1/query${NC}"
+    echo -e "    ${GREEN}VMUI:${NC}    ${CYAN}http://localhost:${VM_ACCESS_PORT}/victoriametrics/vmui${NC}"
+fi
 echo ""
 
 # Check if Zen Watcher has ingress
-if timeout 10 kubectl get ingress zen-watcher -n ${NAMESPACE} 2>/dev/null | grep -q zen-watcher; then
+if [ "$USE_PORT_FORWARD" = false ] && timeout 10 kubectl get ingress zen-watcher -n ${NAMESPACE} 2>/dev/null | grep -q zen-watcher; then
     echo -e "${CYAN}  ZEN WATCHER:${NC}"
     echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/zen-watcher${NC}"
     echo -e "    ${GREEN}Metrics:${NC} ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/zen-watcher/metrics${NC}"
@@ -1718,25 +1755,73 @@ if timeout 10 kubectl get ingress zen-watcher -n ${NAMESPACE} 2>/dev/null | grep
     echo ""
 fi
 
-# Final verification that Grafana is accessible via ingress
-echo -e "${CYAN}   [DEBUG] Final verification of Grafana via ingress...${NC}"
-FINAL_CHECK=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" http://localhost:${INGRESS_HTTP_PORT}/grafana/api/health 2>/dev/null || echo "000")
-if [ "$FINAL_CHECK" = "200" ] || [ "$FINAL_CHECK" = "401" ] || [ "$FINAL_CHECK" = "403" ]; then
-    echo -e "${GREEN}✓${NC} ${CYAN}Grafana VERIFIED via ingress (HTTP ${FINAL_CHECK})${NC}"
-    echo ""
+# Final verification - test ALL endpoints with retries until they work
+echo -e "${CYAN}   [DEBUG] Final verification of all endpoints...${NC}"
+echo -e "${YELLOW}→${NC} Testing endpoints (will retry until working)...${NC}"
+
+# Test Grafana with retries
+GRAFANA_WORKING=false
+for retry in {1..60}; do
+    if [ "$USE_PORT_FORWARD" = true ]; then
+        HTTP_CODE=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" http://localhost:${GRAFANA_ACCESS_PORT}/api/health 2>/dev/null || echo "000")
+        TEST_URL="http://localhost:${GRAFANA_ACCESS_PORT}"
+    else
+        HTTP_CODE=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" http://localhost:${GRAFANA_ACCESS_PORT}/grafana/api/health 2>/dev/null || echo "000")
+        TEST_URL="http://localhost:${GRAFANA_ACCESS_PORT}/grafana"
+    fi
+    
+    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
+        echo -e "${GREEN}✓${NC} Grafana is accessible (HTTP ${HTTP_CODE})"
+        GRAFANA_WORKING=true
+        break
+    fi
+    if [ $((retry % 10)) -eq 0 ]; then
+        echo -e "${CYAN}   Retry $retry/60: Grafana not ready yet (HTTP ${HTTP_CODE})...${NC}"
+    fi
+    sleep 2
+done
+
+# Test VictoriaMetrics with retries
+VM_WORKING=false
+for retry in {1..60}; do
+    if [ "$USE_PORT_FORWARD" = true ]; then
+        HTTP_CODE=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" http://localhost:${VM_ACCESS_PORT}/health 2>/dev/null || echo "000")
+        VM_TEST_URL="http://localhost:${VM_ACCESS_PORT}"
+    else
+        HTTP_CODE=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" http://localhost:${VM_ACCESS_PORT}/victoriametrics/health 2>/dev/null || echo "000")
+        VM_TEST_URL="http://localhost:${VM_ACCESS_PORT}/victoriametrics"
+    fi
+    
+    if [ "$HTTP_CODE" = "200" ]; then
+        echo -e "${GREEN}✓${NC} VictoriaMetrics is accessible (HTTP ${HTTP_CODE})"
+        VM_WORKING=true
+        break
+    fi
+    if [ $((retry % 10)) -eq 0 ]; then
+        echo -e "${CYAN}   Retry $retry/60: VictoriaMetrics not ready yet (HTTP ${HTTP_CODE})...${NC}"
+    fi
+    sleep 2
+done
+
+# Show final results
+echo ""
+if [ "$GRAFANA_WORKING" = true ] && [ "$VM_WORKING" = true ]; then
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${GREEN}  ✅✅✅ WORKING GRAFANA URL AND CREDENTIALS ✅✅✅${NC}"
+    echo -e "${GREEN}  ✅✅✅ ALL ENDPOINTS WORKING ✅✅✅${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo -e "  ${GREEN}URL:${NC}     ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/grafana${NC}"
-    echo -e "  ${GREEN}Username:${NC} ${CYAN}zen${NC}"
-    echo -e "  ${GREEN}Password:${NC} ${CYAN}${GRAFANA_PASSWORD}${NC}"
+    echo -e "  ${GREEN}Grafana:${NC}     ${CYAN}${TEST_URL}${NC}"
+    echo -e "  ${GREEN}Username:${NC}   ${CYAN}zen${NC}"
+    echo -e "  ${GREEN}Password:${NC}   ${CYAN}${GRAFANA_PASSWORD}${NC}"
     echo ""
-    echo -e "${GREEN}✅ VERIFIED: Grafana is accessible and working!${NC}"
+    echo -e "  ${GREEN}VictoriaMetrics:${NC} ${CYAN}${VM_TEST_URL}${NC}"
+    echo ""
+    echo -e "${GREEN}✅ VERIFIED: All endpoints are accessible and working!${NC}"
     echo ""
 else
-    echo -e "${YELLOW}⚠${NC}  Grafana may not be accessible yet (HTTP ${FINAL_CHECK})"
-    echo -e "${CYAN}   Try: curl http://localhost:${INGRESS_HTTP_PORT}/grafana/api/health${NC}"
+    echo -e "${YELLOW}⚠${NC}  Some endpoints may not be fully ready:"
+    [ "$GRAFANA_WORKING" = false ] && echo -e "${YELLOW}   - Grafana not accessible${NC}"
+    [ "$VM_WORKING" = false ] && echo -e "${YELLOW}   - VictoriaMetrics not accessible${NC}"
     echo ""
 fi
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

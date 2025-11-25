@@ -16,16 +16,17 @@ import (
 
 // Server wraps the HTTP server and handlers
 type Server struct {
-	server          *http.Server
-	ready           bool
-	readyMu         sync.RWMutex
-	falcoAlertsChan chan map[string]interface{}
-	auditEventsChan chan map[string]interface{}
-	webhookMetrics  *prometheus.CounterVec
+	server           *http.Server
+	ready            bool
+	readyMu          sync.RWMutex
+	falcoAlertsChan  chan map[string]interface{}
+	auditEventsChan  chan map[string]interface{}
+	webhookMetrics   *prometheus.CounterVec
+	webhookDropped   *prometheus.CounterVec
 }
 
 // NewServer creates a new HTTP server with handlers
-func NewServer(falcoChan, auditChan chan map[string]interface{}, webhookMetrics *prometheus.CounterVec) *Server {
+func NewServer(falcoChan, auditChan chan map[string]interface{}, webhookMetrics, webhookDropped *prometheus.CounterVec) *Server {
 	port := os.Getenv("WATCHER_PORT")
 	if port == "" {
 		port = "8080"
@@ -41,6 +42,7 @@ func NewServer(falcoChan, auditChan chan map[string]interface{}, webhookMetrics 
 		falcoAlertsChan: falcoChan,
 		auditEventsChan: auditChan,
 		webhookMetrics:  webhookMetrics,
+		webhookDropped:  webhookDropped,
 	}
 
 	s.registerHandlers()
@@ -107,6 +109,9 @@ func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 	default:
 		log.Println("⚠️  Falco alerts channel full, dropping alert")
 		s.webhookMetrics.WithLabelValues("falco", "503").Inc()
+		if s.webhookDropped != nil {
+			s.webhookDropped.WithLabelValues("falco").Inc()
+		}
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
 }
@@ -138,6 +143,9 @@ func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
 	default:
 		log.Println("⚠️  Audit events channel full, dropping event")
 		s.webhookMetrics.WithLabelValues("audit", "503").Inc()
+		if s.webhookDropped != nil {
+			s.webhookDropped.WithLabelValues("audit").Inc()
+		}
 		w.WriteHeader(http.StatusServiceUnavailable)
 	}
 }
@@ -164,7 +172,18 @@ func (s *Server) Start(ctx context.Context, wg *sync.WaitGroup) {
 	go func() {
 		<-ctx.Done()
 		log.Println("🛑 Shutting down HTTP server...")
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+		
+		// Get shutdown timeout from env var, default to 10 seconds
+		shutdownTimeout := 10 * time.Second
+		if timeoutStr := os.Getenv("HTTP_SHUTDOWN_TIMEOUT"); timeoutStr != "" {
+			if parsed, err := time.ParseDuration(timeoutStr); err == nil {
+				shutdownTimeout = parsed
+			} else {
+				log.Printf("⚠️  Invalid HTTP_SHUTDOWN_TIMEOUT value '%s', using default 10s", timeoutStr)
+			}
+		}
+		
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer shutdownCancel()
 		if err := s.server.Shutdown(shutdownCtx); err != nil {
 			log.Printf("⚠️  HTTP server shutdown error: %v", err)

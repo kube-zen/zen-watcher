@@ -57,7 +57,7 @@ func main() {
 	auditEventsChan := make(chan map[string]interface{}, 200)
 
 	// Create HTTP server
-	httpServer := server.NewServer(falcoAlertsChan, auditEventsChan, m.WebhookRequests)
+	httpServer := server.NewServer(falcoAlertsChan, auditEventsChan, m.WebhookRequests, m.WebhookDropped)
 
 	// Create ConfigMap poller
 	configMapPoller := watcher.NewConfigMapPoller(
