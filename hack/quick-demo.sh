@@ -1222,10 +1222,28 @@ for i in {1..10}; do
     fi
 done
 
+# Expose Grafana as NodePort for reliable access
 kubectl expose deployment grafana \
     --port=3000 --target-port=3000 \
+    --type=NodePort \
     -n ${NAMESPACE} 2>/dev/null || true
+
+# Get the NodePort
+GRAFANA_NODEPORT=$(kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
+if [ -z "$GRAFANA_NODEPORT" ]; then
+    # If service exists but isn't NodePort, delete and recreate
+    kubectl delete svc grafana -n ${NAMESPACE} 2>/dev/null || true
+    kubectl expose deployment grafana \
+        --port=3000 --target-port=3000 \
+        --type=NodePort \
+        -n ${NAMESPACE} 2>/dev/null || true
+    GRAFANA_NODEPORT=$(kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
+fi
+
 echo -e "${GREEN}✓${NC} Grafana deployed (user: zen)"
+if [ -n "$GRAFANA_NODEPORT" ]; then
+    echo -e "${CYAN}   NodePort: ${GRAFANA_NODEPORT}${NC}"
+fi
 
 # Wait for pods
 echo -e "${YELLOW}→${NC} Waiting for monitoring stack to be ready (this takes 30-60 seconds)..."
@@ -1298,28 +1316,40 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 SECTION_START_TIME=$(date +%s)
 
-# Setup port-forwards
-echo -e "${YELLOW}→${NC} Setting up port-forwards..."
+# Setup access - use NodePort for Grafana (more reliable than port-forward)
+echo -e "${YELLOW}→${NC} Setting up service access..."
 
-# Kill existing port-forwards
-pkill -f "kubectl port-forward.*${NAMESPACE}" 2>/dev/null || true
-sleep 2
+# Initialize access port to default
+GRAFANA_ACCESS_PORT=${GRAFANA_PORT}
 
-# Start port-forwards in background
-kubectl port-forward -n ${NAMESPACE} svc/grafana ${GRAFANA_PORT}:3000 --address=0.0.0.0 > /tmp/grafana-pf.log 2>&1 &
-GRAFANA_PF_PID=$!
-sleep 3
+# Get NodePort for Grafana
+GRAFANA_NODEPORT=$(kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
+if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ]; then
+    GRAFANA_ACCESS_PORT=${GRAFANA_NODEPORT}
+    echo -e "${CYAN}   Grafana accessible via NodePort: ${GRAFANA_NODEPORT}${NC}"
+    echo -e "${CYAN}   Access at: http://localhost:${GRAFANA_NODEPORT}${NC}"
+else
+    # Fallback to port-forward if NodePort not available
+    echo -e "${CYAN}   Using port-forward for Grafana (NodePort not available)${NC}"
+    pkill -f "kubectl port-forward.*grafana" 2>/dev/null || true
+    sleep 2
+    kubectl port-forward -n ${NAMESPACE} svc/grafana ${GRAFANA_PORT}:3000 --address=0.0.0.0 > /tmp/grafana-pf.log 2>&1 &
+    GRAFANA_PF_PID=$!
+    sleep 3
+    GRAFANA_ACCESS_PORT=${GRAFANA_PORT}
+fi
 
+# VictoriaMetrics can use port-forward (less critical)
 kubectl port-forward -n ${NAMESPACE} svc/victoriametrics ${VICTORIA_METRICS_PORT}:8428 --address=0.0.0.0 > /tmp/vm-pf.log 2>&1 &
 VM_PF_PID=$!
 sleep 2
 
-echo -e "${GREEN}✓${NC} Port-forwards active"
+echo -e "${GREEN}✓${NC} Service access configured"
 
 # Wait for Grafana to be fully ready
 echo -e "${YELLOW}→${NC} Waiting for Grafana to be fully ready (15-30 seconds)..."
 for i in {1..60}; do
-    if curl -s http://localhost:${GRAFANA_PORT}/api/health 2>/dev/null | grep -q "ok"; then
+    if curl -s http://localhost:${GRAFANA_ACCESS_PORT}/api/health 2>/dev/null | grep -q "ok"; then
         echo -e "${GREEN}✓${NC} Grafana is ready"
         break
     fi
@@ -1332,7 +1362,7 @@ show_section_time "Grafana configuration"
 
 # Configure Grafana datasource (with timeout to prevent hanging)
 echo -e "${YELLOW}→${NC} Configuring VictoriaMetrics datasource..."
-DATASOURCE_RESULT=$(timeout 10 curl -s -X POST http://localhost:${GRAFANA_PORT}/api/datasources \
+DATASOURCE_RESULT=$(timeout 10 curl -s -X POST http://localhost:${GRAFANA_ACCESS_PORT}/api/datasources \
     -H "Content-Type: application/json" \
     -u zen:${GRAFANA_PASSWORD} \
     -d '{
@@ -1358,7 +1388,7 @@ echo -e "${YELLOW}→${NC} Importing Zen Watcher dashboard..."
 if [ -f "config/dashboards/zen-watcher-dashboard.json" ]; then
     DASHBOARD_RESULT=$(timeout 10 cat config/dashboards/zen-watcher-dashboard.json | \
     jq '{dashboard: ., overwrite: true, message: "Demo Import"}' | \
-    curl -s -X POST http://localhost:${GRAFANA_PORT}/api/dashboards/db \
+    curl -s -X POST http://localhost:${GRAFANA_ACCESS_PORT}/api/dashboards/db \
         -H "Content-Type: application/json" \
         -u zen:${GRAFANA_PASSWORD} \
         -d @- 2>&1 || echo "timeout or error")
@@ -1387,11 +1417,11 @@ echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━�
 echo -e "${CYAN}  📊 GRAFANA ACCESS${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "  ${GREEN}URL:${NC}     ${CYAN}http://localhost:${GRAFANA_PORT}${NC}"
+echo -e "  ${GREEN}URL:${NC}     ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}${NC}"
 echo -e "  ${GREEN}Username:${NC} ${CYAN}zen${NC}"
 echo -e "  ${GREEN}Password:${NC} ${CYAN}${GRAFANA_PASSWORD}${NC}"
 echo ""
-echo -e "  ${GREEN}Dashboard:${NC} ${CYAN}http://localhost:${GRAFANA_PORT}/d/zen-watcher${NC}"
+echo -e "  ${GREEN}Dashboard:${NC} ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/d/zen-watcher${NC}"
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 if [ $TOTAL_MINUTES -gt 0 ]; then
