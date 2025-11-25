@@ -2,8 +2,8 @@ package kubernetes
 
 import (
 	"context"
-	"fmt"
 	"log"
+	"time"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -75,11 +75,16 @@ func SetupInformers(
 	// Start informers
 	factory.Start(stopCh)
 
-	// Wait for caches to sync
-	if !cache.WaitForCacheSync(ctx.Done(), policyInformer.HasSynced, trivyInformer.HasSynced) {
-		return fmt.Errorf("failed to sync informer caches")
+	// Wait for caches to sync (with timeout to avoid blocking if CRDs don't exist)
+	syncCtx, syncCancel := context.WithTimeout(ctx, 30*time.Second)
+	defer syncCancel()
+
+	if !cache.WaitForCacheSync(syncCtx.Done(), policyInformer.HasSynced, trivyInformer.HasSynced) {
+		log.Println("⚠️  Informer caches did not sync within timeout (CRDs may not be installed - this is OK)")
+		log.Println("   Informers will continue running and will sync when CRDs become available")
+	} else {
+		log.Println("✅ Informers started and synced - real-time event processing enabled")
 	}
 
-	log.Println("✅ Informers started and synced - real-time event processing enabled")
 	return nil
 }

@@ -1260,13 +1260,23 @@ if ! timeout 10 helm repo list 2>/dev/null | grep -q ingress-nginx; then
     timeout 30 helm repo update 2>&1 || true
 fi
 
-# Install nginx ingress with NodePort for k3d (expose on ports 80/443)
+# Find available high port (8080-8090 range)
+INGRESS_HTTP_PORT=8080
+for port in {8080..8090}; do
+    if ! timeout 2 ss -tlnp 2>/dev/null | grep -q ":${port} "; then
+        INGRESS_HTTP_PORT=${port}
+        echo -e "${CYAN}   Using port ${INGRESS_HTTP_PORT} for ingress${NC}"
+        break
+    fi
+done
+
+# Install nginx ingress with NodePort on high port
 if timeout 120 helm install ingress-nginx ingress-nginx/ingress-nginx \
     --namespace ingress-nginx \
     --create-namespace \
     --set controller.service.type=NodePort \
-    --set controller.service.nodePorts.http=80 \
-    --set controller.service.nodePorts.https=443 \
+    --set controller.service.nodePorts.http=${INGRESS_HTTP_PORT} \
+    --set controller.service.nodePorts.https=$((INGRESS_HTTP_PORT + 1)) \
     --set controller.admissionWebhooks.enabled=false \
     --wait --timeout=2m 2>&1 | tee /tmp/ingress-install.log; then
     echo -e "${GREEN}✓${NC} Nginx ingress controller installed"
@@ -1292,10 +1302,13 @@ for i in {1..30}; do
     fi
 done
 
-# Get ingress service port (should be 80/443)
-INGRESS_HTTP_PORT=$(timeout 10 kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || echo "80")
-INGRESS_HTTPS_PORT=$(timeout 10 kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' 2>/dev/null || echo "443")
-echo -e "${CYAN}   Ingress accessible on ports: HTTP ${INGRESS_HTTP_PORT}, HTTPS ${INGRESS_HTTPS_PORT}${NC}"
+# Verify ingress service port
+ACTUAL_INGRESS_PORT=$(timeout 10 kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || echo "${INGRESS_HTTP_PORT}")
+if [ "$ACTUAL_INGRESS_PORT" != "${INGRESS_HTTP_PORT}" ]; then
+    INGRESS_HTTP_PORT=${ACTUAL_INGRESS_PORT}
+    echo -e "${CYAN}   Ingress using port ${INGRESS_HTTP_PORT}${NC}"
+fi
+echo -e "${CYAN}   Ingress accessible on: http://localhost:${INGRESS_HTTP_PORT}${NC}"
 show_section_time "Nginx ingress installation"
 
 echo ""
@@ -1364,47 +1377,30 @@ echo -e "${YELLOW}→${NC} Creating ingress resources..."
 INGRESS_HTTP_PORT=$(timeout 10 kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || echo "80")
 GRAFANA_ACCESS_PORT=${INGRESS_HTTP_PORT}
 
-# Create Grafana ingress
+# Create single ingress with path-based routing (no Host header needed)
 cat <<EOF | timeout 30 kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" > /dev/null || true
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: grafana
+  name: zen-demo-services
   namespace: ${NAMESPACE}
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/rewrite-target: /\$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
   ingressClassName: nginx
   rules:
-  - host: grafana.local
-    http:
+  - http:
       paths:
-      - path: /
-        pathType: Prefix
+      - path: /grafana(/|$)(.*)
+        pathType: ImplementationSpecific
         backend:
           service:
             name: grafana
             port:
               number: 3000
-EOF
-
-# Create VictoriaMetrics ingress
-cat <<EOF | timeout 30 kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" > /dev/null || true
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: victoriametrics
-  namespace: ${NAMESPACE}
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: victoriametrics.local
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
+      - path: /victoriametrics(/|$)(.*)
+        pathType: ImplementationSpecific
         backend:
           service:
             name: victoriametrics
@@ -1424,15 +1420,15 @@ metadata:
   name: zen-watcher
   namespace: ${NAMESPACE}
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/rewrite-target: /\$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
   ingressClassName: nginx
   rules:
-  - host: zen-watcher.local
-    http:
+  - http:
       paths:
-      - path: /
-        pathType: Prefix
+      - path: /zen-watcher(/|$)(.*)
+        pathType: ImplementationSpecific
         backend:
           service:
             name: zen-watcher
@@ -1442,18 +1438,18 @@ EOF
     echo -e "${CYAN}   Zen Watcher ingress created${NC}"
 fi
 
-echo -e "${GREEN}✓${NC} Ingress resources created"
-echo -e "${CYAN}   Grafana: http://grafana.local (or http://localhost:${INGRESS_HTTP_PORT} with Host header)${NC}"
-echo -e "${CYAN}   VictoriaMetrics: http://victoriametrics.local${NC}"
+echo -e "${GREEN}✓${NC} Ingress resources created (path-based routing)"
+echo -e "${CYAN}   Grafana: http://localhost:${INGRESS_HTTP_PORT}/grafana${NC}"
+echo -e "${CYAN}   VictoriaMetrics: http://localhost:${INGRESS_HTTP_PORT}/victoriametrics${NC}"
 
 # Wait for Grafana to be fully ready and VERIFY it works via ingress
 echo -e "${YELLOW}→${NC} Waiting for Grafana to be fully ready and verifying ingress access..."
 GRAFANA_READY=false
 for i in {1..60}; do
-    # Test via ingress with Host header
-    HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" -H "Host: grafana.local" http://localhost:${INGRESS_HTTP_PORT}/api/health 2>/dev/null || echo "000")
+    # Test via ingress with path-based routing (no Host header needed)
+    HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" http://localhost:${INGRESS_HTTP_PORT}/grafana/api/health 2>/dev/null || echo "000")
     if [ "$HTTP_CODE" = "200" ]; then
-        HEALTH_RESPONSE=$(timeout 3 curl -s -H "Host: grafana.local" http://localhost:${INGRESS_HTTP_PORT}/api/health 2>/dev/null || echo "")
+        HEALTH_RESPONSE=$(timeout 3 curl -s http://localhost:${INGRESS_HTTP_PORT}/grafana/api/health 2>/dev/null || echo "")
         if echo "$HEALTH_RESPONSE" | grep -q "ok\|database"; then
             echo -e "${GREEN}✓${NC} Grafana is ready and responding via ingress (HTTP ${HTTP_CODE})"
             GRAFANA_READY=true
@@ -1478,9 +1474,9 @@ fi
 
 # Final verification - try to login via ingress
 echo -e "${CYAN}   [DEBUG] Verifying credentials via ingress...${NC}"
-LOGIN_TEST=$(timeout 5 curl -s -X POST -H "Host: grafana.local" -H "Content-Type: application/json" \
+LOGIN_TEST=$(timeout 5 curl -s -X POST -H "Content-Type: application/json" \
     -d "{\"user\":\"zen\",\"password\":\"${GRAFANA_PASSWORD}\"}" \
-    http://localhost:${INGRESS_HTTP_PORT}/api/login 2>/dev/null || echo "ERROR")
+    http://localhost:${INGRESS_HTTP_PORT}/grafana/api/login 2>/dev/null || echo "ERROR")
 if echo "$LOGIN_TEST" | grep -q "Logged in\|message.*success"; then
     echo -e "${GREEN}✓${NC} Credentials verified via ingress - login successful"
 elif echo "$LOGIN_TEST" | grep -q "Invalid"; then
@@ -1493,7 +1489,7 @@ show_section_time "Grafana configuration"
 
 # Configure Grafana datasource via ingress (with timeout to prevent hanging)
 echo -e "${YELLOW}→${NC} Configuring VictoriaMetrics datasource..."
-DATASOURCE_RESULT=$(timeout 10 curl -s -X POST -H "Host: grafana.local" \
+DATASOURCE_RESULT=$(timeout 10 curl -s -X POST \
     -H "Content-Type: application/json" \
     -u zen:${GRAFANA_PASSWORD} \
     -d '{
@@ -1507,7 +1503,7 @@ DATASOURCE_RESULT=$(timeout 10 curl -s -X POST -H "Host: grafana.local" \
             "httpMethod": "POST"
         }
     }' \
-    http://localhost:${INGRESS_HTTP_PORT}/api/datasources 2>&1 || echo "timeout or error")
+    http://localhost:${INGRESS_HTTP_PORT}/grafana/api/datasources 2>&1 || echo "timeout or error")
 
 if echo "$DATASOURCE_RESULT" | grep -q "Datasource added\|already exists\|success"; then
     echo -e "${GREEN}✓${NC} Datasource configured"
@@ -1520,11 +1516,11 @@ echo -e "${YELLOW}→${NC} Importing Zen Watcher dashboard..."
 if [ -f "config/dashboards/zen-watcher-dashboard.json" ]; then
     DASHBOARD_RESULT=$(timeout 10 cat config/dashboards/zen-watcher-dashboard.json | \
     jq '{dashboard: ., overwrite: true, message: "Demo Import"}' | \
-    curl -s -X POST -H "Host: grafana.local" \
+    curl -s -X POST \
         -H "Content-Type: application/json" \
         -u zen:${GRAFANA_PASSWORD} \
         -d @- \
-        http://localhost:${INGRESS_HTTP_PORT}/api/dashboards/db 2>&1 || echo "timeout or error")
+        http://localhost:${INGRESS_HTTP_PORT}/grafana/api/dashboards/db 2>&1 || echo "timeout or error")
     
     if echo "$DASHBOARD_RESULT" | grep -q "success"; then
         echo -e "${GREEN}✓${NC} Dashboard imported successfully"
@@ -1550,34 +1546,30 @@ echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━�
 echo -e "${CYAN}  📊 SERVICE ACCESS (via Nginx Ingress)${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "${CYAN}  Access services using Host header:${NC}"
-echo -e "    ${YELLOW}curl -H 'Host: grafana.local' http://localhost:${INGRESS_HTTP_PORT}${NC}"
-echo ""
 echo -e "${CYAN}  GRAFANA:${NC}"
-echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${INGRESS_HTTP_PORT}${NC} ${YELLOW}(with Host: grafana.local)${NC}"
+echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/grafana${NC}"
 echo -e "    ${GREEN}Username:${NC} ${CYAN}zen${NC}"
 echo -e "    ${GREEN}Password:${NC} ${CYAN}${GRAFANA_PASSWORD}${NC}"
-echo -e "    ${GREEN}Dashboard:${NC} ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/d/zen-watcher${NC} ${YELLOW}(with Host: grafana.local)${NC}"
+echo -e "    ${GREEN}Dashboard:${NC} ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/grafana/d/zen-watcher${NC}"
 echo ""
 echo -e "${CYAN}  VICTORIAMETRICS:${NC}"
-echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${INGRESS_HTTP_PORT}${NC} ${YELLOW}(with Host: victoriametrics.local)${NC}"
-echo -e "    ${GREEN}Metrics API:${NC} ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/api/v1/query${NC} ${YELLOW}(with Host: victoriametrics.local)${NC}"
-echo -e "    ${GREEN}VMUI:${NC}    ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/vmui${NC} ${YELLOW}(with Host: victoriametrics.local)${NC}"
-echo -e "    ${GREEN}Prometheus:${NC} ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/prometheus${NC} ${YELLOW}(with Host: victoriametrics.local)${NC}"
+echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/victoriametrics${NC}"
+echo -e "    ${GREEN}Metrics API:${NC} ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/victoriametrics/api/v1/query${NC}"
+echo -e "    ${GREEN}VMUI:${NC}    ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/victoriametrics/vmui${NC}"
 echo ""
 
 # Check if Zen Watcher has ingress
 if timeout 10 kubectl get ingress zen-watcher -n ${NAMESPACE} 2>/dev/null | grep -q zen-watcher; then
     echo -e "${CYAN}  ZEN WATCHER:${NC}"
-    echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${INGRESS_HTTP_PORT}${NC} ${YELLOW}(with Host: zen-watcher.local)${NC}"
-    echo -e "    ${GREEN}Metrics:${NC} ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/metrics${NC} ${YELLOW}(with Host: zen-watcher.local)${NC}"
-    echo -e "    ${GREEN}Health:${NC}  ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/health${NC} ${YELLOW}(with Host: zen-watcher.local)${NC}"
+    echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/zen-watcher${NC}"
+    echo -e "    ${GREEN}Metrics:${NC} ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/zen-watcher/metrics${NC}"
+    echo -e "    ${GREEN}Health:${NC}  ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/zen-watcher/health${NC}"
     echo ""
 fi
 
 # Final verification that Grafana is accessible via ingress
 echo -e "${CYAN}   [DEBUG] Final verification of Grafana via ingress...${NC}"
-FINAL_CHECK=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" -H "Host: grafana.local" http://localhost:${INGRESS_HTTP_PORT}/api/health 2>/dev/null || echo "000")
+FINAL_CHECK=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" http://localhost:${INGRESS_HTTP_PORT}/grafana/api/health 2>/dev/null || echo "000")
 if [ "$FINAL_CHECK" = "200" ] || [ "$FINAL_CHECK" = "401" ] || [ "$FINAL_CHECK" = "403" ]; then
     echo -e "${GREEN}✓${NC} ${CYAN}Grafana VERIFIED via ingress (HTTP ${FINAL_CHECK})${NC}"
     echo ""
@@ -1585,7 +1577,7 @@ if [ "$FINAL_CHECK" = "200" ] || [ "$FINAL_CHECK" = "401" ] || [ "$FINAL_CHECK" 
     echo -e "${GREEN}  ✅✅✅ WORKING GRAFANA URL AND CREDENTIALS ✅✅✅${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo -e "  ${GREEN}URL:${NC}     ${CYAN}http://localhost:${INGRESS_HTTP_PORT}${NC} ${YELLOW}(use Host: grafana.local header)${NC}"
+    echo -e "  ${GREEN}URL:${NC}     ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/grafana${NC}"
     echo -e "  ${GREEN}Username:${NC} ${CYAN}zen${NC}"
     echo -e "  ${GREEN}Password:${NC} ${CYAN}${GRAFANA_PASSWORD}${NC}"
     echo ""
@@ -1593,7 +1585,7 @@ if [ "$FINAL_CHECK" = "200" ] || [ "$FINAL_CHECK" = "401" ] || [ "$FINAL_CHECK" 
     echo ""
 else
     echo -e "${YELLOW}⚠${NC}  Grafana may not be accessible yet (HTTP ${FINAL_CHECK})"
-    echo -e "${CYAN}   Try: curl -H 'Host: grafana.local' http://localhost:${INGRESS_HTTP_PORT}/api/health${NC}"
+    echo -e "${CYAN}   Try: curl http://localhost:${INGRESS_HTTP_PORT}/grafana/api/health${NC}"
     echo ""
 fi
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
