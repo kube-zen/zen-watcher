@@ -1248,8 +1248,21 @@ SECTION_START_TIME=$(date +%s)
 
 # Deploy Zen Watcher CRDs
 echo -e "${YELLOW}→${NC} Deploying Zen Watcher CRDs..."
-kubectl apply -f deployments/crds/ > /dev/null 2>&1
-echo -e "${GREEN}✓${NC} CRDs deployed"
+for i in {1..10}; do
+    if kubectl apply -f deployments/crds/ --validate=false 2>&1 | grep -v "already exists\|unchanged" > /dev/null; then
+        echo -e "${GREEN}✓${NC} CRDs deployed"
+        break
+    elif kubectl get crd observations.zen.kube-zen.io 2>/dev/null | grep -q observations; then
+        echo -e "${GREEN}✓${NC} CRDs already exist"
+        break
+    else
+        if [ $i -lt 10 ]; then
+            sleep 2
+        else
+            echo -e "${YELLOW}⚠${NC}  CRD deployment had issues (continuing...)"
+        fi
+    fi
+done
 
 # Handle mock data deployment
 SECTION_START_TIME=$(date +%s)
