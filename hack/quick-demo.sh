@@ -677,41 +677,42 @@ create_cluster() {
             echo -e "${CYAN}   API Port: ${K3D_API_PORT}${NC}"
             echo -e "${CYAN}   This may take 30-60 seconds...${NC}"
             
-            # Build k3d command
-            # k3d automatically handles port conflicts by using random ports when needed
-            # But if K3D_API_PORT is explicitly set to non-default, use it
+            # Build k3d command - simplified approach like zen-gamma
+            # Always use explicit ports to avoid conflicts with multiple clusters
             local k3d_create_args=(
                 "cluster" "create" "${CLUSTER_NAME}"
                 "--agents" "1"
                 "--k3s-arg" "--disable=traefik@server:0"
             )
             
-            # CRITICAL: When multiple k3d clusters exist, k3d may ignore --api-port and use random ports
-            # Solution: Use a different port range when other clusters exist (like zen-alpha does)
+            # Determine API port: use 6550+ range when other clusters exist (like zen-gamma)
             local existing_clusters=$(k3d cluster list 2>/dev/null | grep -v "^NAME" | wc -l || echo "0")
             if [ "$existing_clusters" -gt 0 ] && [ "${K3D_API_PORT}" = "6443" ]; then
-                # Other clusters exist and we're using default port - use a different port to avoid conflicts
-                # Use port 6550+ range (like zen-alpha demo clusters)
+                # Other clusters exist - use 6550+ range (like zen-gamma demo clusters)
                 local demo_port=6550
-                while ! check_port $demo_port "k3d API" 2>/dev/null; do
-                    demo_port=$((demo_port + 1))
-                    if [ $demo_port -gt 6560 ]; then
-                        demo_port=$(find_available_port 6443 "k3d API")
+                # Find first available port in 6550-6560 range
+                while [ $demo_port -le 6560 ]; do
+                    if check_port $demo_port "k3d API" 2>/dev/null; then
                         break
                     fi
+                    demo_port=$((demo_port + 1))
                 done
+                if [ $demo_port -gt 6560 ]; then
+                    # Fallback to finding any available port
+                    demo_port=$(find_available_port 6550 "k3d API")
+                fi
                 k3d_create_args+=("--api-port" "${demo_port}")
                 K3D_API_PORT=${demo_port}
-                echo -e "${CYAN}   Multiple clusters detected, using port ${demo_port} to avoid conflicts${NC}"
+                echo -e "${CYAN}   Multiple clusters detected, using port ${demo_port} (zen-gamma style)${NC}"
             elif [ "${K3D_API_PORT}" != "6443" ]; then
+                # Custom port specified
                 k3d_create_args+=("--api-port" "${K3D_API_PORT}")
                 echo -e "${CYAN}   Using custom API port: ${K3D_API_PORT}${NC}"
             elif ! check_port 6443 "k3d API"; then
-                # Default port is in use, find alternative
-                local alt_port=$(find_available_port 6443 "k3d API")
-                k3d_create_args+=("--api-port" "${alt_port}")
-                K3D_API_PORT=${alt_port}
-                echo -e "${CYAN}   Port 6443 in use, using ${alt_port} instead${NC}"
+                # Default port is in use, use 6550
+                k3d_create_args+=("--api-port" "6550")
+                K3D_API_PORT=6550
+                echo -e "${CYAN}   Port 6443 in use, using 6550 instead${NC}"
             else
                 # Default port is free, use it
                 k3d_create_args+=("--api-port" "${K3D_API_PORT}")
@@ -830,79 +831,33 @@ SECTION_START_TIME=$(date +%s)
 case "$PLATFORM" in
     k3d)
         # Wait a moment for k3d to finish setting up
-        sleep 5
+        sleep 3
         
-        # CRITICAL: Detect the ACTUAL port k3d used (it may differ from requested port when multiple clusters exist)
-        echo -e "${CYAN}   Detecting actual k3d API port...${NC}"
-        actual_port=""
-        
-        # Method 1: Check docker inspect (most reliable for k3d loadbalancer)
-        inspect_port=$(docker inspect k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | jq -r '.[0].NetworkSettings.Ports."6443/tcp"[0].HostPort // empty' 2>/dev/null || echo "")
-        if [ -n "$inspect_port" ] && [ "$inspect_port" != "null" ] && [ "$inspect_port" != "" ]; then
-            actual_port="$inspect_port"
-            echo -e "${CYAN}   Found port via docker inspect: ${actual_port}${NC}"
-        fi
-        
-        # Method 2: Check docker port command
-        if [ -z "$actual_port" ]; then
-            lb_port=$(docker port k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | grep "6443/tcp" | cut -d: -f2 | tr -d ' ' | head -1)
-            if [ -n "$lb_port" ] && [ "$lb_port" != "" ]; then
-                actual_port="$lb_port"
-                echo -e "${CYAN}   Found port via docker port: ${actual_port}${NC}"
-            fi
-        fi
-        
-        # Method 3: Check what port is actually listening (fallback)
-        if [ -z "$actual_port" ]; then
-            # Find what port k3d actually bound to by checking listening ports
-            for test_port in 6443 6444 6445 6446 6447 6448 6449 6450; do
-                if ss -tlnp 2>/dev/null | grep -q ":${test_port}"; then
-                    # Verify it's actually the k3d cluster by trying to connect
-                    if timeout 2 kubectl --server="https://127.0.0.1:${test_port}" get nodes --request-timeout=1s &>/dev/null 2>&1; then
-                        actual_port="$test_port"
-                        echo -e "${CYAN}   Found port via port scan: ${actual_port}${NC}"
-                        break
-                    fi
-                fi
-            done
-        fi
+        # Simplified approach: use the port we specified (like zen-gamma)
+        # k3d respects --api-port when specified, so we trust what we set
+        echo -e "${CYAN}   Setting up kubeconfig for port ${K3D_API_PORT}...${NC}"
         
         # Merge kubeconfig (preferred method - updates default kubeconfig)
-        if ! k3d kubeconfig merge ${CLUSTER_NAME} --kubeconfig-merge-default --kubeconfig-switch-context 2>/dev/null; then
+        if ! timeout 10 k3d kubeconfig merge ${CLUSTER_NAME} --kubeconfig-merge-default --kubeconfig-switch-context 2>/dev/null; then
             # Fallback: write to temp file and export
-            k3d kubeconfig write ${CLUSTER_NAME} > /tmp/k3d-kubeconfig-${CLUSTER_NAME} 2>/dev/null
+            timeout 10 k3d kubeconfig write ${CLUSTER_NAME} > /tmp/k3d-kubeconfig-${CLUSTER_NAME} 2>/dev/null
             export KUBECONFIG=/tmp/k3d-kubeconfig-${CLUSTER_NAME}
         fi
         
         # Ensure context is set
-        kubectl config use-context k3d-${CLUSTER_NAME} 2>/dev/null || {
+        timeout 5 kubectl config use-context k3d-${CLUSTER_NAME} 2>/dev/null || {
             # Try alternative context name
-            kubectl config use-context k3d-${CLUSTER_NAME}@${CLUSTER_NAME} 2>/dev/null || true
+            timeout 5 kubectl config use-context k3d-${CLUSTER_NAME}@${CLUSTER_NAME} 2>/dev/null || true
         }
         
-        # Fix kubeconfig server URL - k3d sometimes uses 0.0.0.0 which doesn't work
-        # Replace 0.0.0.0 with 127.0.0.1
-        current_server=$(kubectl config view --minify --context k3d-${CLUSTER_NAME} -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || echo "")
-        if echo "$current_server" | grep -q "0.0.0.0"; then
-            fixed_server=$(echo "$current_server" | sed 's/0\.0\.0\.0/127.0.0.1/')
-            echo -e "${CYAN}   Fixing kubeconfig server URL: ${current_server} → ${fixed_server}${NC}"
-            kubectl config set clusters.k3d-${CLUSTER_NAME}.server "$fixed_server" 2>/dev/null || true
-        fi
-        
-        # Update kubeconfig with actual port if we detected one
-        if [ -n "$actual_port" ] && [ "$actual_port" != "6443" ]; then
-            echo -e "${CYAN}   Updating kubeconfig to use actual port: ${actual_port}${NC}"
-            kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${actual_port}" 2>/dev/null || true
-            # Also update K3D_API_PORT for later reference
-            K3D_API_PORT="$actual_port"
-        fi
+        # Fix kubeconfig server URL - always use 127.0.0.1 and the port we specified
+        timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${K3D_API_PORT}" 2>/dev/null || true
         
         # CRITICAL: k3d uses self-signed certificates, so we need to skip TLS verification
-        # This is safe for local development clusters
         # Remove certificate-authority-data if present (conflicts with insecure-skip-tls-verify)
-        kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data 2>/dev/null || true
-        kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>/dev/null || true
-        echo -e "${CYAN}   Configured k3d cluster to skip TLS verification (self-signed certs)${NC}"
+        timeout 5 kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data 2>/dev/null || true
+        timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>/dev/null || true
+        echo -e "${CYAN}   Configured kubeconfig for port ${K3D_API_PORT} (TLS verification skipped)${NC}"
         ;;
     kind)
         # kind automatically updates kubeconfig, but ensure context is set
@@ -961,21 +916,15 @@ for i in $(seq 1 $max_wait); do
     sleep 3
 done
 
-# Final attempt to fix port if still not ready
+# Final attempt to verify cluster is ready
 if [ "$cluster_ready" = false ] && [ "$PLATFORM" = "k3d" ]; then
-    echo -e "${CYAN}   Attempting final port detection...${NC}"
-    lb_port=$(docker port k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | grep "6443/tcp" | cut -d: -f2 | head -1)
-    if [ -z "$lb_port" ]; then
-        lb_port=$(docker inspect k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | jq -r '.[0].NetworkSettings.Ports."6443/tcp"[0].HostPort // empty' 2>/dev/null || echo "")
-    fi
-    if [ -n "$lb_port" ] && [ "$lb_port" != "null" ] && [ "$lb_port" != "6443" ]; then
-        echo -e "${CYAN}   Updating kubeconfig to use port ${lb_port}...${NC}"
-        kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${lb_port}" 2>/dev/null || true
-        sleep 3
-        if kubectl get nodes --request-timeout=5s &>/dev/null 2>&1; then
-            cluster_ready=true
-            echo -e "${GREEN}✓${NC} Cluster is ready (after port fix)"
-        fi
+    echo -e "${CYAN}   Verifying cluster connectivity on port ${K3D_API_PORT}...${NC}"
+    sleep 2
+    if timeout 5 kubectl get nodes --request-timeout=5s &>/dev/null 2>&1; then
+        cluster_ready=true
+        echo -e "${GREEN}✓${NC} Cluster is ready"
+    else
+        echo -e "${YELLOW}⚠${NC}  Cluster may not be fully ready, but continuing...${NC}"
     fi
 fi
 
@@ -1223,49 +1172,49 @@ for i in {1..10}; do
 done
 
 # Expose Grafana as NodePort for reliable access
-timeout 10 kubectl expose deployment grafana \
+# Delete existing service if it exists (might be ClusterIP)
+timeout 10 kubectl delete svc grafana -n ${NAMESPACE} 2>/dev/null || true
+sleep 1
+
+# Create NodePort service
+echo -e "${CYAN}   Creating Grafana NodePort service...${NC}"
+if timeout 15 kubectl expose deployment grafana \
     --port=3000 --target-port=3000 \
     --type=NodePort \
-    -n ${NAMESPACE} 2>/dev/null || true
-
-# Get the NodePort (with retries and timeouts)
-GRAFANA_NODEPORT=""
-for i in {1..5}; do
-    GRAFANA_NODEPORT=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
-    if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ]; then
-        break
-    fi
-    sleep 1
-done
-
-if [ -z "$GRAFANA_NODEPORT" ] || [ "$GRAFANA_NODEPORT" = "null" ]; then
-    # If service exists but isn't NodePort, delete and recreate
-    timeout 10 kubectl delete svc grafana -n ${NAMESPACE} 2>/dev/null || true
-    sleep 1
-    timeout 10 kubectl expose deployment grafana \
-        --port=3000 --target-port=3000 \
-        --type=NodePort \
-        -n ${NAMESPACE} 2>/dev/null || true
-    sleep 2
-    for i in {1..5}; do
-        GRAFANA_NODEPORT=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
-        if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ]; then
-            break
-        fi
-        sleep 1
-    done
+    --name=grafana \
+    -n ${NAMESPACE} 2>&1 | grep -v "already exists" > /dev/null; then
+    echo -e "${CYAN}   NodePort service created${NC}"
+else
+    echo -e "${YELLOW}⚠${NC}  Service creation had issues (may already exist)${NC}"
 fi
 
+# Wait for service to be ready and get NodePort (with retries)
+# Kubernetes needs a moment to assign the NodePort
+GRAFANA_NODEPORT=""
+for i in {1..20}; do
+    sleep 1
+    # Check if service exists and is NodePort type
+    svc_type=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.type}' 2>/dev/null || echo "")
+    if [ "$svc_type" = "NodePort" ]; then
+        GRAFANA_NODEPORT=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
+        if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ] && [ "$GRAFANA_NODEPORT" != "0" ]; then
+            break
+        fi
+    fi
+done
+
 echo -e "${GREEN}✓${NC} Grafana deployed (user: zen)"
-if [ -n "$GRAFANA_NODEPORT" ]; then
+if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ] && [ "$GRAFANA_NODEPORT" != "0" ]; then
     echo -e "${CYAN}   NodePort: ${GRAFANA_NODEPORT}${NC}"
+else
+    echo -e "${YELLOW}⚠${NC}  NodePort not yet assigned (will retry later)${NC}"
 fi
 
 # Wait for pods
 echo -e "${YELLOW}→${NC} Waiting for monitoring stack to be ready (this takes 30-60 seconds)..."
 for attempt in {1..30}; do
-    if kubectl wait --for=condition=ready pod -l app=victoriametrics -n ${NAMESPACE} --timeout=10s > /dev/null 2>&1 && \
-       kubectl wait --for=condition=ready pod -l app=grafana -n ${NAMESPACE} --timeout=10s > /dev/null 2>&1; then
+    if timeout 15 kubectl wait --for=condition=ready pod -l app=victoriametrics -n ${NAMESPACE} --timeout=10s > /dev/null 2>&1 && \
+       timeout 15 kubectl wait --for=condition=ready pod -l app=grafana -n ${NAMESPACE} --timeout=10s > /dev/null 2>&1; then
         break
     fi
     sleep 2
@@ -1283,10 +1232,10 @@ SECTION_START_TIME=$(date +%s)
 # Deploy Zen Watcher CRDs
 echo -e "${YELLOW}→${NC} Deploying Zen Watcher CRDs..."
 for i in {1..10}; do
-    if kubectl apply -f deployments/crds/ --validate=false 2>&1 | grep -v "already exists\|unchanged" > /dev/null; then
+    if timeout 30 kubectl apply -f deployments/crds/ --validate=false 2>&1 | grep -v "already exists\|unchanged" > /dev/null; then
         echo -e "${GREEN}✓${NC} CRDs deployed"
         break
-    elif kubectl get crd observations.zen.kube-zen.io 2>/dev/null | grep -q observations; then
+    elif timeout 10 kubectl get crd observations.zen.kube-zen.io 2>/dev/null | grep -q observations; then
         echo -e "${GREEN}✓${NC} CRDs already exist"
         break
     else
@@ -1339,36 +1288,52 @@ echo -e "${YELLOW}→${NC} Setting up service access..."
 GRAFANA_ACCESS_PORT=${GRAFANA_PORT}
 
 # Get NodePort for Grafana (with retries and timeout)
+# k3d exposes NodePorts on localhost in the 30000-32767 range
 GRAFANA_NODEPORT=""
-for i in {1..10}; do
-    GRAFANA_NODEPORT=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
-    if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ]; then
-        break
+for i in {1..20}; do
+    # First check if service exists and is NodePort type
+    svc_type=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.type}' 2>/dev/null || echo "")
+    if [ "$svc_type" = "NodePort" ]; then
+        GRAFANA_NODEPORT=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
+        if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ] && [ "$GRAFANA_NODEPORT" != "0" ]; then
+            break
+        fi
     fi
-    sleep 1
+    if [ $i -lt 20 ]; then
+        sleep 1
+    fi
 done
 
-if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ]; then
+if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ] && [ "$GRAFANA_NODEPORT" != "0" ]; then
     GRAFANA_ACCESS_PORT=${GRAFANA_NODEPORT}
     echo -e "${CYAN}   Grafana accessible via NodePort: ${GRAFANA_NODEPORT}${NC}"
     echo -e "${CYAN}   Access at: http://localhost:${GRAFANA_NODEPORT}${NC}"
-    # Verify it's actually listening with timeout
-    if timeout 3 nc -zv localhost ${GRAFANA_NODEPORT} 2>/dev/null; then
-        echo -e "${GREEN}✓${NC} NodePort is listening and accessible"
-    fi
+    # Verify it's actually listening (k3d exposes NodePorts on localhost)
+    echo -e "${CYAN}   Verifying NodePort is accessible...${NC}"
+    for j in {1..5}; do
+        if timeout 2 nc -zv localhost ${GRAFANA_NODEPORT} 2>/dev/null || \
+           timeout 2 curl -s -o /dev/null -w "%{http_code}" http://localhost:${GRAFANA_NODEPORT}/api/health 2>/dev/null | grep -q "200\|401\|403"; then
+            echo -e "${GREEN}✓${NC} NodePort is listening and accessible"
+            break
+        fi
+        if [ $j -lt 5 ]; then
+            sleep 2
+        fi
+    done
 else
     # Fallback to port-forward if NodePort not available
-    echo -e "${CYAN}   Using port-forward for Grafana (NodePort not detected)${NC}"
+    echo -e "${YELLOW}⚠${NC}  NodePort not available, using port-forward for Grafana${NC}"
     pkill -f "kubectl port-forward.*grafana" 2>/dev/null || true
     sleep 2
     timeout 10 kubectl port-forward -n ${NAMESPACE} svc/grafana ${GRAFANA_PORT}:3000 --address=0.0.0.0 > /tmp/grafana-pf.log 2>&1 &
     GRAFANA_PF_PID=$!
     sleep 3
     GRAFANA_ACCESS_PORT=${GRAFANA_PORT}
+    echo -e "${CYAN}   Port-forward active on port ${GRAFANA_PORT}${NC}"
 fi
 
 # VictoriaMetrics can use port-forward (less critical)
-kubectl port-forward -n ${NAMESPACE} svc/victoriametrics ${VICTORIA_METRICS_PORT}:8428 --address=0.0.0.0 > /tmp/vm-pf.log 2>&1 &
+timeout 10 kubectl port-forward -n ${NAMESPACE} svc/victoriametrics ${VICTORIA_METRICS_PORT}:8428 --address=0.0.0.0 > /tmp/vm-pf.log 2>&1 &
 VM_PF_PID=$!
 sleep 2
 
