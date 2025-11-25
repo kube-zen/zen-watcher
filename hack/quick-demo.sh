@@ -896,6 +896,11 @@ case "$PLATFORM" in
             # Also update K3D_API_PORT for later reference
             K3D_API_PORT="$actual_port"
         fi
+        
+        # CRITICAL: k3d uses self-signed certificates, so we need to skip TLS verification
+        # This is safe for local development clusters
+        kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>/dev/null || true
+        echo -e "${CYAN}   Configured k3d cluster to skip TLS verification (self-signed certs)${NC}"
         ;;
     kind)
         # kind automatically updates kubeconfig, but ensure context is set
@@ -930,7 +935,8 @@ echo -e "${YELLOW}→${NC} Waiting for cluster to be ready..."
 cluster_ready=false
 for i in {1..60}; do
     # Try multiple methods to check cluster readiness
-    if kubectl get nodes --request-timeout=3s &>/dev/null 2>&1; then
+    # Use --insecure-skip-tls-verify for k3d clusters (they use self-signed certs)
+    if kubectl get nodes --request-timeout=3s --insecure-skip-tls-verify &>/dev/null 2>&1; then
         cluster_ready=true
         echo -e "${GREEN}✓${NC} Cluster is ready"
         show_section_time "Cluster readiness"
@@ -938,8 +944,19 @@ for i in {1..60}; do
     fi
     
     # Check if it's a connection issue vs cluster not ready
-    kubectl_output=$(kubectl get nodes --request-timeout=3s 2>&1)
-    if echo "$kubectl_output" | grep -q "connection refused\|dial tcp"; then
+    kubectl_output=$(kubectl get nodes --request-timeout=3s --insecure-skip-tls-verify 2>&1)
+    # TLS errors mean the cluster is accessible, just certificate issues (normal for k3d)
+    if echo "$kubectl_output" | grep -q "tls\|certificate"; then
+        # Cluster is accessible but cert issue - update kubeconfig to skip TLS verify for this cluster
+        kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>/dev/null || true
+        sleep 2
+        if kubectl get nodes --request-timeout=3s &>/dev/null 2>&1; then
+            cluster_ready=true
+            echo -e "${GREEN}✓${NC} Cluster is ready (TLS configured)"
+            show_section_time "Cluster readiness"
+            break
+        fi
+    elif echo "$kubectl_output" | grep -q "connection refused\|dial tcp"; then
         # Connection issue - might be port mismatch, try to detect and fix
         if [ "$PLATFORM" = "k3d" ] && [ $i -le 20 ]; then
             # Try multiple methods to detect actual k3d port
