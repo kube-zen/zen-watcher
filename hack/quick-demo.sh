@@ -673,7 +673,7 @@ create_cluster() {
                 exit 1
             fi
             
-            echo -e "${YELLOW}→${NC} Creating k3d cluster '${CLUSTER_NAME}'..."
+                echo -e "${YELLOW}→${NC} Creating k3d cluster '${CLUSTER_NAME}'..."
             echo -e "${CYAN}   API Port: ${K3D_API_PORT}${NC}"
             echo -e "${CYAN}   This may take 30-60 seconds...${NC}"
             
@@ -685,30 +685,20 @@ create_cluster() {
                 "--k3s-arg" "--disable=traefik@server:0"
             )
             
-            # Determine API port: use 6550+ range when other clusters exist (like zen-gamma)
+            # Determine API port: ALWAYS use explicit port when other clusters exist (zen-gamma pattern)
+            # This prevents port conflicts when multiple k3d clusters run on same host
             local existing_clusters=$(k3d cluster list 2>/dev/null | grep -v "^NAME" | wc -l || echo "0")
             if [ "$existing_clusters" -gt 0 ] && [ "${K3D_API_PORT}" = "6443" ]; then
-                # Other clusters exist - use 6550+ range (like zen-gamma demo clusters)
-                local demo_port=6550
-                # Find first available port in 6550-6560 range
-                while [ $demo_port -le 6560 ]; do
-                    if check_port $demo_port "k3d API" 2>/dev/null; then
-                        break
-                    fi
-                    demo_port=$((demo_port + 1))
-                done
-                if [ $demo_port -gt 6560 ]; then
-                    # Fallback to finding any available port
-                    demo_port=$(find_available_port 6550 "k3d API")
-                fi
-                k3d_create_args+=("--api-port" "${demo_port}")
-                K3D_API_PORT=${demo_port}
-                echo -e "${CYAN}   Multiple clusters detected, using port ${demo_port} (zen-gamma style)${NC}"
+                # Other clusters exist - ALWAYS use 6550 (zen-gamma demo pattern)
+                # Don't check if port is free - k3d will handle it or fail clearly
+                k3d_create_args+=("--api-port" "6550")
+                K3D_API_PORT=6550
+                echo -e "${CYAN}   Multiple clusters detected, using port 6550 (zen-gamma pattern)${NC}"
             elif [ "${K3D_API_PORT}" != "6443" ]; then
                 # Custom port specified
                 k3d_create_args+=("--api-port" "${K3D_API_PORT}")
                 echo -e "${CYAN}   Using custom API port: ${K3D_API_PORT}${NC}"
-            elif ! check_port 6443 "k3d API"; then
+            elif ! check_port 6443 "k3d API" 2>/dev/null; then
                 # Default port is in use, use 6550
                 k3d_create_args+=("--api-port" "6550")
                 K3D_API_PORT=6550
@@ -719,28 +709,27 @@ create_cluster() {
                 echo -e "${CYAN}   Using API port: ${K3D_API_PORT}${NC}"
             fi
             
-            k3d_create_args+=("--wait")
-            
-            # Create cluster with timeout (increased for reliability)
-            if timeout 180 k3d "${k3d_create_args[@]}" 2>&1 | tee /tmp/k3d-create.log; then
-                echo -e "${GREEN}✓${NC} Cluster created successfully"
+            # CRITICAL: Don't use --wait as it can hang with multiple clusters
+            # Instead, create cluster and manually wait for readiness
+            echo -e "${CYAN}   Creating cluster (this may take 60-120 seconds)...${NC}"
+            if timeout 120 k3d "${k3d_create_args[@]}" 2>&1 | tee /tmp/k3d-create.log; then
+                echo -e "${CYAN}   Cluster creation command completed, waiting for readiness...${NC}"
             else
                 local exit_code=$?
-                echo -e "${RED}✗${NC} Cluster creation failed or timed out"
-                echo -e "${YELLOW}   Check logs: cat /tmp/k3d-create.log${NC}"
-                if [ $exit_code -eq 124 ]; then
-                    echo -e "${RED}   Timeout: Cluster creation took longer than 2 minutes${NC}"
-                    echo -e "${YELLOW}   This might indicate port conflicts or resource issues${NC}"
-                    echo -e "${CYAN}   Try using a different API port: K3D_API_PORT=7443 ./hack/quick-demo.sh${NC}"
+                # Check if cluster was actually created despite timeout
+                if k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
+                    echo -e "${YELLOW}⚠${NC}  Cluster creation timed out, but cluster exists - continuing...${NC}"
                 else
-                    # Check if error is port-related
+                    echo -e "${RED}✗${NC} Cluster creation failed"
+                    echo -e "${YELLOW}   Check logs: cat /tmp/k3d-create.log${NC}"
+                    if [ $exit_code -eq 124 ]; then
+                        echo -e "${RED}   Timeout: Cluster creation took longer than 2 minutes${NC}"
+                    fi
                     if grep -q -i "port.*in use\|bind.*address\|address already in use\|failed to.*port" /tmp/k3d-create.log 2>/dev/null; then
                         echo -e "${RED}   Port conflict detected!${NC}"
-                        echo -e "${CYAN}   Try using a different API port: K3D_API_PORT=7443 ./hack/quick-demo.sh${NC}"
-                        echo -e "${CYAN}   Or check existing clusters: k3d cluster list${NC}"
                     fi
+                    exit 1
                 fi
-                exit 1
             fi
             ;;
         kind)
@@ -750,7 +739,7 @@ create_cluster() {
                 exit 1
             fi
             
-            echo -e "${YELLOW}→${NC} Creating kind cluster '${CLUSTER_NAME}'..."
+                echo -e "${YELLOW}→${NC} Creating kind cluster '${CLUSTER_NAME}'..."
             echo -e "${CYAN}   API Port: ${KIND_API_PORT}${NC}"
             echo -e "${CYAN}   This may take 1-2 minutes...${NC}"
             
@@ -792,7 +781,7 @@ EOF
                 exit 1
             fi
             
-            echo -e "${YELLOW}→${NC} Creating minikube cluster '${CLUSTER_NAME}'..."
+                echo -e "${YELLOW}→${NC} Creating minikube cluster '${CLUSTER_NAME}'..."
             echo -e "${CYAN}   API Port: ${MINIKUBE_API_PORT}${NC}"
             echo -e "${CYAN}   This may take 2-3 minutes...${NC}"
             
@@ -971,52 +960,52 @@ echo ""
 
 # Deploy Security Tools (only if flags are set)
 if [ "$INSTALL_TRIVY" = true ] || [ "$INSTALL_FALCO" = true ] || [ "$INSTALL_KYVERNO" = true ] || [ "$INSTALL_CHECKOV" = true ] || [ "$INSTALL_KUBE_BENCH" = true ]; then
-    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${BLUE}  Deploying Security Tools${NC}"
-    echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo ""
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}  Deploying Security Tools${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
     SECTION_START_TIME=$(date +%s)
 
     # Add Helm repositories (only if needed)
     if [ "$INSTALL_TRIVY" = true ] || [ "$INSTALL_FALCO" = true ] || [ "$INSTALL_KYVERNO" = true ]; then
-        echo -e "${YELLOW}→${NC} Adding Helm repositories..."
+echo -e "${YELLOW}→${NC} Adding Helm repositories..."
         [ "$INSTALL_TRIVY" = true ] && helm repo add aqua https://aquasecurity.github.io/helm-charts 2>/dev/null || true
         [ "$INSTALL_FALCO" = true ] && helm repo add falcosecurity https://falcosecurity.github.io/charts 2>/dev/null || true
         [ "$INSTALL_KYVERNO" = true ] && helm repo add kyverno https://kyverno.github.io/kyverno/ 2>/dev/null || true
-        helm repo update > /dev/null 2>&1
-        echo -e "${GREEN}✓${NC} Helm repositories updated"
+helm repo update > /dev/null 2>&1
+echo -e "${GREEN}✓${NC} Helm repositories updated"
     fi
 
-    # Deploy Trivy Operator
+# Deploy Trivy Operator
     if [ "$INSTALL_TRIVY" = true ]; then
-        echo -e "${YELLOW}→${NC} Deploying Trivy Operator (this may take 1-2 minutes)..."
-        helm upgrade --install trivy-operator aqua/trivy-operator \
-            --namespace trivy-system \
-            --create-namespace \
-            --set="trivy.ignoreUnfixed=true" \
-            --wait --timeout=2m > /dev/null 2>&1 || echo -e "${YELLOW}⚠${NC}  Trivy deployment taking longer, continuing..."
-        echo -e "${GREEN}✓${NC} Trivy Operator deployed"
+echo -e "${YELLOW}→${NC} Deploying Trivy Operator (this may take 1-2 minutes)..."
+helm upgrade --install trivy-operator aqua/trivy-operator \
+    --namespace trivy-system \
+    --create-namespace \
+    --set="trivy.ignoreUnfixed=true" \
+    --wait --timeout=2m > /dev/null 2>&1 || echo -e "${YELLOW}⚠${NC}  Trivy deployment taking longer, continuing..."
+echo -e "${GREEN}✓${NC} Trivy Operator deployed"
     fi
 
     # Deploy Falco
     if [ "$INSTALL_FALCO" = true ]; then
-        echo -e "${YELLOW}→${NC} Deploying Falco (starting in background)..."
-        helm upgrade --install falco falcosecurity/falco \
-            --namespace falco \
-            --create-namespace \
-            --set falcosidekick.enabled=false \
-            --wait --timeout=30s > /dev/null 2>&1 || echo -e "${YELLOW}⚠${NC}  Falco starting (will be ready soon)"
-        echo -e "${GREEN}✓${NC} Falco deployed"
+echo -e "${YELLOW}→${NC} Deploying Falco (starting in background)..."
+helm upgrade --install falco falcosecurity/falco \
+    --namespace falco \
+    --create-namespace \
+    --set falcosidekick.enabled=false \
+    --wait --timeout=30s > /dev/null 2>&1 || echo -e "${YELLOW}⚠${NC}  Falco starting (will be ready soon)"
+echo -e "${GREEN}✓${NC} Falco deployed"
     fi
 
-    # Deploy Kyverno
+# Deploy Kyverno
     if [ "$INSTALL_KYVERNO" = true ]; then
-        echo -e "${YELLOW}→${NC} Deploying Kyverno (starting in background)..."
-        helm upgrade --install kyverno kyverno/kyverno \
-            --namespace kyverno \
-            --create-namespace \
-            --wait --timeout=30s > /dev/null 2>&1 || echo -e "${YELLOW}⚠${NC}  Kyverno starting (will be ready soon)"
-        echo -e "${GREEN}✓${NC} Kyverno deployed"
+echo -e "${YELLOW}→${NC} Deploying Kyverno (starting in background)..."
+helm upgrade --install kyverno kyverno/kyverno \
+    --namespace kyverno \
+    --create-namespace \
+    --wait --timeout=30s > /dev/null 2>&1 || echo -e "${YELLOW}⚠${NC}  Kyverno starting (will be ready soon)"
+echo -e "${GREEN}✓${NC} Kyverno deployed"
     fi
 
     # Deploy Checkov as a Kubernetes Job
@@ -1150,7 +1139,7 @@ echo ""
 
 # Create namespace (skip if using existing)
 if [ "${USE_EXISTING_NAMESPACE:-false}" != "true" ]; then
-    kubectl create namespace ${NAMESPACE} 2>/dev/null || true
+kubectl create namespace ${NAMESPACE} 2>/dev/null || true
 else
     echo -e "${CYAN}→${NC} Using existing namespace '${NAMESPACE}'"
 fi
@@ -1159,7 +1148,7 @@ fi
 echo -e "${YELLOW}→${NC} Deploying VictoriaMetrics..."
 for i in {1..10}; do
     if kubectl create deployment victoriametrics \
-        --image=victoriametrics/victoria-metrics:latest \
+    --image=victoriametrics/victoria-metrics:latest \
         -n ${NAMESPACE} 2>/dev/null; then
         break
     elif kubectl get deployment victoriametrics -n ${NAMESPACE} &>/dev/null; then
@@ -1180,14 +1169,14 @@ echo -e "${GREEN}✓${NC} VictoriaMetrics deployed"
 echo -e "${YELLOW}→${NC} Deploying Grafana with zen user..."
 for i in {1..10}; do
     if kubectl create deployment grafana \
-        --image=grafana/grafana:latest \
-        -n ${NAMESPACE} \
+    --image=grafana/grafana:latest \
+    -n ${NAMESPACE} \
         --dry-run=client -o yaml 2>/dev/null | \
-    kubectl set env --local -f - \
-        GF_SECURITY_ADMIN_USER=zen \
-        GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD} \
-        GF_USERS_ALLOW_SIGN_UP=false \
-        GF_USERS_DEFAULT_THEME=dark \
+kubectl set env --local -f - \
+    GF_SECURITY_ADMIN_USER=zen \
+    GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD} \
+    GF_USERS_ALLOW_SIGN_UP=false \
+    GF_USERS_DEFAULT_THEME=dark \
         --dry-run=client -o yaml 2>/dev/null | \
     kubectl apply -f - 2>&1 | grep -v "already exists" > /dev/null; then
         break
@@ -1284,7 +1273,7 @@ SECTION_START_TIME=$(date +%s)
 echo -e "${YELLOW}→${NC} Deploying Zen Watcher CRDs..."
 for i in {1..10}; do
     if timeout 30 kubectl apply -f deployments/crds/ --validate=false 2>&1 | grep -v "already exists\|unchanged" > /dev/null; then
-        echo -e "${GREEN}✓${NC} CRDs deployed"
+echo -e "${GREEN}✓${NC} CRDs deployed"
         break
     elif timeout 10 kubectl get crd observations.zen.kube-zen.io 2>/dev/null | grep -q observations; then
         echo -e "${GREEN}✓${NC} CRDs already exist"
@@ -1312,13 +1301,13 @@ elif [ "$NON_INTERACTIVE" = true ]; then
     echo -e "${CYAN}→${NC} Non-interactive mode: skipping mock data (use --deploy-mock-data to enable)${NC}"
 else
     # Interactive mode: prompt user
-    echo ""
+echo ""
     read -p "$(echo -e ${CYAN}Deploy mock data with Observations and metrics? [Y/n]${NC}) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-        echo -e "${YELLOW}→${NC} Deploying mock data..."
-        ./hack/mock-data.sh ${NAMESPACE} > /dev/null 2>&1 || echo -e "${YELLOW}⚠${NC}  Mock data deployment issue (continuing...)"
-        echo -e "${GREEN}✓${NC} Mock data deployed"
+echo
+if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+    echo -e "${YELLOW}→${NC} Deploying mock data..."
+    ./hack/mock-data.sh ${NAMESPACE} > /dev/null 2>&1 || echo -e "${YELLOW}⚠${NC}  Mock data deployment issue (continuing...)"
+    echo -e "${GREEN}✓${NC} Mock data deployed"
         show_section_time "Mock data deployment"
     else
         echo -e "${CYAN}→${NC} Skipping mock data deployment${NC}"
@@ -1400,8 +1389,8 @@ else
     sleep 2
     echo -e "${CYAN}   [DEBUG] Starting port-forward on port ${GRAFANA_PORT}...${NC}"
     timeout 10 kubectl port-forward -n ${NAMESPACE} svc/grafana ${GRAFANA_PORT}:3000 --address=0.0.0.0 > /tmp/grafana-pf.log 2>&1 &
-    GRAFANA_PF_PID=$!
-    sleep 3
+GRAFANA_PF_PID=$!
+sleep 3
     GRAFANA_ACCESS_PORT=${GRAFANA_PORT}
     echo -e "${CYAN}   Port-forward active on port ${GRAFANA_PORT}${NC}"
     echo -e "${CYAN}   [DEBUG] Port-forward PID: ${GRAFANA_PF_PID}${NC}"
@@ -1425,8 +1414,8 @@ for i in {1..90}; do
         if echo "$HEALTH_RESPONSE" | grep -q "ok\|database"; then
             echo -e "${GREEN}✓${NC} Grafana is ready and responding (HTTP ${HTTP_CODE})"
             GRAFANA_READY=true
-            break
-        fi
+        break
+    fi
     elif [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
         # These codes mean Grafana is up but requires auth - that's fine!
         echo -e "${GREEN}✓${NC} Grafana is ready (HTTP ${HTTP_CODE} - auth required, which is expected)"
