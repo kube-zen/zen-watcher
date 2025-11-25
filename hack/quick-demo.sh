@@ -679,9 +679,10 @@ create_cluster() {
             
             # Build k3d command - simplified approach like zen-gamma
             # Always use explicit ports to avoid conflicts with multiple clusters
+            # Use single server (no agents) for demo - more reliable
             local k3d_create_args=(
                 "cluster" "create" "${CLUSTER_NAME}"
-                "--agents" "1"
+                "--agents" "0"
                 "--k3s-arg" "--disable=traefik@server:0"
             )
             
