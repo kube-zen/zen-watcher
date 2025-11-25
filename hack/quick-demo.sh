@@ -888,22 +888,33 @@ case "$PLATFORM" in
         timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>/dev/null || true
         echo -e "${CYAN}   Configured kubeconfig for port ${K3D_API_PORT} (TLS verification skipped)${NC}"
         
-        # Wait for cluster to be ready, then verify connectivity with retries
+        # Wait for cluster to be ready - check via docker exec first (more reliable)
         echo -e "${CYAN}   [DEBUG] Waiting for cluster to be ready...${NC}"
-        sleep 5  # Give cluster a moment to start
+        CLUSTER_READY=false
+        for wait_attempt in {1..60}; do
+            # Check if nodes are ready via docker exec (bypasses kubeconfig issues)
+            if docker exec k3d-${CLUSTER_NAME}-server-0 kubectl get nodes --no-headers 2>/dev/null | grep -q " Ready "; then
+                echo -e "${CYAN}   [DEBUG] Cluster nodes are Ready (via docker exec)${NC}"
+                CLUSTER_READY=true
+                break
+            fi
+            if [ $((wait_attempt % 10)) -eq 0 ]; then
+                echo -e "${CYAN}   [DEBUG] Waiting for cluster readiness... ($wait_attempt/60)${NC}"
+            fi
+            sleep 2
+        done
         
-        # Verify connectivity with retries
+        if [ "$CLUSTER_READY" = false ]; then
+            echo -e "${YELLOW}⚠${NC}  Cluster may not be fully ready, but continuing with authentication...${NC}"
+        fi
+        
+        # Now verify connectivity with retries
         echo -e "${CYAN}   [DEBUG] Verifying cluster connectivity...${NC}"
         CLUSTER_ACCESSIBLE=false
         for retry in {1..20}; do
-            # First wait a bit for cluster to be ready
-            if [ $retry -le 5 ]; then
-                sleep 3
-            fi
-            
             if timeout 10 kubectl get nodes --request-timeout=5s > /dev/null 2>&1; then
                 # Verify nodes are actually ready
-                if timeout 10 kubectl get nodes --request-timeout=5s 2>&1 | grep -q "Ready"; then
+                if timeout 10 kubectl get nodes --request-timeout=5s 2>&1 | grep -q " Ready "; then
                     echo -e "${GREEN}✓${NC} Cluster is accessible and nodes are ready"
                     CLUSTER_ACCESSIBLE=true
                     break
