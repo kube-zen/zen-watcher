@@ -889,17 +889,18 @@ case "$PLATFORM" in
         echo -e "${CYAN}   Configured kubeconfig for port ${K3D_API_PORT} (TLS verification skipped)${NC}"
         
         # Wait for cluster to be ready - check via docker exec first (more reliable)
-        echo -e "${CYAN}   [DEBUG] Waiting for cluster to be ready...${NC}"
+        echo -e "${CYAN}   [DEBUG] Waiting for cluster to be ready (this can take 2-3 minutes)...${NC}"
         CLUSTER_READY=false
-        for wait_attempt in {1..60}; do
+        for wait_attempt in {1..120}; do
             # Check if nodes are ready via docker exec (bypasses kubeconfig issues)
-            if docker exec k3d-${CLUSTER_NAME}-server-0 kubectl get nodes --no-headers 2>/dev/null | grep -q " Ready "; then
-                echo -e "${CYAN}   [DEBUG] Cluster nodes are Ready (via docker exec)${NC}"
+            if docker exec k3d-${CLUSTER_NAME}-server-0 kubectl get nodes --no-headers 2>/dev/null 2>&1 | grep -q " Ready "; then
+                echo -e "${GREEN}✓${NC} Cluster nodes are Ready (after $((wait_attempt*2)) seconds)"
                 CLUSTER_READY=true
                 break
             fi
-            if [ $((wait_attempt % 10)) -eq 0 ]; then
-                echo -e "${CYAN}   [DEBUG] Waiting for cluster readiness... ($wait_attempt/60)${NC}"
+            if [ $((wait_attempt % 15)) -eq 0 ]; then
+                echo -e "${CYAN}   [DEBUG] Still waiting for cluster readiness... ($((wait_attempt*2)) seconds)${NC}"
+                docker exec k3d-${CLUSTER_NAME}-server-0 kubectl get nodes 2>&1 | head -3 || true
             fi
             sleep 2
         done
