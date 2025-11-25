@@ -1364,7 +1364,11 @@ for i in {1..10}; do
     fi
 done
 # Expose VictoriaMetrics as ClusterIP (ingress will handle routing)
-timeout 10 kubectl delete svc victoriametrics -n ${NAMESPACE} 2>&1 || true
+# Delete existing service if it exists, then create new one
+if kubectl get svc victoriametrics -n ${NAMESPACE} &>/dev/null; then
+    timeout 10 kubectl delete svc victoriametrics -n ${NAMESPACE} 2>&1 | grep -v "not found" > /dev/null || true
+    sleep 1
+fi
 timeout 15 kubectl expose deployment victoriametrics \
     --port=8428 --target-port=8428 \
     --type=ClusterIP \
@@ -1498,6 +1502,8 @@ for retry in {1..5}; do
         --set controller.service.type=LoadBalancer \
         --set controller.service.annotations."k3d\.io/loadbalancer"=true \
         --set controller.admissionWebhooks.enabled=false \
+        --set controller.podLabels.app=ingress-nginx \
+        --set controller.podLabels."app\.kubernetes\.io/name"=ingress-nginx \
         --wait --timeout=2m 2>&1 | tee /tmp/ingress-install.log; then
         echo -e "${GREEN}✓${NC} Nginx ingress controller installed"
         INGRESS_INSTALLED=true
@@ -2010,14 +2016,13 @@ echo ""
 # All services are accessible via ingress (no port-forward needed)
 # URLs are already displayed above
 
-# Final verification - test ALL endpoints with retries until they work
-echo -e "${CYAN}   [DEBUG] Final verification of all endpoints...${NC}"
-echo -e "${YELLOW}→${NC} Testing endpoints (will retry until working)...${NC}"
+# Quick verification - test endpoints with limited retries (don't block forever)
+echo -e "${CYAN}   Verifying endpoint accessibility...${NC}"
 
-# Test Grafana with retries
+# Test Grafana with limited retries
 GRAFANA_WORKING=false
-for retry in {1..60}; do
-    HTTP_CODE=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${GRAFANA_ACCESS_PORT}/grafana/api/health 2>/dev/null || echo "000")
+for retry in {1..10}; do
+    HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${GRAFANA_ACCESS_PORT}/grafana/api/health 2>/dev/null || echo "000")
     TEST_URL="http://localhost:${GRAFANA_ACCESS_PORT}/grafana"
     
     if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
@@ -2025,21 +2030,17 @@ for retry in {1..60}; do
         GRAFANA_WORKING=true
         break
     fi
-    if [ $((retry % 10)) -eq 0 ]; then
-        echo -e "${CYAN}   Retry $retry/60: Grafana not ready yet (HTTP ${HTTP_CODE})...${NC}"
-    fi
-    sleep 2
+    sleep 1
 done
 
-# Test VictoriaMetrics with retries
-# VictoriaMetrics health endpoint is at root, not /health
+# Test VictoriaMetrics with limited retries
 VM_WORKING=false
-for retry in {1..60}; do
+for retry in {1..10}; do
     # Try both /victoriametrics/health and /victoriametrics (root)
-    HTTP_CODE=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${VM_ACCESS_PORT}/victoriametrics/health 2>/dev/null || echo "000")
+    HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${VM_ACCESS_PORT}/victoriametrics/health 2>/dev/null || echo "000")
     if [ "$HTTP_CODE" = "000" ] || [ "$HTTP_CODE" != "200" ]; then
         # Try root path
-        HTTP_CODE=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${VM_ACCESS_PORT}/victoriametrics/ 2>/dev/null || echo "000")
+        HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${VM_ACCESS_PORT}/victoriametrics/ 2>/dev/null || echo "000")
     fi
     VM_TEST_URL="http://localhost:${VM_ACCESS_PORT}/victoriametrics"
     
@@ -2048,37 +2049,21 @@ for retry in {1..60}; do
         VM_WORKING=true
         break
     fi
-    if [ $((retry % 10)) -eq 0 ]; then
-        echo -e "${CYAN}   Retry $retry/60: VictoriaMetrics not ready yet (HTTP ${HTTP_CODE})...${NC}"
-        # Debug: check if ingress controller is responding
-        INGRESS_TEST=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" http://localhost:${INGRESS_HTTP_PORT}/ 2>/dev/null || echo "000")
-        if [ "$INGRESS_TEST" = "000" ]; then
-            echo -e "${YELLOW}   ⚠  Ingress controller may not be responding on port ${INGRESS_HTTP_PORT}${NC}"
-        fi
-    fi
-    sleep 2
+    sleep 1
 done
 
-# Show final results
-echo ""
+# Show results (non-blocking - don't fail if endpoints aren't ready)
 if [ "$GRAFANA_WORKING" = true ] && [ "$VM_WORKING" = true ]; then
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${GREEN}  ✅✅✅ ALL ENDPOINTS WORKING ✅✅✅${NC}"
-    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo ""
-    echo -e "  ${GREEN}Grafana:${NC}     ${CYAN}${TEST_URL}${NC}"
-    echo -e "  ${GREEN}Username:${NC}   ${CYAN}zen${NC}"
-    echo -e "  ${GREEN}Password:${NC}   ${CYAN}${GRAFANA_PASSWORD}${NC}"
-    echo ""
-    echo -e "  ${GREEN}VictoriaMetrics:${NC} ${CYAN}${VM_TEST_URL}${NC}"
-    echo ""
-    echo -e "${GREEN}✅ VERIFIED: All endpoints are accessible and working!${NC}"
-    echo ""
+    echo -e "${GREEN}✓${NC} All endpoints verified and accessible"
 else
-    echo -e "${YELLOW}⚠${NC}  Some endpoints may not be fully ready:"
-    [ "$GRAFANA_WORKING" = false ] && echo -e "${YELLOW}   - Grafana not accessible${NC}"
-    [ "$VM_WORKING" = false ] && echo -e "${YELLOW}   - VictoriaMetrics not accessible${NC}"
-    echo ""
+    if [ "$GRAFANA_WORKING" = false ]; then
+        echo -e "${YELLOW}⚠${NC}  Grafana may not be accessible via ingress yet (this is OK - may need a few more seconds)"
+    fi
+    if [ "$VM_WORKING" = false ]; then
+        echo -e "${YELLOW}⚠${NC}  VictoriaMetrics may not be accessible via ingress yet (this is OK - may need a few more seconds)"
+    fi
+    echo -e "${CYAN}   Note: Services may take a few more seconds to become fully accessible${NC}"
+    echo -e "${CYAN}   You can verify manually: curl -H 'Host: localhost' http://localhost:${INGRESS_HTTP_PORT}/grafana${NC}"
 fi
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 if [ $TOTAL_MINUTES -gt 0 ]; then
