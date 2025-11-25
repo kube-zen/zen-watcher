@@ -1330,9 +1330,9 @@ for i in {1..60}; do
 done
 show_section_time "Grafana configuration"
 
-# Configure Grafana datasource
+# Configure Grafana datasource (with timeout to prevent hanging)
 echo -e "${YELLOW}→${NC} Configuring VictoriaMetrics datasource..."
-DATASOURCE_RESULT=$(curl -s -X POST http://localhost:${GRAFANA_PORT}/api/datasources \
+DATASOURCE_RESULT=$(timeout 10 curl -s -X POST http://localhost:${GRAFANA_PORT}/api/datasources \
     -H "Content-Type: application/json" \
     -u zen:${GRAFANA_PASSWORD} \
     -d '{
@@ -1345,28 +1345,28 @@ DATASOURCE_RESULT=$(curl -s -X POST http://localhost:${GRAFANA_PORT}/api/datasou
             "timeInterval": "15s",
             "httpMethod": "POST"
         }
-    }' 2>&1)
+    }' 2>&1 || echo "timeout or error")
 
-if echo "$DATASOURCE_RESULT" | grep -q "Datasource added\|already exists"; then
+if echo "$DATASOURCE_RESULT" | grep -q "Datasource added\|already exists\|success"; then
     echo -e "${GREEN}✓${NC} Datasource configured"
 else
-    echo -e "${YELLOW}⚠${NC}  Datasource: $(echo $DATASOURCE_RESULT | jq -r '.message' 2>/dev/null || echo 'checking...')"
+    echo -e "${YELLOW}⚠${NC}  Datasource configuration skipped (Grafana may need manual setup)"
 fi
 
-# Import dashboard
+# Import dashboard (with timeout to prevent hanging)
 echo -e "${YELLOW}→${NC} Importing Zen Watcher dashboard..."
 if [ -f "config/dashboards/zen-watcher-dashboard.json" ]; then
-    DASHBOARD_RESULT=$(cat config/dashboards/zen-watcher-dashboard.json | \
+    DASHBOARD_RESULT=$(timeout 10 cat config/dashboards/zen-watcher-dashboard.json | \
     jq '{dashboard: ., overwrite: true, message: "Demo Import"}' | \
     curl -s -X POST http://localhost:${GRAFANA_PORT}/api/dashboards/db \
         -H "Content-Type: application/json" \
         -u zen:${GRAFANA_PASSWORD} \
-        -d @- 2>&1)
+        -d @- 2>&1 || echo "timeout or error")
     
     if echo "$DASHBOARD_RESULT" | grep -q "success"; then
         echo -e "${GREEN}✓${NC} Dashboard imported successfully"
     else
-        echo -e "${YELLOW}⚠${NC}  Dashboard: $(echo $DASHBOARD_RESULT | jq -r '.message' 2>/dev/null || echo 'checking...')"
+        echo -e "${YELLOW}⚠${NC}  Dashboard import skipped (can be imported manually later)"
     fi
 else
     echo -e "${YELLOW}⚠${NC}  Dashboard file not found at config/dashboards/zen-watcher-dashboard.json"
