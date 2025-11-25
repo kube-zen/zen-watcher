@@ -29,9 +29,9 @@
 #   --install-kube-bench             # Install kube-bench (CIS benchmark job)
 #
 # Port Configuration (all configurable via environment variables):
-#   GRAFANA_PORT=3100                 # Grafana port-forward (default: 3100)
-#   VICTORIA_METRICS_PORT=8528        # VictoriaMetrics port-forward (default: 8528)
-#   ZEN_WATCHER_PORT=8180             # Zen Watcher port-forward (default: 8180)
+#   GRAFANA_PORT=3100                 # Grafana service port (default: 3100, not used with ingress)
+#   VICTORIA_METRICS_PORT=8528        # VictoriaMetrics service port (default: 8528, not used with ingress)
+#   ZEN_WATCHER_PORT=8180             # Zen Watcher service port (default: 8180, not used with ingress)
 #   K3D_API_PORT=6443                 # k3d API server port (default: 6443)
 #   KIND_API_PORT=6443                # kind API server port (default: 6443)
 #   MINIKUBE_API_PORT=8443            # minikube API server port (default: 8443)
@@ -174,7 +174,7 @@ K3D_API_PORT="${K3D_API_PORT:-6443}"
 KIND_API_PORT="${KIND_API_PORT:-6443}"
 MINIKUBE_API_PORT="${MINIKUBE_API_PORT:-8443}"
 
-# Service ports (port-forward targets)
+# Service ports (internal cluster ports, not exposed directly)
 GRAFANA_PORT="${GRAFANA_PORT:-3100}"
 ZEN_WATCHER_PORT="${ZEN_WATCHER_PORT:-8180}"
 VICTORIA_METRICS_PORT="${VICTORIA_METRICS_PORT:-8528}"
@@ -187,16 +187,17 @@ check_port() {
     local port=$1
     local service=$2
     
-    if command -v lsof &> /dev/null; then
+    # Use ss first (most reliable on modern Linux)
+    if command -v ss &> /dev/null; then
+        if ss -tlnp 2>/dev/null | grep -qE ":${port}[[:space:]]|:${port}$"; then
+            return 1  # Port is in use
+        fi
+    elif command -v lsof &> /dev/null; then
         if lsof -Pi :${port} -sTCP:LISTEN -t >/dev/null 2>&1; then
             return 1  # Port is in use
         fi
     elif command -v netstat &> /dev/null; then
         if netstat -an 2>/dev/null | grep -q ":${port}.*LISTEN"; then
-            return 1  # Port is in use
-        fi
-    elif command -v ss &> /dev/null; then
-        if ss -lnt 2>/dev/null | grep -q ":${port}"; then
             return 1  # Port is in use
         fi
     fi
@@ -243,11 +244,27 @@ check_existing_demo_ports() {
 validate_ports() {
     echo -e "${YELLOW}→${NC} Checking port availability..."
     
-    local ports_changed=false
-    local default_ports_in_use=false
-    local original_grafana=${GRAFANA_PORT}
-    local original_vm=${VICTORIA_METRICS_PORT}
-    local original_watcher=${ZEN_WATCHER_PORT}
+    ports_changed=false
+    default_ports_in_use=false
+    original_grafana=${GRAFANA_PORT}
+    original_vm=${VICTORIA_METRICS_PORT}
+    original_watcher=${ZEN_WATCHER_PORT}
+    
+    # Check k3d loadbalancer port (8080) if using k3d
+    if [ "$PLATFORM" = "k3d" ]; then
+        K3D_LB_PORT=8080
+        if ! check_port ${K3D_LB_PORT} "k3d LoadBalancer"; then
+            echo -e "${YELLOW}⚠${NC}  Port ${K3D_LB_PORT} is in use (k3d LoadBalancer)"
+            echo -e "${CYAN}   Finding alternative port...${NC}"
+            K3D_LB_PORT=$(find_available_port ${K3D_LB_PORT} "k3d LoadBalancer")
+            echo -e "${CYAN}   Will use port ${K3D_LB_PORT} for k3d LoadBalancer${NC}"
+            ports_changed=true
+        fi
+        INGRESS_HTTP_PORT=${K3D_LB_PORT}
+    else
+        # For other platforms, use default
+        INGRESS_HTTP_PORT=8080
+    fi
     
     # Check if default ports are in use (might indicate existing demo)
     if check_existing_demo_ports; then
@@ -680,10 +697,14 @@ create_cluster() {
             # Build k3d command - simplified approach like zen-gamma
             # Always use explicit ports to avoid conflicts with multiple clusters
             # Use single server (no agents) for demo - more reliable
-            local k3d_create_args=(
+            # Disable Traefik (we'll use nginx ingress)
+            # Map ingress port for LoadBalancer access
+            k3d_create_args=(
                 "cluster" "create" "${CLUSTER_NAME}"
                 "--agents" "0"
                 "--k3s-arg" "--disable=traefik@server:0"
+                "--port" "${INGRESS_HTTP_PORT}:80@loadbalancer"
+                "--port" "$((INGRESS_HTTP_PORT + 1)):443@loadbalancer"
             )
             
             # Determine API port: Find available port when other clusters exist
@@ -1045,6 +1066,48 @@ for i in $(seq 1 $max_wait); do
     sleep 3
 done
 
+# Create separate kubeconfig file for easy access
+echo -e "${YELLOW}→${NC} Creating separate kubeconfig file..."
+KUBECONFIG_FILE="${HOME}/.kube/${CLUSTER_NAME}-kubeconfig"
+case "$PLATFORM" in
+    k3d)
+        # k3d kubeconfig write outputs a path, so we need to read that file
+        K3D_CONFIG_PATH=$(k3d kubeconfig write ${CLUSTER_NAME} 2>/dev/null || echo "")
+        if [ -n "$K3D_CONFIG_PATH" ] && [ -f "$K3D_CONFIG_PATH" ]; then
+            cp "$K3D_CONFIG_PATH" ${KUBECONFIG_FILE} 2>/dev/null || true
+        else
+            # Fallback: try to find the k3d config file
+            K3D_CONFIG_PATH="${HOME}/.config/k3d/kubeconfig-${CLUSTER_NAME}.yaml"
+            if [ -f "$K3D_CONFIG_PATH" ]; then
+                cp "$K3D_CONFIG_PATH" ${KUBECONFIG_FILE} 2>/dev/null || true
+            fi
+        fi
+        # Fix server URL to use 127.0.0.1
+        if [ -f "${KUBECONFIG_FILE}" ]; then
+            sed -i.bak "s|0.0.0.0:${K3D_API_PORT}|127.0.0.1:${K3D_API_PORT}|g" ${KUBECONFIG_FILE} 2>/dev/null || true
+            sed -i.bak "s|server: https://.*:${K3D_API_PORT}|server: https://127.0.0.1:${K3D_API_PORT}|g" ${KUBECONFIG_FILE} 2>/dev/null || true
+            rm -f ${KUBECONFIG_FILE}.bak 2>/dev/null || true
+            # Remove certificate authority data and add insecure skip
+            kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data --kubeconfig=${KUBECONFIG_FILE} 2>/dev/null || true
+            kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true --kubeconfig=${KUBECONFIG_FILE} 2>/dev/null || true
+        fi
+        ;;
+    kind)
+        kind export kubeconfig --name ${CLUSTER_NAME} --kubeconfig=${KUBECONFIG_FILE} 2>/dev/null || true
+        ;;
+    minikube)
+        minikube update-context -p ${CLUSTER_NAME} 2>/dev/null || true
+        cp ${HOME}/.kube/config ${KUBECONFIG_FILE} 2>/dev/null || true
+        ;;
+esac
+if [ -f "${KUBECONFIG_FILE}" ]; then
+    chmod 600 ${KUBECONFIG_FILE} 2>/dev/null || true
+    echo -e "${GREEN}✓${NC} Kubeconfig saved to: ${KUBECONFIG_FILE}"
+    echo -e "${CYAN}   Use it with: kubectl get observations --kubeconfig ${KUBECONFIG_FILE}${NC}"
+else
+    echo -e "${YELLOW}⚠${NC}  Kubeconfig file could not be created, but cluster is accessible via default kubeconfig"
+fi
+
 # Final attempt to verify cluster is ready
 if [ "$cluster_ready" = false ] && [ "$PLATFORM" = "k3d" ]; then
     echo -e "${CYAN}   Verifying cluster connectivity on port ${K3D_API_PORT}...${NC}"
@@ -1062,7 +1125,18 @@ echo ""
 validate_namespace
 echo ""
 
-# Deploy Security Tools (only if flags are set)
+# Deploy Security Tools (default: install all for comprehensive demo)
+# If no flags set, install all tools by default
+if [ "$INSTALL_TRIVY" = false ] && [ "$INSTALL_FALCO" = false ] && [ "$INSTALL_KYVERNO" = false ] && [ "$INSTALL_CHECKOV" = false ] && [ "$INSTALL_KUBE_BENCH" = false ]; then
+    # Default: install all tools for comprehensive demo
+    INSTALL_TRIVY=true
+    INSTALL_FALCO=true
+    INSTALL_KYVERNO=true
+    INSTALL_CHECKOV=true
+    INSTALL_KUBE_BENCH=true
+    echo -e "${CYAN}ℹ${NC}  No security tools specified - installing all tools for comprehensive demo"
+fi
+
 if [ "$INSTALL_TRIVY" = true ] || [ "$INSTALL_FALCO" = true ] || [ "$INSTALL_KYVERNO" = true ] || [ "$INSTALL_CHECKOV" = true ] || [ "$INSTALL_KUBE_BENCH" = true ]; then
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BLUE}  Deploying Security Tools${NC}"
@@ -1098,8 +1172,10 @@ helm upgrade --install falco falcosecurity/falco \
     --namespace falco \
     --create-namespace \
     --set falcosidekick.enabled=false \
+    --set falco.httpOutput.enabled=true \
+    --set falco.httpOutput.url=http://zen-watcher.${NAMESPACE}.svc.cluster.local:8080/falco/webhook \
     --wait --timeout=30s > /dev/null 2>&1 || echo -e "${YELLOW}⚠${NC}  Falco starting (will be ready soon)"
-echo -e "${GREEN}✓${NC} Falco deployed"
+echo -e "${GREEN}✓${NC} Falco deployed (configured to send webhooks to zen-watcher)"
     fi
 
 # Deploy Kyverno
@@ -1108,8 +1184,33 @@ echo -e "${YELLOW}→${NC} Deploying Kyverno (starting in background)..."
 helm upgrade --install kyverno kyverno/kyverno \
     --namespace kyverno \
     --create-namespace \
+    --set replicaCount=1 \
     --wait --timeout=30s > /dev/null 2>&1 || echo -e "${YELLOW}⚠${NC}  Kyverno starting (will be ready soon)"
 echo -e "${GREEN}✓${NC} Kyverno deployed"
+
+# Create a test Kyverno policy that requires labels
+echo -e "${CYAN}   Creating test Kyverno policy...${NC}"
+cat <<EOF | kubectl apply -f - 2>&1 | grep -v "already exists" > /dev/null || true
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-labels
+spec:
+  validationFailureAction: enforce
+  rules:
+  - name: check-label-app
+    match:
+      resources:
+        kinds:
+        - Pod
+    validate:
+      message: "The label 'app' is required."
+      pattern:
+        metadata:
+          labels:
+            app: "?*"
+EOF
+echo -e "${GREEN}✓${NC} Test Kyverno policy created"
     fi
 
     # Deploy Checkov as a Kubernetes Job
@@ -1165,13 +1266,11 @@ EOF
         kubectl create namespace kube-bench 2>/dev/null || true
         
         # Detect cluster type for kube-bench benchmark target
-        local bench_target="cis-1.6"
-        local node_image=""
+        bench_target="cis-1.6"
         
         # Try to detect cluster type
         if kubectl get nodes --no-headers 2>/dev/null | head -1 | grep -q "k3d"; then
             bench_target="cis-1.6"
-            node_image="k3d-${CLUSTER_NAME}-server-0"
         elif kubectl get nodes --no-headers 2>/dev/null | head -1 | grep -q "kind"; then
             bench_target="cis-1.6"
         else
@@ -1375,17 +1474,15 @@ if ! timeout 10 helm repo list 2>/dev/null | grep -q ingress-nginx; then
     timeout 30 helm repo update 2>&1 || true
 fi
 
-# Find available NodePort (must be in 30000-32767 range for Kubernetes)
-INGRESS_HTTP_PORT=30080
-for port in {30080..30090}; do
-    if ! timeout 2 ss -tlnp 2>/dev/null | grep -q ":${port} "; then
-        INGRESS_HTTP_PORT=${port}
-        echo -e "${CYAN}   Using port ${INGRESS_HTTP_PORT} for ingress${NC}"
-        break
-    fi
-done
+# Use k3d loadbalancer port (already set in validate_ports)
+# If not set, default to 8080 (shouldn't happen if validate_ports ran)
+if [ -z "${INGRESS_HTTP_PORT:-}" ]; then
+    INGRESS_HTTP_PORT=8080
+    echo -e "${YELLOW}⚠${NC}  INGRESS_HTTP_PORT not set, using default 8080${NC}"
+fi
+echo -e "${CYAN}   Using k3d loadbalancer port ${INGRESS_HTTP_PORT} for ingress access${NC}"
 
-# Install nginx ingress with NodePort on high port - with retries
+# Install nginx ingress with LoadBalancer (k3d will map it to port 8080)
 INGRESS_INSTALLED=false
 for retry in {1..5}; do
     if timeout 10 helm list -n ingress-nginx 2>&1 | grep -q ingress-nginx; then
@@ -1398,9 +1495,8 @@ for retry in {1..5}; do
     if timeout 120 helm install ingress-nginx ingress-nginx/ingress-nginx \
         --namespace ingress-nginx \
         --create-namespace \
-        --set controller.service.type=NodePort \
-        --set controller.service.nodePorts.http=${INGRESS_HTTP_PORT} \
-        --set controller.service.nodePorts.https=$((INGRESS_HTTP_PORT + 1)) \
+        --set controller.service.type=LoadBalancer \
+        --set controller.service.annotations."k3d\.io/loadbalancer"=true \
         --set controller.admissionWebhooks.enabled=false \
         --wait --timeout=2m 2>&1 | tee /tmp/ingress-install.log; then
         echo -e "${GREEN}✓${NC} Nginx ingress controller installed"
@@ -1424,21 +1520,16 @@ if [ "$INGRESS_INSTALLED" = false ]; then
     exit 1
 fi
 
-# Wait for ingress controller to be ready with verification
+# Wait for ingress controller to be ready
 echo -e "${CYAN}   Waiting for ingress controller to be ready...${NC}"
 INGRESS_READY=false
 for i in {1..60}; do
     if timeout 10 kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=controller -n ingress-nginx --timeout=10s > /dev/null 2>&1; then
-        # Verify it's actually accessible
-        ACTUAL_PORT=$(timeout 10 kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || echo "")
-        if [ -n "$ACTUAL_PORT" ] && [ "$ACTUAL_PORT" != "null" ] && [ "$ACTUAL_PORT" != "0" ]; then
-            # Test if port is actually listening
-            if timeout 2 curl -s -o /dev/null -w "%{http_code}" http://localhost:${ACTUAL_PORT} 2>/dev/null | grep -q "[234]"; then
-                echo -e "${GREEN}✓${NC} Ingress controller ready and accessible on port ${ACTUAL_PORT}"
-                INGRESS_READY=true
-                break
-            fi
-        fi
+        # Wait for LoadBalancer to get an IP (k3d will assign it)
+        sleep 5
+        echo -e "${GREEN}✓${NC} Ingress controller ready"
+        INGRESS_READY=true
+        break
     fi
     sleep 2
     if [ $((i % 10)) -eq 0 ]; then
@@ -1450,11 +1541,13 @@ if [ "$INGRESS_READY" = false ]; then
     echo -e "${YELLOW}⚠${NC}  Ingress controller may not be fully ready, but continuing...${NC}"
 fi
 
-# Verify ingress service port
-ACTUAL_INGRESS_PORT=$(timeout 10 kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || echo "${INGRESS_HTTP_PORT}")
-if [ "$ACTUAL_INGRESS_PORT" != "${INGRESS_HTTP_PORT}" ]; then
-    INGRESS_HTTP_PORT=${ACTUAL_INGRESS_PORT}
-    echo -e "${CYAN}   Ingress using port ${INGRESS_HTTP_PORT}${NC}"
+# k3d maps LoadBalancer to port 8080 (as configured in cluster creation)
+# Verify the service is using LoadBalancer type
+INGRESS_SVC_TYPE=$(timeout 10 kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.type}' 2>/dev/null || echo "")
+if [ "$INGRESS_SVC_TYPE" = "LoadBalancer" ]; then
+    echo -e "${CYAN}   Ingress using LoadBalancer (k3d maps to port ${INGRESS_HTTP_PORT})${NC}"
+else
+    echo -e "${YELLOW}⚠${NC}  Ingress service type is ${INGRESS_SVC_TYPE}, expected LoadBalancer${NC}"
 fi
 echo -e "${CYAN}   Ingress accessible on: http://localhost:${INGRESS_HTTP_PORT}${NC}"
 show_section_time "Nginx ingress installation"
@@ -1484,32 +1577,236 @@ echo -e "${GREEN}✓${NC} CRDs deployed"
     fi
 done
 
-# Handle mock data deployment
-SECTION_START_TIME=$(date +%s)
-if [ "$SKIP_MOCK_DATA" = true ]; then
-    echo -e "${CYAN}→${NC} Skipping mock data deployment (--skip-mock-data flag)${NC}"
-elif [ "$DEPLOY_MOCK_DATA" = true ]; then
-    echo -e "${YELLOW}→${NC} Deploying mock data (--deploy-mock-data flag)..."
-    ./hack/mock-data.sh ${NAMESPACE} > /dev/null 2>&1 || echo -e "${YELLOW}⚠${NC}  Mock data deployment issue (continuing...)"
-    echo -e "${GREEN}✓${NC} Mock data deployed"
-    show_section_time "Mock data deployment"
-elif [ "$NON_INTERACTIVE" = true ]; then
-    # In non-interactive mode, skip mock data unless explicitly requested
-    echo -e "${CYAN}→${NC} Non-interactive mode: skipping mock data (use --deploy-mock-data to enable)${NC}"
-else
-    # Interactive mode: prompt user
-echo ""
-    read -p "$(echo -e ${CYAN}Deploy mock data with Observations and metrics? [Y/n]${NC}) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-    echo -e "${YELLOW}→${NC} Deploying mock data..."
-    ./hack/mock-data.sh ${NAMESPACE} > /dev/null 2>&1 || echo -e "${YELLOW}⚠${NC}  Mock data deployment issue (continuing...)"
-    echo -e "${GREEN}✓${NC} Mock data deployed"
-        show_section_time "Mock data deployment"
-    else
-        echo -e "${CYAN}→${NC} Skipping mock data deployment${NC}"
-    fi
+# Deploy Zen Watcher using Helm or direct deployment
+echo -e "${YELLOW}→${NC} Deploying Zen Watcher..."
+ZEN_WATCHER_IMAGE="${ZEN_WATCHER_IMAGE:-kubezen/zen-watcher:latest}"
+
+# Try to get latest image tag from Docker Hub or use latest
+if [ "$ZEN_WATCHER_IMAGE" = "kubezen/zen-watcher:latest" ]; then
+    echo -e "${CYAN}   Using image: ${ZEN_WATCHER_IMAGE}${NC}"
 fi
+
+# Create zen-watcher deployment
+cat <<EOF | kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" > /dev/null || true
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zen-watcher
+  namespace: ${NAMESPACE}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zen-watcher
+rules:
+- apiGroups: ["zen.kube-zen.io"]
+  resources: ["observations"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+- apiGroups: ["wgpolicyk8s.io"]
+  resources: ["policyreports", "clusterpolicyreports"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["aquasecurity.github.io"]
+  resources: ["vulnerabilityreports"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: zen-watcher
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: zen-watcher
+subjects:
+- kind: ServiceAccount
+  name: zen-watcher
+  namespace: ${NAMESPACE}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zen-watcher
+  namespace: ${NAMESPACE}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zen-watcher
+  template:
+    metadata:
+      labels:
+        app: zen-watcher
+    spec:
+      serviceAccountName: zen-watcher
+      containers:
+      - name: zen-watcher
+        image: ${ZEN_WATCHER_IMAGE}
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+        - name: metrics
+          containerPort: 9090
+        env:
+        - name: HTTP_SHUTDOWN_TIMEOUT
+          value: "15s"
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        fsGroup: 65532
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zen-watcher
+  namespace: ${NAMESPACE}
+spec:
+  selector:
+    app: zen-watcher
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+EOF
+
+echo -e "${GREEN}✓${NC} Zen Watcher deployed"
+
+# Wait for zen-watcher to be ready
+echo -e "${YELLOW}→${NC} Waiting for Zen Watcher to be ready..."
+for i in {1..60}; do
+    if timeout 10 kubectl wait --for=condition=ready pod -l app=zen-watcher -n ${NAMESPACE} --timeout=10s > /dev/null 2>&1; then
+        echo -e "${GREEN}✓${NC} Zen Watcher is ready"
+        break
+    fi
+    if [ $((i % 10)) -eq 0 ]; then
+        echo -e "${CYAN}   Still waiting... ($((i*2)) seconds)${NC}"
+    fi
+    sleep 2
+done
+show_section_time "Zen Watcher deployment"
+
+# Generate test observations by creating test resources
+SECTION_START_TIME=$(date +%s)
+echo ""
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}  Generating Test Observations${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
+# Create test pods that will trigger Kyverno policies
+if [ "$INSTALL_KYVERNO" = true ]; then
+    echo -e "${YELLOW}→${NC} Creating test pods to trigger Kyverno observations..."
+    # Create a pod without required labels (will be blocked by Kyverno)
+    kubectl run test-pod-no-label --image=nginx:latest --restart=Never 2>&1 | grep -v "already exists" > /dev/null || true
+    sleep 5
+    echo -e "${GREEN}✓${NC} Test pods created (Kyverno will generate PolicyReports)"
+fi
+
+# Create test pods for Trivy scanning
+if [ "$INSTALL_TRIVY" = true ]; then
+    echo -e "${YELLOW}→${NC} Creating test pods for Trivy scanning..."
+    kubectl run test-app --image=nginx:1.21.0 --restart=Never -l app=test-app 2>&1 | grep -v "already exists" > /dev/null || true
+    sleep 10
+    echo -e "${GREEN}✓${NC} Test pods created (Trivy will scan them)"
+fi
+
+# Create Checkov ConfigMap with test results
+if [ "$INSTALL_CHECKOV" = true ]; then
+    echo -e "${YELLOW}→${NC} Creating Checkov test results ConfigMap..."
+    cat > /tmp/checkov-results.json <<'EOF'
+{
+  "results": {
+    "failed_checks": [
+      {
+        "check_id": "CKV_K8S_20",
+        "check_name": "Ensure that the --service-account-lookup argument is set to true",
+        "resource": "Pod.default.test-pod",
+        "guideline": "https://docs.bridgecrew.io/docs/bc_k8s_20"
+      },
+      {
+        "check_id": "CKV_K8S_23",
+        "check_name": "Minimize the admission of containers with capabilities assigned",
+        "resource": "Deployment.default.test-deployment",
+        "guideline": "https://docs.bridgecrew.io/docs/bc_k8s_23"
+      }
+    ]
+  }
+}
+EOF
+    kubectl create configmap checkov-results --from-file=results.json=/tmp/checkov-results.json -n checkov --dry-run=client -o yaml | kubectl apply -f - 2>&1 | grep -v "already exists" > /dev/null || true
+    kubectl label configmap checkov-results -n checkov app=checkov 2>&1 | grep -v "already labeled" > /dev/null || true
+    echo -e "${GREEN}✓${NC} Checkov ConfigMap created"
+fi
+
+# Create kube-bench ConfigMap with test results
+if [ "$INSTALL_KUBE_BENCH" = true ]; then
+    echo -e "${YELLOW}→${NC} Creating kube-bench test results ConfigMap..."
+    cat > /tmp/kube-bench-results.json <<'EOF'
+{
+  "Controls": [
+    {
+      "id": "1",
+      "tests": [
+        {
+          "section": "1.1",
+          "results": [
+            {
+              "test_number": "1.1.1",
+              "test_desc": "Ensure that the API server pod specification file permissions are set to 644 or more restrictive",
+              "status": "FAIL",
+              "scored": true,
+              "remediation": "Run the following command: chmod 644 /etc/kubernetes/manifests/kube-apiserver.yaml"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+EOF
+    kubectl create configmap kube-bench-results --from-file=results.json=/tmp/kube-bench-results.json -n kube-bench --dry-run=client -o yaml | kubectl apply -f - 2>&1 | grep -v "already exists" > /dev/null || true
+    kubectl label configmap kube-bench-results -n kube-bench app=kube-bench 2>&1 | grep -v "already labeled" > /dev/null || true
+    echo -e "${GREEN}✓${NC} kube-bench ConfigMap created"
+fi
+
+# Test Falco and Audit webhooks via ingress
+echo -e "${YELLOW}→${NC} Testing Falco and Audit webhooks via ingress..."
+# Webhooks are accessible via ingress at /zen-watcher/falco/webhook and /zen-watcher/audit/webhook
+# No port-forward needed - use ingress endpoint
+sleep 2
+
+# Test Falco webhook via ingress
+curl -s -X POST -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}/zen-watcher/falco/webhook -H "Content-Type: application/json" \
+    -d '{"output":"16:31:56.123456789: Warning Sensitive file opened for reading by non-trusted program (user=root program=nmap)","priority":"Warning","rule":"Sensitive file opened for reading by non-trusted program","time":"'$(date -u +%Y-%m-%dT%H:%M:%S)'","output_fields":{"container.id":"test","proc.name":"nmap"}}' > /dev/null 2>&1 || true
+
+# Test Audit webhook via ingress
+curl -s -X POST -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}/zen-watcher/audit/webhook -H "Content-Type: application/json" \
+    -d '{"kind":"Event","apiVersion":"audit.k8s.io/v1","level":"Request","auditID":"test-'$(date +%s)'","stage":"ResponseComplete","requestURI":"/api/v1/namespaces/default/pods","verb":"delete","user":{"username":"test-user"},"sourceIPs":["127.0.0.1"],"objectRef":{"resource":"pods","namespace":"default","name":"test-pod"},"responseStatus":{"code":200}}' > /dev/null 2>&1 || true
+
+echo -e "${GREEN}✓${NC} Webhooks tested via ingress"
+
+# Wait for observations to be created
+echo -e "${YELLOW}→${NC} Waiting for observations to be created (this may take 30-60 seconds)..."
+OBSERVATION_COUNT=0
+for i in {1..30}; do
+    OBSERVATION_COUNT=$(kubectl get observations -A --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+    if [ "$OBSERVATION_COUNT" -gt 0 ]; then
+        echo -e "${GREEN}✓${NC} Observations created: ${OBSERVATION_COUNT}"
+        break
+    fi
+    if [ $((i % 10)) -eq 0 ]; then
+        echo -e "${CYAN}   Still waiting... ($((i*2)) seconds)${NC}"
+    fi
+    sleep 2
+done
+
+show_section_time "Test observations generation"
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -1521,14 +1818,12 @@ SECTION_START_TIME=$(date +%s)
 # Create ingress resources for Grafana, VictoriaMetrics, and Zen Watcher
 echo -e "${YELLOW}→${NC} Creating ingress resources..."
 
-# Get actual ingress HTTP port (use the one we set earlier)
-ACTUAL_INGRESS_PORT=$(timeout 10 kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || echo "${INGRESS_HTTP_PORT}")
-if [ "$ACTUAL_INGRESS_PORT" != "null" ] && [ -n "$ACTUAL_INGRESS_PORT" ] && [ "$ACTUAL_INGRESS_PORT" != "0" ]; then
-    INGRESS_HTTP_PORT=${ACTUAL_INGRESS_PORT}
-fi
+# Use k3d loadbalancer port (8080) for all access
 GRAFANA_ACCESS_PORT=${INGRESS_HTTP_PORT}
 
-# Create single ingress with path-based routing (no Host header needed)
+# Create ingress with host-based routing and path rewriting
+# Grafana and VictoriaMetrics need rewrite-target because they don't handle subpaths well
+# Use localhost as hostname for easy access
 cat <<EOF | timeout 30 kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" > /dev/null || true
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -1536,12 +1831,14 @@ metadata:
   name: zen-demo-services
   namespace: ${NAMESPACE}
   annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/rewrite-target: /\$2
     nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
   ingressClassName: nginx
   rules:
-  - http:
+  - host: localhost
+    http:
       paths:
       - path: /grafana(/|$)(.*)
         pathType: ImplementationSpecific
@@ -1557,27 +1854,6 @@ spec:
             name: victoriametrics
             port:
               number: 8428
-EOF
-
-# Create Zen Watcher metrics ingress (if deployment exists)
-if timeout 10 kubectl get deployment zen-watcher -n ${NAMESPACE} 2>/dev/null | grep -q zen-watcher; then
-    # Ensure zen-watcher service exists
-    timeout 15 kubectl expose deployment zen-watcher --port=8080 --target-port=8080 --type=ClusterIP --name=zen-watcher -n ${NAMESPACE} 2>&1 | grep -v "already exists" > /dev/null || true
-    
-    cat <<EOF | timeout 30 kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" > /dev/null || true
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: zen-watcher
-  namespace: ${NAMESPACE}
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /\$2
-    nginx.ingress.kubernetes.io/use-regex: "true"
-spec:
-  ingressClassName: nginx
-  rules:
-  - http:
-      paths:
       - path: /zen-watcher(/|$)(.*)
         pathType: ImplementationSpecific
         backend:
@@ -1586,21 +1862,28 @@ spec:
             port:
               number: 8080
 EOF
-    echo -e "${CYAN}   Zen Watcher ingress created${NC}"
+
+# Ensure zen-watcher service exists
+if timeout 10 kubectl get deployment zen-watcher -n ${NAMESPACE} 2>/dev/null | grep -q zen-watcher; then
+    timeout 15 kubectl expose deployment zen-watcher --port=8080 --target-port=8080 --type=ClusterIP --name=zen-watcher -n ${NAMESPACE} 2>&1 | grep -v "already exists" > /dev/null || true
 fi
 
-echo -e "${GREEN}✓${NC} Ingress resources created (path-based routing)"
+echo -e "${GREEN}✓${NC} Ingress resources created"
 echo -e "${CYAN}   Grafana: http://localhost:${INGRESS_HTTP_PORT}/grafana${NC}"
 echo -e "${CYAN}   VictoriaMetrics: http://localhost:${INGRESS_HTTP_PORT}/victoriametrics${NC}"
+echo -e "${CYAN}   Zen Watcher: http://localhost:${INGRESS_HTTP_PORT}/zen-watcher${NC}"
 
-# Wait for Grafana to be fully ready and VERIFY it works via ingress
-echo -e "${YELLOW}→${NC} Waiting for Grafana to be fully ready and verifying ingress access..."
+# Wait for Grafana to be fully ready and verify ingress access
+echo -e "${YELLOW}→${NC} Waiting for Grafana to be ready and verifying ingress access..."
 GRAFANA_READY=false
 for i in {1..60}; do
-    # Test via ingress with path-based routing (no Host header needed)
-    HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" http://localhost:${INGRESS_HTTP_PORT}/grafana/api/health 2>/dev/null || echo "000")
+    # First verify ingress controller is responding
+    INGRESS_TEST=$(timeout 2 curl -s -o /dev/null -w "%{http_code}" http://localhost:${INGRESS_HTTP_PORT}/ 2>/dev/null || echo "000")
+    
+    # Test via ingress with host header
+    HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}/grafana/api/health 2>/dev/null || echo "000")
     if [ "$HTTP_CODE" = "200" ]; then
-        HEALTH_RESPONSE=$(timeout 3 curl -s http://localhost:${INGRESS_HTTP_PORT}/grafana/api/health 2>/dev/null || echo "")
+        HEALTH_RESPONSE=$(timeout 3 curl -s -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}/grafana/api/health 2>/dev/null || echo "")
         if echo "$HEALTH_RESPONSE" | grep -q "ok\|database"; then
             echo -e "${GREEN}✓${NC} Grafana is ready and responding via ingress (HTTP ${HTTP_CODE})"
             GRAFANA_READY=true
@@ -1613,27 +1896,19 @@ for i in {1..60}; do
         break
     fi
     if [ $((i % 10)) -eq 0 ]; then
-        echo -e "${CYAN}  [DEBUG] Still waiting... (${i}/60 seconds, HTTP code: ${HTTP_CODE})${NC}"
+        echo -e "${CYAN}  Still waiting... (${i}/60 seconds, HTTP code: ${HTTP_CODE}, Ingress test: ${INGRESS_TEST})${NC}"
+        if [ "$INGRESS_TEST" = "000" ]; then
+            echo -e "${YELLOW}   ⚠  Ingress controller may not be responding on port ${INGRESS_HTTP_PORT}${NC}"
+            echo -e "${CYAN}   Checking ingress controller...${NC}"
+            kubectl get pods -n ingress-nginx -l app.kubernetes.io/component=controller 2>&1 | head -3 || true
+            kubectl get svc ingress-nginx-controller -n ingress-nginx 2>&1 | head -2 || true
+        fi
     fi
     sleep 1
 done
 
 if [ "$GRAFANA_READY" = false ]; then
     echo -e "${YELLOW}⚠${NC}  Grafana may not be fully ready via ingress, but continuing...${NC}"
-    echo -e "${CYAN}   [DEBUG] Last HTTP code: ${HTTP_CODE}${NC}"
-fi
-
-# Final verification - try to login via ingress
-echo -e "${CYAN}   [DEBUG] Verifying credentials via ingress...${NC}"
-LOGIN_TEST=$(timeout 5 curl -s -X POST -H "Content-Type: application/json" \
-    -d "{\"user\":\"zen\",\"password\":\"${GRAFANA_PASSWORD}\"}" \
-    http://localhost:${INGRESS_HTTP_PORT}/grafana/api/login 2>/dev/null || echo "ERROR")
-if echo "$LOGIN_TEST" | grep -q "Logged in\|message.*success"; then
-    echo -e "${GREEN}✓${NC} Credentials verified via ingress - login successful"
-elif echo "$LOGIN_TEST" | grep -q "Invalid"; then
-    echo -e "${YELLOW}⚠${NC}  Login test failed - password may be incorrect${NC}"
-else
-    echo -e "${CYAN}   [DEBUG] Login test result: ${LOGIN_TEST:0:100}${NC}"
 fi
 
 show_section_time "Grafana configuration"
@@ -1642,6 +1917,7 @@ show_section_time "Grafana configuration"
 echo -e "${YELLOW}→${NC} Configuring VictoriaMetrics datasource..."
 DATASOURCE_RESULT=$(timeout 10 curl -s -X POST \
     -H "Content-Type: application/json" \
+    -H "Host: localhost" \
     -u zen:${GRAFANA_PASSWORD} \
     -d '{
         "name": "VictoriaMetrics",
@@ -1669,6 +1945,7 @@ if [ -f "config/dashboards/zen-watcher-dashboard.json" ]; then
     jq '{dashboard: ., overwrite: true, message: "Demo Import"}' | \
     curl -s -X POST \
         -H "Content-Type: application/json" \
+        -H "Host: localhost" \
         -u zen:${GRAFANA_PASSWORD} \
         -d @- \
         http://localhost:${INGRESS_HTTP_PORT}/grafana/api/dashboards/db 2>&1 || echo "timeout or error")
@@ -1693,67 +1970,45 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 echo -e "${GREEN}  🎉 Demo Environment Ready!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-# Determine access method (ingress or port-forward)
-USE_PORT_FORWARD=false
-if ! timeout 10 kubectl get pods -n ingress-nginx -l app.kubernetes.io/component=controller --no-headers 2>&1 | grep -q " Running "; then
-    USE_PORT_FORWARD=true
-    echo -e "${YELLOW}⚠${NC}  Ingress not ready, using port-forward for service access...${NC}"
-    pkill -f "kubectl port-forward.*grafana" 2>/dev/null || true
-    pkill -f "kubectl port-forward.*victoriametrics" 2>/dev/null || true
-    timeout 10 kubectl port-forward -n ${NAMESPACE} svc/grafana ${GRAFANA_PORT}:3000 --address=0.0.0.0 > /tmp/grafana-pf.log 2>&1 &
-    GRAFANA_PF_PID=$!
-    timeout 10 kubectl port-forward -n ${NAMESPACE} svc/victoriametrics ${VICTORIA_METRICS_PORT}:8428 --address=0.0.0.0 > /tmp/vm-pf.log 2>&1 &
-    VM_PF_PID=$!
-    sleep 3
-    GRAFANA_ACCESS_PORT=${GRAFANA_PORT}
-    VM_ACCESS_PORT=${VICTORIA_METRICS_PORT}
-else
-    GRAFANA_ACCESS_PORT=${INGRESS_HTTP_PORT}
-    VM_ACCESS_PORT=${INGRESS_HTTP_PORT}
-fi
+# Use ingress for all access (k3d loadbalancer on port 8080)
+GRAFANA_ACCESS_PORT=${INGRESS_HTTP_PORT}
+VM_ACCESS_PORT=${INGRESS_HTTP_PORT}
+ZEN_WATCHER_ACCESS_PORT=${INGRESS_HTTP_PORT}
 
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-if [ "$USE_PORT_FORWARD" = true ]; then
-    echo -e "${CYAN}  📊 SERVICE ACCESS (via Port-Forward)${NC}"
-else
-    echo -e "${CYAN}  📊 SERVICE ACCESS (via Nginx Ingress)${NC}"
-fi
+echo -e "${CYAN}  📊 SERVICE ACCESS (via k3d LoadBalancer)${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "${CYAN}  GRAFANA:${NC}"
-if [ "$USE_PORT_FORWARD" = true ]; then
-    echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}${NC}"
-else
-    echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/grafana${NC}"
-fi
+echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/grafana${NC}"
 echo -e "    ${GREEN}Username:${NC} ${CYAN}zen${NC}"
 echo -e "    ${GREEN}Password:${NC} ${CYAN}${GRAFANA_PASSWORD}${NC}"
-if [ "$USE_PORT_FORWARD" = true ]; then
-    echo -e "    ${GREEN}Dashboard:${NC} ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/d/zen-watcher${NC}"
-else
-    echo -e "    ${GREEN}Dashboard:${NC} ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/grafana/d/zen-watcher${NC}"
-fi
+echo -e "    ${GREEN}Dashboard:${NC} ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/grafana/d/zen-watcher${NC}"
 echo ""
 echo -e "${CYAN}  VICTORIAMETRICS:${NC}"
-if [ "$USE_PORT_FORWARD" = true ]; then
-    echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${VM_ACCESS_PORT}${NC}"
-    echo -e "    ${GREEN}Metrics API:${NC} ${CYAN}http://localhost:${VM_ACCESS_PORT}/api/v1/query${NC}"
-    echo -e "    ${GREEN}VMUI:${NC}    ${CYAN}http://localhost:${VM_ACCESS_PORT}/vmui${NC}"
-else
-    echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${VM_ACCESS_PORT}/victoriametrics${NC}"
-    echo -e "    ${GREEN}Metrics API:${NC} ${CYAN}http://localhost:${VM_ACCESS_PORT}/victoriametrics/api/v1/query${NC}"
-    echo -e "    ${GREEN}VMUI:${NC}    ${CYAN}http://localhost:${VM_ACCESS_PORT}/victoriametrics/vmui${NC}"
-fi
+echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${VM_ACCESS_PORT}/victoriametrics${NC}"
+echo -e "    ${GREEN}Metrics API:${NC} ${CYAN}http://localhost:${VM_ACCESS_PORT}/victoriametrics/api/v1/query${NC}"
+echo -e "    ${GREEN}VMUI:${NC}    ${CYAN}http://localhost:${VM_ACCESS_PORT}/victoriametrics/vmui${NC}"
+echo ""
+echo -e "${CYAN}  ZEN WATCHER:${NC}"
+echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${ZEN_WATCHER_ACCESS_PORT}/zen-watcher${NC}"
+echo -e "    ${GREEN}Metrics:${NC} ${CYAN}http://localhost:${ZEN_WATCHER_ACCESS_PORT}/zen-watcher/metrics${NC}"
+echo -e "    ${GREEN}Health:${NC}  ${CYAN}http://localhost:${ZEN_WATCHER_ACCESS_PORT}/zen-watcher/health${NC}"
+echo ""
+echo -e "${CYAN}  KUBECONFIG:${NC}"
+echo -e "    ${GREEN}File:${NC}     ${CYAN}${KUBECONFIG_FILE}${NC}"
+echo -e "    ${GREEN}Usage:${NC}   ${CYAN}kubectl get observations --kubeconfig ${KUBECONFIG_FILE}${NC}"
+echo -e "    ${GREEN}Or:${NC}      ${CYAN}export KUBECONFIG=${KUBECONFIG_FILE} && kubectl get observations${NC}"
+echo ""
+OBSERVATION_COUNT=$(kubectl get observations -A --kubeconfig=${KUBECONFIG_FILE} --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+echo -e "${CYAN}  OBSERVATIONS:${NC}"
+echo -e "    ${GREEN}Total:${NC}    ${CYAN}${OBSERVATION_COUNT}${NC}"
+echo -e "    ${GREEN}View:${NC}     ${CYAN}kubectl get observations -A --kubeconfig ${KUBECONFIG_FILE}${NC}"
+echo -e "    ${GREEN}By source:${NC} ${CYAN}kubectl get observations -A --kubeconfig ${KUBECONFIG_FILE} -o json | jq -r '.items[] | .spec.source' | sort | uniq -c${NC}"
 echo ""
 
-# Check if Zen Watcher has ingress
-if [ "$USE_PORT_FORWARD" = false ] && timeout 10 kubectl get ingress zen-watcher -n ${NAMESPACE} 2>/dev/null | grep -q zen-watcher; then
-    echo -e "${CYAN}  ZEN WATCHER:${NC}"
-    echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/zen-watcher${NC}"
-    echo -e "    ${GREEN}Metrics:${NC} ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/zen-watcher/metrics${NC}"
-    echo -e "    ${GREEN}Health:${NC}  ${CYAN}http://localhost:${INGRESS_HTTP_PORT}/zen-watcher/health${NC}"
-    echo ""
-fi
+# All services are accessible via ingress (no port-forward needed)
+# URLs are already displayed above
 
 # Final verification - test ALL endpoints with retries until they work
 echo -e "${CYAN}   [DEBUG] Final verification of all endpoints...${NC}"
@@ -1762,13 +2017,8 @@ echo -e "${YELLOW}→${NC} Testing endpoints (will retry until working)...${NC}"
 # Test Grafana with retries
 GRAFANA_WORKING=false
 for retry in {1..60}; do
-    if [ "$USE_PORT_FORWARD" = true ]; then
-        HTTP_CODE=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" http://localhost:${GRAFANA_ACCESS_PORT}/api/health 2>/dev/null || echo "000")
-        TEST_URL="http://localhost:${GRAFANA_ACCESS_PORT}"
-    else
-        HTTP_CODE=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" http://localhost:${GRAFANA_ACCESS_PORT}/grafana/api/health 2>/dev/null || echo "000")
-        TEST_URL="http://localhost:${GRAFANA_ACCESS_PORT}/grafana"
-    fi
+    HTTP_CODE=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${GRAFANA_ACCESS_PORT}/grafana/api/health 2>/dev/null || echo "000")
+    TEST_URL="http://localhost:${GRAFANA_ACCESS_PORT}/grafana"
     
     if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
         echo -e "${GREEN}✓${NC} Grafana is accessible (HTTP ${HTTP_CODE})"
@@ -1782,23 +2032,29 @@ for retry in {1..60}; do
 done
 
 # Test VictoriaMetrics with retries
+# VictoriaMetrics health endpoint is at root, not /health
 VM_WORKING=false
 for retry in {1..60}; do
-    if [ "$USE_PORT_FORWARD" = true ]; then
-        HTTP_CODE=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" http://localhost:${VM_ACCESS_PORT}/health 2>/dev/null || echo "000")
-        VM_TEST_URL="http://localhost:${VM_ACCESS_PORT}"
-    else
-        HTTP_CODE=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" http://localhost:${VM_ACCESS_PORT}/victoriametrics/health 2>/dev/null || echo "000")
-        VM_TEST_URL="http://localhost:${VM_ACCESS_PORT}/victoriametrics"
+    # Try both /victoriametrics/health and /victoriametrics (root)
+    HTTP_CODE=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${VM_ACCESS_PORT}/victoriametrics/health 2>/dev/null || echo "000")
+    if [ "$HTTP_CODE" = "000" ] || [ "$HTTP_CODE" != "200" ]; then
+        # Try root path
+        HTTP_CODE=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${VM_ACCESS_PORT}/victoriametrics/ 2>/dev/null || echo "000")
     fi
+    VM_TEST_URL="http://localhost:${VM_ACCESS_PORT}/victoriametrics"
     
-    if [ "$HTTP_CODE" = "200" ]; then
+    if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ]; then
         echo -e "${GREEN}✓${NC} VictoriaMetrics is accessible (HTTP ${HTTP_CODE})"
         VM_WORKING=true
         break
     fi
     if [ $((retry % 10)) -eq 0 ]; then
         echo -e "${CYAN}   Retry $retry/60: VictoriaMetrics not ready yet (HTTP ${HTTP_CODE})...${NC}"
+        # Debug: check if ingress controller is responding
+        INGRESS_TEST=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" http://localhost:${INGRESS_HTTP_PORT}/ 2>/dev/null || echo "000")
+        if [ "$INGRESS_TEST" = "000" ]; then
+            echo -e "${YELLOW}   ⚠  Ingress controller may not be responding on port ${INGRESS_HTTP_PORT}${NC}"
+        fi
     fi
     sleep 2
 done
@@ -1833,36 +2089,22 @@ fi
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Store PIDs (only if port-forward was used)
-if [ -n "${GRAFANA_PF_PID:-}" ]; then
-    echo $GRAFANA_PF_PID > /tmp/zen-demo-grafana.pid
-fi
-if [ -n "${VM_PF_PID:-}" ]; then
-    echo $VM_PF_PID > /tmp/zen-demo-vm.pid
-fi
-
-# Trap Ctrl+C to cleanup
-cleanup() {
-    echo ""
-    echo -e "${YELLOW}→${NC} Stopping port-forwards (if any)..."
-    [ -n "${GRAFANA_PF_PID:-}" ] && kill ${GRAFANA_PF_PID} 2>/dev/null || true
-    [ -n "${VM_PF_PID:-}" ] && kill ${VM_PF_PID} 2>/dev/null || true
-    rm -f /tmp/zen-demo-*.pid
-    echo -e "${GREEN}✓${NC} Port-forwards stopped"
-    echo ""
-    echo -e "${BLUE}Cluster is still running. To remove:${NC}"
-    case "$PLATFORM" in
-        k3d) echo -e "  ${CYAN}k3d cluster delete ${CLUSTER_NAME}${NC}" ;;
-        kind) echo -e "  ${CYAN}kind delete cluster --name ${CLUSTER_NAME}${NC}" ;;
-        minikube) echo -e "  ${CYAN}minikube delete -p ${CLUSTER_NAME}${NC}" ;;
-    esac
-    exit 0
-}
-
-trap cleanup INT TERM
-
-# Wait indefinitely
-echo -e "${GREEN}Port-forwards active. Press Ctrl+C to exit.${NC}"
-while true; do
-    sleep 1
-done
+# Services are accessible via ingress (no port-forwards needed)
+echo ""
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}  ✅ Demo environment is ready and accessible!${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+echo -e "${CYAN}All services are accessible via k3d LoadBalancer on port ${INGRESS_HTTP_PORT}${NC}"
+echo -e "${CYAN}No port-forwards needed - endpoints will remain accessible until cluster is deleted.${NC}"
+echo ""
+echo -e "${BLUE}To clean up the demo:${NC}"
+case "$PLATFORM" in
+    k3d) echo -e "  ${CYAN}k3d cluster delete ${CLUSTER_NAME}${NC}" ;;
+    kind) echo -e "  ${CYAN}kind delete cluster --name ${CLUSTER_NAME}${NC}" ;;
+    minikube) echo -e "  ${CYAN}minikube delete -p ${CLUSTER_NAME}${NC}" ;;
+esac
+echo ""
+echo -e "${CYAN}Or use the cleanup script:${NC}"
+echo -e "  ${CYAN}./hack/cleanup-demo.sh${NC}"
+echo ""
