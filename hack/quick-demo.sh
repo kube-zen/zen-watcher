@@ -935,66 +935,30 @@ kubectl_retry() {
 # Wait for cluster to be ready (with retries and better error handling)
 echo -e "${YELLOW}→${NC} Waiting for cluster to be ready..."
 cluster_ready=false
-for i in {1..60}; do
-    # Try multiple methods to check cluster readiness
-    # TLS verification is already configured in kubeconfig, so don't use the flag
-    if kubectl get nodes --request-timeout=3s &>/dev/null 2>&1; then
+max_wait=20
+for i in $(seq 1 $max_wait); do
+    # Try to check cluster readiness
+    if kubectl get nodes --request-timeout=5s &>/dev/null 2>&1; then
         cluster_ready=true
         echo -e "${GREEN}✓${NC} Cluster is ready"
         show_section_time "Cluster readiness"
         break
     fi
     
-    # Check if it's a connection issue vs cluster not ready
-    kubectl_output=$(kubectl get nodes --request-timeout=3s 2>&1)
-    # TLS errors mean the cluster is accessible, just certificate issues (normal for k3d)
-    if echo "$kubectl_output" | grep -q "tls\|certificate"; then
-        # Cluster is accessible but cert issue - update kubeconfig to skip TLS verify for this cluster
-        kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>/dev/null || true
-        sleep 2
-        if kubectl get nodes --request-timeout=3s &>/dev/null 2>&1; then
-            cluster_ready=true
-            echo -e "${GREEN}✓${NC} Cluster is ready (TLS configured)"
-            show_section_time "Cluster readiness"
-            break
-        fi
-    elif echo "$kubectl_output" | grep -q "connection refused\|dial tcp"; then
-        # Connection issue - might be port mismatch, try to detect and fix
-        if [ "$PLATFORM" = "k3d" ] && [ $i -le 20 ]; then
-            # Try multiple methods to detect actual k3d port
-            lb_port=$(docker port k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | grep "6443/tcp" | cut -d: -f2 | head -1)
-            if [ -z "$lb_port" ]; then
-                lb_port=$(docker inspect k3d-${CLUSTER_NAME}-serverlb 2>/dev/null | jq -r '.[0].NetworkSettings.Ports."6443/tcp"[0].HostPort // empty' 2>/dev/null || echo "")
-            fi
-            if [ -z "$lb_port" ]; then
-                lb_port=$(k3d cluster list ${CLUSTER_NAME} -o json 2>/dev/null | jq -r '.[0].servers[0].portMappings."6443"[0]? // empty' 2>/dev/null || echo "")
-            fi
-            
-            if [ -n "$lb_port" ] && [ "$lb_port" != "null" ] && [ "$lb_port" != "6443" ]; then
-                echo -e "${CYAN}   Detected k3d using port ${lb_port}, updating kubeconfig...${NC}"
-                kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${lb_port}" 2>/dev/null || true
-                sleep 3
-                if kubectl get nodes --request-timeout=5s &>/dev/null 2>&1; then
-                    cluster_ready=true
-                    echo -e "${GREEN}✓${NC} Cluster is ready (after port fix)"
-                    show_section_time "Cluster readiness"
-                    break
-                fi
-            fi
-        fi
+    # Show progress every 5 iterations
+    if [ $((i % 5)) -eq 0 ]; then
+        echo -e "${CYAN}   ... still waiting ($((i*3)) seconds)${NC}"
     fi
     
-    if [ $i -eq 60 ]; then
-        echo -e "${YELLOW}⚠${NC}  Cluster API not responding after 2 minutes"
+    # Break after max_wait iterations
+    if [ $i -eq $max_wait ]; then
+        echo -e "${YELLOW}⚠${NC}  Cluster API not fully ready after $((max_wait*3)) seconds"
         echo -e "${CYAN}   Continuing anyway - operations will retry automatically...${NC}"
         show_section_time "Cluster readiness (timeout)"
         break
-    else
-        sleep 2
-        if [ $((i % 10)) -eq 0 ]; then
-            echo -e "${CYAN}   ... still waiting ($((i*2)) seconds)${NC}"
-        fi
     fi
+    
+    sleep 3
 done
 
 # Final attempt to fix port if still not ready
