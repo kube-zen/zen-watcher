@@ -1538,15 +1538,18 @@ fi
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Store PIDs
-echo $GRAFANA_PF_PID > /tmp/zen-demo-grafana.pid
+# Store PIDs (only if port-forward was used)
+if [ -n "${GRAFANA_PF_PID:-}" ]; then
+    echo $GRAFANA_PF_PID > /tmp/zen-demo-grafana.pid
+fi
 echo $VM_PF_PID > /tmp/zen-demo-vm.pid
 
 # Trap Ctrl+C to cleanup
 cleanup() {
     echo ""
     echo -e "${YELLOW}→${NC} Stopping port-forwards..."
-    kill $GRAFANA_PF_PID $VM_PF_PID 2>/dev/null || true
+    [ -n "${GRAFANA_PF_PID:-}" ] && kill $GRAFANA_PF_PID 2>/dev/null || true
+    [ -n "${VM_PF_PID:-}" ] && kill $VM_PF_PID 2>/dev/null || true
     rm -f /tmp/zen-demo-*.pid
     echo -e "${GREEN}✓${NC} Port-forwards stopped"
     echo ""
