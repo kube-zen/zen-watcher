@@ -876,28 +876,41 @@ case "$PLATFORM" in
         timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>/dev/null || true
         echo -e "${CYAN}   Configured kubeconfig for port ${K3D_API_PORT} (TLS verification skipped)${NC}"
         
+        # Wait for cluster to be ready, then verify connectivity with retries
+        echo -e "${CYAN}   [DEBUG] Waiting for cluster to be ready...${NC}"
+        sleep 5  # Give cluster a moment to start
+        
         # Verify connectivity with retries
         echo -e "${CYAN}   [DEBUG] Verifying cluster connectivity...${NC}"
         CLUSTER_ACCESSIBLE=false
-        for retry in {1..10}; do
+        for retry in {1..20}; do
+            # First wait a bit for cluster to be ready
+            if [ $retry -le 5 ]; then
+                sleep 3
+            fi
+            
             if timeout 10 kubectl get nodes --request-timeout=5s > /dev/null 2>&1; then
-                echo -e "${GREEN}✓${NC} Cluster is accessible"
-                CLUSTER_ACCESSIBLE=true
-                break
-            else
-                if [ $retry -lt 10 ]; then
-                    echo -e "${CYAN}   [DEBUG] Retry $retry/10: Regenerating kubeconfig...${NC}"
-                    timeout 10 k3d kubeconfig write ${CLUSTER_NAME} 2>&1 | grep -v "ERRO" > /dev/null || true
-                    timeout 10 k3d kubeconfig merge ${CLUSTER_NAME} --kubeconfig-merge-default --kubeconfig-switch-context 2>&1 | grep -v "ERRO" > /dev/null || true
-                    timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${K3D_API_PORT}" 2>&1 > /dev/null || true
-                    timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>&1 > /dev/null || true
-                    timeout 5 kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data 2>&1 > /dev/null || true
-                    sleep 2
+                # Verify nodes are actually ready
+                if timeout 10 kubectl get nodes --request-timeout=5s 2>&1 | grep -q "Ready"; then
+                    echo -e "${GREEN}✓${NC} Cluster is accessible and nodes are ready"
+                    CLUSTER_ACCESSIBLE=true
+                    break
                 fi
+            fi
+            
+            if [ $retry -lt 20 ]; then
+                echo -e "${CYAN}   [DEBUG] Retry $retry/20: Regenerating kubeconfig...${NC}"
+                timeout 10 k3d kubeconfig write ${CLUSTER_NAME} 2>&1 | grep -v "ERRO" > /dev/null || true
+                timeout 10 k3d kubeconfig merge ${CLUSTER_NAME} --kubeconfig-merge-default --kubeconfig-switch-context 2>&1 | grep -v "ERRO" > /dev/null || true
+                timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${K3D_API_PORT}" 2>&1 > /dev/null || true
+                timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>&1 > /dev/null || true
+                timeout 5 kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data 2>&1 > /dev/null || true
+                sleep 2
             fi
         done
         if [ "$CLUSTER_ACCESSIBLE" = false ]; then
-            echo -e "${RED}✗${NC} Cannot access cluster after 10 retries"
+            echo -e "${RED}✗${NC} Cannot access cluster after 20 retries"
+            echo -e "${YELLOW}   Cluster may still be starting. Check with: kubectl get nodes${NC}"
             exit 1
         fi
         if timeout 5 kubectl get nodes --request-timeout=5s &>/dev/null 2>&1; then
