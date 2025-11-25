@@ -1160,10 +1160,14 @@ for i in {1..10}; do
         fi
     fi
 done
-kubectl expose deployment victoriametrics \
+# Expose VictoriaMetrics as ClusterIP (ingress will handle routing)
+timeout 10 kubectl delete svc victoriametrics -n ${NAMESPACE} 2>&1 || true
+timeout 15 kubectl expose deployment victoriametrics \
     --port=8428 --target-port=8428 \
-    -n ${NAMESPACE} 2>/dev/null || true
-echo -e "${GREEN}✓${NC} VictoriaMetrics deployed"
+    --type=ClusterIP \
+    --name=victoriametrics \
+    -n ${NAMESPACE} 2>&1 | grep -v "already exists" > /dev/null || true
+echo -e "${GREEN}✓${NC} VictoriaMetrics deployed (ClusterIP)"
 
 # Deploy Grafana with zen user (with retries for cluster readiness)
 echo -e "${YELLOW}→${NC} Deploying Grafana with zen user..."
@@ -1196,59 +1200,21 @@ kubectl set env --local -f - \
     fi
 done
 
-# Expose Grafana as NodePort for reliable access
-echo -e "${CYAN}   [DEBUG] Checking for existing Grafana service...${NC}"
+# Expose Grafana as ClusterIP (ingress will handle routing)
+echo -e "${CYAN}   Creating Grafana service (ClusterIP for ingress)...${NC}"
 EXISTING_SVC=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.type}' 2>/dev/null || echo "none")
 if [ "$EXISTING_SVC" != "none" ]; then
-    echo -e "${CYAN}   [DEBUG] Existing service found (type: ${EXISTING_SVC}), deleting...${NC}"
     timeout 10 kubectl delete svc grafana -n ${NAMESPACE} 2>&1 || true
-    sleep 2
-fi
-
-# Create NodePort service
-echo -e "${CYAN}   Creating Grafana NodePort service...${NC}"
-SVC_CREATE_OUTPUT=$(timeout 15 kubectl expose deployment grafana \
-    --port=3000 --target-port=3000 \
-    --type=NodePort \
-    --name=grafana \
-    -n ${NAMESPACE} 2>&1 || echo "ERROR")
-if echo "$SVC_CREATE_OUTPUT" | grep -q "service.*exposed\|already exists"; then
-    echo -e "${CYAN}   [DEBUG] Service creation output: ${SVC_CREATE_OUTPUT}${NC}"
-    echo -e "${GREEN}✓${NC} NodePort service created"
-else
-    echo -e "${YELLOW}⚠${NC}  Service creation output: ${SVC_CREATE_OUTPUT}${NC}"
-fi
-
-# Wait for service to be ready and get NodePort (with retries)
-# Kubernetes needs a moment to assign the NodePort
-echo -e "${CYAN}   [DEBUG] Waiting for NodePort assignment...${NC}"
-GRAFANA_NODEPORT=""
-for i in {1..30}; do
     sleep 1
-    # Check if service exists and is NodePort type
-    svc_type=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.type}' 2>/dev/null || echo "none")
-    echo -e "${CYAN}   [DEBUG] Attempt $i: Service type = ${svc_type}${NC}"
-    if [ "$svc_type" = "NodePort" ]; then
-        GRAFANA_NODEPORT=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
-        echo -e "${CYAN}   [DEBUG] NodePort value = '${GRAFANA_NODEPORT}'${NC}"
-        if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ] && [ "$GRAFANA_NODEPORT" != "0" ]; then
-            echo -e "${GREEN}✓${NC} NodePort assigned: ${GRAFANA_NODEPORT}"
-            break
-        fi
-    elif [ "$svc_type" != "none" ]; then
-        echo -e "${YELLOW}⚠${NC}  Service exists but type is '${svc_type}', not NodePort${NC}"
-    fi
-    if [ $((i % 5)) -eq 0 ]; then
-        echo -e "${CYAN}   [DEBUG] Still waiting for NodePort... (${i}/30)${NC}"
-    fi
-done
-
-echo -e "${GREEN}✓${NC} Grafana deployed (user: zen)"
-if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ] && [ "$GRAFANA_NODEPORT" != "0" ]; then
-    echo -e "${CYAN}   NodePort: ${GRAFANA_NODEPORT}${NC}"
-else
-    echo -e "${YELLOW}⚠${NC}  NodePort not yet assigned (will retry later)${NC}"
 fi
+
+timeout 15 kubectl expose deployment grafana \
+    --port=3000 --target-port=3000 \
+    --type=ClusterIP \
+    --name=grafana \
+    -n ${NAMESPACE} 2>&1 | grep -v "already exists" > /dev/null || true
+echo -e "${GREEN}✓${NC} Grafana service created (ClusterIP)"
+echo -e "${GREEN}✓${NC} Grafana deployed (user: zen)"
 
 # Wait for pods
 echo -e "${YELLOW}→${NC} Waiting for monitoring stack to be ready (this takes 30-60 seconds)..."
@@ -1261,6 +1227,59 @@ for attempt in {1..30}; do
 done
 echo -e "${GREEN}✓${NC} Monitoring stack ready"
 show_section_time "Monitoring stack deployment"
+
+# Install nginx ingress controller (replaces Traefik for better service exposure)
+echo ""
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}  Installing Nginx Ingress Controller${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+SECTION_START_TIME=$(date +%s)
+
+echo -e "${YELLOW}→${NC} Installing nginx ingress controller..."
+# Add ingress-nginx helm repo if not already added
+if ! helm repo list 2>/dev/null | grep -q ingress-nginx; then
+    timeout 30 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx 2>&1 || true
+    timeout 30 helm repo update 2>&1 || true
+fi
+
+# Install nginx ingress with NodePort for k3d (expose on ports 80/443)
+if timeout 120 helm install ingress-nginx ingress-nginx/ingress-nginx \
+    --namespace ingress-nginx \
+    --create-namespace \
+    --set controller.service.type=NodePort \
+    --set controller.service.nodePorts.http=80 \
+    --set controller.service.nodePorts.https=443 \
+    --set controller.admissionWebhooks.enabled=false \
+    --wait --timeout=2m 2>&1 | tee /tmp/ingress-install.log; then
+    echo -e "${GREEN}✓${NC} Nginx ingress controller installed"
+else
+    # Check if already installed
+    if timeout 10 helm list -n ingress-nginx 2>&1 | grep -q ingress-nginx; then
+        echo -e "${GREEN}✓${NC} Nginx ingress controller already installed"
+    else
+        echo -e "${YELLOW}⚠${NC}  Ingress installation had issues (continuing...)"
+    fi
+fi
+
+# Wait for ingress controller to be ready
+echo -e "${CYAN}   Waiting for ingress controller to be ready...${NC}"
+for i in {1..30}; do
+    if timeout 10 kubectl wait --for=condition=ready pod -l app.kubernetes.io/component=controller -n ingress-nginx --timeout=10s > /dev/null 2>&1; then
+        echo -e "${GREEN}✓${NC} Ingress controller ready"
+        break
+    fi
+    sleep 2
+    if [ $((i % 5)) -eq 0 ]; then
+        echo -e "${CYAN}   ... still waiting ($((i*2)) seconds)${NC}"
+    fi
+done
+
+# Get ingress service port (should be 80/443)
+INGRESS_HTTP_PORT=$(timeout 10 kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || echo "80")
+INGRESS_HTTPS_PORT=$(timeout 10 kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="https")].nodePort}' 2>/dev/null || echo "443")
+echo -e "${CYAN}   Ingress accessible on ports: HTTP ${INGRESS_HTTP_PORT}, HTTPS ${INGRESS_HTTPS_PORT}${NC}"
+show_section_time "Nginx ingress installation"
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -1321,125 +1340,132 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 SECTION_START_TIME=$(date +%s)
 
-# Setup access - use NodePort for Grafana (more reliable than port-forward)
-echo -e "${YELLOW}→${NC} Setting up service access..."
+# Create ingress resources for Grafana, VictoriaMetrics, and Zen Watcher
+echo -e "${YELLOW}→${NC} Creating ingress resources..."
 
-# Initialize access port to default
-GRAFANA_ACCESS_PORT=${GRAFANA_PORT}
+# Get ingress HTTP port (should be 80)
+INGRESS_HTTP_PORT=$(timeout 10 kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null || echo "80")
+GRAFANA_ACCESS_PORT=${INGRESS_HTTP_PORT}
 
-# Get NodePort for Grafana (with retries and timeout)
-# k3d exposes NodePorts on localhost in the 30000-32767 range
-echo -e "${CYAN}   [DEBUG] Checking for NodePort service...${NC}"
-GRAFANA_NODEPORT=""
-for i in {1..30}; do
-    # First check if service exists and is NodePort type
-    svc_type=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.type}' 2>/dev/null || echo "none")
-    if [ "$svc_type" = "NodePort" ]; then
-        GRAFANA_NODEPORT=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
-        echo -e "${CYAN}   [DEBUG] Attempt $i: Service type=${svc_type}, NodePort=${GRAFANA_NODEPORT}${NC}"
-        if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ] && [ "$GRAFANA_NODEPORT" != "0" ]; then
-            echo -e "${GREEN}✓${NC} NodePort detected: ${GRAFANA_NODEPORT}"
-            break
-        fi
-    else
-        echo -e "${CYAN}   [DEBUG] Attempt $i: Service type=${svc_type} (not NodePort yet)${NC}"
-    fi
-    if [ $i -lt 30 ]; then
-        sleep 1
-    fi
-done
+# Create Grafana ingress
+cat <<EOF | timeout 30 kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" > /dev/null || true
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana
+  namespace: ${NAMESPACE}
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: grafana.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+EOF
 
-if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ] && [ "$GRAFANA_NODEPORT" != "0" ]; then
-    GRAFANA_ACCESS_PORT=${GRAFANA_NODEPORT}
-    echo -e "${CYAN}   Grafana accessible via NodePort: ${GRAFANA_NODEPORT}${NC}"
-    echo -e "${CYAN}   Access at: http://localhost:${GRAFANA_NODEPORT}${NC}"
-    # Verify it's actually listening (k3d exposes NodePorts on localhost)
-    echo -e "${CYAN}   [DEBUG] Verifying NodePort ${GRAFANA_NODEPORT} is accessible...${NC}"
-    NODEPORT_VERIFIED=false
-    for j in {1..10}; do
-        echo -e "${CYAN}   [DEBUG] Verification attempt $j/10...${NC}"
-        # Try nc first
-        if command -v nc &> /dev/null; then
-            if timeout 3 nc -zv localhost ${GRAFANA_NODEPORT} 2>&1 | grep -q "succeeded\|open"; then
-                echo -e "${GREEN}✓${NC} NodePort ${GRAFANA_NODEPORT} is listening (nc check)"
-                NODEPORT_VERIFIED=true
-                break
-            fi
-        fi
-        # Try curl as fallback
-        HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" http://localhost:${GRAFANA_NODEPORT}/api/health 2>/dev/null || echo "000")
-        echo -e "${CYAN}   [DEBUG] HTTP response code: ${HTTP_CODE}${NC}"
-        if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
-            echo -e "${GREEN}✓${NC} NodePort ${GRAFANA_NODEPORT} is accessible (HTTP ${HTTP_CODE})"
-            NODEPORT_VERIFIED=true
-            break
-        fi
-        if [ $j -lt 10 ]; then
-            sleep 2
-        fi
-    done
-    if [ "$NODEPORT_VERIFIED" = false ]; then
-        echo -e "${YELLOW}⚠${NC}  NodePort ${GRAFANA_NODEPORT} not yet accessible, will verify later${NC}"
-    fi
-else
-    # Fallback to port-forward if NodePort not available
-    echo -e "${YELLOW}⚠${NC}  NodePort not available, using port-forward for Grafana${NC}"
-    echo -e "${CYAN}   [DEBUG] Killing any existing port-forwards...${NC}"
-    pkill -f "kubectl port-forward.*grafana" 2>/dev/null || true
-    sleep 2
-    echo -e "${CYAN}   [DEBUG] Starting port-forward on port ${GRAFANA_PORT}...${NC}"
-    timeout 10 kubectl port-forward -n ${NAMESPACE} svc/grafana ${GRAFANA_PORT}:3000 --address=0.0.0.0 > /tmp/grafana-pf.log 2>&1 &
-GRAFANA_PF_PID=$!
-sleep 3
-    GRAFANA_ACCESS_PORT=${GRAFANA_PORT}
-    echo -e "${CYAN}   Port-forward active on port ${GRAFANA_PORT}${NC}"
-    echo -e "${CYAN}   [DEBUG] Port-forward PID: ${GRAFANA_PF_PID}${NC}"
-    echo -e "${CYAN}   [DEBUG] Port-forward log: $(head -5 /tmp/grafana-pf.log 2>/dev/null || echo 'no log yet')${NC}"
+# Create VictoriaMetrics ingress
+cat <<EOF | timeout 30 kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" > /dev/null || true
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: victoriametrics
+  namespace: ${NAMESPACE}
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: victoriametrics.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: victoriametrics
+            port:
+              number: 8428
+EOF
+
+# Create Zen Watcher metrics ingress (if deployment exists)
+if timeout 10 kubectl get deployment zen-watcher -n ${NAMESPACE} 2>/dev/null | grep -q zen-watcher; then
+    # Ensure zen-watcher service exists
+    timeout 15 kubectl expose deployment zen-watcher --port=8080 --target-port=8080 --type=ClusterIP --name=zen-watcher -n ${NAMESPACE} 2>&1 | grep -v "already exists" > /dev/null || true
+    
+    cat <<EOF | timeout 30 kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" > /dev/null || true
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: zen-watcher
+  namespace: ${NAMESPACE}
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: zen-watcher.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: zen-watcher
+            port:
+              number: 8080
+EOF
+    echo -e "${CYAN}   Zen Watcher ingress created${NC}"
 fi
 
-# VictoriaMetrics can use port-forward (less critical)
-timeout 10 kubectl port-forward -n ${NAMESPACE} svc/victoriametrics ${VICTORIA_METRICS_PORT}:8428 --address=0.0.0.0 > /tmp/vm-pf.log 2>&1 &
-VM_PF_PID=$!
-sleep 2
+echo -e "${GREEN}✓${NC} Ingress resources created"
+echo -e "${CYAN}   Grafana: http://grafana.local (or http://localhost:${INGRESS_HTTP_PORT} with Host header)${NC}"
+echo -e "${CYAN}   VictoriaMetrics: http://victoriametrics.local${NC}"
 
-echo -e "${GREEN}✓${NC} Service access configured"
-
-# Wait for Grafana to be fully ready and VERIFY it works
-echo -e "${YELLOW}→${NC} Waiting for Grafana to be fully ready and verifying access..."
+# Wait for Grafana to be fully ready and VERIFY it works via ingress
+echo -e "${YELLOW}→${NC} Waiting for Grafana to be fully ready and verifying ingress access..."
 GRAFANA_READY=false
-for i in {1..90}; do
-    HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" http://localhost:${GRAFANA_ACCESS_PORT}/api/health 2>/dev/null || echo "000")
+for i in {1..60}; do
+    # Test via ingress with Host header
+    HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" -H "Host: grafana.local" http://localhost:${INGRESS_HTTP_PORT}/api/health 2>/dev/null || echo "000")
     if [ "$HTTP_CODE" = "200" ]; then
-        HEALTH_RESPONSE=$(timeout 3 curl -s http://localhost:${GRAFANA_ACCESS_PORT}/api/health 2>/dev/null || echo "")
+        HEALTH_RESPONSE=$(timeout 3 curl -s -H "Host: grafana.local" http://localhost:${INGRESS_HTTP_PORT}/api/health 2>/dev/null || echo "")
         if echo "$HEALTH_RESPONSE" | grep -q "ok\|database"; then
-            echo -e "${GREEN}✓${NC} Grafana is ready and responding (HTTP ${HTTP_CODE})"
+            echo -e "${GREEN}✓${NC} Grafana is ready and responding via ingress (HTTP ${HTTP_CODE})"
             GRAFANA_READY=true
-        break
-    fi
+            break
+        fi
     elif [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
         # These codes mean Grafana is up but requires auth - that's fine!
-        echo -e "${GREEN}✓${NC} Grafana is ready (HTTP ${HTTP_CODE} - auth required, which is expected)"
+        echo -e "${GREEN}✓${NC} Grafana is ready via ingress (HTTP ${HTTP_CODE} - auth required)"
         GRAFANA_READY=true
         break
     fi
     if [ $((i % 10)) -eq 0 ]; then
-        echo -e "${CYAN}  [DEBUG] Still waiting... (${i}/90 seconds, HTTP code: ${HTTP_CODE})${NC}"
+        echo -e "${CYAN}  [DEBUG] Still waiting... (${i}/60 seconds, HTTP code: ${HTTP_CODE})${NC}"
     fi
     sleep 1
 done
 
 if [ "$GRAFANA_READY" = false ]; then
-    echo -e "${YELLOW}⚠${NC}  Grafana may not be fully ready, but continuing...${NC}"
+    echo -e "${YELLOW}⚠${NC}  Grafana may not be fully ready via ingress, but continuing...${NC}"
     echo -e "${CYAN}   [DEBUG] Last HTTP code: ${HTTP_CODE}${NC}"
 fi
 
-# Final verification - try to login to confirm credentials work
-echo -e "${CYAN}   [DEBUG] Verifying credentials work...${NC}"
-LOGIN_TEST=$(timeout 5 curl -s -X POST http://localhost:${GRAFANA_ACCESS_PORT}/api/login \
-    -H "Content-Type: application/json" \
-    -d "{\"user\":\"zen\",\"password\":\"${GRAFANA_PASSWORD}\"}" 2>/dev/null || echo "ERROR")
+# Final verification - try to login via ingress
+echo -e "${CYAN}   [DEBUG] Verifying credentials via ingress...${NC}"
+LOGIN_TEST=$(timeout 5 curl -s -X POST -H "Host: grafana.local" -H "Content-Type: application/json" \
+    -d "{\"user\":\"zen\",\"password\":\"${GRAFANA_PASSWORD}\"}" \
+    http://localhost:${INGRESS_HTTP_PORT}/api/login 2>/dev/null || echo "ERROR")
 if echo "$LOGIN_TEST" | grep -q "Logged in\|message.*success"; then
-    echo -e "${GREEN}✓${NC} Credentials verified - login successful"
+    echo -e "${GREEN}✓${NC} Credentials verified via ingress - login successful"
 elif echo "$LOGIN_TEST" | grep -q "Invalid"; then
     echo -e "${YELLOW}⚠${NC}  Login test failed - password may be incorrect${NC}"
 else
@@ -1448,9 +1474,9 @@ fi
 
 show_section_time "Grafana configuration"
 
-# Configure Grafana datasource (with timeout to prevent hanging)
+# Configure Grafana datasource via ingress (with timeout to prevent hanging)
 echo -e "${YELLOW}→${NC} Configuring VictoriaMetrics datasource..."
-DATASOURCE_RESULT=$(timeout 10 curl -s -X POST http://localhost:${GRAFANA_ACCESS_PORT}/api/datasources \
+DATASOURCE_RESULT=$(timeout 10 curl -s -X POST -H "Host: grafana.local" \
     -H "Content-Type: application/json" \
     -u zen:${GRAFANA_PASSWORD} \
     -d '{
@@ -1463,7 +1489,8 @@ DATASOURCE_RESULT=$(timeout 10 curl -s -X POST http://localhost:${GRAFANA_ACCESS
             "timeInterval": "15s",
             "httpMethod": "POST"
         }
-    }' 2>&1 || echo "timeout or error")
+    }' \
+    http://localhost:${INGRESS_HTTP_PORT}/api/datasources 2>&1 || echo "timeout or error")
 
 if echo "$DATASOURCE_RESULT" | grep -q "Datasource added\|already exists\|success"; then
     echo -e "${GREEN}✓${NC} Datasource configured"
@@ -1471,15 +1498,16 @@ else
     echo -e "${YELLOW}⚠${NC}  Datasource configuration skipped (Grafana may need manual setup)"
 fi
 
-# Import dashboard (with timeout to prevent hanging)
+# Import dashboard via ingress (with timeout to prevent hanging)
 echo -e "${YELLOW}→${NC} Importing Zen Watcher dashboard..."
 if [ -f "config/dashboards/zen-watcher-dashboard.json" ]; then
     DASHBOARD_RESULT=$(timeout 10 cat config/dashboards/zen-watcher-dashboard.json | \
     jq '{dashboard: ., overwrite: true, message: "Demo Import"}' | \
-    curl -s -X POST http://localhost:${GRAFANA_ACCESS_PORT}/api/dashboards/db \
+    curl -s -X POST -H "Host: grafana.local" \
         -H "Content-Type: application/json" \
         -u zen:${GRAFANA_PASSWORD} \
-        -d @- 2>&1 || echo "timeout or error")
+        -d @- \
+        http://localhost:${INGRESS_HTTP_PORT}/api/dashboards/db 2>&1 || echo "timeout or error")
     
     if echo "$DASHBOARD_RESULT" | grep -q "success"; then
         echo -e "${GREEN}✓${NC} Dashboard imported successfully"
@@ -1502,33 +1530,58 @@ echo -e "${GREEN}  🎉 Demo Environment Ready!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${CYAN}  📊 GRAFANA ACCESS${NC}"
+echo -e "${CYAN}  📊 SERVICE ACCESS (via Nginx Ingress)${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "  ${GREEN}URL:${NC}     ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}${NC}"
-echo -e "  ${GREEN}Username:${NC} ${CYAN}zen${NC}"
-echo -e "  ${GREEN}Password:${NC} ${CYAN}${GRAFANA_PASSWORD}${NC}"
+echo -e "${CYAN}  Option 1: Add to /etc/hosts (recommended)${NC}"
+echo -e "    ${YELLOW}sudo sh -c 'echo \"127.0.0.1 grafana.local victoriametrics.local zen-watcher.local\" >> /etc/hosts'${NC}"
+echo ""
+echo -e "${CYAN}  Option 2: Use Host header with curl${NC}"
+echo -e "    ${YELLOW}curl -H 'Host: grafana.local' http://localhost:${INGRESS_HTTP_PORT}/api/health${NC}"
+echo ""
+echo -e "${CYAN}  GRAFANA:${NC}"
+echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://grafana.local${NC} (or http://localhost:${INGRESS_HTTP_PORT} with Host header)"
+echo -e "    ${GREEN}Username:${NC} ${CYAN}zen${NC}"
+echo -e "    ${GREEN}Password:${NC} ${CYAN}${GRAFANA_PASSWORD}${NC}"
+echo -e "    ${GREEN}Dashboard:${NC} ${CYAN}http://grafana.local/d/zen-watcher${NC}"
+echo ""
+echo -e "${CYAN}  VICTORIAMETRICS:${NC}"
+echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://victoriametrics.local${NC}"
+echo -e "    ${GREEN}Metrics API:${NC} ${CYAN}http://victoriametrics.local/api/v1/query${NC}"
+echo -e "    ${GREEN}VMUI:${NC}    ${CYAN}http://victoriametrics.local/vmui${NC}"
+echo -e "    ${GREEN}Prometheus:${NC} ${CYAN}http://victoriametrics.local/prometheus${NC}"
 echo ""
 
-# Final verification that the URL actually works
-echo -e "${CYAN}   [DEBUG] Final verification of Grafana URL...${NC}"
-FINAL_CHECK=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" http://localhost:${GRAFANA_ACCESS_PORT}/api/health 2>/dev/null || echo "000")
-if [ "$FINAL_CHECK" = "200" ] || [ "$FINAL_CHECK" = "401" ] || [ "$FINAL_CHECK" = "403" ]; then
-    echo -e "${GREEN}✓${NC} ${CYAN}URL VERIFIED: http://localhost:${GRAFANA_ACCESS_PORT} is accessible (HTTP ${FINAL_CHECK})${NC}"
-else
-    echo -e "${RED}✗${NC} ${YELLOW}WARNING: URL may not be accessible (HTTP ${FINAL_CHECK})${NC}"
-    echo -e "${CYAN}   [DEBUG] Checking port-forward status...${NC}"
-    if [ -n "${GRAFANA_PF_PID:-}" ]; then
-        if ps -p ${GRAFANA_PF_PID} > /dev/null 2>&1; then
-            echo -e "${CYAN}   [DEBUG] Port-forward PID ${GRAFANA_PF_PID} is running${NC}"
-        else
-            echo -e "${YELLOW}⚠${NC}  Port-forward PID ${GRAFANA_PF_PID} is not running${NC}"
-        fi
-    fi
+# Check if Zen Watcher has ingress
+if timeout 10 kubectl get ingress zen-watcher -n ${NAMESPACE} 2>/dev/null | grep -q zen-watcher; then
+    echo -e "${CYAN}  ZEN WATCHER:${NC}"
+    echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://zen-watcher.local${NC}"
+    echo -e "    ${GREEN}Metrics:${NC} ${CYAN}http://zen-watcher.local/metrics${NC}"
+    echo -e "    ${GREEN}Health:${NC}  ${CYAN}http://zen-watcher.local/health${NC}"
+    echo ""
 fi
 
-echo -e "  ${GREEN}Dashboard:${NC} ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/d/zen-watcher${NC}"
-echo ""
+# Final verification that Grafana is accessible via ingress
+echo -e "${CYAN}   [DEBUG] Final verification of Grafana via ingress...${NC}"
+FINAL_CHECK=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" -H "Host: grafana.local" http://localhost:${INGRESS_HTTP_PORT}/api/health 2>/dev/null || echo "000")
+if [ "$FINAL_CHECK" = "200" ] || [ "$FINAL_CHECK" = "401" ] || [ "$FINAL_CHECK" = "403" ]; then
+    echo -e "${GREEN}✓${NC} ${CYAN}Grafana VERIFIED via ingress: http://grafana.local (HTTP ${FINAL_CHECK})${NC}"
+    echo ""
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}  ✅✅✅ WORKING GRAFANA URL AND CREDENTIALS ✅✅✅${NC}"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "  ${GREEN}URL:${NC}     ${CYAN}http://grafana.local${NC} (or http://localhost:${INGRESS_HTTP_PORT} with Host: grafana.local)"
+    echo -e "  ${GREEN}Username:${NC} ${CYAN}zen${NC}"
+    echo -e "  ${GREEN}Password:${NC} ${CYAN}${GRAFANA_PASSWORD}${NC}"
+    echo ""
+    echo -e "${GREEN}✅ VERIFIED: Grafana is accessible and working!${NC}"
+    echo ""
+else
+    echo -e "${YELLOW}⚠${NC}  Grafana may not be accessible yet (HTTP ${FINAL_CHECK})"
+    echo -e "${CYAN}   Try: curl -H 'Host: grafana.local' http://localhost:${INGRESS_HTTP_PORT}/api/health${NC}"
+    echo ""
+fi
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 if [ $TOTAL_MINUTES -gt 0 ]; then
     echo -e "  ${GREEN}⏱  Deployment Time:${NC} ${CYAN}${TOTAL_MINUTES}m ${TOTAL_SECONDS}s${NC}"
@@ -1542,14 +1595,16 @@ echo ""
 if [ -n "${GRAFANA_PF_PID:-}" ]; then
     echo $GRAFANA_PF_PID > /tmp/zen-demo-grafana.pid
 fi
-echo $VM_PF_PID > /tmp/zen-demo-vm.pid
+if [ -n "${VM_PF_PID:-}" ]; then
+    echo $VM_PF_PID > /tmp/zen-demo-vm.pid
+fi
 
 # Trap Ctrl+C to cleanup
 cleanup() {
     echo ""
-    echo -e "${YELLOW}→${NC} Stopping port-forwards..."
-    [ -n "${GRAFANA_PF_PID:-}" ] && kill $GRAFANA_PF_PID 2>/dev/null || true
-    [ -n "${VM_PF_PID:-}" ] && kill $VM_PF_PID 2>/dev/null || true
+    echo -e "${YELLOW}→${NC} Stopping port-forwards (if any)..."
+    [ -n "${GRAFANA_PF_PID:-}" ] && kill ${GRAFANA_PF_PID} 2>/dev/null || true
+    [ -n "${VM_PF_PID:-}" ] && kill ${VM_PF_PID} 2>/dev/null || true
     rm -f /tmp/zen-demo-*.pid
     echo -e "${GREEN}✓${NC} Port-forwards stopped"
     echo ""
