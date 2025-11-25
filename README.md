@@ -1,7 +1,7 @@
 # Zen Watcher
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Go Version](https://img.shields.io/badge/Go-1.22+-00ADD8?logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://go.dev/)
 
 > **Kubernetes Observation Collector: Turn Any Signal into a CRD**
 
@@ -44,10 +44,19 @@ Collects events from popular security and compliance tools:
 - Read-only filesystem
 - Minimal footprint (~15MB image, <10m CPU, <50MB RAM)
 - Pod Security Standards (restricted)
+- **Zero egress**: No outbound network traffic, no external dependencies
+- **Zero secrets**: No credentials or API keys required
 
 ---
 
 ## 🏗️ Architecture
+
+**Why Modular?** The modular architecture makes zen-watcher easy to extend and maintain:
+
+- **🎯 Community Contributions**: Add a new processor (`wiz_processor.go`) and register it in `factory.go`—no need to understand the entire codebase.
+- **🧪 Testing Made Simple**: Test components in isolation with mocks (`configmap_poller.go` with mock K8s client, `http.go` with `httptest`).
+- **🚀 Future-Proof**: New event sources slot into `pkg/watcher/` or create new packages without refactoring.
+- **⚡ Low Maintenance**: Orchestrate modules instead of maintaining monolithic code—each component has clear boundaries.
 
 ```mermaid
 graph TB
@@ -76,7 +85,7 @@ graph TB
     
     subgraph "Your Integration"
         J[Custom Controller<br/>Watch CRDs]
-        K[Export to System<br/>SIEM, Dashboard, etc]
+        K[Sink Controllers<br/>Slack, PagerDuty, SIEM, etc]
         L[kubectl<br/>Query Events]
     end
     
@@ -353,6 +362,57 @@ curl http://localhost:9090/metrics
 
 ---
 
+## 🔌 Extending Zen Watcher
+
+**Zen Watcher stays pure**: Only watches sources → writes Observation CRDs. Zero egress, zero secrets, zero external dependencies.
+
+**But the Observation CRD is a universal signal format** — and that opens the door for others to react to those observations:
+
+### Community-Driven Sink Controllers
+
+You can build lightweight "sink" controllers that:
+- Watch the `Observation` CRD
+- Filter by category, severity, source, labels, etc.
+- Forward to external systems:
+  - 📢 **Slack**
+  - 🚨 **PagerDuty**
+  - 🛠️ **ServiceNow**
+  - 📊 **Datadog / Splunk / SIEMs**
+  - 📧 **Email**
+  - 🔔 **Custom webhooks**
+
+### Example Sink Controller Structure
+
+```go
+pkg/sink/
+├── sink.go          // interface
+├── slack.go         // implements Sink for Slack
+├── pagerduty.go      // implements Sink for PagerDuty
+└── controller.go    // watches Observations, routes to sinks
+```
+
+### Why This Works
+
+1. **Zen Watcher core stays pure**
+   - Only watches sources → writes Observation CRs
+   - Zero outbound traffic
+   - Zero secrets
+   - Zero config for external systems
+
+2. **Sink controllers are separate, optional components**
+   - Deploy only if needed
+   - Use SealedSecrets or external secret managers for credentials
+   - Can be built by the community or enterprise users
+
+3. **Creates an ecosystem**
+   - "If you can watch a CRD, you can act on it."
+   - Enterprise users can build their own sinks without waiting
+   - Follows the Prometheus Alertmanager / Flux / Crossplane pattern: core is minimal; ecosystem extends it
+
+**See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on building sink controllers.**
+
+---
+
 ## 🤝 Contributing
 
 Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
@@ -366,5 +426,5 @@ Apache License 2.0 - See [LICENSE](LICENSE) for details.
 ---
 
 **Repository:** github.com/kube-zen/zen-watcher  
-**Go Version:** 1.22+  
+**Go Version:** 1.24+  
 **Status:** ✅ Production-ready, standalone, independently useful

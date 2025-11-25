@@ -59,17 +59,13 @@ spec:
             status:
               type: object
               properties:
-                synced:
+                processed:
                   type: boolean
-                  description: "Whether this event has been synced to SaaS"
-                lastSyncAttempt:
+                  description: "Whether this event has been processed"
+                lastProcessedAt:
                   type: string
                   format: date-time
-                syncError:
-                  type: string
-                saasEventId:
-                  type: string
-                  description: "Event ID in SaaS (after successful sync)"
+                  description: "Timestamp when event was last processed"
       subresources:
         status: {}
       additionalPrinterColumns:

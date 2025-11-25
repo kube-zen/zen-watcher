@@ -16,11 +16,13 @@ Zen Watcher is a Kubernetes-native security event aggregator that consolidates e
 
 ### Key Characteristics
 
-- **Standalone**: Works independently, no external SaaS required
+- **Standalone**: Works completely independently, no external services required
+- **Pure & Secure**: Zero egress traffic, zero secrets, zero external dependencies
 - **Kubernetes-native**: Stores data as CRDs in etcd, no external database
 - **Modular**: Each tool watcher is independent and can be enabled/disabled
 - **Efficient**: <10m CPU, <50MB RAM under normal load
 - **Observable**: Prometheus metrics, structured logging, health endpoints
+- **Extensible**: Observation CRD enables ecosystem of sink controllers (Slack, PagerDuty, SIEMs, etc.)
 
 ---
 
@@ -36,10 +38,12 @@ Zen Watcher is a Kubernetes-native security event aggregator that consolidates e
 - Standard RBAC for access control
 - kubectl-compatible
 
-### 3. **Extensible**
-- Easy to add new tool watchers
-- Webhook endpoints for push-based tools
-- ConfigMap-based for batch processing tools
+### 3. **Extensible & Modular**
+- **Informer-based processors** for CRD sources (real-time)
+- **Webhook processors** for push-based tools (real-time)
+- **ConfigMap processors** for batch tools (periodic)
+- Easy to add new watchers by implementing processor interfaces
+- Follows Kubernetes controller best practices
 
 ### 4. **Observable**
 - Prometheus metrics for monitoring
@@ -56,12 +60,36 @@ Zen Watcher is a Kubernetes-native security event aggregator that consolidates e
 
 ## Component Architecture
 
+### Why This Architecture?
+
+The modular design delivers tangible benefits:
+
+**🎯 Community Contributions Become Trivial**
+- Want to add Wiz support? Add a `wiz_processor.go` and register it in `factory.go`.
+- No need to understand the entire codebase—just implement one processor interface.
+- Each processor is self-contained and independently testable.
+
+**🧪 Testing is No Longer Scary**
+- Test `configmap_poller.go` with a mock K8s client—no cluster needed.
+- Test `http.go` with `net/http/httptest`—standard Go testing tools.
+- Each component can be tested in isolation, making unit tests practical.
+
+**🚀 Future Extensions Slot Cleanly**
+- New event source? Choose the right processor type and implement it.
+- Need a new package? Create `pkg/sync/` or any other module—the architecture scales.
+- Extensions don't require refactoring existing code.
+
+**⚡ Your Personal Bandwidth is Freed**
+- You no longer maintain code—you orchestrate it.
+- Each module has clear responsibilities and boundaries.
+- Changes are localized, reducing risk and review time.
+
 ### Main Components
 
 ```
 zen-watcher/
 ├── cmd/zen-watcher/
-│   └── main.go              # Main entry point (1200 lines)
+│   └── main.go              # Main entry point (~143 lines, wiring only)
 ├── build/
 │   └── Dockerfile           # Multi-stage optimized build
 ├── deployments/
@@ -74,25 +102,50 @@ zen-watcher/
 
 ### Watcher System
 
-Each security tool has a dedicated watcher that runs in a 30-second loop:
+Zen Watcher uses a **modular, scalable architecture** following Kubernetes best practices:
 
-1. **Auto-Detection Phase**
-   - Checks if tool pods exist in expected namespaces
-   - Updates tool state (Installed/NotInstalled)
-   - Logs detection status
+#### Event Source Types
 
-2. **Event Processing Phase**
-   - Fetches events from tool (CRD, ConfigMap, or webhook)
-   - Deduplicates against existing ZenAgentEvents
-   - Creates new events only if not already processed
+**1. Informer-Based (CRD Sources) - Real-Time**
+- **Kyverno**: PolicyReports via Kubernetes informers
+- **Trivy**: VulnerabilityReports via Kubernetes informers
+- **Benefits**: Real-time processing, automatic reconnection, efficient resource usage
+- **Implementation**: `pkg/watcher/informer_handlers.go`
 
-3. **Deduplication Keys**
-   - Trivy: `namespace/kind/name/vulnID`
-   - Kyverno: `namespace/kind/name/policy/rule`
-   - Kube-bench: `testNumber`
-   - Checkov: `checkId/resource`
-   - Falco: `rule/pod/output[:50]`
-   - Audit: `auditID`
+**2. Webhook-Based (Push Sources) - Real-Time**
+- **Falco**: HTTP webhook (`/falco/webhook`)
+- **Audit**: Kubernetes audit webhook (`/audit/webhook`)
+- **Benefits**: Immediate event delivery, no polling overhead
+- **Implementation**: `pkg/watcher/webhook_processor.go`
+
+**3. ConfigMap-Based (Batch Sources) - Periodic**
+- **Kube-bench**: ConfigMap polling (5-minute interval)
+- **Checkov**: ConfigMap polling (5-minute interval)
+- **Note**: These tools don't emit CRDs, so polling is appropriate
+
+#### Modular Processor Architecture
+
+Each event source type has a dedicated processor:
+
+- **EventProcessor**: Handles CRD-based events (Kyverno, Trivy)
+  - Thread-safe deduplication
+  - Automatic event creation
+  - Prometheus metrics integration
+
+- **WebhookProcessor**: Handles webhook-based events (Falco, Audit)
+  - Per-source deduplication maps
+  - Event filtering and classification
+  - Non-blocking channel processing
+
+#### Deduplication Strategy
+
+Each processor maintains its own deduplication map:
+- **Trivy**: `namespace/kind/name/vulnID`
+- **Kyverno**: `namespace/kind/name/policy/rule`
+- **Falco**: `rule/pod/output[:50]`
+- **Audit**: `auditID`
+- **Kube-bench**: `testNumber`
+- **Checkov**: `checkId/resource`
 
 ---
 
@@ -107,7 +160,7 @@ VulnerabilityReport (aquasecurity.github.io/v1alpha1)
   ↓
 Extract HIGH/CRITICAL vulnerabilities
   ↓
-Create ZenAgentEvent with category=security
+Create Observation with category=security
 ```
 
 **Kyverno:**
@@ -116,7 +169,7 @@ PolicyReport (wgpolicyk8s.io/v1alpha2)
   ↓
 Extract fail results from scope field
   ↓
-Create ZenAgentEvent with category=security
+Create Observation with category=security
 ```
 
 #### B. ConfigMap-Based Sources (Pull Model)
@@ -126,7 +179,7 @@ ConfigMap with app=kube-bench label
   ↓
 Parse JSON, extract FAIL results
   ↓
-Create ZenAgentEvent with category=compliance
+Create Observation with category=compliance
 ```
 
 **Checkov:**
@@ -135,7 +188,7 @@ ConfigMap with app=checkov label
   ↓
 Parse JSON, extract failed_checks[]
   ↓
-Create ZenAgentEvent with category=security
+Create Observation with category=security
 ```
 
 #### C. Webhook-Based Sources (Push Model)
@@ -147,7 +200,7 @@ Buffer in channel (100 events)
   ↓
 Process in main loop
   ↓
-Create ZenAgentEvent with category=security
+Create Observation with category=security
 ```
 
 **Kubernetes Audit:**
@@ -158,7 +211,7 @@ Buffer in channel (200 events)
   ↓
 Filter important events (deletes, secrets, RBAC)
   ↓
-Create ZenAgentEvent with category=compliance
+Create Observation with category=compliance
 ```
 
 ### 2. Event Processing Pipeline
@@ -190,7 +243,7 @@ Create ZenAgentEvent with category=compliance
          │
          ▼
 ┌─────────────────┐
-│ CRD Creation    │ ← Create ZenAgentEvent
+│ CRD Creation    │ ← Create Observation
 └────────┬────────┘
          │
          ▼
@@ -201,11 +254,11 @@ Create ZenAgentEvent with category=compliance
 
 ### 3. Storage Model
 
-All events are stored as `ZenAgentEvent` CRDs:
+All events are stored as `Observation` CRDs:
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1
-kind: ZenAgentEvent
+kind: Observation
 metadata:
   generateName: trivy-vuln-
   namespace: default
@@ -268,8 +321,7 @@ securityContext:
   - `policies.kyverno.io`
 
 - **Create** access to:
-  - `zenagentevents.zen.kube-zen.io`
-  - `zenagentremediations.zen.kube-zen.io`
+  - `observations.zen.kube-zen.io`
 
 **No write access to any workload resources**
 
@@ -352,7 +404,7 @@ AUDIT_BUFFER_SIZE=200
 4. Check NetworkPolicy: `kubectl describe networkpolicy zen-watcher`
 
 **High Memory Usage?**
-1. Check event count: `kubectl get zenagentevents -A --no-headers | wc -l`
+1. Check event count: `kubectl get observations -A --no-headers | wc -l`
 2. Implement TTL: Add `metadata.ttl` to CRD
 3. Reduce dedup window: Set `DEDUP_WINDOW=1h`
 
@@ -367,39 +419,88 @@ AUDIT_BUFFER_SIZE=200
 
 ### Adding a New Watcher
 
-1. **Implement detection logic:**
-   ```go
-   // Check if tool is installed
-   pods, err := clientSet.CoreV1().Pods(toolNamespace).List(...)
-   if len(pods.Items) > 0 {
-       toolStates["mytool"].Installed = true
-   }
-   ```
+Zen Watcher follows a **modular architecture** making it easy to add new event sources. Choose the appropriate processor type:
 
-2. **Implement event fetching:**
-   ```go
-   // Fetch events from tool
-   reports, err := client.Resource(gvr).List(...)
-   ```
+#### Option 1: CRD-Based Source (Recommended - Use Informers)
 
-3. **Implement deduplication:**
-   ```go
-   // Create unique key for event
-   key := fmt.Sprintf("%s/%s/%s", namespace, name, eventID)
-   if existingKeys[key] { continue }
-   ```
+If your tool emits Kubernetes CRDs, use the informer-based approach:
 
-4. **Create ZenAgentEvent:**
-   ```go
-   event := &unstructured.Unstructured{
-       Object: map[string]interface{}{
-           "apiVersion": "zen.kube-zen.io/v1",
-           "kind": "ZenAgentEvent",
-           // ... spec
-       },
-   }
-   dynClient.Resource(eventGVR).Create(ctx, event, ...)
-   ```
+```go
+// 1. Add GVR definition
+myToolGVR := schema.GroupVersionResource{
+    Group:    "mytool.example.com",
+    Version:  "v1",
+    Resource: "myreports",
+}
+
+// 2. Create informer
+informer := informerFactory.ForResource(myToolGVR).Informer()
+
+// 3. Add event handlers
+informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+    AddFunc: func(obj interface{}) {
+        report := obj.(*unstructured.Unstructured)
+        eventProcessor.ProcessMyToolReport(ctx, report)
+    },
+    UpdateFunc: func(oldObj, newObj interface{}) {
+        report := newObj.(*unstructured.Unstructured)
+        eventProcessor.ProcessMyToolReport(ctx, report)
+    },
+})
+
+// 4. Implement processor method in EventProcessor
+func (ep *EventProcessor) ProcessMyToolReport(ctx context.Context, report *unstructured.Unstructured) {
+    // Extract data, deduplicate, create Observation
+}
+```
+
+**Benefits**: Real-time processing, automatic reconnection, efficient
+
+#### Option 2: Webhook-Based Source
+
+For tools that can send HTTP webhooks:
+
+```go
+// 1. Add webhook handler
+http.HandleFunc("/mytool/webhook", func(w http.ResponseWriter, r *http.Request) {
+    var event map[string]interface{}
+    json.NewDecoder(r.Body).Decode(&event)
+    myToolChan <- event
+    w.WriteHeader(http.StatusOK)
+})
+
+// 2. Process in main loop
+case event := <-myToolChan:
+    webhookProcessor.ProcessMyToolEvent(ctx, event)
+
+// 3. Implement processor method
+func (wp *WebhookProcessor) ProcessMyToolEvent(ctx context.Context, event map[string]interface{}) error {
+    // Filter, deduplicate, create Observation
+}
+```
+
+**Benefits**: Immediate delivery, no polling
+
+#### Option 3: ConfigMap-Based Source
+
+For batch tools that write to ConfigMaps:
+
+```go
+// 1. Periodic polling (5-minute interval)
+case <-configMapTicker.C:
+    configMaps, err := clientSet.CoreV1().ConfigMaps(namespace).List(...)
+    // Parse and process
+```
+
+**Use when**: Tool doesn't emit CRDs and batch processing is acceptable
+
+### Best Practices
+
+1. **Use Informers for CRDs**: Always prefer informers over polling for CRD-based sources
+2. **Thread-Safe Deduplication**: Use mutex-protected maps in processors
+3. **Prometheus Metrics**: Integrate metrics in processor methods
+4. **Error Handling**: Log errors but don't crash on individual event failures
+5. **Modular Design**: Keep processors independent and testable
 
 ### Adding a New Webhook Endpoint
 
@@ -431,6 +532,68 @@ AUDIT_BUFFER_SIZE=200
    ```
 
 ---
+
+## Extensibility: Sink Controllers
+
+Zen Watcher follows a **pure core, extensible ecosystem** pattern:
+
+### Core Principles
+
+1. **Zen Watcher stays pure**
+   - Only watches sources → writes Observation CRDs
+   - Zero outbound network traffic
+   - Zero secrets or credentials
+   - Zero configuration for external systems
+
+2. **Observation CRD is a universal signal format**
+   - Standardized structure (category, severity, source, labels)
+   - Kubernetes-native (stored in etcd)
+   - Watchable by any controller
+   - Filterable by any field
+
+3. **Community-driven sink controllers extend functionality**
+   - Separate, optional components
+   - Watch `Observation` CRDs
+   - Filter by category, severity, source, labels, etc.
+   - Forward to external systems:
+     - 📢 Slack
+     - 🚨 PagerDuty
+     - 🛠️ ServiceNow
+     - 📊 Datadog / Splunk / SIEMs
+     - 📧 Email
+     - 🔔 Custom webhooks
+
+### Sink Controller Architecture
+
+```go
+// pkg/sink/sink.go
+type Sink interface {
+    Send(ctx context.Context, observation *Observation) error
+}
+
+// pkg/sink/slack.go
+type SlackSink struct {
+    webhookURL string
+    client     *http.Client
+}
+
+// pkg/sink/controller.go
+type SinkController struct {
+    sinks []Sink
+    // Watches Observation CRDs
+    // Filters by config
+    // Routes to appropriate sinks
+}
+```
+
+### Benefits
+
+- **You don't build integrations** — the community does
+- **You don't complicate Zen Watcher** — it stays lean and trusted
+- **You create an ecosystem**: "If you can watch a CRD, you can act on it"
+- **Enterprise users can build their own sinks** without waiting
+
+This follows the proven pattern of Prometheus Alertmanager, Flux, and Crossplane: **core is minimal; ecosystem extends it**.
 
 ## Future Architecture Considerations
 

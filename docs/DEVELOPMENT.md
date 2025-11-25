@@ -7,13 +7,14 @@ This guide covers setting up a development environment for zen-watcher with all 
 ## Prerequisites
 
 ### Required
-- **Go 1.22+** - [Download](https://go.dev/dl/)
-- **Docker** - [Install](https://docs.docker.com/get-docker/)
+- **Go 1.24+** - [Download](https://go.dev/dl/)
+- **Docker or Podman** - [Docker Install](https://docs.docker.com/get-docker/) | [Podman Install](https://podman.io/getting-started/installation)
 - **kubectl** - [Install](https://kubernetes.io/docs/tasks/tools/)
 - **Git** - Version control
 
 ### Recommended
-- **k3d** - Local Kubernetes clusters ([Install](https://k3d.io/#installation))
+- **Local Kubernetes cluster** - For testing (k3d, minikube, kind, or any Kubernetes cluster)
+  - k3d is a simple option: [Install](https://k3d.io/#installation)
 - **govulncheck** - Go vulnerability scanner
 - **staticcheck** - Go linter
 - **gosec** - Go security scanner
@@ -126,10 +127,10 @@ make test       # Run tests
 make security   # Security scans
 ```
 
-### 3. Build and Test Docker Image
+### 3. Build and Test Container Image (Docker/Podman)
 
 ```bash
-# Build image
+# Build image (uses Docker or Podman)
 make docker-build
 
 # Scan for vulnerabilities
@@ -145,8 +146,10 @@ make docker-all
 ### 4. Test Locally
 
 ```bash
-# Create local k3d cluster
-k3d cluster create zen-dev
+# Connect to your Kubernetes cluster (any distribution)
+# For local testing, you can use k3d, minikube, kind, etc.
+# Example with k3d (optional):
+#   k3d cluster create zen-dev
 
 # Deploy zen-watcher
 kubectl apply -f deployments/crds/
@@ -160,7 +163,7 @@ kubectl apply -f test-manifests/trivy-operator.yaml
 kubectl apply -f test-manifests/kyverno.yaml
 
 # Verify events are created
-kubectl get zenagentevents -A
+kubectl get observations -A
 ```
 
 ### 5. Commit
@@ -216,9 +219,9 @@ make security       # Run security scans
 make all            # Run everything
 ```
 
-### Docker
+### Container Build (Docker/Podman)
 ```bash
-make docker-build   # Build Docker image
+make docker-build   # Build container image (Docker or Podman)
 make docker-scan    # Scan image with Trivy
 make docker-sbom    # Generate SBOM
 make docker-sign    # Sign with Cosign
@@ -329,6 +332,46 @@ make docker-verify
 
 ## Testing
 
+### Architecture Overview
+
+Zen Watcher uses a **modular, scalable architecture** with clear separation of concerns. This design delivers real benefits:
+
+**🎯 Community Contributions Become Trivial**
+- Want to add Wiz support? Add a `wiz_processor.go` and register it in `factory.go`.
+- No need to understand the entire codebase—just implement one processor interface.
+
+**🧪 Testing is No Longer Scary**
+- Test `configmap_poller.go` with a mock K8s client—no cluster needed.
+- Test `http.go` with `net/http/httptest`—standard Go testing tools.
+- Each component can be tested in isolation.
+
+**🚀 Future Extensions Slot Cleanly**
+- New event source? Choose the right processor type and implement it.
+- Need a new package? Create `pkg/sync/` or any other module—the architecture scales.
+
+**⚡ Your Personal Bandwidth is Freed**
+- You no longer maintain code—you orchestrate it.
+- Each module has clear responsibilities and boundaries.
+
+**Architecture Components:**
+
+1. **Informer-Based (CRD Sources)**: Real-time processing via Kubernetes informers
+   - Kyverno PolicyReports
+   - Trivy VulnerabilityReports
+   - Implemented in `pkg/watcher/informer_handlers.go`
+
+2. **Webhook-Based (Push Sources)**: Immediate event delivery via HTTP webhooks
+   - Falco alerts
+   - Kubernetes audit events
+   - Implemented in `pkg/watcher/webhook_processor.go`
+
+3. **ConfigMap-Based (Batch Sources)**: Periodic polling (5-minute interval)
+   - Kube-bench reports
+   - Checkov reports
+   - Implemented in `pkg/watcher/configmap_poller.go`
+
+**See [CONTRIBUTING.md](../CONTRIBUTING.md) for detailed guidelines on adding new watchers.**
+
 ### Unit Tests (Future)
 
 Currently, zen-watcher doesn't have unit tests due to its integration nature. Future testing strategy:
@@ -347,8 +390,10 @@ go tool cover -html=coverage.out
 ### Integration Testing
 
 ```bash
-# 1. Create test cluster
-k3d cluster create zen-test
+# 1. Connect to your Kubernetes cluster (any distribution)
+#    For local testing, you can use k3d, minikube, kind, etc.
+#    Example with k3d (optional):
+#      k3d cluster create zen-test
 
 # 2. Deploy zen-watcher
 kubectl apply -f deployments/crds/
@@ -361,10 +406,10 @@ kubectl apply -f test-manifests/
 sleep 60
 
 # 5. Verify
-kubectl get zenagentevents -A
+kubectl get observations -A
 
-# 6. Cleanup
-k3d cluster delete zen-test
+# 6. Cleanup (if using local cluster)
+#    k3d cluster delete zen-test
 ```
 
 ### Manual Smoke Test
@@ -434,7 +479,7 @@ kubectl logs -n zen-system deployment/zen-watcher --tail=100 -f
 ### 1. Update Version
 
 ```bash
-# Update version in main.go
+# Update version in main.go (or use build-time version injection)
 sed -i 's/v1.0.19/v1.0.20/' cmd/zen-watcher/main.go
 
 # Update CHANGELOG.md
@@ -492,13 +537,12 @@ docker push kubezen/zen-watcher:latest
 ### 5. Update Helm Charts
 
 ```bash
-# Update zen-agent/values.yaml
-cd /path/to/zen-rufus
-vim charts/zen-agent/values.yaml
+# Update helm chart values.yaml
+vim helm-charts/charts/zen-watcher/values.yaml
 # Change: tag: "1.0.20"
 
 # Commit and push
-git add charts/zen-agent/values.yaml
+git add helm-charts/charts/zen-watcher/values.yaml
 git commit -m "zen-watcher v1.0.20"
 git push
 ```

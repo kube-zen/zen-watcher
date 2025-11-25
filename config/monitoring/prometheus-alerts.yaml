@@ -62,7 +62,7 @@ spec:
     interval: 30s
     rules:
     - alert: HighCriticalEventRate
-      expr: rate(zen_watcher_events_total{severity="CRITICAL"}[5m]) > 10
+      expr: rate(zen_watcher_events_total{severity="HIGH"}[5m]) > 10
       for: 5m
       labels:
         severity: critical
@@ -70,70 +70,43 @@ spec:
         category: events
       annotations:
         summary: "High rate of critical security events"
-        runbook_url: "https://github.com/your-org/zen-watcher/wiki/Runbook-HighCriticalEventRate"
+        description: "zen-watcher is creating {{ $value }} HIGH severity events per second"
     
-    - alert: TooManyCriticalEvents
-      expr: sum(zen_watcher_active_events{severity="CRITICAL"}) > 100
-      for: 10m
-      labels:
-        severity: critical
-        component: zen-watcher
-        category: events
-      annotations:
-        summary: "Too many unresolved critical events"
-    
-    - alert: TooManyHighSeverityEvents
-      expr: sum(zen_watcher_active_events{severity="HIGH"}) > 500
-      for: 15m
-      labels:
-        severity: warning
-        component: zen-watcher
-        category: events
-      annotations:
-        summary: "Too many high severity events"
-    
-    - alert: EventWriteFailures
-      expr: rate(zen_watcher_events_failures_total[5m]) > 1
-      for: 5m
-      labels:
-        severity: warning
-        component: zen-watcher
-        category: events
-      annotations:
-        summary: "High rate of event write failures"
-
-  - name: zen-watcher-watchers
-    interval: 30s
-    rules:
-    - alert: WatcherDisabled
-      expr: zen_watcher_watcher_status == 0
-      for: 5m
-      labels:
-        severity: info
-        component: zen-watcher
-        category: watchers
-      annotations:
-        summary: "Watcher is disabled"
-    
-    - alert: WatcherErrors
-      expr: rate(zen_watcher_watcher_errors_total[5m]) > 0.1
-      for: 5m
-      labels:
-        severity: warning
-        component: zen-watcher
-        category: watchers
-      annotations:
-        summary: "Watcher experiencing errors"
-    
-    - alert: SlowWatcherScrape
-      expr: histogram_quantile(0.95, sum(rate(zen_watcher_scrape_duration_seconds_bucket[5m])) by (le, watcher)) > 30
+    - alert: HighEventProcessingLatency
+      expr: histogram_quantile(0.99, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le, source)) > 5
       for: 10m
       labels:
         severity: warning
         component: zen-watcher
         category: performance
       annotations:
-        summary: "Watcher scrape is slow"
+        summary: "High event processing latency"
+        description: "p99 event processing latency is {{ $value }}s for {{ $labels.source }}"
+
+  - name: zen-watcher-informers
+    interval: 30s
+    rules:
+    - alert: InformerCacheNotSynced
+      expr: zen_watcher_informer_cache_synced == 0
+      for: 5m
+      labels:
+        severity: warning
+        component: zen-watcher
+        category: informers
+      annotations:
+        summary: "Informer cache not synced"
+        description: "Informer cache for {{ $labels.resource }} is not synced"
+    
+    - alert: InformerCacheSyncFailure
+      expr: zen_watcher_informer_cache_synced == 0
+      for: 10m
+      labels:
+        severity: critical
+        component: zen-watcher
+        category: informers
+      annotations:
+        summary: "Informer cache sync failure"
+        description: "Informer cache for {{ $labels.resource }} has been unsynced for more than 10 minutes"
 
   - name: zen-watcher-operations
     interval: 30s
@@ -149,15 +122,16 @@ spec:
         summary: "High CRD operation failure rate"
         runbook_url: "https://github.com/your-org/zen-watcher/wiki/Runbook-CRDOperationFailures"
     
-    - alert: SlowCRDOperations
-      expr: histogram_quantile(0.95, sum(rate(zen_watcher_crd_operation_duration_seconds_bucket[5m])) by (le, operation)) > 5
+    - alert: SlowEventProcessing
+      expr: histogram_quantile(0.95, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le, source)) > 5
       for: 10m
       labels:
         severity: warning
         component: zen-watcher
         category: performance
       annotations:
-        summary: "CRD operations are slow"
+        summary: "Event processing is slow"
+        description: "p95 event processing latency is {{ $value }}s for {{ $labels.source }}"
     
     - alert: HTTPErrorRate
       expr: rate(zen_watcher_http_requests_total{status=~"5.."}[5m]) > 0.1
@@ -209,7 +183,7 @@ spec:
     - alert: EventProcessingSLOViolation
       expr: |
         (
-          histogram_quantile(0.99, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le))
+          histogram_quantile(0.99, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le, source))
           > 5
         )
       for: 10m
@@ -219,14 +193,13 @@ spec:
         category: slo
       annotations:
         summary: "Event processing SLO violation"
+        description: "p99 event processing latency is {{ $value }}s for {{ $labels.source }} (SLO: 5s)"
     
-    # Availability SLO: 99.9% uptime
+    # Availability SLO: 99.9% uptime (based on up metric from Prometheus)
     - alert: AvailabilitySLOViolation
       expr: |
         (
-          sum(rate(zen_watcher_health_status[5m]))
-          / 
-          sum(rate(zen_watcher_health_status[5m]) + rate(zen_watcher_health_status{} == 0[5m]))
+          avg_over_time(up{job="zen-watcher"}[5m])
         ) < 0.999
       for: 5m
       labels:
@@ -235,5 +208,6 @@ spec:
         category: slo
       annotations:
         summary: "Availability SLO violation"
+        description: "zen-watcher availability is below 99.9% SLO"
 
 

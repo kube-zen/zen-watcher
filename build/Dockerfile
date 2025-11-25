@@ -1,5 +1,5 @@
 # Build stage - Use official Go image with build tools
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Install build dependencies
 # git: Required for go mod download with private repos
@@ -74,6 +74,7 @@ ENTRYPOINT ["/zen-watcher"]
 # Metadata labels
 LABEL org.opencontainers.image.title="zen-watcher"
 LABEL org.opencontainers.image.description="Kubernetes security event aggregator"
+ARG VERSION=1.0.19
 LABEL org.opencontainers.image.version="${VERSION}"
 LABEL org.opencontainers.image.source="https://github.com/kube-zen/zen-watcher"
 LABEL org.opencontainers.image.licenses="Apache-2.0"

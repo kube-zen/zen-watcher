@@ -1169,7 +1169,7 @@
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
-      "description": "Watch loop performance histogram",
+      "description": "Event processing performance histogram (informer-based and webhook-based)",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -1253,8 +1253,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "histogram_quantile(0.99, rate(zen_watcher_loop_duration_seconds_bucket[5m]))",
-          "legendFormat": "p99",
+          "expr": "histogram_quantile(0.99, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le, source))",
+          "legendFormat": "p99 - {{source}}",
           "refId": "A"
         },
         {
@@ -1262,8 +1262,8 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "histogram_quantile(0.95, rate(zen_watcher_loop_duration_seconds_bucket[5m]))",
-          "legendFormat": "p95",
+          "expr": "histogram_quantile(0.95, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le, source))",
+          "legendFormat": "p95 - {{source}}",
           "refId": "B"
         },
         {
@@ -1271,12 +1271,12 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "histogram_quantile(0.50, rate(zen_watcher_loop_duration_seconds_bucket[5m]))",
-          "legendFormat": "p50",
+          "expr": "histogram_quantile(0.50, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le, source))",
+          "legendFormat": "p50 - {{source}}",
           "refId": "C"
         }
       ],
-      "title": "Watch Loop Performance (Latency Percentiles)",
+      "title": "Event Processing Performance (Latency Percentiles)",
       "type": "timeseries"
     },
     {
@@ -1449,7 +1449,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "container_memory_working_set_bytes{pod=~\"zen-agent-zen-watcher.*\", namespace=\"zen-cluster\"}",
+          "expr": "container_memory_working_set_bytes{pod=~\"zen-watcher.*\", namespace=\"zen-cluster\"}",
           "legendFormat": "{{pod}}",
           "refId": "A"
         }
@@ -1537,7 +1537,7 @@
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "expr": "rate(container_cpu_usage_seconds_total{pod=~\"zen-agent-zen-watcher.*\", namespace=\"zen-cluster\"}[5m])",
+          "expr": "rate(container_cpu_usage_seconds_total{pod=~\"zen-watcher.*\", namespace=\"zen-cluster\"}[5m])",
           "legendFormat": "{{pod}}",
           "refId": "A"
         }

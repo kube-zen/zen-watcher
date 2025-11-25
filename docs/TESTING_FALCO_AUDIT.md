@@ -1,0 +1,375 @@
+# Testing Falco and Kubernetes Audit Integration
+
+This guide explains how to test zen-watcher's integration with Falco and Kubernetes Audit logs.
+
+## Prerequisites
+
+- Working Kubernetes cluster (kind, minikube, k3d, or cloud cluster)
+- `kubectl` configured and authenticated
+- `helm` installed
+- `docker` or `podman` for building images
+
+## Step 1: Create a Kubernetes Cluster
+
+### Option A: Using kind
+
+```bash
+# Install kind (if not already installed)
+curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64
+chmod +x ./kind
+sudo mv ./kind /usr/local/bin/kind
+
+# Create cluster
+kind create cluster --name zen-test
+
+# Set context
+kubectl config use-context kind-zen-test
+```
+
+### Option B: Using minikube
+
+```bash
+# Start minikube
+minikube start
+
+# Set context
+kubectl config use-context minikube
+```
+
+### Option C: Using k3d
+
+```bash
+# Create cluster
+k3d cluster create zen-test
+
+# Set context
+kubectl config use-context k3d-zen-test
+```
+
+## Step 2: Build and Load zen-watcher Image
+
+```bash
+cd /path/to/zen-watcher
+
+# Build image
+docker build -t kubezen/zen-watcher:test -f build/Dockerfile .
+
+# Load into cluster
+# For kind:
+kind load docker-image kubezen/zen-watcher:test --name zen-test
+
+# For minikube:
+minikube image load kubezen/zen-watcher:test
+
+# For k3d:
+k3d image import kubezen/zen-watcher:test -c zen-test
+```
+
+## Step 3: Deploy zen-watcher
+
+```bash
+# Apply CRD
+kubectl apply -f deployments/crds/observation_crd.yaml
+
+# Create namespace
+kubectl create namespace zen-system
+
+# Deploy zen-watcher
+cat > /tmp/zen-watcher-deploy.yaml <<'EOF'
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zen-watcher
+  namespace: zen-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zen-watcher
+rules:
+- apiGroups: ["*"]
+  resources: ["*"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["zen.kube-zen.io"]
+  resources: ["observations"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: zen-watcher
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: zen-watcher
+subjects:
+- kind: ServiceAccount
+  name: zen-watcher
+  namespace: zen-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zen-watcher
+  namespace: zen-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zen-watcher
+  template:
+    metadata:
+      labels:
+        app: zen-watcher
+    spec:
+      serviceAccountName: zen-watcher
+      containers:
+      - name: zen-watcher
+        image: kubezen/zen-watcher:test
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 9090
+          name: metrics
+        env:
+        - name: LOG_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zen-watcher
+  namespace: zen-system
+spec:
+  selector:
+    app: zen-watcher
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+  - port: 9090
+    targetPort: 9090
+    name: metrics
+EOF
+
+kubectl apply -f /tmp/zen-watcher-deploy.yaml
+
+# Wait for pod to be ready
+kubectl wait --for=condition=ready pod -l app=zen-watcher -n zen-system --timeout=120s
+
+# Verify
+kubectl get pods -n zen-system
+```
+
+## Step 4: Install Falco
+
+```bash
+# Create namespace
+kubectl create namespace falco-system
+
+# Add Falco Helm repo
+helm repo add falcosecurity https://falcosecurity.github.io/charts
+helm repo update
+
+# Install Falco with webhook output to zen-watcher
+helm install falco falcosecurity/falco \
+  --namespace falco-system \
+  --set falco.grpc.enabled=true \
+  --set falco.httpOutput.enabled=true \
+  --set falco.httpOutput.url=http://zen-watcher.zen-system.svc.cluster.local:8080/falco/webhook \
+  --wait --timeout=5m
+
+# Verify Falco is running
+kubectl get pods -n falco-system
+```
+
+**Note**: On k3d, Falco may not work due to kernel module/eBPF limitations. Use minikube or kind for Falco testing.
+
+## Step 5: Test Falco Integration
+
+### Trigger a Falco Event
+
+```bash
+# Run nmap scan (triggers Falco rule)
+kubectl run test-scan --image=alpine --rm -i --restart=Never -- sh -c "apk add --no-cache nmap && nmap -sS 127.0.0.1"
+```
+
+### Check Observations
+
+```bash
+# Wait a few seconds for processing
+sleep 10
+
+# List observations
+kubectl get observations -n zen-system
+
+# View details
+kubectl get observations -n zen-system -o json | jq -r '.items[] | "\(.metadata.name) | Source: \(.spec.source) | Category: \(.spec.category) | Severity: \(.spec.severity)"'
+
+# Filter by source
+kubectl get observations -n zen-system -o json | jq '.items[] | select(.spec.source == "falco")'
+```
+
+### Check Logs
+
+```bash
+# Zen-watcher logs
+kubectl logs -n zen-system -l app=zen-watcher --tail=50 | grep -E "(falco|webhook|Observation)"
+
+# Falco logs
+kubectl logs -n falco-system -l app.kubernetes.io/name=falco --tail=20
+```
+
+## Step 6: Test Kubernetes Audit Webhook
+
+### Configure Audit Logging (for kind/minikube)
+
+For kind, you need to configure audit logging at cluster creation. For minikube, audit logging can be configured via API server flags.
+
+### Test Audit Webhook Directly
+
+```bash
+# Port-forward to zen-watcher
+kubectl port-forward -n zen-system svc/zen-watcher 8080:8080 &
+
+# Test health endpoint
+curl http://localhost:8080/health
+
+# Send test audit event
+curl -X POST http://localhost:8080/audit/webhook \
+  -H "Content-Type: application/json" \
+  -d '{
+    "kind": "Event",
+    "apiVersion": "audit.k8s.io/v1",
+    "level": "Request",
+    "auditID": "test-123",
+    "stage": "ResponseComplete",
+    "requestURI": "/api/v1/namespaces",
+    "verb": "get",
+    "user": {
+      "username": "test-user"
+    },
+    "sourceIPs": ["127.0.0.1"],
+    "responseStatus": {
+      "code": 200
+    }
+  }'
+
+# Check if observation was created
+sleep 5
+kubectl get observations -n zen-system -o json | jq '.items[] | select(.spec.source == "audit")'
+```
+
+## Step 7: Verify Integration
+
+### Count Observations by Source
+
+```bash
+# Total observations
+kubectl get observations -n zen-system --no-headers | wc -l
+
+# By source
+kubectl get observations -n zen-system -o json | jq -r '.items[].spec.source' | sort | uniq -c
+```
+
+### Expected Results
+
+- **Falco**: Observations with `source: falco`, `category: security`, severity based on Falco rule
+- **Audit**: Observations with `source: audit`, `category: compliance`, severity based on audit level
+
+### Check Metrics
+
+```bash
+# Port-forward metrics port
+kubectl port-forward -n zen-system svc/zen-watcher 9090:9090 &
+
+# Query metrics
+curl http://localhost:9090/metrics | grep zen_watcher
+```
+
+## Troubleshooting
+
+### Zen-watcher Pod Not Starting
+
+```bash
+# Check pod status
+kubectl describe pod -n zen-system -l app=zen-watcher
+
+# Check logs
+kubectl logs -n zen-system -l app=zen-watcher
+
+# Check events
+kubectl get events -n zen-system --sort-by='.lastTimestamp'
+```
+
+### Falco Not Sending Events
+
+```bash
+# Check Falco pod status
+kubectl get pods -n falco-system
+
+# Check Falco logs
+kubectl logs -n falco-system -l app.kubernetes.io/name=falco
+
+# Verify webhook URL is correct
+kubectl get configmap -n falco-system -o yaml | grep -A 5 httpOutput
+```
+
+### No Observations Created
+
+```bash
+# Check zen-watcher logs for errors
+kubectl logs -n zen-system -l app=zen-watcher --tail=100 | grep -E "(ERROR|WARN|webhook)"
+
+# Verify webhook endpoints are accessible
+kubectl exec -n zen-system -it deployment/zen-watcher -- wget -qO- http://localhost:8080/health || echo "Health check failed"
+
+# Check RBAC permissions
+kubectl auth can-i create observations --as=system:serviceaccount:zen-system:zen-watcher -n zen-system
+```
+
+### Falco on k3d
+
+Falco requires kernel module or eBPF support, which k3d's lightweight kernel may not provide. Use minikube or kind for Falco testing.
+
+## Cleanup
+
+```bash
+# Delete Falco
+helm uninstall falco -n falco-system
+kubectl delete namespace falco-system
+
+# Delete zen-watcher
+kubectl delete -f /tmp/zen-watcher-deploy.yaml
+kubectl delete namespace zen-system
+kubectl delete crd observations.zen.kube-zen.io
+
+# Delete cluster (if using kind/minikube/k3d)
+# kind delete cluster --name zen-test
+# minikube delete
+# k3d cluster delete zen-test
+```
+
+## Summary
+
+This testing guide covers:
+- ✅ Deploying zen-watcher to a Kubernetes cluster
+- ✅ Installing Falco with webhook output to zen-watcher
+- ✅ Testing Falco event generation and observation creation
+- ✅ Testing Kubernetes Audit webhook integration
+- ✅ Verifying observations are created correctly
+- ✅ Troubleshooting common issues
+
+The integration is working when:
+1. Falco events trigger Observations with `source: falco`
+2. Audit webhook calls create Observations with `source: audit`
+3. All Observations are stored in the `zen-system` namespace
+4. Metrics show webhook requests and event processing

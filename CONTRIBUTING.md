@@ -1,118 +1,256 @@
 # Contributing to Zen Watcher
 
-Thank you for your interest in contributing to Zen Watcher! We welcome contributions from the community.
+Thank you for your interest in contributing to Zen Watcher! This document outlines best practices and guidelines for adding new watchers or improving the codebase.
 
-## Code of Conduct
+## Architecture Principles
 
-This project adheres to a code of conduct that we expect all contributors to follow. Please be respectful and constructive in all interactions.
+Zen Watcher follows **Kubernetes controller best practices** and uses a **modular, scalable architecture**. This design makes contributions easy:
 
-## How to Contribute
+**🎯 Adding a New Watcher is Trivial**
+- Want to add Wiz support? Add a `wiz_processor.go` and register it in `factory.go`.
+- No need to understand the entire codebase—just implement one processor interface.
+- Each processor is self-contained and independently testable.
 
-### Reporting Bugs
+**🧪 Testing is Straightforward**
+- Test `configmap_poller.go` with a mock K8s client—no cluster needed.
+- Test `http.go` with `net/http/httptest`—standard Go testing tools.
+- Each component can be tested in isolation, making unit tests practical.
 
-If you find a bug, please open an issue with:
-- A clear description of the problem
-- Steps to reproduce
-- Expected vs actual behavior
-- Your environment (Kubernetes version, Zen Watcher version, etc.)
+**🚀 Future Extensions Slot Cleanly**
+- New event source? Choose the right processor type and implement it.
+- Need a new package? Create `pkg/sync/` or any other module—the architecture scales.
+- Extensions don't require refactoring existing code.
 
-### Suggesting Features
+**⚡ Maintenance is Minimal**
+- You no longer maintain code—you orchestrate it.
+- Each module has clear responsibilities and boundaries.
+- Changes are localized, reducing risk and review time.
 
-We welcome feature suggestions! Please open an issue with:
-- A clear description of the feature
-- Use cases and benefits
-- Any implementation ideas you might have
+**Technical Architecture:**
 
-### Submitting Pull Requests
+### Event Source Types
 
-1. **Fork the repository**
-2. **Create a feature branch** from `main`:
-   ```bash
-   git checkout -b feature/your-feature-name
+1. **Informer-Based (CRD Sources)** - Use for tools that emit Kubernetes CRDs
+   - Real-time event processing
+   - Automatic reconnection on errors
+   - Efficient resource usage
+   - Example: Kyverno PolicyReports, Trivy VulnerabilityReports
+
+2. **Webhook-Based (Push Sources)** - Use for tools that can send HTTP webhooks
+   - Immediate event delivery
+   - No polling overhead
+   - Example: Falco, Kubernetes Audit Logs
+
+3. **ConfigMap-Based (Batch Sources)** - Use for tools that write to ConfigMaps
+   - Periodic polling (5-minute interval)
+   - Use when CRDs or webhooks aren't available
+   - Example: Kube-bench, Checkov
+
+## Building Sink Controllers
+
+**Zen Watcher stays pure**: It only watches sources and writes Observation CRDs. Zero egress, zero secrets.
+
+**But you can build sink controllers** that watch Observations and forward them to external systems (Slack, PagerDuty, SIEMs, etc.).
+
+### Sink Controller Pattern
+
+1. **Watch Observation CRDs**
+   ```go
+   informer := factory.ForResource(observationGVR).Informer()
+   informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+       AddFunc: func(obj interface{}) {
+           obs := obj.(*unstructured.Unstructured)
+           // Filter and route to sinks
+       },
+   })
    ```
 
-3. **Make your changes**:
-   - Follow Go best practices and conventions
-   - Add tests for new functionality
-   - Update documentation as needed
-   - Ensure all tests pass
-
-4. **Commit your changes**:
-   ```bash
-   git commit -m "Add feature: description of your changes"
+2. **Implement Sink Interface**
+   ```go
+   type Sink interface {
+       Send(ctx context.Context, observation *Observation) error
+   }
    ```
 
-5. **Push to your fork**:
-   ```bash
-   git push origin feature/your-feature-name
-   ```
+3. **Filter by Criteria**
+   - Category (security, compliance, etc.)
+   - Severity (HIGH, MEDIUM, LOW)
+   - Source (trivy, kyverno, falco, etc.)
+   - Labels (custom filtering)
 
-6. **Open a Pull Request**:
-   - Provide a clear description of the changes
-   - Reference any related issues
-   - Ensure CI checks pass
+4. **Forward to External Systems**
+   - Use SealedSecrets or external secret managers for credentials
+   - Handle rate limiting and retries
+   - Log failures without blocking
 
-## Development Setup
+### Example: Slack Sink
 
-### Prerequisites
+```go
+// pkg/sink/slack.go
+type SlackSink struct {
+    webhookURL string
+    client     *http.Client
+}
 
-- Go 1.22 or later
-- Kubernetes cluster (for testing)
-- kubectl configured
-
-### Building
-
-```bash
-cd src
-go build -o zen-watcher .
+func (s *SlackSink) Send(ctx context.Context, obs *Observation) error {
+    // Extract fields from Observation
+    // Format Slack message
+    // POST to webhook
+}
 ```
 
-### Running Tests
+### Deployment
 
-```bash
-go test ./...
+- Deploy as separate, optional component
+- Use RBAC to grant read access to Observations
+- Store credentials in SealedSecrets or external secret manager
+- Can be deployed per-namespace or cluster-wide
+
+**See [ARCHITECTURE.md](ARCHITECTURE.md) for more details on the extensibility pattern.**
+
+---
+
+## Adding a New Watcher
+
+### Step 1: Choose the Right Processor Type
+
+**If your tool emits CRDs → Use Informers**
+```go
+// Add to main.go informer setup
+informer := informerFactory.ForResource(myToolGVR).Informer()
+informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+    AddFunc: func(obj interface{}) {
+        eventProcessor.ProcessMyTool(ctx, obj.(*unstructured.Unstructured))
+    },
+})
 ```
 
-### Running Locally
-
-```bash
-export KUBECONFIG=~/.kube/config
-export WATCH_NAMESPACE=zen-system
-./zen-watcher
+**If your tool can send webhooks → Use WebhookProcessor**
+```go
+// Add webhook handler
+http.HandleFunc("/mytool/webhook", ...)
+// Process in main loop
+case event := <-myToolChan:
+    webhookProcessor.ProcessMyTool(ctx, event)
 ```
 
-## Code Style
+**If your tool writes ConfigMaps → Use periodic polling**
+```go
+// Add to configMapTicker handler
+configMaps, err := clientSet.CoreV1().ConfigMaps(namespace).List(...)
+```
 
-- Follow standard Go formatting (`gofmt`)
-- Use meaningful variable and function names
-- Add comments for complex logic
-- Keep functions focused and concise
+### Step 2: Implement Processor Method
 
-## Testing
+Add your processing logic to the appropriate processor:
 
-- Write unit tests for new functionality
-- Ensure existing tests pass
-- Add integration tests where appropriate
+**For EventProcessor (CRD sources):**
+```go
+func (ep *EventProcessor) ProcessMyTool(ctx context.Context, report *unstructured.Unstructured) {
+    // 1. Extract data from report
+    // 2. Check deduplication
+    // 3. Create Observation
+    // 4. Update metrics
+}
+```
 
-## Documentation
+**For WebhookProcessor (webhook sources):**
+```go
+func (wp *WebhookProcessor) ProcessMyTool(ctx context.Context, event map[string]interface{}) error {
+    // 1. Filter/validate event
+    // 2. Check deduplication
+    // 3. Create Observation
+    // 4. Update metrics
+    return nil
+}
+```
 
-- Update README.md for user-facing changes
-- Add inline code comments for complex logic
-- Update API documentation if CRD schemas change
+### Step 3: Add Deduplication
 
-## Review Process
+Each processor maintains thread-safe deduplication maps:
 
-1. All submissions require review
-2. We aim to review PRs within 3-5 business days
-3. Address review feedback promptly
-4. Once approved, maintainers will merge your PR
+```go
+// In EventProcessor or WebhookProcessor
+dedupKey := fmt.Sprintf("%s/%s/%s", namespace, resource, eventID)
+ep.mu.RLock()
+exists := ep.dedupKeys["mytool"][dedupKey]
+ep.mu.RUnlock()
+if exists {
+    return // Skip duplicate
+}
+```
 
-## License
+### Step 4: Create Observation
 
-By contributing, you agree that your contributions will be licensed under the Apache License 2.0.
+Follow the standard event structure:
+
+```go
+event := &unstructured.Unstructured{
+    Object: map[string]interface{}{
+        "apiVersion": "zen.kube-zen.io/v1",
+        "kind":       "Observation",
+        "metadata": map[string]interface{}{
+            "generateName": "mytool-",
+            "namespace":    namespace,
+            "labels": map[string]interface{}{
+                "source":   "mytool",
+                "category": "security", // or "compliance"
+                "severity": "HIGH",     // HIGH, MEDIUM, LOW
+            },
+        },
+        "spec": map[string]interface{}{
+            "source":     "mytool",
+            "category":   "security",
+            "severity":   "HIGH",
+            "eventType":  "my-event-type",
+            "detectedAt": time.Now().Format(time.RFC3339),
+            "resource": map[string]interface{}{
+                "kind":      "Pod",
+                "name":      resourceName,
+                "namespace": namespace,
+            },
+            "details": map[string]interface{}{
+                // Tool-specific details
+            },
+        },
+    },
+}
+```
+
+### Step 5: Update Metrics
+
+Integrate Prometheus metrics:
+
+```go
+if ep.eventsTotal != nil {
+    ep.eventsTotal.WithLabelValues("mytool", "security", "HIGH").Inc()
+}
+```
+
+## Code Quality Standards
+
+### Best Practices
+
+1. **Use Informers for CRDs**: Always prefer informers over polling
+2. **Thread Safety**: Protect shared state with mutexes
+3. **Error Handling**: Log errors but don't crash on individual failures
+4. **Modularity**: Keep processors independent and testable
+5. **Documentation**: Add comments explaining tool-specific logic
+
+### Testing
+
+- Test deduplication logic
+- Test event creation with various inputs
+- Test error handling
+- Verify Prometheus metrics
+
+### Apache 2.0 License
+
+Zen Watcher is licensed under Apache 2.0. All contributions must:
+- Be compatible with Apache 2.0
+- Include appropriate license headers
+- Follow the project's coding standards
 
 ## Questions?
 
-Feel free to open an issue for any questions about contributing!
-
-
+Open an issue or check existing documentation in `docs/` for more details.

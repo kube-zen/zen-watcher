@@ -1,7 +1,7 @@
 # Zen Watcher Developer Guide
 
 **Version:** 1.0.19+  
-**Go Version:** 1.22+  
+**Go Version:** 1.24+  
 **License:** Apache 2.0
 
 ---
@@ -22,11 +22,11 @@
 
 ### Prerequisites
 
-- **Go 1.22+** installed
-- **Docker** for building images
+- **Go 1.24+** installed
+- **Docker or Podman** for building images
 - **kubectl** for Kubernetes access
-- **k3d** or similar for local testing
-- Basic understanding of Kubernetes CRDs and controllers
+- **Kubernetes cluster 1.28+** (any distribution)
+- Basic understanding of Kubernetes CRDs
 
 ### Development Setup
 
@@ -49,10 +49,12 @@ export KUBECONFIG=~/.kube/config
 ### Development Environment
 
 ```bash
-# Create local k3d cluster for testing
-k3d cluster create zen-dev --agents 0 --api-port 6551
+# Connect to your Kubernetes cluster (any distribution)
+# For local testing, you can use k3d, minikube, kind, or any Kubernetes cluster
+# Example with k3d (optional, simple local option):
+#   k3d cluster create zen-dev --agents 0 --api-port 6551
 
-# Install test tools
+# Install test tools (optional, for testing integrations)
 kubectl apply -f test-manifests/trivy-operator.yaml
 kubectl apply -f test-manifests/kyverno.yaml
 
@@ -68,14 +70,32 @@ kubectl apply -f deployments/base/
 ```
 zen-watcher/
 ├── cmd/zen-watcher/
-│   └── main.go                    # Main entry point (~1200 lines)
+│   └── main.go                    # Main entry point (~143 lines, wiring only)
+│
+├── pkg/                           # Public library code
+│   ├── server/
+│   │   └── http.go               # HTTP server & webhook handlers
+│   ├── watcher/
+│   │   ├── informer_handlers.go   # EventProcessor (informer-based)
+│   │   ├── webhook_processor.go  # WebhookProcessor (webhook-based)
+│   │   ├── configmap_poller.go    # ConfigMap polling (batch-based)
+│   │   └── factory.go             # Processor factory
+│   └── metrics/
+│       └── definitions.go         # Prometheus metric definitions
+│
+├── internal/                      # Internal implementation details
+│   ├── kubernetes/
+│   │   ├── setup.go              # K8s client initialization
+│   │   └── informers.go          # Informer setup & handlers
+│   └── lifecycle/
+│       └── shutdown.go           # Signal handling & graceful shutdown
 │
 ├── build/
 │   └── Dockerfile                 # Multi-stage Docker build
 │
 ├── deployments/
 │   ├── crds/
-│   │   └── zenagent_event_crd.yaml
+│   │   └── observation_crd.yaml
 │   └── base/
 │       └── zen-watcher.yaml       # Deployment manifests
 │
@@ -105,54 +125,115 @@ zen-watcher/
 
 ## Code Architecture
 
+### Why Modular Architecture Matters
+
+The modular architecture isn't just about code organization—it fundamentally changes how you work with zen-watcher:
+
+**🎯 Community Contributions Become Trivial**
+- Want to add Wiz support? Add a `wiz_processor.go` and register it in `factory.go`.
+- No need to understand the entire codebase—just implement one processor interface.
+- Each processor is self-contained and independently testable.
+
+**🧪 Testing is No Longer Scary**
+- Test `configmap_poller.go` with a mock K8s client—no cluster needed.
+- Test `http.go` with `net/http/httptest`—standard Go testing tools.
+- Each component can be tested in isolation, making unit tests practical.
+
+**🚀 Future Extensions Slot Cleanly**
+- New event source? Choose the right processor type and implement it.
+- Need a new package? Create `pkg/sync/` or any other module—the architecture scales.
+- Extensions don't require refactoring existing code.
+
+**⚡ Your Personal Bandwidth is Freed**
+- You no longer maintain code—you orchestrate it.
+- Each module has clear responsibilities and boundaries.
+- Changes are localized, reducing risk and review time.
+
+### Modular Architecture
+
+Zen Watcher uses a **modular, scalable architecture** following Kubernetes informer patterns:
+
+#### Processor Types
+
+**1. EventProcessor (`pkg/watcher/informer_handlers.go`)**
+- Handles **CRD-based sources** (Kyverno, Trivy)
+- Uses **Kubernetes informers** for real-time event processing
+- Thread-safe deduplication with `sync.RWMutex`
+- Automatic reconnection on API server errors
+
+**2. WebhookProcessor (`pkg/watcher/webhook_processor.go`)**
+- Handles **webhook-based sources** (Falco, Audit)
+- Processes events from HTTP webhooks
+- Thread-safe deduplication per source
+- Channel-based async processing
+
+**3. ConfigMapPoller (`pkg/watcher/configmap_poller.go`)**
+- Handles **batch sources** (Kube-bench, Checkov)
+- Periodic polling (5-minute interval)
+- Used when CRDs/webhooks aren't available
+- Self-contained polling logic with proper error handling
+
 ### Main Entry Point (`cmd/zen-watcher/main.go`)
 
-The entire application is contained in a single `main.go` file (~1200 lines) for simplicity and ease of understanding.
+The main entry point is now **minimal wiring only** (~143 lines). All business logic lives in dedicated packages:
+
+```go
+func main() {
+    // 1. Setup signal handling
+    ctx, stopCh := lifecycle.SetupSignalHandler()
+    
+    // 2. Initialize components
+    m := metrics.NewMetrics()
+    clients := kubernetes.NewClients()
+    gvrs := kubernetes.NewGVRs()
+    informerFactory := kubernetes.NewInformerFactory(clients.Dynamic)
+    eventProcessor, webhookProcessor := watcher.NewProcessors(...)
+    
+    // 3. Setup informers
+    kubernetes.SetupInformers(ctx, informerFactory, gvrs, eventProcessor, stopCh)
+    
+    // 4. Create and start HTTP server
+    httpServer := server.NewServer(...)
+    httpServer.Start(ctx, &wg)
+    
+    // 5. Start background processors
+    // 6. Wait for shutdown
+    lifecycle.WaitForShutdown(ctx, &wg, cleanup)
+}
+```
 
 #### Code Structure
 
 ```go
-// Line 1-30: Package declaration and imports
-package main
-import (...)
+// 1. Initialization (lines 27-100)
+// - Create Kubernetes clients (kubernetes, dynamic)
+// - Setup Prometheus metrics
+// - Configure tool namespaces
 
-// Line 31-85: Main function setup
-func main() {
-    // 1. Initialize logging
-    // 2. Create Kubernetes clients
-    // 3. Set up signal handling
-    // 4. Configure tool namespaces
-    // 5. Start HTTP server (webhooks, health)
-    // 6. Start main watch loop
-}
-
-// Line 86-200: HTTP Server Setup
+// 2. HTTP Server Setup (lines 100-275)
 // - /health endpoint
 // - /ready endpoint
+// - /metrics endpoint (Prometheus)
 // - /falco/webhook endpoint
 // - /audit/webhook endpoint
 
-// Line 201-1200: Main Watch Loop
-// - Auto-detection (line 201-300)
-// - Trivy watcher (line 301-450)
-// - Kyverno watcher (line 451-600)
-// - Falco watcher (line 601-700)
-// - Kube-bench watcher (line 701-850)
-// - Checkov watcher (line 851-1000)
-// - Audit watcher (line 1001-1150)
-// - Metrics and cleanup (line 1151-1200)
+// 3. Processor Initialization (lines 277-282)
+// - eventProcessor := watcher.NewEventProcessor(...)
+// - webhookProcessor := watcher.NewWebhookProcessor(...)
+
+// 4. Informer Setup (lines 284-320)
+// - Kyverno PolicyReport informer
+// - Trivy VulnerabilityReport informer
+// - Start informer factory
+// - Wait for cache sync
+
+// 5. Main Loop (lines 322-400)
+// - Handle webhook channels (Falco, Audit)
+// - Periodic ConfigMap checks (Kube-bench, Checkov)
+// - Graceful shutdown
 ```
 
 #### Key Data Structures
-
-**ToolState**: Tracks detection status
-```go
-type ToolState struct {
-    Installed bool
-    Namespace string
-    LastCheck time.Time
-}
-```
 
 **Event Channels**: For webhook-based tools
 ```go
@@ -160,210 +241,313 @@ falcoAlertsChan := make(chan map[string]interface{}, 100)
 auditEventsChan := make(chan map[string]interface{}, 200)
 ```
 
-**Deduplication Maps**: Prevent duplicate events
+**Informer Factory**: For CRD-based tools
 ```go
-existingKeys := make(map[string]bool)
+informerFactory := dynamicinformer.NewDynamicSharedInformerFactory(
+    dynClient, 
+    time.Minute*30, // Resync interval
+)
 ```
 
-### Watch Loop Pattern
+**Processors**: Modular event handlers
+```go
+eventProcessor := watcher.NewEventProcessor(dynClient, eventGVR, eventsTotal)
+webhookProcessor := watcher.NewWebhookProcessor(dynClient, eventGVR, eventsTotal)
+```
 
-Each watcher follows this pattern:
+### Informer-Based Pattern (CRD Sources)
+
+For tools that emit Kubernetes CRDs (Kyverno, Trivy):
 
 ```go
-// 1. Auto-detect tool
-if toolStates["mytool"].Installed {
+// 1. Create informer factory
+informerFactory := dynamicinformer.NewDynamicSharedInformerFactory(
+    dynClient, 
+    time.Minute*30, // Resync every 30 minutes
+)
+
+// 2. Create informer for your tool's CRD
+myToolGVR := schema.GroupVersionResource{
+    Group:    "mytool.io",
+    Version:  "v1",
+    Resource: "mytoolreports",
+}
+informer := informerFactory.ForResource(myToolGVR).Informer()
+
+// 3. Add event handlers
+informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+    AddFunc: func(obj interface{}) {
+        report := obj.(*unstructured.Unstructured)
+        eventProcessor.ProcessMyTool(ctx, report)
+    },
+    UpdateFunc: func(oldObj, newObj interface{}) {
+        report := newObj.(*unstructured.Unstructured)
+        eventProcessor.ProcessMyTool(ctx, report)
+    },
+})
+
+// 4. Start informers
+informerFactory.Start(stopCh)
+cache.WaitForCacheSync(ctx.Done(), informer.HasSynced)
+```
+
+### Webhook-Based Pattern (Push Sources)
+
+For tools that can send HTTP webhooks (Falco, Audit):
+
+```go
+// 1. Create webhook handler
+http.HandleFunc("/mytool/webhook", func(w http.ResponseWriter, r *http.Request) {
+    var event map[string]interface{}
+    json.NewDecoder(r.Body).Decode(&event)
     
-    // 2. Fetch existing events for deduplication
-    existingEvents, err := dynClient.Resource(eventGVR).List(...)
-    existingKeys := make(map[string]bool)
-    for _, ev := range existingEvents.Items {
-        key := generateDedupKey(ev)
-        existingKeys[key] = true
+    // Send to channel for async processing
+    select {
+    case myToolChan <- event:
+        w.WriteHeader(http.StatusOK)
+    default:
+        w.WriteHeader(http.StatusServiceUnavailable)
     }
-    
-    // 3. Fetch new events from tool
-    reports, err := fetchToolReports(...)
-    
-    // 4. Process each report
-    for _, report := range reports {
-        // Generate dedup key
-        key := generateDedupKey(report)
-        
-        // Skip if already exists
-        if existingKeys[key] { continue }
-        
-        // Create ZenAgentEvent
-        event := createZenAgentEvent(report)
-        dynClient.Resource(eventGVR).Create(ctx, event, ...)
-        
-        // Update dedup map
-        existingKeys[key] = true
-    }
+})
+
+// 2. Process in main loop
+select {
+case event := <-myToolChan:
+    webhookProcessor.ProcessMyTool(ctx, event)
+default:
+    // No events
 }
 ```
 
 ---
 
+## Extending Zen Watcher with Sink Controllers
+
+**Important**: Zen Watcher core stays pure — it only watches sources and writes Observation CRDs. Zero egress, zero secrets, zero external dependencies.
+
+**But the Observation CRD is a universal signal format**, and you can build lightweight "sink" controllers that:
+
+- Watch `Observation` CRDs
+- Filter by category, severity, source, labels, etc.
+- Forward to external systems:
+  - 📢 Slack
+  - 🚨 PagerDuty
+  - 🛠️ ServiceNow
+  - 📊 Datadog / Splunk / SIEMs
+  - 📧 Email
+  - 🔔 Custom webhooks
+
+### Why This Pattern Works
+
+1. **Zen Watcher stays pure**
+   - Only watches sources → writes Observation CRs
+   - Zero outbound traffic
+   - Zero secrets
+   - Zero config for external systems
+
+2. **Sink controllers are separate, optional components**
+   - Deploy only if needed
+   - Use SealedSecrets or external secret managers for credentials
+   - Can be built by the community or enterprise users
+
+3. **Creates an ecosystem**
+   - "If you can watch a CRD, you can act on it."
+   - Enterprise users can build their own sinks without waiting
+   - Follows the Prometheus Alertmanager / Flux / Crossplane pattern
+
+### Example Sink Controller Structure
+
+```go
+pkg/sink/
+├── sink.go          // interface
+├── slack.go         // implements Sink for Slack
+├── pagerduty.go     // implements Sink for PagerDuty
+└── controller.go    // watches Observations, routes to sinks
+```
+
+**See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines on building sink controllers.**
+
+---
+
 ## Adding a New Watcher
 
-### Step 1: Add Tool to Auto-Detection
+**See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed guidelines.** This section provides a quick overview.
+
+### Step 1: Choose the Right Processor Type
+
+**If your tool emits CRDs → Use EventProcessor (Informer-based)**
+- Real-time event processing
+- Automatic reconnection
+- Efficient resource usage
+- Example: Kyverno, Trivy
+
+**If your tool can send webhooks → Use WebhookProcessor**
+- Immediate event delivery
+- No polling overhead
+- Example: Falco, Audit
+
+**If your tool writes ConfigMaps → Use periodic polling**
+- 5-minute interval
+- Use when CRDs/webhooks aren't available
+- Example: Kube-bench, Checkov
+
+### Step 2: Implement Processor Method
+
+**For EventProcessor (CRD sources):**
+
+Add to `pkg/watcher/informer_handlers.go`:
 
 ```go
-// Add namespace configuration
-mytoolNs := os.Getenv("MYTOOL_NAMESPACE")
-if mytoolNs == "" {
-    mytoolNs = "mytool-system"
-}
-
-// Add to tool states
-toolStates := map[string]*ToolState{
-    // ... existing tools
-    "mytool": {Namespace: mytoolNs},
-}
-```
-
-### Step 2: Implement Auto-Detection Logic
-
-```go
-// In auto-detection phase
-log.Println("  → Listing pods in namespace 'mytool-system'...")
-mytoolPods, err := clientSet.CoreV1().Pods(mytoolNs).List(ctx, metav1.ListOptions{})
-if err != nil {
-    log.Printf("  ⚠️  Error listing pods in namespace '%s': %v", mytoolNs, err)
-    toolStates["mytool"].Installed = false
-} else if len(mytoolPods.Items) > 0 {
-    log.Printf("  ✅ MyTool detected in namespace '%s' (%d pods)", mytoolNs, len(mytoolPods.Items))
-    toolStates["mytool"].Installed = true
-    toolStates["mytool"].LastCheck = time.Now()
-}
-```
-
-### Step 3: Implement Event Watcher
-
-```go
-// Check if tool is installed
-if toolStates["mytool"].Installed {
-    log.Println("  → Checking MyTool reports...")
+func (ep *EventProcessor) ProcessMyTool(ctx context.Context, report *unstructured.Unstructured) {
+    // 1. Extract data from report
+    spec, found, _ := unstructured.NestedMap(report.Object, "spec")
+    if !found { return }
     
-    // Define GVR (Group/Version/Resource) for tool CRD
-    mytoolGVR := schema.GroupVersionResource{
-        Group:    "mytool.io",
-        Version:  "v1",
-        Resource: "mytoolreports",
+    // 2. Generate deduplication key
+    dedupKey := fmt.Sprintf("%s/%s/%s", 
+        report.GetNamespace(),
+        report.GetName(),
+        fmt.Sprintf("%v", spec["eventID"]))
+    
+    // 3. Check deduplication (thread-safe)
+    ep.mu.Lock()
+    if ep.mytoolDedup[dedupKey] {
+        ep.mu.Unlock()
+        return // Skip duplicate
+    }
+    ep.mytoolDedup[dedupKey] = true
+    ep.mu.Unlock()
+    
+    // 4. Create Observation
+    event := &unstructured.Unstructured{...}
+    _, err := ep.dynClient.Resource(ep.eventGVR).Create(ctx, event, metav1.CreateOptions{})
+    
+    // 5. Update metrics
+    if ep.eventsTotal != nil {
+        ep.eventsTotal.WithLabelValues("mytool", "security", "HIGH").Inc()
+    }
+}
+```
+
+**For WebhookProcessor (webhook sources):**
+
+Add to `pkg/watcher/webhook_processor.go`:
+
+```go
+func (wp *WebhookProcessor) ProcessMyTool(ctx context.Context, event map[string]interface{}) error {
+    // 1. Filter/validate event
+    if !shouldProcess(event) { return nil }
+    
+    // 2. Generate deduplication key
+    dedupKey := fmt.Sprintf("%s/%s", 
+        fmt.Sprintf("%v", event["id"]),
+        fmt.Sprintf("%v", event["timestamp"]))
+    
+    // 3. Check deduplication (thread-safe)
+    wp.mu.Lock()
+    if wp.dedupKeys["mytool"] == nil {
+        wp.dedupKeys["mytool"] = make(map[string]bool)
+    }
+    if wp.dedupKeys["mytool"][dedupKey] {
+        wp.mu.Unlock()
+        return nil // Skip duplicate
+    }
+    wp.dedupKeys["mytool"][dedupKey] = true
+    wp.mu.Unlock()
+    
+    // 4. Create Observation
+    event := &unstructured.Unstructured{...}
+    _, err := wp.dynClient.Resource(wp.eventGVR).Create(ctx, event, metav1.CreateOptions{})
+    
+    // 5. Update metrics
+    if wp.eventsTotal != nil {
+        wp.eventsTotal.WithLabelValues("mytool", "security", "HIGH").Inc()
     }
     
-    // Fetch reports
-    reports, err := dynClient.Resource(mytoolGVR).Namespace("").List(ctx, metav1.ListOptions{})
-    if err != nil {
-        log.Printf("  ⚠️  Cannot access MyTool reports: %v", err)
-    } else {
-        log.Printf("  ✓ Found %d MyTool reports", len(reports.Items))
-        
-        // Get existing ZenAgentEvents for deduplication
-        existingEvents, err := dynClient.Resource(eventGVR).Namespace("").List(ctx, metav1.ListOptions{
-            LabelSelector: "source=mytool,category=security",
-        })
-        existingKeys := make(map[string]bool)
-        if err != nil {
-            log.Printf("  ⚠️  Cannot load existing events for dedup: %v", err)
-        } else {
-            for _, ev := range existingEvents.Items {
-                spec, _ := ev.Object["spec"].(map[string]interface{})
-                if spec != nil {
-                    details, _ := spec["details"].(map[string]interface{})
-                    if details != nil {
-                        // Create dedup key
-                        eventID := fmt.Sprintf("%v", details["eventID"])
-                        resourceName := fmt.Sprintf("%v", details["resourceName"])
-                        key := fmt.Sprintf("%s/%s", eventID, resourceName)
-                        existingKeys[key] = true
-                    }
-                }
-            }
+    return err
+}
+```
+
+### Step 3: Register in informers.go
+
+**For Informer-based (CRD sources):**
+
+Add to `internal/kubernetes/informers.go` in the `SetupInformers` function:
+
+```go
+// Add to informer setup section
+myToolGVR := schema.GroupVersionResource{
+    Group:    "mytool.io",
+    Version:  "v1",
+    Resource: "mytoolreports",
+}
+myToolInformer := factory.ForResource(myToolGVR).Informer()
+myToolInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+    AddFunc: func(obj interface{}) {
+        report, ok := obj.(*unstructured.Unstructured)
+        if !ok {
+            log.Printf("⚠️  Invalid object type in MyTool AddFunc")
+            return
         }
-        log.Printf("  📋 Dedup: %d existing events, checking for new issues...", len(existingKeys))
-        
-        // Process each report
-        mytoolCount := 0
-        for _, report := range reports.Items {
-            // Extract fields from report
-            spec, _ := report.Object["spec"].(map[string]interface{})
-            if spec == nil { continue }
-            
-            eventID := fmt.Sprintf("%v", spec["eventID"])
-            severity := fmt.Sprintf("%v", spec["severity"])
-            description := fmt.Sprintf("%v", spec["description"])
-            
-            // Extract resource info
-            metadata, _ := report.Object["metadata"].(map[string]interface{})
-            namespace := fmt.Sprintf("%v", metadata["namespace"])
+        eventProcessor.ProcessMyTool(ctx, report)
+    },
+    UpdateFunc: func(oldObj, newObj interface{}) {
+        report, ok := newObj.(*unstructured.Unstructured)
+        if !ok {
+            log.Printf("⚠️  Invalid object type in MyTool UpdateFunc")
+            return
+        }
+        eventProcessor.ProcessMyTool(ctx, report)
+    },
+})
+
+// Add to cache sync wait:
+cache.WaitForCacheSync(ctx.Done(), ..., myToolInformer.HasSynced)
+```
+
+**For Webhook-based:**
+
+1. **Add webhook handler** in `pkg/server/http.go`:
+
+```go
+// In registerHandlers():
+http.HandleFunc("/mytool/webhook", s.handleMyToolWebhook)
+
+// Add handler method:
+func (s *Server) handleMyToolWebhook(w http.ResponseWriter, r *http.Request) {
+    var event map[string]interface{}
+    if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
+        http.Error(w, "Invalid JSON", http.StatusBadRequest)
+        return
+    }
+    
+    select {
+    case s.myToolChan <- event:
+        w.WriteHeader(http.StatusOK)
+        s.webhookMetrics.WithLabelValues("mytool", "success").Inc()
+    default:
+        w.WriteHeader(http.StatusServiceUnavailable)
+        s.webhookMetrics.WithLabelValues("mytool", "dropped").Inc()
+    }
+}
+```
+
+2. **Add channel and processing** in `main.go`:
+
+```go
+// Create channel
+myToolChan := make(chan map[string]interface{}, 100)
+
+// Pass to server
+httpServer := server.NewServer(..., myToolChan, ...)
+
+// Process in webhook processing goroutine:
+case event := <-myToolChan:
+    webhookProcessor.ProcessMyTool(ctx, event)
+```
             name := fmt.Sprintf("%v", metadata["name"])
             
             // Create dedup key
-            dedupKey := fmt.Sprintf("%s/%s", eventID, name)
-            if existingKeys[dedupKey] {
-                continue
-            }
-            
-            // Map severity to standard levels
-            mappedSeverity := "MEDIUM"
-            if severity == "critical" || severity == "high" {
-                mappedSeverity = "HIGH"
-            } else if severity == "low" {
-                mappedSeverity = "LOW"
-            }
-            
-            // Create ZenAgentEvent
-            event := &unstructured.Unstructured{
-                Object: map[string]interface{}{
-                    "apiVersion": "zen.kube-zen.io/v1",
-                    "kind":       "ZenAgentEvent",
-                    "metadata": map[string]interface{}{
-                        "generateName": "mytool-",
-                        "namespace":    namespace,
-                        "labels": map[string]interface{}{
-                            "source":   "mytool",
-                            "category": "security",
-                            "severity": mappedSeverity,
-                        },
-                    },
-                    "spec": map[string]interface{}{
-                        "source":     "mytool",
-                        "category":   "security",
-                        "severity":   mappedSeverity,
-                        "eventType":  "mytool-event",
-                        "detectedAt": time.Now().Format(time.RFC3339),
-                        "resource": map[string]interface{}{
-                            "kind":      "Pod",
-                            "name":      name,
-                            "namespace": namespace,
-                        },
-                        "details": map[string]interface{}{
-                            "eventID":     eventID,
-                            "description": description,
-                            "severity":    severity,
-                        },
-                    },
-                },
-            }
-            
-            _, err := dynClient.Resource(eventGVR).Namespace(namespace).Create(ctx, event, metav1.CreateOptions{})
-            if err != nil {
-                log.Printf("  ⚠️  Failed to create MyTool ZenAgentEvent: %v", err)
-            } else {
-                mytoolCount++
-                existingKeys[dedupKey] = true
-                lastLoopCount++
-            }
-        }
-        
-        if mytoolCount > 0 {
-            log.Printf("  ✅ Created %d NEW ZenAgentEvents from MyTool", mytoolCount)
-        }
-    }
-}
-```
-
 ### Step 4: Add RBAC Permissions
 
 Update `deployments/rbac/clusterrole.yaml`:
@@ -414,7 +598,7 @@ kubectl apply -f test-manifests/trivy-operator.yaml
 sleep 60
 
 # 4. Verify events created
-kubectl get zenagentevents -A -l source=trivy
+kubectl get observations -A -l source=trivy
 
 # 5. Check logs
 kubectl logs -n zen-system deployment/zen-watcher | grep "Trivy"
@@ -457,10 +641,10 @@ go build \
 - `-trimpath`: Remove file system paths from binary (security best practice)
 - `CGO_ENABLED=0`: Static binary, no C dependencies
 
-### Docker Build
+### Container Build (Docker/Podman)
 
 ```bash
-# Build image
+# Build image (using Docker or Podman)
 docker build \
     --no-cache \
     --pull \
@@ -468,13 +652,17 @@ docker build \
     -f build/Dockerfile \
     .
 
+# Or with Podman (drop-in replacement):
+# podman build --no-cache --pull -t kubezen/zen-watcher:1.0.19 -f build/Dockerfile .
+
 # Push to registry
 docker push kubezen/zen-watcher:1.0.19
+# Or: podman push kubezen/zen-watcher:1.0.19
 ```
 
 **Dockerfile optimization:**
 - Multi-stage build (builder + distroless)
-- Uses `golang:1.22-alpine` for small builder image
+- Uses `golang:1.24-alpine` for small builder image
 - Final image based on `gcr.io/distroless/static:nonroot` (~15MB)
 - No shell, no package manager in final image
 
@@ -636,14 +824,14 @@ kubectl describe networkpolicy zen-watcher -n zen-system
 kubectl get events -n zen-system --field-selector involvedObject.name=zen-watcher
 
 # Check CRD status
-kubectl get crd zenagentevents.zen.kube-zen.io -o yaml
+kubectl get crd observations.zen.kube-zen.io -o yaml
 ```
 
 ---
 
 ## Common Patterns
 
-### Pattern 1: Fetching CRD-Based Reports
+### Pattern 1: Using Informers for CRD-Based Reports (Recommended)
 
 ```go
 // Define GVR
@@ -653,9 +841,20 @@ gvr := schema.GroupVersionResource{
     Resource: "vulnerabilityreports",
 }
 
-// List all reports
-reports, err := dynClient.Resource(gvr).Namespace("").List(ctx, metav1.ListOptions{})
+// Create informer (in main.go setup)
+informer := informerFactory.ForResource(gvr).Informer()
+informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+    AddFunc: func(obj interface{}) {
+        eventProcessor.ProcessMyTool(ctx, obj.(*unstructured.Unstructured))
+    },
+})
+
+// Start informer
+informerFactory.Start(stopCh)
+cache.WaitForCacheSync(ctx.Done(), informer.HasSynced)
 ```
+
+**Note**: Prefer informers over `List()` for real-time processing. Use `List()` only for one-time operations or batch processing.
 
 ### Pattern 2: Parsing Nested JSON
 
@@ -673,13 +872,13 @@ for _, v := range vulnerabilities {
 }
 ```
 
-### Pattern 3: Creating ZenAgentEvents
+### Pattern 3: Creating Observations
 
 ```go
 event := &unstructured.Unstructured{
     Object: map[string]interface{}{
         "apiVersion": "zen.kube-zen.io/v1",
-        "kind":       "ZenAgentEvent",
+        "kind":       "Observation",
         "metadata": map[string]interface{}{
             "generateName": "mytool-",
             "namespace":    namespace,
@@ -718,7 +917,7 @@ _, err := dynClient.Resource(eventGVR).Namespace(namespace).Create(ctx, event, m
 
 1. Update version in `main.go`:
    ```go
-   log.Println("🚀 zen-watcher v1.0.20 (Go 1.22, Apache 2.0)")
+   log.Println("🚀 zen-watcher v1.0.22 (Go 1.24, Apache 2.0)")
    ```
 
 2. Update `CHANGELOG.md` with changes
@@ -732,25 +931,28 @@ _, err := dynClient.Resource(eventGVR).Namespace(namespace).Create(ctx, event, m
 ### Build and Push
 
 ```bash
-# Build
+# Build (using Docker or Podman)
 docker build --no-cache --pull -t kubezen/zen-watcher:1.0.20 -f build/Dockerfile .
+# Or with Podman: podman build --no-cache --pull -t kubezen/zen-watcher:1.0.20 -f build/Dockerfile .
 
 # Push
 docker push kubezen/zen-watcher:1.0.20
+# Or: podman push kubezen/zen-watcher:1.0.20
 
 # Tag as latest (optional)
 docker tag kubezen/zen-watcher:1.0.20 kubezen/zen-watcher:latest
 docker push kubezen/zen-watcher:latest
+# Or with Podman: podman tag kubezen/zen-watcher:1.0.20 kubezen/zen-watcher:latest && podman push kubezen/zen-watcher:latest
 ```
 
 ### Update Helm Charts
 
 ```bash
-# Update zen-agent/values.yaml
-sed -i 's/tag: "1.0.19"/tag: "1.0.20"/' charts/zen-agent/values.yaml
+# Update helm chart values.yaml
+sed -i 's/tag: "1.0.19"/tag: "1.0.20"/' helm-charts/charts/zen-watcher/values.yaml
 
 # Commit
-git add charts/zen-agent/values.yaml
+git add helm-charts/charts/zen-watcher/values.yaml
 git commit -m "zen-watcher v1.0.20: <summary>"
 git push
 ```

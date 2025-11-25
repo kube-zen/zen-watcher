@@ -580,9 +580,9 @@
             "matcher": {
               "id": "byRegexp",
               "options": "/high/i"
-            },
+        },
             "properties": [
-              {
+        {
                 "id": "color",
                 "value": {
                   "fixedColor": "orange",
@@ -595,18 +595,18 @@
             "matcher": {
               "id": "byRegexp",
               "options": "/medium/i"
-            },
+      },
             "properties": [
-              {
+        {
                 "id": "color",
                 "value": {
                   "fixedColor": "yellow",
                   "mode": "fixed"
-                }
+            }
               }
             ]
-          }
-        ]
+              }
+            ]
       },
       "gridPos": {
         "h": 8,
@@ -742,12 +742,12 @@
           },
           "mappings": [
             {
-              "options": {
+      "options": {
                 "0": {
                   "color": "red",
                   "index": 0,
                   "text": "Disabled"
-                },
+      },
                 "1": {
                   "color": "green",
                   "index": 1,

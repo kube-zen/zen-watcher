@@ -65,7 +65,10 @@ func (ep *EventProcessor) ProcessKyvernoPolicyReport(ctx context.Context, report
 
 	count := 0
 	for _, r := range results {
-		result := r.(map[string]interface{})
+		result, ok := r.(map[string]interface{})
+		if !ok {
+			continue
+		}
 		resultStatus := fmt.Sprintf("%v", result["result"])
 
 		// Only process failed policies
@@ -169,7 +172,10 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 
 	count := 0
 	for _, v := range vulnerabilities {
-		vuln := v.(map[string]interface{})
+		vuln, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
 		severity := vuln["severity"]
 		if severity != "HIGH" && severity != "CRITICAL" {
 			continue

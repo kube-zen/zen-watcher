@@ -261,7 +261,7 @@ sum(rate(zen_watcher_events_total[5m])) / (sum(rate(zen_watcher_events_total[5m]
 
 1. **Check Prometheus scraping:**
    ```bash
-   kubectl port-forward -n zen-cluster deployment/zen-agent-zen-watcher 8080:8080
+   kubectl port-forward -n zen-cluster deployment/zen-watcher 8080:8080
    curl http://localhost:8080/metrics | grep zen_watcher
    ```
 
@@ -283,7 +283,7 @@ sum(rate(zen_watcher_events_total[5m])) / (sum(rate(zen_watcher_events_total[5m]
 
 2. **Check metrics endpoint:**
    ```bash
-   kubectl logs -n zen-cluster deployment/zen-agent-zen-watcher | grep metrics
+   kubectl logs -n zen-cluster deployment/zen-watcher | grep metrics
    ```
 
 3. **Verify scrape interval:**

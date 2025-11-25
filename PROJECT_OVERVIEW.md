@@ -6,7 +6,7 @@ Zen Watcher is an open-source, production-ready Kubernetes operator that aggrega
 
 **Version**: 1.0.0  
 **License**: Apache 2.0  
-**Language**: Go 1.22+  
+**Language**: Go 1.24+  
 **Platform**: Kubernetes 1.28+
 
 ---
@@ -33,7 +33,7 @@ Provide a **central event aggregation hub** for Kubernetes clusters that:
 
 **Components**:
 1. **Watchers** - Monitor security tools (Trivy, Falco, Kyverno, Audit, Kube-bench)
-2. **CRD Writer** - Converts events to ZenAgentEvent CRDs
+2. **CRD Writer** - Converts events to Observation CRDs
 3. **Metrics Exporter** - Exposes Prometheus metrics
 4. **API Server** - Health checks and status endpoints
 
@@ -41,7 +41,7 @@ Provide a **central event aggregation hub** for Kubernetes clusters that:
 
 ## 📦 Key Components
 
-### ZenAgentEvent CRD
+### Observation CRD
 
 The core data model - stores all events as Kubernetes resources:
 
@@ -233,7 +233,7 @@ kubectl apply -f deploy/k8s-deployment.yaml
 
 ## 🔧 Technology Stack
 
-- **Language**: Go 1.22
+- **Language**: Go 1.24
 - **Platform**: Kubernetes 1.28+
 - **Storage**: Kubernetes CRDs
 - **Metrics**: Prometheus format

@@ -79,7 +79,7 @@ Zen Watcher uses minimal RBAC permissions:
 
 - **Read-only** access to ConfigMaps, Pods, Namespaces
 - **Read-only** access to security tool CRDs
-- **Read/Write** access only to its own ZenAgentEvent CRDs
+- **Read/Write** access only to its own Observation CRDs
 
 #### ServiceAccount
 Dedicated ServiceAccount with limited permissions.
@@ -301,7 +301,7 @@ Before deploying to production:
    # Check events
    kubectl get events -n zen-system
    
-   # Check ZenAgentEvents
+   # Check Observations
    kubectl get zenevents -n zen-system
    ```
 

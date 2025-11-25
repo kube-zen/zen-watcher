@@ -198,9 +198,9 @@ zen_watcher_watcher_status{{cluster_id="demo",watcher="audit"}} 1
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
                 if self.path == '/metrics':
-                    self.send_response(200)
-                    self.send_header("Content-Type", "text/plain; version=0.0.4")
-                    self.end_headers()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/plain; version=0.0.4")
+                self.end_headers()
                     self.wfile.write(get_metrics().encode())
                 else:
                     self.send_response(404)

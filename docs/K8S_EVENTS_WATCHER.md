@@ -25,7 +25,7 @@ eventsGVR := schema.GroupVersionResource{
 
 ### 2. Filter Important Events
 
-Only create ZenAgentEvents for significant operational issues:
+Only create Observations for significant operational issues:
 
 - **Pod Scheduling Failures**: `reason=FailedScheduling`
 - **Volume Mount Issues**: `reason=FailedMount`, `reason=FailedAttachVolume`
@@ -51,11 +51,11 @@ dedupKey := fmt.Sprintf("%s/%s/%s/%s/%s",
 - `category: operations` - Pod failures, volume issues
 - `category: security` - Only if related to security (e.g., image pull from untrusted registry)
 
-### 5. Example ZenAgentEvent
+### 5. Example Observation
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1
-kind: ZenAgentEvent
+kind: Observation
 metadata:
   generateName: k8s-event-
   namespace: default
@@ -92,7 +92,7 @@ K8S_EVENTS_ENABLED=true
 # Filter by reason (comma-separated, empty = all)
 K8S_EVENTS_FILTER_REASONS=FailedScheduling,FailedMount,NodeHasDiskPressure
 
-# Minimum event count before creating ZenAgentEvent (default: 1)
+# Minimum event count before creating Observation (default: 1)
 K8S_EVENTS_MIN_COUNT=1
 
 # Time window for event aggregation (default: 5m)

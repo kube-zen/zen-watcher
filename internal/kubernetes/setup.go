@@ -1,0 +1,82 @@
+package kubernetes
+
+import (
+	"log"
+	"time"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/dynamic/dynamicinformer"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+)
+
+// Clients holds Kubernetes client interfaces
+type Clients struct {
+	Dynamic  dynamic.Interface
+	Standard kubernetes.Interface
+	Config   *rest.Config
+}
+
+// GVRs holds GroupVersionResource definitions for security tools
+type GVRs struct {
+	Observations schema.GroupVersionResource
+	PolicyReport schema.GroupVersionResource
+	TrivyReport  schema.GroupVersionResource
+}
+
+// NewClients creates Kubernetes clients from in-cluster config
+func NewClients() (*Clients, error) {
+	log.Println("📡 Initializing Kubernetes client...")
+
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	dynClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	clientSet, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+
+	log.Println("✅ Kubernetes client ready")
+
+	return &Clients{
+		Dynamic:  dynClient,
+		Standard: clientSet,
+		Config:   config,
+	}, nil
+}
+
+// NewGVRs returns the GroupVersionResource definitions
+func NewGVRs() *GVRs {
+	return &GVRs{
+		Observations: schema.GroupVersionResource{
+			Group:    "zen.kube-zen.io",
+			Version:  "v1",
+			Resource: "observations",
+		},
+		PolicyReport: schema.GroupVersionResource{
+			Group:    "wgpolicyk8s.io",
+			Version:  "v1alpha2",
+			Resource: "policyreports",
+		},
+		TrivyReport: schema.GroupVersionResource{
+			Group:    "aquasecurity.github.io",
+			Version:  "v1alpha1",
+			Resource: "vulnerabilityreports",
+		},
+	}
+}
+
+// NewInformerFactory creates a dynamic informer factory with default resync period
+func NewInformerFactory(dynClient dynamic.Interface) dynamicinformer.DynamicSharedInformerFactory {
+	// Resync period: 30 minutes (periodic full resync for deduplication)
+	resyncPeriod := 30 * time.Minute
+	return dynamicinformer.NewDynamicSharedInformerFactory(dynClient, resyncPeriod)
+}
