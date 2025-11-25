@@ -1236,9 +1236,26 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 SECTION_START_TIME=$(date +%s)
 
+# Ensure kubeconfig is properly configured before installing ingress
+echo -e "${CYAN}   Ensuring kubeconfig is properly configured...${NC}"
+timeout 10 k3d kubeconfig merge ${CLUSTER_NAME} --kubeconfig-merge-default --kubeconfig-switch-context 2>&1 | grep -v "ERRO" > /dev/null || true
+timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${K3D_API_PORT}" 2>&1 > /dev/null || true
+timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>&1 > /dev/null || true
+timeout 5 kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data 2>&1 > /dev/null || true
+
+# Verify cluster access
+if ! timeout 10 kubectl get nodes --request-timeout=5s > /dev/null 2>&1; then
+    echo -e "${YELLOW}⚠${NC}  Cluster access issue detected, regenerating kubeconfig...${NC}"
+    timeout 10 k3d kubeconfig write ${CLUSTER_NAME} 2>&1 | grep -v "ERRO" > /dev/null || true
+    timeout 10 k3d kubeconfig merge ${CLUSTER_NAME} --kubeconfig-merge-default --kubeconfig-switch-context 2>&1 | grep -v "ERRO" > /dev/null || true
+    timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${K3D_API_PORT}" 2>&1 > /dev/null || true
+    timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>&1 > /dev/null || true
+    timeout 5 kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data 2>&1 > /dev/null || true
+fi
+
 echo -e "${YELLOW}→${NC} Installing nginx ingress controller..."
 # Add ingress-nginx helm repo if not already added
-if ! helm repo list 2>/dev/null | grep -q ingress-nginx; then
+if ! timeout 10 helm repo list 2>/dev/null | grep -q ingress-nginx; then
     timeout 30 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx 2>&1 || true
     timeout 30 helm repo update 2>&1 || true
 fi
