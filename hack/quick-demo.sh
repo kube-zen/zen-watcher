@@ -503,7 +503,7 @@ validate_cluster() {
                         ;;
                     2)
                         echo -e "${YELLOW}→${NC} Deleting existing cluster..."
-                        k3d cluster delete ${CLUSTER_NAME} || {
+                        timeout 30 k3d cluster delete ${CLUSTER_NAME} || {
                             echo -e "${RED}✗${NC} Failed to delete cluster. Please delete manually."
                             exit 1
                         }
@@ -1223,21 +1223,37 @@ for i in {1..10}; do
 done
 
 # Expose Grafana as NodePort for reliable access
-kubectl expose deployment grafana \
+timeout 10 kubectl expose deployment grafana \
     --port=3000 --target-port=3000 \
     --type=NodePort \
     -n ${NAMESPACE} 2>/dev/null || true
 
-# Get the NodePort
-GRAFANA_NODEPORT=$(kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
-if [ -z "$GRAFANA_NODEPORT" ]; then
+# Get the NodePort (with retries and timeouts)
+GRAFANA_NODEPORT=""
+for i in {1..5}; do
+    GRAFANA_NODEPORT=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
+    if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ]; then
+        break
+    fi
+    sleep 1
+done
+
+if [ -z "$GRAFANA_NODEPORT" ] || [ "$GRAFANA_NODEPORT" = "null" ]; then
     # If service exists but isn't NodePort, delete and recreate
-    kubectl delete svc grafana -n ${NAMESPACE} 2>/dev/null || true
-    kubectl expose deployment grafana \
+    timeout 10 kubectl delete svc grafana -n ${NAMESPACE} 2>/dev/null || true
+    sleep 1
+    timeout 10 kubectl expose deployment grafana \
         --port=3000 --target-port=3000 \
         --type=NodePort \
         -n ${NAMESPACE} 2>/dev/null || true
-    GRAFANA_NODEPORT=$(kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
+    sleep 2
+    for i in {1..5}; do
+        GRAFANA_NODEPORT=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
+        if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ]; then
+            break
+        fi
+        sleep 1
+    done
 fi
 
 echo -e "${GREEN}✓${NC} Grafana deployed (user: zen)"
@@ -1322,18 +1338,30 @@ echo -e "${YELLOW}→${NC} Setting up service access..."
 # Initialize access port to default
 GRAFANA_ACCESS_PORT=${GRAFANA_PORT}
 
-# Get NodePort for Grafana
-GRAFANA_NODEPORT=$(kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
+# Get NodePort for Grafana (with retries and timeout)
+GRAFANA_NODEPORT=""
+for i in {1..10}; do
+    GRAFANA_NODEPORT=$(timeout 5 kubectl get svc grafana -n ${NAMESPACE} -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "")
+    if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ]; then
+        break
+    fi
+    sleep 1
+done
+
 if [ -n "$GRAFANA_NODEPORT" ] && [ "$GRAFANA_NODEPORT" != "null" ] && [ "$GRAFANA_NODEPORT" != "" ]; then
     GRAFANA_ACCESS_PORT=${GRAFANA_NODEPORT}
     echo -e "${CYAN}   Grafana accessible via NodePort: ${GRAFANA_NODEPORT}${NC}"
     echo -e "${CYAN}   Access at: http://localhost:${GRAFANA_NODEPORT}${NC}"
+    # Verify it's actually listening with timeout
+    if timeout 3 nc -zv localhost ${GRAFANA_NODEPORT} 2>/dev/null; then
+        echo -e "${GREEN}✓${NC} NodePort is listening and accessible"
+    fi
 else
     # Fallback to port-forward if NodePort not available
-    echo -e "${CYAN}   Using port-forward for Grafana (NodePort not available)${NC}"
+    echo -e "${CYAN}   Using port-forward for Grafana (NodePort not detected)${NC}"
     pkill -f "kubectl port-forward.*grafana" 2>/dev/null || true
     sleep 2
-    kubectl port-forward -n ${NAMESPACE} svc/grafana ${GRAFANA_PORT}:3000 --address=0.0.0.0 > /tmp/grafana-pf.log 2>&1 &
+    timeout 10 kubectl port-forward -n ${NAMESPACE} svc/grafana ${GRAFANA_PORT}:3000 --address=0.0.0.0 > /tmp/grafana-pf.log 2>&1 &
     GRAFANA_PF_PID=$!
     sleep 3
     GRAFANA_ACCESS_PORT=${GRAFANA_PORT}
