@@ -1330,7 +1330,13 @@ helm repo update > /dev/null 2>&1 || true
 
 # Run helmfile sync (this handles all Helm installations)
 # Change to repo root so local chart paths work correctly
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$(cd "$(dirname "$0")/.." && pwd)")"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null | tr -d '\n\r' || echo "$(cd "$(dirname "$0")/.." && pwd)")"
+# Remove any trailing newlines and validate path
+REPO_ROOT="${REPO_ROOT%"${REPO_ROOT##*[![:space:]]}"}"  # Trim trailing whitespace
+if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT" ]; then
+    echo "Error: Failed to determine repository root" >&2
+    exit 1
+fi
 cd "$REPO_ROOT" || { echo "Error: Failed to change to repo root: $REPO_ROOT" >&2; exit 1; }
 
 # Suppress verbose Helm output (NOTES, examples, etc.) but keep errors
