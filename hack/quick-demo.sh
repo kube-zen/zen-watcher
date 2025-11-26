@@ -1931,29 +1931,40 @@ if [ "$FAILED_COUNT" -gt 0 ]; then
     echo -e "${YELLOW}⚠${NC}  ${FAILED_COUNT} endpoint(s) failed - showing diagnostics..."
     echo ""
     
-    # Show ingress and service diagnostics for failed endpoints
+    # Track which namespaces we've already shown diagnostics for
+    declare -A DIAGNOSTICS_SHOWN
+    
+    # Show ingress and service diagnostics for failed endpoints (once per namespace)
     for failed_ep in "${FAILED_ENDPOINTS[@]}"; do
         IFS=':' read -r name path <<< "$failed_ep"
-        echo -e "${CYAN}  Diagnostics for $name:${NC}"
         
-        # Check which service this endpoint should route to
+        # Determine namespace based on path
         if echo "$path" | grep -q "^/grafana"; then
-            echo -e "${CYAN}    Checking Grafana ingress...${NC}"
-            kubectl get ingress zen-demo-grafana -n grafana 2>&1 | head -5 || echo "    Ingress not found"
-            echo -e "${CYAN}    Checking Grafana service...${NC}"
-            kubectl get svc -n grafana 2>&1 | grep -E "grafana|NAME" || echo "    Service not found"
+            ns="grafana"
+            ingress_name="zen-demo-grafana"
+            svc_filter="grafana"
         elif echo "$path" | grep -q "^/victoriametrics"; then
-            echo -e "${CYAN}    Checking VictoriaMetrics ingress...${NC}"
-            kubectl get ingress zen-demo-victoriametrics -n victoriametrics 2>&1 | head -5 || echo "    Ingress not found"
-            echo -e "${CYAN}    Checking VictoriaMetrics service...${NC}"
-            kubectl get svc -n victoriametrics 2>&1 | grep -E "victoriametrics|NAME" || echo "    Service not found"
+            ns="victoriametrics"
+            ingress_name="zen-demo-victoriametrics"
+            svc_filter="victoriametrics"
         elif echo "$path" | grep -q "^/zen-watcher"; then
-            echo -e "${CYAN}    Checking Zen Watcher ingress...${NC}"
-            kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} 2>&1 | head -5 || echo "    Ingress not found"
-            echo -e "${CYAN}    Checking Zen Watcher service...${NC}"
-            kubectl get svc -n ${NAMESPACE} 2>&1 | grep -E "zen-watcher|NAME" || echo "    Service not found"
+            ns="${NAMESPACE}"
+            ingress_name="zen-demo-zen-watcher"
+            svc_filter="zen-watcher"
+        else
+            continue
         fi
-        echo ""
+        
+        # Only show diagnostics once per namespace
+        if [ -z "${DIAGNOSTICS_SHOWN[$ns]}" ]; then
+            echo -e "${CYAN}  Diagnostics for ${ns} namespace:${NC}"
+            echo -e "${CYAN}    Checking ingress...${NC}"
+            kubectl get ingress ${ingress_name} -n ${ns} 2>&1 | head -5 || echo "    Ingress not found"
+            echo -e "${CYAN}    Checking service...${NC}"
+            kubectl get svc -n ${ns} 2>&1 | grep -E "${svc_filter}|NAME" || echo "    Service not found"
+            echo ""
+            DIAGNOSTICS_SHOWN[$ns]=true
+        fi
     done
 fi
 
