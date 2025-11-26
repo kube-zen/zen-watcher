@@ -1275,7 +1275,8 @@ if ! timeout 10 helm list -n ingress-nginx 2>&1 | grep -q ingress-nginx; then
         --set controller.admissionWebhooks.patch.enabled=false \
         --set controller.podLabels.app=ingress-nginx \
         --set controller.podLabels."app\.kubernetes\.io/name"=ingress-nginx \
-        >/dev/null 2>&1 &
+        2>&1 | tee /tmp/helm-ingress.log > /dev/null &
+    HELM_INGRESS_PID=$!
     # Delete admission webhooks if created
     sleep 2
     kubectl delete validatingwebhookconfiguration ingress-nginx-admission 2>&1 | grep -v "not found" > /dev/null || true
@@ -1295,7 +1296,8 @@ if [ "$SKIP_MONITORING" != true ]; then
         timeout 120 helm install victoriametrics-operator vm/victoria-metrics-operator \
             --namespace victoriametrics-operator \
             --create-namespace \
-            >/dev/null 2>&1 &
+            2>&1 | tee /tmp/helm-vm-operator.log > /dev/null &
+        HELM_VM_OPERATOR_PID=$!
     fi
 fi
 
@@ -1401,7 +1403,8 @@ if [ "$INSTALL_TRIVY" = true ] || [ "$INSTALL_FALCO" = true ] || [ "$INSTALL_KYV
             --namespace trivy-system \
             --create-namespace \
             --set="trivy.ignoreUnfixed=true" \
-            > /dev/null 2>&1 &
+            2>&1 | tee /tmp/helm-trivy.log > /dev/null &
+        HELM_TRIVY_PID=$!
     fi
 
     # Deploy Falco with resource limits to reduce CPU usage
@@ -1418,7 +1421,8 @@ if [ "$INSTALL_TRIVY" = true ] || [ "$INSTALL_FALCO" = true ] || [ "$INSTALL_KYV
             --set resources.requests.memory=128Mi \
             --set resources.limits.cpu=500m \
             --set resources.limits.memory=512Mi \
-            > /dev/null 2>&1 &
+            2>&1 | tee /tmp/helm-falco.log > /dev/null &
+        HELM_FALCO_PID=$!
     fi
 
     # Deploy Kyverno
@@ -1428,7 +1432,8 @@ if [ "$INSTALL_TRIVY" = true ] || [ "$INSTALL_FALCO" = true ] || [ "$INSTALL_KYV
             --namespace kyverno \
             --create-namespace \
             --set replicaCount=1 \
-            > /dev/null 2>&1 &
+            2>&1 | tee /tmp/helm-kyverno.log > /dev/null &
+        HELM_KYVERNO_PID=$!
         
         # Create a test Kyverno policy that requires labels
         cat <<EOF | kubectl apply -f - 2>&1 | grep -v "already exists" > /dev/null || true
@@ -1456,6 +1461,8 @@ EOF
     # Deploy Checkov as a Kubernetes Job
     if [ "$INSTALL_CHECKOV" = true ]; then
         echo -e "${YELLOW}→${NC} Deploying Checkov scanning job..."
+        # Create namespace if it doesn't exist (jobs don't create namespaces)
+        kubectl create namespace checkov 2>&1 | grep -v "already exists" > /dev/null || true
         
         # Create ConfigMap with demo manifests for Checkov to scan
         echo -e "${CYAN}   Creating demo manifests ConfigMap...${NC}"
@@ -1502,6 +1509,8 @@ EOF
     # Deploy kube-bench as a Kubernetes Job
     if [ "$INSTALL_KUBE_BENCH" = true ]; then
         echo -e "${YELLOW}→${NC} Deploying kube-bench CIS benchmark job..."
+        # Create namespace if it doesn't exist (jobs don't create namespaces)
+        kubectl create namespace kube-bench 2>&1 | grep -v "already exists" > /dev/null || true
         
         # Detect cluster type for kube-bench benchmark target
         bench_target="cis-1.6"
@@ -1596,6 +1605,9 @@ data:
         scrape_interval: 15s
 EOF
 
+# Create namespace for VictoriaMetrics (kubectl create deployment doesn't create namespaces)
+kubectl create namespace victoriametrics 2>&1 | grep -v "already exists" > /dev/null || true
+
 # Deploy VictoriaMetrics with path prefix and scrape config using full YAML
 cat <<EOF | kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" > /dev/null || true
 apiVersion: apps/v1
@@ -1643,6 +1655,9 @@ kubectl expose deployment victoriametrics \
 
 # Deploy Grafana with zen user
 echo -e "${YELLOW}→${NC} Deploying Grafana..."
+
+# Create namespace for Grafana (kubectl create deployment doesn't create namespaces)
+kubectl create namespace grafana 2>&1 | grep -v "already exists" > /dev/null || true
 
 kubectl create deployment grafana \
     --image=grafana/grafana:latest \
@@ -1787,6 +1802,43 @@ if [ -f "config/dashboards/zen-watcher-dashboard.json" ]; then
     else
         echo -e "${YELLOW}⚠${NC}  Dashboard file not found at config/dashboards/zen-watcher-dashboard.json"
     fi
+fi
+
+# Wait for background Helm processes and check for errors
+echo -e "${CYAN}   Waiting for Helm installations to complete...${NC}"
+HELM_ERRORS=0
+if [ -n "${HELM_INGRESS_PID:-}" ]; then
+    wait $HELM_INGRESS_PID 2>/dev/null || HELM_ERRORS=$((HELM_ERRORS + 1))
+    if [ -f /tmp/helm-ingress.log ] && grep -q -i "error\|failed" /tmp/helm-ingress.log; then
+        echo -e "${YELLOW}⚠${NC}  Ingress installation had errors. Check /tmp/helm-ingress.log"
+    fi
+fi
+if [ -n "${HELM_VM_OPERATOR_PID:-}" ]; then
+    wait $HELM_VM_OPERATOR_PID 2>/dev/null || HELM_ERRORS=$((HELM_ERRORS + 1))
+    if [ -f /tmp/helm-vm-operator.log ] && grep -q -i "error\|failed" /tmp/helm-vm-operator.log; then
+        echo -e "${YELLOW}⚠${NC}  VictoriaMetrics Operator installation had errors. Check /tmp/helm-vm-operator.log"
+    fi
+fi
+if [ -n "${HELM_TRIVY_PID:-}" ]; then
+    wait $HELM_TRIVY_PID 2>/dev/null || HELM_ERRORS=$((HELM_ERRORS + 1))
+    if [ -f /tmp/helm-trivy.log ] && grep -q -i "error\|failed" /tmp/helm-trivy.log; then
+        echo -e "${YELLOW}⚠${NC}  Trivy installation had errors. Check /tmp/helm-trivy.log"
+    fi
+fi
+if [ -n "${HELM_FALCO_PID:-}" ]; then
+    wait $HELM_FALCO_PID 2>/dev/null || HELM_ERRORS=$((HELM_ERRORS + 1))
+    if [ -f /tmp/helm-falco.log ] && grep -q -i "error\|failed" /tmp/helm-falco.log; then
+        echo -e "${YELLOW}⚠${NC}  Falco installation had errors. Check /tmp/helm-falco.log"
+    fi
+fi
+if [ -n "${HELM_KYVERNO_PID:-}" ]; then
+    wait $HELM_KYVERNO_PID 2>/dev/null || HELM_ERRORS=$((HELM_ERRORS + 1))
+    if [ -f /tmp/helm-kyverno.log ] && grep -q -i "error\|failed" /tmp/helm-kyverno.log; then
+        echo -e "${YELLOW}⚠${NC}  Kyverno installation had errors. Check /tmp/helm-kyverno.log"
+    fi
+fi
+if [ $HELM_ERRORS -gt 0 ]; then
+    echo -e "${YELLOW}⚠${NC}  $HELM_ERRORS Helm installation(s) had errors. Check log files in /tmp/helm-*.log"
 fi
 
 # Wait for all components to be ready and verify endpoints
