@@ -116,52 +116,52 @@ check_namespace_ready() {
     local name=$2
     
     # Check deployments
-    local deployments=$(kubectl get deployment -n "$namespace" --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+    local deployments=$(kubectl get deployment -n "$namespace" --no-headers 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")
     if [ "$deployments" -gt 0 ]; then
         local ready_deployments=$(kubectl get deployment -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.readyReplicas}{"\t"}{.spec.replicas}{"\n"}{end}' 2>/dev/null | \
-            awk -F'\t' '$2 == $3 && $3 > 0' | wc -l | tr -d ' ' || echo "0")
+            awk -F'\t' '$2 == $3 && $3 > 0' | wc -l | tr -d '[:space:]' || echo "0")
         if [ "$ready_deployments" != "$deployments" ]; then
             return 1
         fi
     fi
     
     # Check daemonsets
-    local daemonsets=$(kubectl get daemonset -n "$namespace" --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+    local daemonsets=$(kubectl get daemonset -n "$namespace" --no-headers 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")
     if [ "$daemonsets" -gt 0 ]; then
         local ready_daemonsets=$(kubectl get daemonset -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.numberReady}{"\t"}{.status.desiredNumberScheduled}{"\n"}{end}' 2>/dev/null | \
-            awk -F'\t' '$2 == $3 && $3 > 0' | wc -l | tr -d ' ' || echo "0")
+            awk -F'\t' '$2 == $3 && $3 > 0' | wc -l | tr -d '[:space:]' || echo "0")
         if [ "$ready_daemonsets" != "$daemonsets" ]; then
             return 1
         fi
     fi
     
     # Check statefulsets
-    local statefulsets=$(kubectl get statefulset -n "$namespace" --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+    local statefulsets=$(kubectl get statefulset -n "$namespace" --no-headers 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")
     if [ "$statefulsets" -gt 0 ]; then
         local ready_statefulsets=$(kubectl get statefulset -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.readyReplicas}{"\t"}{.spec.replicas}{"\n"}{end}' 2>/dev/null | \
-            awk -F'\t' '$2 == $3 && $3 > 0' | wc -l | tr -d ' ' || echo "0")
+            awk -F'\t' '$2 == $3 && $3 > 0' | wc -l | tr -d '[:space:]' || echo "0")
         if [ "$ready_statefulsets" != "$statefulsets" ]; then
             return 1
         fi
     fi
     
     # Check jobs (if any exist, they must be succeeded, not failed)
-    local jobs=$(kubectl get jobs -n "$namespace" --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+    local jobs=$(kubectl get jobs -n "$namespace" --no-headers 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")
     if [ "$jobs" -gt 0 ]; then
         # Get job statuses - check for failed jobs
         local failed_jobs=$(kubectl get jobs -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Failed")].status}{"\n"}{end}' 2>/dev/null | \
-            grep -c "True" || echo "0")
+            grep -c "True" | tr -d '[:space:]' || echo "0")
         if [ "$failed_jobs" -gt 0 ]; then
             return 1  # At least one job failed
         fi
         # Check if all jobs are succeeded
         local succeeded_jobs=$(kubectl get jobs -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.succeeded}{"\n"}{end}' 2>/dev/null | \
-            awk -F'\t' '$2 > 0' | wc -l | tr -d ' ' || echo "0")
+            awk -F'\t' '$2 > 0' | wc -l | tr -d '[:space:]' || echo "0")
         # If we have jobs but none succeeded yet, they're still running or pending
         if [ "$succeeded_jobs" -lt "$jobs" ]; then
             # Check if any are still active (running)
             local active_jobs=$(kubectl get jobs -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.active}{"\n"}{end}' 2>/dev/null | \
-                awk -F'\t' '$2 > 0' | wc -l | tr -d ' ' || echo "0")
+                awk -F'\t' '$2 > 0' | wc -l | tr -d '[:space:]' || echo "0")
             if [ "$active_jobs" -gt 0 ]; then
                 return 1  # Jobs are still running
             fi
