@@ -145,14 +145,48 @@ check_namespace_ready() {
         fi
     fi
     
+    # Check jobs (if any exist, they must be succeeded, not failed)
+    local jobs=$(kubectl get jobs -n "$namespace" --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+    if [ "$jobs" -gt 0 ]; then
+        # Get job statuses - check for failed jobs
+        local failed_jobs=$(kubectl get jobs -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Failed")].status}{"\n"}{end}' 2>/dev/null | \
+            grep -c "True" || echo "0")
+        if [ "$failed_jobs" -gt 0 ]; then
+            return 1  # At least one job failed
+        fi
+        # Check if all jobs are succeeded
+        local succeeded_jobs=$(kubectl get jobs -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.succeeded}{"\n"}{end}' 2>/dev/null | \
+            awk -F'\t' '$2 > 0' | wc -l | tr -d ' ' || echo "0")
+        # If we have jobs but none succeeded yet, they're still running or pending
+        if [ "$succeeded_jobs" -lt "$jobs" ]; then
+            # Check if any are still active (running)
+            local active_jobs=$(kubectl get jobs -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.active}{"\n"}{end}' 2>/dev/null | \
+                awk -F'\t' '$2 > 0' | wc -l | tr -d ' ' || echo "0")
+            if [ "$active_jobs" -gt 0 ]; then
+                return 1  # Jobs are still running
+            fi
+            # If no active jobs and not all succeeded, check if they're pending (no pods created yet)
+            # For now, consider pending jobs as "not ready" if they haven't succeeded
+            return 1
+        fi
+    fi
+    
     # If namespace has controllers and all are ready, return success
     local total_controllers=$((deployments + daemonsets + statefulsets))
     if [ "$total_controllers" -gt 0 ]; then
         return 0
     fi
     
-    # If no controllers found, check if namespace exists (for jobs/ingress)
+    # If no controllers found but namespace exists (for ingress-only namespaces), return success
     if kubectl get namespace "$namespace" >/dev/null 2>&1; then
+        # But if there are jobs, they must be succeeded
+        if [ "$jobs" -gt 0 ]; then
+            local succeeded_jobs=$(kubectl get jobs -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.succeeded}{"\n"}{end}' 2>/dev/null | \
+                awk -F'\t' '$2 > 0' | wc -l | tr -d ' ' || echo "0")
+            if [ "$succeeded_jobs" -lt "$jobs" ]; then
+                return 1
+            fi
+        fi
         return 0
     fi
     
@@ -1672,6 +1706,9 @@ if [ "$ZEN_WATCHER_IMAGE" = "kubezen/zen-watcher:latest" ]; then
 fi
 
 # Deploy using Helm chart (includes CRDs, RBAC, Service, Deployment, and VMServiceScrape)
+# Ensure namespace exists before Helm install
+kubectl create namespace ${NAMESPACE} 2>&1 | grep -v "already exists" > /dev/null || true
+
 helm upgrade --install zen-watcher ./charts/zen-watcher \
     --namespace ${NAMESPACE} \
     --create-namespace \
@@ -1688,7 +1725,7 @@ helm upgrade --install zen-watcher ./charts/zen-watcher \
     --set crd.install=true \
     --set rbac.create=true \
     --set serviceAccount.create=true \
-    > /dev/null 2>&1 &
+    > /dev/null 2>&1
 
 # Configure Grafana datasource via ingress (only if monitoring is enabled)
 if [ "$SKIP_MONITORING" != true ]; then
