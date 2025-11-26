@@ -1709,8 +1709,16 @@ fi
 # Ensure namespace exists before Helm install
 kubectl create namespace ${NAMESPACE} 2>&1 | grep -v "already exists" > /dev/null || true
 
-# Deploy zen-watcher using Helm chart
-if ! helm upgrade --install zen-watcher ./charts/zen-watcher \
+# Check if Helm chart directory exists
+if [ ! -d "./charts/zen-watcher" ]; then
+    echo -e "${RED}✗${NC} Helm chart not found at ./charts/zen-watcher"
+    echo -e "${YELLOW}   Please ensure you're running from the repository root${NC}"
+    exit 1
+fi
+
+# Deploy zen-watcher using Helm chart (don't fail on warnings)
+set +e  # Temporarily disable exit on error for Helm command
+helm upgrade --install zen-watcher ./charts/zen-watcher \
     --namespace ${NAMESPACE} \
     --create-namespace \
     --set image.repository="${IMAGE_REPO}" \
@@ -1726,8 +1734,13 @@ if ! helm upgrade --install zen-watcher ./charts/zen-watcher \
     --set crd.install=true \
     --set rbac.create=true \
     --set serviceAccount.create=true \
-    2>&1 | grep -v "already exists\|unchanged" > /dev/null; then
-    echo -e "${YELLOW}⚠${NC}  Helm install had warnings (continuing anyway)"
+    2>&1 | grep -v "already exists\|unchanged" > /dev/null
+HELM_EXIT_CODE=$?
+set -e  # Re-enable exit on error
+
+if [ $HELM_EXIT_CODE -ne 0 ]; then
+    echo -e "${YELLOW}⚠${NC}  Helm install had errors (exit code: $HELM_EXIT_CODE)"
+    echo -e "${YELLOW}   Continuing anyway - check deployment status later${NC}"
 fi
 
 # Configure Grafana datasource via ingress (only if monitoring is enabled)
