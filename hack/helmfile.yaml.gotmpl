@@ -16,6 +16,17 @@
 {{ $grafanaPassword := env "GRAFANA_PASSWORD" | default (randAlphaNum 16) }}
 
 releases:
+  # VictoriaMetrics Operator CRDs (must be installed first for VMServiceScrape)
+  - name: victoriametrics-operator-crds
+    namespace: victoriametrics
+    chart: vm/victoria-metrics-operator-crds
+    version: 0.30.0
+    createNamespace: true
+    needs: []
+    installed: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
+    values:
+      - nameOverride: vmoc
+
   # Ingress Controller (must be installed first)
   - name: ingress-nginx
     namespace: ingress-nginx
@@ -42,7 +53,8 @@ releases:
     chart: vm/victoria-metrics-single
     version: 0.25.5
     createNamespace: true
-    needs: []
+    needs:
+      - victoriametrics/victoriametrics-operator-crds
     installed: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
     values:
       - nameOverride: vms
@@ -61,11 +73,48 @@ releases:
             servicePort: 8428
           scrape:
             enabled: true
+            config:
+              global:
+                scrape_interval: 15s
+              scrape_configs:
+                - job_name: victoriametrics
+                  static_configs:
+                    - targets:
+                      - localhost:8428
+                  metrics_path: /victoriametrics/metrics
+                - job_name: kubernetes-service-endpoints
+                  kubernetes_sd_configs:
+                    - role: endpoints
+                  relabel_configs:
+                    - action: keep
+                      regex: true
+                      source_labels:
+                        - __meta_kubernetes_service_annotation_prometheus_io_scrape
+                    - action: replace
+                      regex: (https?)
+                      source_labels:
+                        - __meta_kubernetes_service_annotation_prometheus_io_scheme
+                      target_label: __scheme__
+                    - action: replace
+                      regex: (.+)
+                      source_labels:
+                        - __meta_kubernetes_service_annotation_prometheus_io_path
+                      target_label: __metrics_path__
+                    - action: replace
+                      regex: ([^:]+)(?::\d+)?;(\d+)
+                      replacement: $1:$2
+                      source_labels:
+                        - __address__
+                        - __meta_kubernetes_service_annotation_prometheus_io_port
+                      target_label: __address__
           persistentVolume:
             enabled: false
           emptyDir: {}
           extraArgs:
             http.pathPrefix: /victoriametrics
+            promscrape.dropOriginalLabels: false
+          vmServiceScrape:
+            enabled: true
 
   # Grafana (depends on VictoriaMetrics for datasource)
   - name: grafana

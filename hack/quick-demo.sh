@@ -1441,6 +1441,11 @@ metadata:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/rewrite-target: /victoriametrics/\$2
     nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "Content-Security-Policy: default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob:; base-uri /victoriametrics/;";
+      sub_filter_types text/html text/css application/javascript;
+      sub_filter '<head>' '<head><base href="/victoriametrics/">';
+      sub_filter_once off;
 spec:
   ingressClassName: nginx
   rules:
