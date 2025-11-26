@@ -39,7 +39,8 @@ This guide covers different deployment scenarios for Zen Watcher, from quick dem
 **Situation**: New Kubernetes cluster, no existing monitoring or security tools
 
 ```bash
-./hack/install.sh --namespace production-zen
+# For production, use Helm charts or kubectl apply directly
+# For demo/testing, use: ./hack/quick-demo.sh
 ```
 
 **Installs**:
@@ -59,7 +60,9 @@ This guide covers different deployment scenarios for Zen Watcher, from quick dem
 **Situation**: You already have Prometheus and Grafana deployed
 
 ```bash
-./hack/install.sh \
+# For demo/testing, use: ./hack/quick-demo.sh
+# For production, use Helm charts or kubectl apply directly
+# Example:
   --use-prometheus http://prometheus.monitoring.svc:9090 \
   --use-grafana http://grafana.monitoring.svc:3000 \
   --namespace zen-system
@@ -80,7 +83,9 @@ This guide covers different deployment scenarios for Zen Watcher, from quick dem
 **Situation**: Trivy, Falco, Kyverno already deployed
 
 ```bash
-./hack/install.sh \
+# For demo/testing, use: ./hack/quick-demo.sh
+# For production, use Helm charts or kubectl apply directly
+# Example:
   --skip-tools \
   --namespace zen-system
 ```
@@ -99,7 +104,9 @@ This guide covers different deployment scenarios for Zen Watcher, from quick dem
 **Situation**: Full monitoring & security stack already deployed
 
 ```bash
-./hack/install.sh \
+# For demo/testing, use: ./hack/quick-demo.sh
+# For production, use Helm charts or kubectl apply directly
+# Example:
   --skip-tools \
   --skip-monitoring \
   --use-prometheus http://prometheus.monitoring.svc:9090 \
@@ -219,7 +226,8 @@ helm install zen-watcher ./charts/zen-watcher \
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
 # Install
-./hack/install.sh --namespace zen-system
+# For demo/testing: ./hack/quick-demo.sh
+# For production: Use Helm charts or kubectl apply
 ```
 
 **Optimized for k3s**:
@@ -360,7 +368,8 @@ helm install zen-watcher ./charts/zen-watcher \
 Want to see what will be installed without making changes?
 
 ```bash
-./hack/install.sh --dry-run
+# For demo/testing: ./hack/quick-demo.sh --non-interactive
+# For production: Review Helm values and use kubectl apply --dry-run
 ```
 
 **Output shows**:

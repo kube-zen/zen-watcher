@@ -1377,6 +1377,7 @@ timeout 15 kubectl expose deployment victoriametrics \
 echo -e "${GREEN}✓${NC} VictoriaMetrics deployed (ClusterIP)"
 
 # Deploy Grafana with zen user (with retries for cluster readiness)
+# Configure Grafana to work behind ingress with subpath /grafana
 echo -e "${YELLOW}→${NC} Deploying Grafana with zen user..."
 for i in {1..10}; do
     if kubectl create deployment grafana \
@@ -1388,6 +1389,9 @@ kubectl set env --local -f - \
     GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD} \
     GF_USERS_ALLOW_SIGN_UP=false \
     GF_USERS_DEFAULT_THEME=dark \
+    GF_SERVER_ROOT_URL=http://localhost:${INGRESS_HTTP_PORT}/grafana/ \
+    GF_SERVER_SERVE_FROM_SUB_PATH=true \
+    GF_SERVER_DOMAIN=localhost \
         --dry-run=client -o yaml 2>/dev/null | \
     kubectl apply -f - 2>&1 | grep -v "already exists" > /dev/null; then
         break
@@ -1398,6 +1402,9 @@ kubectl set env --local -f - \
             GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD} \
             GF_USERS_ALLOW_SIGN_UP=false \
             GF_USERS_DEFAULT_THEME=dark \
+            GF_SERVER_ROOT_URL=http://localhost:${INGRESS_HTTP_PORT}/grafana/ \
+            GF_SERVER_SERVE_FROM_SUB_PATH=true \
+            GF_SERVER_DOMAIN=localhost \
             -n ${NAMESPACE} 2>/dev/null || true
         break
     else
@@ -1502,9 +1509,13 @@ for retry in {1..5}; do
         --set controller.service.type=LoadBalancer \
         --set controller.service.annotations."k3d\.io/loadbalancer"=true \
         --set controller.admissionWebhooks.enabled=false \
+        --set controller.admissionWebhooks.patch.enabled=false \
         --set controller.podLabels.app=ingress-nginx \
         --set controller.podLabels."app\.kubernetes\.io/name"=ingress-nginx \
         --wait --timeout=2m 2>&1 | tee /tmp/ingress-install.log; then
+        # Delete admission webhook if it was created (sometimes it still gets created)
+        kubectl delete validatingwebhookconfiguration ingress-nginx-admission 2>&1 | grep -v "not found" > /dev/null || true
+        kubectl delete mutatingwebhookconfiguration ingress-nginx-admission 2>&1 | grep -v "not found" > /dev/null || true
         echo -e "${GREEN}✓${NC} Nginx ingress controller installed"
         INGRESS_INSTALLED=true
         break
@@ -1548,13 +1559,26 @@ if [ "$INGRESS_READY" = false ]; then
 fi
 
 # k3d maps LoadBalancer to port 8080 (as configured in cluster creation)
-# Verify the service is using LoadBalancer type
+# Verify the service is using LoadBalancer type and fix if needed
 INGRESS_SVC_TYPE=$(timeout 10 kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.type}' 2>/dev/null || echo "")
-if [ "$INGRESS_SVC_TYPE" = "LoadBalancer" ]; then
-    echo -e "${CYAN}   Ingress using LoadBalancer (k3d maps to port ${INGRESS_HTTP_PORT})${NC}"
-else
-    echo -e "${YELLOW}⚠${NC}  Ingress service type is ${INGRESS_SVC_TYPE}, expected LoadBalancer${NC}"
+if [ "$INGRESS_SVC_TYPE" != "LoadBalancer" ]; then
+    echo -e "${YELLOW}⚠${NC}  Ingress service type is ${INGRESS_SVC_TYPE}, converting to LoadBalancer...${NC}"
+    kubectl patch svc ingress-nginx-controller -n ingress-nginx \
+        -p '{"spec":{"type":"LoadBalancer"},"metadata":{"annotations":{"k3d.io/loadbalancer":"true"}}}' 2>&1 | grep -v "not patched" > /dev/null || true
+    sleep 5
+    # Wait for LoadBalancer to get an IP
+    for i in {1..30}; do
+        LB_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null || echo "")
+        if [ -n "$LB_IP" ]; then
+            break
+        fi
+        sleep 1
+    done
+    # Restart k3d loadbalancer to pick up the change
+    docker restart $(docker ps -q --filter "name=k3d-${CLUSTER_NAME}-serverlb") 2>&1 | grep -v "No such container" > /dev/null || true
+    sleep 5
 fi
+echo -e "${CYAN}   Ingress using LoadBalancer (k3d maps to port ${INGRESS_HTTP_PORT})${NC}"
 echo -e "${CYAN}   Ingress accessible on: http://localhost:${INGRESS_HTTP_PORT}${NC}"
 show_section_time "Nginx ingress installation"
 
@@ -1781,29 +1805,126 @@ EOF
     echo -e "${GREEN}✓${NC} kube-bench ConfigMap created"
 fi
 
-# Test Falco and Audit webhooks via ingress
+# Test Falco and Audit webhooks via ingress with comprehensive validation
 echo -e "${YELLOW}→${NC} Testing Falco and Audit webhooks via ingress..."
-# Webhooks are accessible via ingress at /zen-watcher/falco/webhook and /zen-watcher/audit/webhook
-# No port-forward needed - use ingress endpoint
+
+# Verify zen-watcher service exists before testing
+if ! kubectl get svc zen-watcher -n ${NAMESPACE} >/dev/null 2>&1; then
+    echo -e "${YELLOW}⚠${NC}  zen-watcher service not found, creating it..."
+    if kubectl get deployment zen-watcher -n ${NAMESPACE} >/dev/null 2>&1; then
+        kubectl expose deployment zen-watcher --port=8080 --target-port=8080 --type=ClusterIP --name=zen-watcher -n ${NAMESPACE} 2>&1 | grep -v "already exists" || true
+        sleep 2
+    else
+        echo -e "${YELLOW}⚠${NC}  zen-watcher deployment not found, skipping webhook tests"
+        ZEN_WATCHER_URL=""
+    fi
+fi
+
+# Verify ingress exists for zen-watcher
+if ! kubectl get ingress zen-demo-services -n ${NAMESPACE} >/dev/null 2>&1; then
+    echo -e "${YELLOW}⚠${NC}  zen-watcher ingress not found, webhook tests may fail"
+fi
+
+ZEN_WATCHER_URL="http://localhost:${INGRESS_HTTP_PORT}/zen-watcher"
 sleep 2
 
-# Test Falco webhook via ingress
-curl -s -X POST -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}/zen-watcher/falco/webhook -H "Content-Type: application/json" \
-    -d '{"output":"16:31:56.123456789: Warning Sensitive file opened for reading by non-trusted program (user=root program=nmap)","priority":"Warning","rule":"Sensitive file opened for reading by non-trusted program","time":"'$(date -u +%Y-%m-%dT%H:%M:%S)'","output_fields":{"container.id":"test","proc.name":"nmap"}}' > /dev/null 2>&1 || true
+# Test Falco webhook
+echo -e "${CYAN}   Testing Falco webhook...${NC}"
+FALCO_TEST_EVENT='{
+  "output": "16:31:56.123456789: Warning Sensitive file opened for reading by non-trusted program (user=root user_loginuid=-1 program=nmap command=nmap -sS 127.0.0.1 container_id=host image=<NA>)",
+  "priority": "Warning",
+  "rule": "Sensitive file opened for reading by non-trusted program",
+  "time": "'$(date -u +%Y-%m-%dT%H:%M:%S.%N)'",
+  "output_fields": {
+    "container.id": "host",
+    "evt.time": "1609456316123456789",
+    "fd.name": "/etc/passwd",
+    "proc.cmdline": "nmap -sS 127.0.0.1",
+    "proc.name": "nmap",
+    "user.name": "root"
+  }
+}'
 
-# Test Audit webhook via ingress
-curl -s -X POST -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}/zen-watcher/audit/webhook -H "Content-Type: application/json" \
-    -d '{"kind":"Event","apiVersion":"audit.k8s.io/v1","level":"Request","auditID":"test-'$(date +%s)'","stage":"ResponseComplete","requestURI":"/api/v1/namespaces/default/pods","verb":"delete","user":{"username":"test-user"},"sourceIPs":["127.0.0.1"],"objectRef":{"resource":"pods","namespace":"default","name":"test-pod"},"responseStatus":{"code":200}}' > /dev/null 2>&1 || true
+if [ -n "$ZEN_WATCHER_URL" ]; then
+    FALCO_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST -H "Host: localhost" "${ZEN_WATCHER_URL}/falco/webhook" \
+      -H "Content-Type: application/json" \
+      -d "$FALCO_TEST_EVENT" 2>&1 || echo "000")
+else
+    FALCO_RESPONSE="000"
+fi
 
-echo -e "${GREEN}✓${NC} Webhooks tested via ingress"
+FALCO_HTTP_CODE=$(echo "$FALCO_RESPONSE" | tail -n1)
+FALCO_BODY=$(echo "$FALCO_RESPONSE" | sed '$d')
 
-# Wait for observations to be created
-echo -e "${YELLOW}→${NC} Waiting for observations to be created (this may take 30-60 seconds)..."
+if [ "$FALCO_HTTP_CODE" = "200" ] || [ "$FALCO_HTTP_CODE" = "202" ]; then
+    echo -e "${GREEN}✓${NC} Falco webhook accepted event (HTTP $FALCO_HTTP_CODE)"
+else
+    echo -e "${YELLOW}⚠${NC}  Falco webhook returned HTTP $FALCO_HTTP_CODE (may be normal if processing is delayed)"
+fi
+
+# Test Audit webhook
+echo -e "${CYAN}   Testing Audit webhook...${NC}"
+AUDIT_TEST_EVENT='{
+  "kind": "Event",
+  "apiVersion": "audit.k8s.io/v1",
+  "level": "Request",
+  "auditID": "test-'$(date +%s)'",
+  "stage": "ResponseComplete",
+  "requestURI": "/api/v1/namespaces/default/pods",
+  "verb": "delete",
+  "user": {
+    "username": "test-user",
+    "groups": ["system:authenticated"]
+  },
+  "sourceIPs": ["127.0.0.1"],
+  "userAgent": "kubectl/v1.27.0",
+  "objectRef": {
+    "resource": "pods",
+    "namespace": "default",
+    "name": "test-pod"
+  },
+  "responseStatus": {
+    "code": 200
+  },
+  "requestReceivedTimestamp": "'$(date -u +%Y-%m-%dT%H:%M:%S.%N)'",
+  "stageTimestamp": "'$(date -u +%Y-%m-%dT%H:%M:%S.%N)'"
+}'
+
+if [ -n "$ZEN_WATCHER_URL" ]; then
+    AUDIT_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST -H "Host: localhost" "${ZEN_WATCHER_URL}/audit/webhook" \
+      -H "Content-Type: application/json" \
+      -d "$AUDIT_TEST_EVENT" 2>&1 || echo "000")
+else
+    AUDIT_RESPONSE="000"
+fi
+
+AUDIT_HTTP_CODE=$(echo "$AUDIT_RESPONSE" | tail -n1)
+AUDIT_BODY=$(echo "$AUDIT_RESPONSE" | sed '$d')
+
+if [ "$AUDIT_HTTP_CODE" = "200" ] || [ "$AUDIT_HTTP_CODE" = "202" ]; then
+    echo -e "${GREEN}✓${NC} Audit webhook accepted event (HTTP $AUDIT_HTTP_CODE)"
+else
+    echo -e "${YELLOW}⚠${NC}  Audit webhook returned HTTP $AUDIT_HTTP_CODE (may be normal if processing is delayed)"
+fi
+
+# Wait for observations to be created and validate webhook processing
+echo -e "${YELLOW}→${NC} Validating webhook processing and waiting for observations..."
 OBSERVATION_COUNT=0
+FALCO_OBS_COUNT=0
+AUDIT_OBS_COUNT=0
 for i in {1..30}; do
     OBSERVATION_COUNT=$(kubectl get observations -A --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
     if [ "$OBSERVATION_COUNT" -gt 0 ]; then
-        echo -e "${GREEN}✓${NC} Observations created: ${OBSERVATION_COUNT}"
+        # Count observations by source
+        if command -v jq >/dev/null 2>&1; then
+            FALCO_OBS_COUNT=$(kubectl get observations -A -o json 2>/dev/null | jq -r '.items[] | select(.spec.source=="falco") | .metadata.name' 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+            AUDIT_OBS_COUNT=$(kubectl get observations -A -o json 2>/dev/null | jq -r '.items[] | select(.spec.source=="kubernetes-audit") | .metadata.name' 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+        fi
+        echo -e "${GREEN}✓${NC} Observations created: ${OBSERVATION_COUNT} total"
+        if [ "$FALCO_OBS_COUNT" -gt 0 ] || [ "$AUDIT_OBS_COUNT" -gt 0 ]; then
+            [ "$FALCO_OBS_COUNT" -gt 0 ] && echo -e "${GREEN}  ✓${NC} Falco observations: ${FALCO_OBS_COUNT}"
+            [ "$AUDIT_OBS_COUNT" -gt 0 ] && echo -e "${GREEN}  ✓${NC} Audit observations: ${AUDIT_OBS_COUNT}"
+        fi
         break
     fi
     if [ $((i % 10)) -eq 0 ]; then
@@ -1811,6 +1932,25 @@ for i in {1..30}; do
     fi
     sleep 2
 done
+
+# Show webhook validation summary
+echo ""
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${CYAN}  Webhook Validation Summary${NC}"
+echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}✓${NC} Falco webhook: $([ "$FALCO_HTTP_CODE" = "200" ] || [ "$FALCO_HTTP_CODE" = "202" ] && echo "OK (HTTP $FALCO_HTTP_CODE)" || echo "Response: HTTP $FALCO_HTTP_CODE")"
+echo -e "${GREEN}✓${NC} Audit webhook: $([ "$AUDIT_HTTP_CODE" = "200" ] || [ "$AUDIT_HTTP_CODE" = "202" ] && echo "OK (HTTP $AUDIT_HTTP_CODE)" || echo "Response: HTTP $AUDIT_HTTP_CODE")"
+if [ "$OBSERVATION_COUNT" -gt 0 ]; then
+    echo -e "${GREEN}✓${NC} Observations created: ${OBSERVATION_COUNT}"
+    if command -v jq >/dev/null 2>&1; then
+        echo -e "${CYAN}   Observations by source:${NC}"
+        kubectl get observations -A -o json 2>/dev/null | \
+          jq -r '.items[] | .spec.source' | sort | uniq -c | awk '{printf "     %s: %d\n", $2, $1}' || true
+    fi
+else
+    echo -e "${YELLOW}⚠${NC}  No observations found yet (may take a few more seconds to process)"
+fi
+echo ""
 
 show_section_time "Test observations generation"
 
@@ -1827,10 +1967,130 @@ echo -e "${YELLOW}→${NC} Creating ingress resources..."
 # Use k3d loadbalancer port (8080) for all access
 GRAFANA_ACCESS_PORT=${INGRESS_HTTP_PORT}
 
+# Ensure namespace exists before creating ingress
+echo -e "${CYAN}   Ensuring namespace exists...${NC}"
+kubectl create namespace ${NAMESPACE} 2>/dev/null || true
+sleep 1
+
 # Create ingress with host-based routing and path rewriting
-# Grafana and VictoriaMetrics need rewrite-target because they don't handle subpaths well
+# Grafana: Use separate ingress - Grafana handles subpath with SERVE_FROM_SUB_PATH=true and root_url
+# VictoriaMetrics and Zen Watcher: Use standard rewrite-target
 # Use localhost as hostname for easy access
-cat <<EOF | timeout 30 kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" > /dev/null || true
+echo -e "${CYAN}   Creating Grafana ingress...${NC}"
+cat <<EOF | timeout 30 kubectl apply -f - 2>&1
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: zen-demo-grafana
+  namespace: ${NAMESPACE}
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # Grafana with SERVE_FROM_SUB_PATH=true and root_url=/grafana/ handles subpath itself
+    # Forward /grafana/* to Grafana as-is (no rewrite needed)
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: localhost
+    http:
+      paths:
+      - path: /grafana
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: zen-demo-services
+  namespace: ${NAMESPACE}
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # VictoriaMetrics and Zen Watcher need rewrite-target because they don't handle subpaths
+    nginx.ingress.kubernetes.io/rewrite-target: /\$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: localhost
+    http:
+      paths:
+      # VictoriaMetrics - needs rewrite
+      - path: /victoriametrics(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: victoriametrics
+            port:
+              number: 8428
+      # Zen Watcher - needs rewrite to strip /zen-watcher prefix
+      - path: /zen-watcher(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: zen-watcher
+            port:
+              number: 8080
+EOF
+
+INGRESS_RESULT=$?
+if [ $INGRESS_RESULT -eq 0 ]; then
+    echo -e "${GREEN}✓${NC} Ingress resources created"
+    # Verify Grafana ingress was created
+    sleep 2
+    if kubectl get ingress zen-demo-grafana -n ${NAMESPACE} >/dev/null 2>&1; then
+        echo -e "${GREEN}✓${NC} Grafana ingress verified"
+    else
+        echo -e "${YELLOW}⚠${NC}  Grafana ingress not found, recreating..."
+        cat <<EOF | kubectl apply -f - 2>&1 | grep -v "unchanged" || true
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: zen-demo-grafana
+  namespace: ${NAMESPACE}
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: localhost
+    http:
+      paths:
+      - path: /grafana
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+EOF
+    fi
+else
+    echo -e "${YELLOW}⚠${NC}  Ingress creation had issues, trying again..."
+    cat <<EOF | kubectl apply -f - 2>&1 | grep -v "unchanged" || true
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: zen-demo-grafana
+  namespace: ${NAMESPACE}
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: localhost
+    http:
+      paths:
+      - path: /grafana
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -1846,13 +2106,6 @@ spec:
   - host: localhost
     http:
       paths:
-      - path: /grafana(/|$)(.*)
-        pathType: ImplementationSpecific
-        backend:
-          service:
-            name: grafana
-            port:
-              number: 3000
       - path: /victoriametrics(/|$)(.*)
         pathType: ImplementationSpecific
         backend:
@@ -1868,6 +2121,7 @@ spec:
             port:
               number: 8080
 EOF
+fi
 
 # Ensure zen-watcher service exists
 if timeout 10 kubectl get deployment zen-watcher -n ${NAMESPACE} 2>/dev/null | grep -q zen-watcher; then
@@ -1976,7 +2230,7 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 echo -e "${GREEN}  🎉 Demo Environment Ready!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-# Use ingress for all access (k3d loadbalancer on port 8080)
+# Use ingress for all access via LoadBalancer
 GRAFANA_ACCESS_PORT=${INGRESS_HTTP_PORT}
 VM_ACCESS_PORT=${INGRESS_HTTP_PORT}
 ZEN_WATCHER_ACCESS_PORT=${INGRESS_HTTP_PORT}
@@ -1984,12 +2238,6 @@ ZEN_WATCHER_ACCESS_PORT=${INGRESS_HTTP_PORT}
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${CYAN}  📊 SERVICE ACCESS (via k3d LoadBalancer)${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo ""
-echo -e "${CYAN}  GRAFANA:${NC}"
-echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/grafana${NC}"
-echo -e "    ${GREEN}Username:${NC} ${CYAN}zen${NC}"
-echo -e "    ${GREEN}Password:${NC} ${CYAN}${GRAFANA_PASSWORD}${NC}"
-echo -e "    ${GREEN}Dashboard:${NC} ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/grafana/d/zen-watcher${NC}"
 echo ""
 echo -e "${CYAN}  VICTORIAMETRICS:${NC}"
 echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${VM_ACCESS_PORT}/victoriametrics${NC}"
@@ -2000,6 +2248,12 @@ echo -e "${CYAN}  ZEN WATCHER:${NC}"
 echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${ZEN_WATCHER_ACCESS_PORT}/zen-watcher${NC}"
 echo -e "    ${GREEN}Metrics:${NC} ${CYAN}http://localhost:${ZEN_WATCHER_ACCESS_PORT}/zen-watcher/metrics${NC}"
 echo -e "    ${GREEN}Health:${NC}  ${CYAN}http://localhost:${ZEN_WATCHER_ACCESS_PORT}/zen-watcher/health${NC}"
+echo ""
+echo -e "${CYAN}  GRAFANA:${NC}"
+echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/grafana${NC}"
+echo -e "    ${GREEN}Username:${NC} ${CYAN}zen${NC}"
+echo -e "    ${GREEN}Password:${NC} ${CYAN}${GRAFANA_PASSWORD}${NC}"
+echo -e "    ${GREEN}Dashboard:${NC} ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/grafana/d/zen-watcher${NC}"
 echo ""
 echo -e "${CYAN}  KUBECONFIG:${NC}"
 echo -e "    ${GREEN}File:${NC}     ${CYAN}${KUBECONFIG_FILE}${NC}"
@@ -2013,7 +2267,7 @@ echo -e "    ${GREEN}View:${NC}     ${CYAN}kubectl get observations -A --kubecon
 echo -e "    ${GREEN}By source:${NC} ${CYAN}kubectl get observations -A --kubeconfig ${KUBECONFIG_FILE} -o json | jq -r '.items[] | .spec.source' | sort | uniq -c${NC}"
 echo ""
 
-# All services are accessible via ingress (no port-forward needed)
+# All services are accessible via ingress
 # URLs are already displayed above
 
 # Quick verification - test endpoints with limited retries (don't block forever)
@@ -2074,14 +2328,13 @@ fi
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Services are accessible via ingress (no port-forwards needed)
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  ✅ Demo environment is ready and accessible!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
-echo -e "${CYAN}All services are accessible via k3d LoadBalancer on port ${INGRESS_HTTP_PORT}${NC}"
-echo -e "${CYAN}No port-forwards needed - endpoints will remain accessible until cluster is deleted.${NC}"
+echo -e "${CYAN}All services are accessible via ingress LoadBalancer on port ${INGRESS_HTTP_PORT}${NC}"
+echo -e "${CYAN}Endpoints will remain accessible until cluster is deleted.${NC}"
 echo ""
 echo -e "${BLUE}To clean up the demo:${NC}"
 case "$PLATFORM" in

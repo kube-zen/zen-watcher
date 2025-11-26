@@ -111,44 +111,14 @@ This directory contains helpful scripts for installing, testing, and managing Ze
 
 ---
 
-## 🔧 Smart Installer
-
-### `install.sh`
-
-**Intelligent production installation with auto-detection.**
-
-```bash
-./hack/install.sh [options]
-```
-
-**Features**:
-- Auto-detects existing Prometheus/Grafana
-- Auto-detects existing security tools
-- Installs only what's missing
-- Production-ready
-
-**Options**:
-```bash
---namespace NAME          # Target namespace
---skip-tools              # Don't install security tools
---skip-monitoring         # Don't install monitoring  
---use-prometheus URL      # Use existing Prometheus
---use-grafana URL         # Use existing Grafana
---dry-run                 # Show what would be installed
-```
-
----
-
 ## 🎯 Quick Reference
 
 | Task | Command |
 |------|---------|
-| Full demo with data | `./hack/quick-demo.sh` → Yes |
-| Infrastructure only | `./hack/quick-demo.sh` → No |
+| Full demo with all tools | `./hack/quick-demo.sh` |
+| Demo without test data | `./hack/quick-demo.sh --non-interactive` |
+| Cleanup demo cluster | `./hack/cleanup-demo.sh` |
 | Add mock data | `./hack/mock-data.sh` |
-| Production install | `./hack/install.sh` |
-| With existing tools | `./hack/install.sh --skip-tools` |
-| Dry run | `./hack/install.sh --dry-run` |
 
 ---
 
@@ -173,8 +143,7 @@ kubectl exec -n zen-system deployment/zen-watcher-mock -- \
 
 ### Test Smart Installer
 ```bash
-./hack/install.sh --dry-run
-./hack/install.sh --namespace test-zen
+./hack/quick-demo.sh --non-interactive
 ```
 
 ---

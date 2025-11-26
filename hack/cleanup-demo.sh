@@ -105,28 +105,41 @@ cleanup_namespace() {
     fi
 }
 
-# Function to cleanup port-forwards
-cleanup_port_forwards() {
-    echo -e "${YELLOW}→${NC} Stopping port-forwards..."
-    pkill -f "kubectl port-forward.*${NAMESPACE}" 2>/dev/null || true
-    rm -f /tmp/zen-demo-*.pid 2>/dev/null || true
-    echo -e "${GREEN}✓${NC} Port-forwards stopped"
-}
-
-# Main cleanup
-cleanup_port_forwards
-cleanup_cluster
-
-# Optionally cleanup namespace (only if cluster was deleted)
+# Optionally cleanup namespace BEFORE deleting cluster (if cluster still exists)
+# Note: If cluster is deleted, namespaces are automatically deleted too
 if [ "$CLEANUP_ALL" = false ]; then
-    echo ""
-    read -p "$(echo -e ${YELLOW}Also delete namespace '${NAMESPACE}'? [y/N]${NC}) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        cleanup_namespace
+    # Check if cluster exists before asking about namespace
+    CLUSTER_EXISTS=false
+    case "$PLATFORM" in
+        k3d)
+            if k3d cluster list 2>/dev/null | grep -q "^${CLUSTER_NAME}"; then
+                CLUSTER_EXISTS=true
+            fi
+            ;;
+        kind)
+            if kind get clusters 2>/dev/null | grep -q "^${CLUSTER_NAME}$"; then
+                CLUSTER_EXISTS=true
+            fi
+            ;;
+        minikube)
+            if minikube status -p ${CLUSTER_NAME} &>/dev/null 2>&1; then
+                CLUSTER_EXISTS=true
+            fi
+            ;;
+    esac
+    
+    if [ "$CLUSTER_EXISTS" = true ]; then
+        echo ""
+        read -p "$(echo -e ${YELLOW}Delete namespace '${NAMESPACE}' before deleting cluster? [y/N]${NC}) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            cleanup_namespace
+        fi
+    else
+        echo -e "${CYAN}ℹ${NC}  Cluster doesn't exist, skipping namespace deletion (it would be deleted with cluster anyway)"
     fi
 else
-    # In --all mode, try to cleanup common namespaces
+    # In --all mode, try to cleanup common namespaces before deleting clusters
     for ns in zen-system zen-watcher zen-demo; do
         if kubectl get namespace ${ns} &>/dev/null 2>&1; then
             echo -e "${YELLOW}→${NC} Deleting namespace '${ns}'..."
@@ -134,6 +147,9 @@ else
         fi
     done
 fi
+
+# Main cleanup - delete cluster (this will also delete all namespaces)
+cleanup_cluster
 
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
