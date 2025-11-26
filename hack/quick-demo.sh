@@ -997,12 +997,12 @@ case "$PLATFORM" in
         export KUBECONFIG=${KUBECONFIG_FILE}
         
         # Fix kubeconfig server URL - always use 127.0.0.1 and the port we specified/detected
-        timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${K3D_API_PORT}" --kubeconfig=${KUBECONFIG_FILE} 2>/dev/null || true
+        timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${K3D_API_PORT}" --kubeconfig=${KUBECONFIG_FILE} >/dev/null 2>&1 || true
         
         # CRITICAL: k3d uses self-signed certificates, so we need to skip TLS verification
         # Remove certificate-authority-data if present (conflicts with insecure-skip-tls-verify)
-        timeout 5 kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data --kubeconfig=${KUBECONFIG_FILE} 2>/dev/null || true
-        timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true --kubeconfig=${KUBECONFIG_FILE} 2>/dev/null || true
+        timeout 5 kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data --kubeconfig=${KUBECONFIG_FILE} >/dev/null 2>&1 || true
+        timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true --kubeconfig=${KUBECONFIG_FILE} >/dev/null 2>&1 || true
         
         # Wait for cluster API to be accessible (don't wait for nodes - they may take longer)
         CLUSTER_READY=false
