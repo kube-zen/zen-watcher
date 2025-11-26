@@ -1852,7 +1852,7 @@ for i in {1..60}; do
         fi
         
         if [ "$OUTSTANDING_COUNT" -gt 0 ]; then
-            echo -e "${CYAN}   Still waiting ${READY_COUNT}/${EXPECTED_READY} components (${i}s elapsed):${NC}"
+            echo -e "${CYAN}   Still waiting ${OUTSTANDING_COUNT}/${EXPECTED_READY} components (${i}s elapsed):${NC}"
             for name in "${OUTSTANDING_LIST[@]}"; do
                 echo -e "${YELLOW}     ⏳${NC} $name"
             done
