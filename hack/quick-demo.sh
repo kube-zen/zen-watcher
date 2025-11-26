@@ -1329,8 +1329,8 @@ helm repo add grafana https://grafana.github.io/helm-charts 2>&1 | grep -v "alre
 helm repo add aqua https://aquasecurity.github.io/helm-charts 2>&1 | grep -v "already exists" > /dev/null || true
 helm repo add falcosecurity https://falcosecurity.github.io/charts 2>&1 | grep -v "already exists" > /dev/null || true
 helm repo add kyverno https://kyverno.github.io/kyverno/ 2>&1 | grep -v "already exists" > /dev/null || true
-# Add zen-watcher chart repository (local helm-charts repo)
-helm repo add kube-zen file://${HOME}/letsgo/helm-charts 2>&1 | grep -v "already exists" > /dev/null || true
+# Add zen-watcher chart repository
+helm repo add kube-zen https://charts.kube-zen.io 2>&1 | grep -v "already exists" > /dev/null || true
 helm repo update > /dev/null 2>&1 || true
 
 # Run helmfile sync (this handles all Helm installations)
