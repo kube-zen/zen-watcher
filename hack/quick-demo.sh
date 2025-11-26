@@ -1342,8 +1342,8 @@ if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT" ]; then
 fi
 cd "$REPO_ROOT" || { echo "Error: Failed to change to repo root: $REPO_ROOT" >&2; exit 1; }
 
-# Suppress verbose Helm output (NOTES, examples, etc.) but keep errors
-if helmfile -f hack/helmfile.yaml.gotmpl sync 2>&1 | grep -v "^Adding repo\|^Listing releases\|^Release.*does not exist\|^NAME:\|^LAST DEPLOYED:\|^NAMESPACE:\|^STATUS:\|^REVISION:\|^DESCRIPTION:\|^TEST SUITE:\|^NOTES:\|^Chart version:\|^Kyverno version:\|^Thank you for\|^The following\|^⚠\|^💡\|^Get the\|^You need\|^for example\|^Input this\|^Read API:\|^An example\|^apiVersion:\|^kind:\|^metadata:\|^spec:\|^rules:\|^host:\|^http:\|^paths:\|^pathType:\|^backend:\|^service:\|^name:\|^port:\|^number:\|^tls:\|^hosts:\|^secretName:\|^data:\|^tls.crt:\|^tls.key:\|^type:\|^  # This section\|^If TLS is\|^  apiVersion:" | tee /tmp/helmfile-sync.log; then
+# Suppress verbose Helm output using --quiet flag
+if helmfile -f hack/helmfile.yaml.gotmpl --quiet sync 2>&1 | tee /tmp/helmfile-sync.log; then
     echo -e "${GREEN}✓${NC} Helmfile sync completed"
 else
     HELMFILE_EXIT=$?
