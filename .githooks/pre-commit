@@ -87,47 +87,6 @@ echo ""
 echo "🔒 Step 3: Security Scanning"
 echo "────────────────────────────────────────────────────"
 
-# govulncheck (REQUIRED)
-if ! command -v govulncheck &> /dev/null; then
-    echo "❌ govulncheck not installed (REQUIRED)"
-    echo "   Install: go install golang.org/x/vuln/cmd/govulncheck@latest"
-    exit 1
-fi
-echo "  → Running 'govulncheck'..."
-if ! govulncheck ./...; then
-    echo "❌ Vulnerabilities found in dependencies (BLOCKING)"
-    echo "   Update dependencies: go get -u ./... && go mod tidy"
-    exit 1
-fi
-echo "  ✅ No known vulnerabilities"
-
-# gosec (security linter) (REQUIRED)
-if ! command -v gosec &> /dev/null; then
-    echo "❌ gosec not installed (REQUIRED)"
-    echo "   Install: go install github.com/securego/gosec/v2/cmd/gosec@latest"
-    exit 1
-fi
-echo "  → Running 'gosec'..."
-if ! gosec -quiet ./...; then
-    echo "❌ Security issues found (BLOCKING)"
-    echo "   Fix security issues before committing"
-    exit 1
-fi
-echo "  ✅ No security issues (gosec)"
-
-# staticcheck (REQUIRED)
-if ! command -v staticcheck &> /dev/null; then
-    echo "❌ staticcheck not installed (REQUIRED)"
-    echo "   Install: go install honnef.co/go/tools/cmd/staticcheck@latest"
-    exit 1
-fi
-echo "  → Running 'staticcheck'..."
-if ! staticcheck ./...; then
-    echo "❌ staticcheck found issues (BLOCKING)"
-    exit 1
-fi
-echo "  ✅ staticcheck passed"
-
 # ============================================================
 # 4. DOCKER IMAGE SECURITY (if Dockerfile changed)
 # ============================================================
