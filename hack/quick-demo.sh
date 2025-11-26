@@ -1722,15 +1722,27 @@ if [ "$ZEN_WATCHER_IMAGE" = "kubezen/zen-watcher:latest" ]; then
     echo -e "${CYAN}   Using image: ${ZEN_WATCHER_IMAGE}${NC}"
 fi
 
-# Deploy using Helm chart (includes CRDs, RBAC, Service, Deployment, and VMServiceScrape)
-# Ensure namespace exists before Helm install
-kubectl create namespace ${NAMESPACE} 2>&1 | grep -v "already exists" > /dev/null || true
-
 # Check if Helm chart directory exists
 if [ ! -d "./charts/zen-watcher" ]; then
     echo -e "${RED}✗${NC} Helm chart not found at ./charts/zen-watcher"
     echo -e "${YELLOW}   Please ensure you're running from the repository root${NC}"
     exit 1
+fi
+
+# Check if namespace exists and is managed by Helm
+# If namespace exists but isn't managed by Helm, we need to let Helm create it or delete it first
+NAMESPACE_EXISTS=false
+if kubectl get namespace ${NAMESPACE} >/dev/null 2>&1; then
+    NAMESPACE_EXISTS=true
+    # Check if namespace is managed by Helm
+    if ! kubectl get namespace ${NAMESPACE} -o jsonpath='{.metadata.labels.app\.kubernetes\.io/managed-by}' 2>/dev/null | grep -q "Helm"; then
+        # Namespace exists but isn't managed by Helm - delete it so Helm can create it
+        echo -e "${CYAN}   Removing existing namespace to allow Helm to manage it...${NC}"
+        kubectl delete namespace ${NAMESPACE} --wait=false 2>&1 | grep -v "not found" > /dev/null || true
+        # Wait a bit for namespace deletion
+        sleep 2
+        NAMESPACE_EXISTS=false
+    fi
 fi
 
 # Deploy zen-watcher using Helm chart
