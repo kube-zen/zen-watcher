@@ -1282,7 +1282,7 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: zen-demo-services
+  name: zen-demo-victoriametrics
   namespace: victoriametrics
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
@@ -1301,18 +1301,34 @@ spec:
             name: victoriametrics
             port:
               number: 8428
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: zen-demo-zen-watcher
+  namespace: ${NAMESPACE}
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/rewrite-target: /\$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: localhost
+    http:
+      paths:
       - path: /zen-watcher(/|$)(.*)
         pathType: ImplementationSpecific
         backend:
           service:
             name: zen-watcher
-            namespace: ${NAMESPACE}
             port:
               number: 8080
 EOF
     # Verify ingress resources were created
     if kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && \
-       kubectl get ingress zen-demo-services -n victoriametrics >/dev/null 2>&1; then
+       kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1 && \
+       kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1; then
         echo -e "${GREEN}✓${NC} Ingress resources created"
     else
         echo -e "${YELLOW}⚠${NC}  Ingress resources may not have been created correctly"
@@ -1785,7 +1801,8 @@ for i in {1..60}; do
     # Check ingress resources exist (only if monitoring is enabled)
     if [ "$SKIP_MONITORING" != true ] && [ "$INGRESS_RESOURCES_READY" = false ]; then
         if kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && \
-           kubectl get ingress zen-demo-services -n victoriametrics >/dev/null 2>&1; then
+           kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1 && \
+           kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1; then
             INGRESS_RESOURCES_READY=true
             if [ "$INGRESS_RESOURCES_SHOWN" = false ]; then
                 echo -e "${GREEN}     ✓${NC} Ingress resources"
@@ -1860,7 +1877,10 @@ if [ "$HAS_FAILURES" = true ]; then
         kubectl get ingress zen-demo-grafana -n grafana 2>&1 || echo "    Ingress not found"
         echo ""
         echo -e "${CYAN}    Checking VictoriaMetrics ingress...${NC}"
-        kubectl get ingress zen-demo-services -n victoriametrics 2>&1 || echo "    Ingress not found"
+        kubectl get ingress zen-demo-victoriametrics -n victoriametrics 2>&1 || echo "    Ingress not found"
+        echo ""
+        echo -e "${CYAN}    Checking Zen Watcher ingress...${NC}"
+        kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} 2>&1 || echo "    Ingress not found"
         echo ""
     fi
 fi
