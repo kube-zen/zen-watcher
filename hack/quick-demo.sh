@@ -1716,32 +1716,41 @@ if [ ! -d "./charts/zen-watcher" ]; then
     exit 1
 fi
 
-# Deploy zen-watcher using Helm chart (don't fail on warnings)
-set +e  # Temporarily disable exit on error for Helm command
-helm upgrade --install zen-watcher ./charts/zen-watcher \
-    --namespace ${NAMESPACE} \
-    --create-namespace \
-    --set image.repository="${IMAGE_REPO}" \
-    --set image.tag="${IMAGE_TAG}" \
-    --set image.pullPolicy="${IMAGE_PULL_POLICY}" \
-    --set config.watchNamespace="${NAMESPACE}" \
-    --set config.trivyNamespace="trivy-system" \
-    --set config.falcoNamespace="falco" \
-    --set victoriametricsScrape.enabled=true \
-    --set victoriametricsScrape.interval="15s" \
-    --set service.type=ClusterIP \
-    --set service.port=8080 \
-    --set crd.install=true \
-    --set rbac.create=true \
-    --set serviceAccount.create=true \
-    2>&1 | grep -v "already exists\|unchanged" > /dev/null
-HELM_EXIT_CODE=$?
-set -e  # Re-enable exit on error
-
-if [ $HELM_EXIT_CODE -ne 0 ]; then
-    echo -e "${YELLOW}⚠${NC}  Helm install had errors (exit code: $HELM_EXIT_CODE)"
-    echo -e "${YELLOW}   Continuing anyway - check deployment status later${NC}"
+# Check if VMServiceScrape CRD exists (VictoriaMetrics Operator)
+VM_SERVICESCRAPE_CRD_EXISTS=false
+if kubectl get crd vmservicescrapes.operator.victoriametrics.com >/dev/null 2>&1; then
+    VM_SERVICESCRAPE_CRD_EXISTS=true
 fi
+
+# Build Helm command with conditional VMServiceScrape
+HELM_ARGS=(
+    "upgrade" "--install" "zen-watcher" "./charts/zen-watcher"
+    "--namespace" "${NAMESPACE}"
+    "--create-namespace"
+    "--set" "image.repository=${IMAGE_REPO}"
+    "--set" "image.tag=${IMAGE_TAG}"
+    "--set" "image.pullPolicy=${IMAGE_PULL_POLICY}"
+    "--set" "config.watchNamespace=${NAMESPACE}"
+    "--set" "config.trivyNamespace=trivy-system"
+    "--set" "config.falcoNamespace=falco"
+    "--set" "service.type=ClusterIP"
+    "--set" "service.port=8080"
+    "--set" "crd.install=true"
+    "--set" "rbac.create=true"
+    "--set" "serviceAccount.create=true"
+)
+
+# Only enable VMServiceScrape if the CRD exists
+if [ "$VM_SERVICESCRAPE_CRD_EXISTS" = true ]; then
+    HELM_ARGS+=("--set" "victoriametricsScrape.enabled=true")
+    HELM_ARGS+=("--set" "victoriametricsScrape.interval=15s")
+else
+    HELM_ARGS+=("--set" "victoriametricsScrape.enabled=false")
+    echo -e "${CYAN}   VMServiceScrape CRD not found - disabling VictoriaMetrics scraping${NC}"
+fi
+
+# Deploy zen-watcher using Helm chart
+helm "${HELM_ARGS[@]}" 2>&1 | grep -v "already exists\|unchanged" > /dev/null
 
 # Configure Grafana datasource via ingress (only if monitoring is enabled)
 if [ "$SKIP_MONITORING" != true ]; then
