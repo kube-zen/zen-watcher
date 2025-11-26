@@ -108,13 +108,30 @@ show_total_time() {
 }
 
 # Function to check if all controllers in a namespace are ready
-# Usage: check_namespace_ready <namespace> <name>
-# Checks all deployments, daemonsets, statefulsets, and ingress in the namespace
-# Returns: 0 if all ready, 1 if not ready
+# Usage: check_namespace_ready <namespace> <name> [helm_release_name]
+# Checks if Helm release is deployed, or falls back to checking pods/deployments
+# Returns: 0 if ready, 1 if not ready
 check_namespace_ready() {
     local namespace=$1
     local name=$2
+    local helm_release=${3:-""}
     
+    # If helm_release is provided, check Helm release status first (simpler and more reliable)
+    if [ -n "$helm_release" ]; then
+        # Check if Helm release exists and is deployed
+        if helm ls -n "$namespace" --short 2>/dev/null | grep -q "^${helm_release}$"; then
+            # Check if release status is "deployed"
+            local status=$(helm ls -n "$namespace" -o json 2>/dev/null | \
+                jq -r ".[] | select(.name==\"${helm_release}\") | .status" 2>/dev/null || echo "")
+            if [ "$status" = "deployed" ]; then
+                return 0
+            fi
+        fi
+        # Helm release not found or not deployed yet
+        return 1
+    fi
+    
+    # Fallback: Check deployments, daemonsets, statefulsets, and jobs (for non-Helm components)
     # Check deployments
     local deployments=$(kubectl get deployment -n "$namespace" --no-headers 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")
     if [ "$deployments" -gt 0 ]; then
