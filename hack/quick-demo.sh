@@ -1062,6 +1062,7 @@ case "$PLATFORM" in
         fi
         if timeout 5 kubectl get nodes --request-timeout=5s --kubeconfig=${KUBECONFIG_FILE} &>/dev/null 2>&1; then
             # Cluster connectivity verified (silently)
+            true
         else
             echo -e "${YELLOW}⚠${NC}  Cluster connectivity check failed, but continuing...${NC}"
         fi
