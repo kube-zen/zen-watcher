@@ -1734,6 +1734,8 @@ if [ ! -d "./charts/zen-watcher" ]; then
 fi
 
 # Deploy zen-watcher using Helm chart
+# Temporarily disable exit on error to handle Helm warnings gracefully
+set +e
 helm upgrade --install zen-watcher ./charts/zen-watcher \
     --namespace ${NAMESPACE} \
     --create-namespace \
@@ -1751,6 +1753,11 @@ helm upgrade --install zen-watcher ./charts/zen-watcher \
     --set rbac.create=true \
     --set serviceAccount.create=true \
     2>&1 | grep -v "already exists\|unchanged" > /dev/null
+HELM_EXIT=$?
+set -e
+if [ $HELM_EXIT -ne 0 ]; then
+    echo -e "${YELLOW}⚠${NC}  Helm install had errors (exit code: $HELM_EXIT) - continuing anyway"
+fi
 
 # Configure Grafana datasource via ingress (only if monitoring is enabled)
 if [ "$SKIP_MONITORING" != true ]; then
