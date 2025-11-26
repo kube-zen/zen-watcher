@@ -842,7 +842,8 @@ create_cluster() {
                 # Unset docker config to avoid using docker login credentials
                 export DOCKER_CONFIG=""
             fi
-            if timeout 240 k3d "${k3d_create_args[@]}" 2>&1 | grep -v "You can now use it like this:" | grep -v "^kubectl cluster-info$" | grep -vE "^${HOME}/\.kube/.*-kubeconfig$" | grep -vE "^/.*kubeconfig$" | tee /tmp/k3d-create.log; then
+            # k3d outputs the kubeconfig path - we'll filter duplicates later
+            if timeout 240 k3d "${k3d_create_args[@]}" 2>&1 | tee /tmp/k3d-create.log; then
                 # Cluster creation completed (silently)
                 true
             else
@@ -1950,8 +1951,8 @@ for endpoint_def in "${ENDPOINTS[@]}"; do
     ENDPOINT_SHOWN["$name"]=false
 done
 
-MAX_WAIT=120  # 2 minutes max
-for i in {1..120}; do
+MAX_WAIT=60  # 1 minute max
+for i in {1..60}; do
     ALL_WORKING=true
     
     for endpoint_def in "${ENDPOINTS[@]}"; do
@@ -1993,7 +1994,15 @@ for i in {1..120}; do
             WORKING_COUNT=$((${#ENDPOINTS[@]} - OUTSTANDING_COUNT))
             echo -e "${CYAN}   Still waiting ${WORKING_COUNT}/${#ENDPOINTS[@]} endpoints (${i}s elapsed):${NC}"
             for name in "${OUTSTANDING_LIST[@]}"; do
-                echo -e "${YELLOW}     ⏳${NC} $name"
+                # Get current HTTP code for this endpoint
+                for endpoint_def in "${ENDPOINTS[@]}"; do
+                    IFS=':' read -r ep_name ep_path ep_codes <<< "$endpoint_def"
+                    if [ "$ep_name" = "$name" ]; then
+                        HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}${ep_path} 2>/dev/null || echo "000")
+                        echo -e "${YELLOW}     ⏳${NC} $name (HTTP ${HTTP_CODE})"
+                        break
+                    fi
+                done
             done
         fi
     fi
@@ -2003,17 +2012,45 @@ done
 
 # Show any endpoints that failed after max wait
 FAILED_COUNT=0
+FAILED_ENDPOINTS=()
 for endpoint_def in "${ENDPOINTS[@]}"; do
     IFS=':' read -r name path expected_codes <<< "$endpoint_def"
     if [ "${ENDPOINT_STATUS[$name]}" != "working" ]; then
         FAILED_COUNT=$((FAILED_COUNT + 1))
         HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}${path} 2>/dev/null || echo "000")
         echo -e "${YELLOW}⚠${NC}  $name not accessible (HTTP ${HTTP_CODE})"
+        FAILED_ENDPOINTS+=("$name:$path")
     fi
 done
 
 if [ "$FAILED_COUNT" -gt 0 ]; then
-    echo -e "${YELLOW}⚠${NC}  ${FAILED_COUNT} endpoint(s) failed - check service status and ingress configuration"
+    echo -e "${YELLOW}⚠${NC}  ${FAILED_COUNT} endpoint(s) failed - showing diagnostics..."
+    echo ""
+    
+    # Show ingress and service diagnostics for failed endpoints
+    for failed_ep in "${FAILED_ENDPOINTS[@]}"; do
+        IFS=':' read -r name path <<< "$failed_ep"
+        echo -e "${CYAN}  Diagnostics for $name:${NC}"
+        
+        # Check which service this endpoint should route to
+        if echo "$path" | grep -q "^/grafana"; then
+            echo -e "${CYAN}    Checking Grafana ingress...${NC}"
+            kubectl get ingress zen-demo-grafana -n grafana 2>&1 | head -5 || echo "    Ingress not found"
+            echo -e "${CYAN}    Checking Grafana service...${NC}"
+            kubectl get svc -n grafana 2>&1 | grep -E "grafana|NAME" || echo "    Service not found"
+        elif echo "$path" | grep -q "^/victoriametrics"; then
+            echo -e "${CYAN}    Checking VictoriaMetrics ingress...${NC}"
+            kubectl get ingress zen-demo-victoriametrics -n victoriametrics 2>&1 | head -5 || echo "    Ingress not found"
+            echo -e "${CYAN}    Checking VictoriaMetrics service...${NC}"
+            kubectl get svc -n victoriametrics 2>&1 | grep -E "victoriametrics|NAME" || echo "    Service not found"
+        elif echo "$path" | grep -q "^/zen-watcher"; then
+            echo -e "${CYAN}    Checking Zen Watcher ingress...${NC}"
+            kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} 2>&1 | head -5 || echo "    Ingress not found"
+            echo -e "${CYAN}    Checking Zen Watcher service...${NC}"
+            kubectl get svc -n ${NAMESPACE} 2>&1 | grep -E "zen-watcher|NAME" || echo "    Service not found"
+        fi
+        echo ""
+    done
 fi
 
 # Check observations
