@@ -1774,7 +1774,8 @@ INGRESS_RESOURCES_SHOWN=false
 
 MAX_WAIT=60  # 1 minute max
 EXPECTED_READY=${#COMPONENTS[@]}  # Number of components in the list
-[ "$SKIP_MONITORING" != true ] && EXPECTED_READY=$((EXPECTED_READY + 1))  # Add ingress resources
+# Add ingress resources (Grafana, VictoriaMetrics, and Zen Watcher)
+[ "$SKIP_MONITORING" != true ] && EXPECTED_READY=$((EXPECTED_READY + 3))  # Add 3 ingress resources
 
 for i in {1..60}; do
     READY_COUNT=0
@@ -1799,20 +1800,28 @@ for i in {1..60}; do
     done
     
     # Check ingress resources exist (only if monitoring is enabled)
-    if [ "$SKIP_MONITORING" != true ] && [ "$INGRESS_RESOURCES_READY" = false ]; then
-        if kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && \
-           kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1 && \
-           kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1; then
-            INGRESS_RESOURCES_READY=true
-            if [ "$INGRESS_RESOURCES_SHOWN" = false ]; then
-                echo -e "${GREEN}     ✓${NC} Ingress resources"
-                INGRESS_RESOURCES_SHOWN=true
+    if [ "$SKIP_MONITORING" != true ]; then
+        INGRESS_GRAFANA_READY=false
+        INGRESS_VM_READY=false
+        INGRESS_ZW_READY=false
+        
+        kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && INGRESS_GRAFANA_READY=true
+        kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1 && INGRESS_VM_READY=true
+        kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1 && INGRESS_ZW_READY=true
+        
+        if [ "$INGRESS_GRAFANA_READY" = true ] && [ "$INGRESS_VM_READY" = true ] && [ "$INGRESS_ZW_READY" = true ]; then
+            if [ "$INGRESS_RESOURCES_READY" = false ]; then
+                INGRESS_RESOURCES_READY=true
+                if [ "$INGRESS_RESOURCES_SHOWN" = false ]; then
+                    echo -e "${GREEN}     ✓${NC} Ingress resources"
+                    INGRESS_RESOURCES_SHOWN=true
+                fi
             fi
         fi
-    fi
-    
-    if [ "$SKIP_MONITORING" != true ] && [ "$INGRESS_RESOURCES_READY" = true ]; then
-        READY_COUNT=$((READY_COUNT + 1))
+        
+        [ "$INGRESS_GRAFANA_READY" = true ] && READY_COUNT=$((READY_COUNT + 1))
+        [ "$INGRESS_VM_READY" = true ] && READY_COUNT=$((READY_COUNT + 1))
+        [ "$INGRESS_ZW_READY" = true ] && READY_COUNT=$((READY_COUNT + 1))
     fi
     
     if [ $((i % 10)) -eq 0 ]; then
@@ -1826,14 +1835,29 @@ for i in {1..60}; do
                 OUTSTANDING_LIST+=("$name")
             fi
         done
-        [ "$SKIP_MONITORING" != true ] && [ "$INGRESS_RESOURCES_READY" = false ] && OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1))
+        # Count outstanding ingress resources
+        if [ "$SKIP_MONITORING" != true ]; then
+            INGRESS_GRAFANA_READY=false
+            INGRESS_VM_READY=false
+            INGRESS_ZW_READY=false
+            kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && INGRESS_GRAFANA_READY=true
+            kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1 && INGRESS_VM_READY=true
+            kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1 && INGRESS_ZW_READY=true
+            [ "$INGRESS_GRAFANA_READY" = false ] && OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1))
+            [ "$INGRESS_VM_READY" = false ] && OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1))
+            [ "$INGRESS_ZW_READY" = false ] && OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1))
+        fi
         
         if [ "$OUTSTANDING_COUNT" -gt 0 ]; then
             echo -e "${CYAN}   Still waiting (${i}s elapsed):${NC}"
             for name in "${OUTSTANDING_LIST[@]}"; do
                 echo -e "${YELLOW}     ⏳${NC} $name"
             done
-            [ "$SKIP_MONITORING" != true ] && [ "$INGRESS_RESOURCES_READY" = false ] && echo -e "${YELLOW}     ⏳${NC} Ingress resources"
+            if [ "$SKIP_MONITORING" != true ]; then
+                [ "$INGRESS_GRAFANA_READY" = false ] && echo -e "${YELLOW}     ⏳${NC} Grafana ingress"
+                [ "$INGRESS_VM_READY" = false ] && echo -e "${YELLOW}     ⏳${NC} VictoriaMetrics ingress"
+                [ "$INGRESS_ZW_READY" = false ] && echo -e "${YELLOW}     ⏳${NC} Zen Watcher ingress"
+            fi
         fi
     fi
     
@@ -1855,7 +1879,18 @@ for comp in "${COMPONENTS[@]}"; do
         break
     fi
 done
-[ "$SKIP_MONITORING" != true ] && [ "$INGRESS_RESOURCES_READY" = false ] && HAS_FAILURES=true
+# Check ingress resources separately
+if [ "$SKIP_MONITORING" != true ]; then
+    INGRESS_GRAFANA_READY=false
+    INGRESS_VM_READY=false
+    INGRESS_ZW_READY=false
+    kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && INGRESS_GRAFANA_READY=true
+    kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1 && INGRESS_VM_READY=true
+    kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1 && INGRESS_ZW_READY=true
+    [ "$INGRESS_GRAFANA_READY" = false ] && HAS_FAILURES=true
+    [ "$INGRESS_VM_READY" = false ] && HAS_FAILURES=true
+    [ "$INGRESS_ZW_READY" = false ] && HAS_FAILURES=true
+fi
 
 if [ "$HAS_FAILURES" = true ]; then
     echo -e "${YELLOW}⚠${NC}  Some components are not ready. Diagnostics:${NC}"
@@ -1871,17 +1906,21 @@ if [ "$HAS_FAILURES" = true ]; then
     done
     
     # Show ingress resources diagnostics separately (they're not pods)
-    if [ "$SKIP_MONITORING" != true ] && [ "$INGRESS_RESOURCES_READY" = false ]; then
-        echo -e "${YELLOW}  Ingress resources:${NC}"
-        echo -e "${CYAN}    Checking Grafana ingress...${NC}"
-        kubectl get ingress zen-demo-grafana -n grafana 2>&1 || echo "    Ingress not found"
-        echo ""
-        echo -e "${CYAN}    Checking VictoriaMetrics ingress...${NC}"
-        kubectl get ingress zen-demo-victoriametrics -n victoriametrics 2>&1 || echo "    Ingress not found"
-        echo ""
-        echo -e "${CYAN}    Checking Zen Watcher ingress...${NC}"
-        kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} 2>&1 || echo "    Ingress not found"
-        echo ""
+    if [ "$SKIP_MONITORING" != true ]; then
+        INGRESS_GRAFANA_READY=false
+        INGRESS_VM_READY=false
+        INGRESS_ZW_READY=false
+        kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && INGRESS_GRAFANA_READY=true
+        kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1 && INGRESS_VM_READY=true
+        kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1 && INGRESS_ZW_READY=true
+        
+        if [ "$INGRESS_GRAFANA_READY" = false ] || [ "$INGRESS_VM_READY" = false ] || [ "$INGRESS_ZW_READY" = false ]; then
+            echo -e "${YELLOW}  Ingress resources:${NC}"
+            [ "$INGRESS_GRAFANA_READY" = false ] && echo -e "${CYAN}    Checking Grafana ingress...${NC}" && kubectl get ingress zen-demo-grafana -n grafana 2>&1 || echo "    Ingress not found"
+            [ "$INGRESS_VM_READY" = false ] && echo -e "${CYAN}    Checking VictoriaMetrics ingress...${NC}" && kubectl get ingress zen-demo-victoriametrics -n victoriametrics 2>&1 || echo "    Ingress not found"
+            [ "$INGRESS_ZW_READY" = false ] && echo -e "${CYAN}    Checking Zen Watcher ingress...${NC}" && kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} 2>&1 || echo "    Ingress not found"
+            echo ""
+        fi
     fi
 fi
 
