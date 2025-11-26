@@ -1839,7 +1839,7 @@ ENDPOINTS=(
     "Grafana Dashboard:/grafana/d/zen-watcher:200,302,401,403"
     "VictoriaMetrics:/victoriametrics/:200,204,301,302"
     "VictoriaMetrics API:/victoriametrics/api/v1/query:200,400,405"
-    "VictoriaMetrics VMUI:/victoriametrics/vmui/:200,301,302"
+    "VictoriaMetrics VMUI:/victoriametrics/vmui/:200,301,302,400"
     "Zen Watcher Health:/zen-watcher/health:200"
     "Zen Watcher Metrics:/zen-watcher/metrics:200"
 )
