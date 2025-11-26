@@ -1345,7 +1345,7 @@ helm repo add aqua https://aquasecurity.github.io/helm-charts 2>&1 | grep -v "al
 helm repo add falcosecurity https://falcosecurity.github.io/charts 2>&1 | grep -v "already exists" > /dev/null || true
 helm repo add kyverno https://kyverno.github.io/kyverno/ 2>&1 | grep -v "already exists" > /dev/null || true
 # Add zen-watcher chart repository
-helm repo add kube-zen https://charts.kube-zen.io 2>&1 | grep -v "already exists" > /dev/null || true
+helm repo add kube-zen https://kube-zen.github.io/helm-charts 2>&1 | grep -v "already exists" > /dev/null || true
 helm repo update > /dev/null 2>&1 || true
 
 # Run helmfile sync (this handles all Helm installations)
@@ -1728,9 +1728,9 @@ done
                 if [ "${COMPONENT_SHOWN[Zen Watcher ingress]}" != "true" ]; then
                     echo -e "${GREEN}     ✓${NC} Zen Watcher ingress"
                     COMPONENT_SHOWN["Zen Watcher ingress"]=true
-                fi
             fi
         fi
+    fi
         
         # Count ready ingress resources
         [ "${COMPONENT_READY[Grafana ingress]}" = "true" ] && READY_COUNT=$((READY_COUNT + 1))
@@ -1930,20 +1930,20 @@ if [ "$SKIP_MONITORING" != true ] && [ "${ENDPOINT_STATUS[Grafana]}" = "working"
     # Configure VictoriaMetrics datasource
     echo -e "${CYAN}  Configuring VictoriaMetrics datasource...${NC}"
     DATASOURCE_RESULT=$(timeout 15 curl -s -X POST \
-        -H "Content-Type: application/json" \
+    -H "Content-Type: application/json" \
         -H "Host: localhost" \
-        -u zen:${GRAFANA_PASSWORD} \
-        -d '{
-            "name": "VictoriaMetrics",
-            "type": "prometheus",
+    -u zen:${GRAFANA_PASSWORD} \
+    -d '{
+        "name": "VictoriaMetrics",
+        "type": "prometheus",
             "url": "http://victoriametrics-single-vms-server.victoriametrics.svc.cluster.local:8428/victoriametrics",
-            "access": "proxy",
-            "isDefault": true,
-            "jsonData": {
-                "httpMethod": "POST"
-            }
-        }' \
-        http://localhost:${INGRESS_HTTP_PORT}/grafana/api/datasources 2>&1 || echo "timeout or error")
+        "access": "proxy",
+        "isDefault": true,
+        "jsonData": {
+            "httpMethod": "POST"
+        }
+    }' \
+    http://localhost:${INGRESS_HTTP_PORT}/grafana/api/datasources 2>&1 || echo "timeout or error")
 
     if echo "$DATASOURCE_RESULT" | grep -qE "Datasource added|already exists|success|message.*VictoriaMetrics"; then
         echo -e "${GREEN}    ✓${NC} Datasource configured"
@@ -1978,22 +1978,22 @@ if [ "$SKIP_MONITORING" != true ] && [ "${ENDPOINT_STATUS[Grafana]}" = "working"
     
     # Import dashboard
     echo -e "${CYAN}  Importing Zen Watcher dashboard...${NC}"
-    if [ -f "config/dashboards/zen-watcher-dashboard.json" ]; then
+if [ -f "config/dashboards/zen-watcher-dashboard.json" ]; then
         DASHBOARD_RESULT=$(timeout 15 cat config/dashboards/zen-watcher-dashboard.json | \
-        jq '{dashboard: ., overwrite: true, message: "Demo Import"}' | \
-        curl -s -X POST \
-            -H "Content-Type: application/json" \
+    jq '{dashboard: ., overwrite: true, message: "Demo Import"}' | \
+    curl -s -X POST \
+        -H "Content-Type: application/json" \
             -H "Host: localhost" \
-            -u zen:${GRAFANA_PASSWORD} \
-            -d @- \
-            http://localhost:${INGRESS_HTTP_PORT}/grafana/api/dashboards/db 2>&1 || echo "timeout or error")
-        
+        -u zen:${GRAFANA_PASSWORD} \
+        -d @- \
+        http://localhost:${INGRESS_HTTP_PORT}/grafana/api/dashboards/db 2>&1 || echo "timeout or error")
+    
         if echo "$DASHBOARD_RESULT" | grep -qE "success|Dashboard.*imported|message.*success"; then
             echo -e "${GREEN}    ✓${NC} Dashboard imported successfully"
-        else
-            echo -e "${YELLOW}    ⚠${NC}  Dashboard import failed: $(echo "$DASHBOARD_RESULT" | jq -r '.message // .' 2>/dev/null | head -1)"
-        fi
     else
+            echo -e "${YELLOW}    ⚠${NC}  Dashboard import failed: $(echo "$DASHBOARD_RESULT" | jq -r '.message // .' 2>/dev/null | head -1)"
+    fi
+else
         echo -e "${YELLOW}    ⚠${NC}  Dashboard file not found at config/dashboards/zen-watcher-dashboard.json"
     fi
 elif [ "$SKIP_MONITORING" != true ]; then
