@@ -1559,7 +1559,6 @@ spec:
       - name: victoriametrics
         image: victoriametrics/victoria-metrics:latest
         args:
-          - -http.pathPrefix=/victoriametrics
           - -promscrape.config=/etc/vm/scrape.yml
         ports:
         - containerPort: 8428
