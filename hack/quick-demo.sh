@@ -1302,11 +1302,6 @@ fi
 # Create ingress resources (only if monitoring is enabled)
 if [ "$SKIP_MONITORING" != true ]; then
     echo -e "${YELLOW}→${NC} Creating ingress resources..."
-    # Ensure namespaces exist before creating ingress resources
-    kubectl create namespace grafana 2>&1 | grep -v "already exists" > /dev/null || true
-    kubectl create namespace victoriametrics 2>&1 | grep -v "already exists" > /dev/null || true
-    kubectl create namespace ${NAMESPACE} 2>/dev/null || true
-    sleep 1
     
     # Create ingress with host-based routing and path rewriting
     cat <<EOF | timeout 30 kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" > /dev/null || true
@@ -1387,10 +1382,7 @@ EOF
     fi
 fi
 
-# Create namespace
-if [ "${USE_EXISTING_NAMESPACE:-false}" != "true" ]; then
-    kubectl create namespace ${NAMESPACE} 2>/dev/null || true
-fi
+# Namespace will be created by Helm when installing zen-watcher
 
 if [ "$INSTALL_TRIVY" = true ] || [ "$INSTALL_FALCO" = true ] || [ "$INSTALL_KYVERNO" = true ] || [ "$INSTALL_CHECKOV" = true ] || [ "$INSTALL_KUBE_BENCH" = true ]; then
 
@@ -1464,7 +1456,6 @@ EOF
     # Deploy Checkov as a Kubernetes Job
     if [ "$INSTALL_CHECKOV" = true ]; then
         echo -e "${YELLOW}→${NC} Deploying Checkov scanning job..."
-        kubectl create namespace checkov 2>/dev/null || true
         
         # Create ConfigMap with demo manifests for Checkov to scan
         echo -e "${CYAN}   Creating demo manifests ConfigMap...${NC}"
@@ -1511,7 +1502,6 @@ EOF
     # Deploy kube-bench as a Kubernetes Job
     if [ "$INSTALL_KUBE_BENCH" = true ]; then
         echo -e "${YELLOW}→${NC} Deploying kube-bench CIS benchmark job..."
-        kubectl create namespace kube-bench 2>/dev/null || true
         
         # Detect cluster type for kube-bench benchmark target
         bench_target="cis-1.6"
@@ -1640,8 +1630,6 @@ spec:
         configMap:
           name: victoriametrics-scrape-config
 EOF
-# Create namespace for VictoriaMetrics
-kubectl create namespace victoriametrics 2>&1 | grep -v "already exists" > /dev/null || true
 
 # Expose VictoriaMetrics as ClusterIP (ingress will handle routing)
 if kubectl get svc victoriametrics -n victoriametrics &>/dev/null; then
@@ -1655,8 +1643,6 @@ kubectl expose deployment victoriametrics \
 
 # Deploy Grafana with zen user
 echo -e "${YELLOW}→${NC} Deploying Grafana..."
-# Create namespace for Grafana
-kubectl create namespace grafana 2>&1 | grep -v "already exists" > /dev/null || true
 
 kubectl create deployment grafana \
     --image=grafana/grafana:latest \
@@ -1729,21 +1715,6 @@ if [ ! -d "./charts/zen-watcher" ]; then
     exit 1
 fi
 
-# Check if namespace exists and is managed by Helm
-# If namespace exists but isn't managed by Helm, we need to let Helm create it or delete it first
-NAMESPACE_EXISTS=false
-if kubectl get namespace ${NAMESPACE} >/dev/null 2>&1; then
-    NAMESPACE_EXISTS=true
-    # Check if namespace is managed by Helm
-    if ! kubectl get namespace ${NAMESPACE} -o jsonpath='{.metadata.labels.app\.kubernetes\.io/managed-by}' 2>/dev/null | grep -q "Helm"; then
-        # Namespace exists but isn't managed by Helm - delete it so Helm can create it
-        echo -e "${CYAN}   Removing existing namespace to allow Helm to manage it...${NC}"
-        kubectl delete namespace ${NAMESPACE} --wait=false 2>&1 | grep -v "not found" > /dev/null || true
-        # Wait a bit for namespace deletion
-        sleep 2
-        NAMESPACE_EXISTS=false
-    fi
-fi
 
 # Deploy zen-watcher using Helm chart
 # Temporarily disable exit on error to handle Helm warnings gracefully
