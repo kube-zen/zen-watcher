@@ -126,8 +126,9 @@ check_namespace_ready() {
         
         # Check if Helm release exists and is deployed
         # Use helm ls to check status - simpler than checking individual pods
-        # STATUS is column 5 in helm ls output: NAME NAMESPACE REVISION UPDATED STATUS CHART APP_VERSION
-        local release_status=$(helm ls $kubeconfig_arg -n "$namespace" 2>/dev/null | grep "^${helm_release}[[:space:]]" | awk '{print $5}' || echo "")
+        # STATUS is column 8 in helm ls output (date/time splits into multiple columns)
+        # Format: NAME NAMESPACE REVISION DATE TIME TIMEZONE STATUS CHART APP_VERSION
+        local release_status=$(helm ls $kubeconfig_arg -n "$namespace" 2>/dev/null | grep "^${helm_release}[[:space:]]" | awk '{print $8}' || echo "")
         # If status is "deployed", component is ready
         if [ "$release_status" = "deployed" ]; then
             return 0
