@@ -844,6 +844,7 @@ create_cluster() {
             fi
             if timeout 240 k3d "${k3d_create_args[@]}" 2>&1 | tee /tmp/k3d-create.log; then
                 # Cluster creation completed (silently)
+                true
             else
                 local exit_code=$?
                 # Check if cluster was actually created despite timeout
