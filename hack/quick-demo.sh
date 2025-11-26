@@ -842,7 +842,7 @@ create_cluster() {
                 # Unset docker config to avoid using docker login credentials
                 export DOCKER_CONFIG=""
             fi
-            if timeout 240 k3d "${k3d_create_args[@]}" 2>&1 | tee /tmp/k3d-create.log; then
+            if timeout 240 k3d "${k3d_create_args[@]}" 2>&1 | grep -v "You can now use it like this:" | grep -v "^kubectl cluster-info$" | grep -vE "^${HOME}/\.kube/.*-kubeconfig$" | grep -vE "^/.*kubeconfig$" | tee /tmp/k3d-create.log; then
                 # Cluster creation completed (silently)
                 true
             else
