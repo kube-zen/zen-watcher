@@ -45,6 +45,7 @@ releases:
     needs: []
     installed: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
     values:
+      - nameOverride: vms
       - server:
           enabled: true
           replicaCount: 1
