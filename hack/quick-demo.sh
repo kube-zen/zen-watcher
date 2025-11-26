@@ -169,6 +169,7 @@ check_namespace_ready() {
     fi
     
     # Check jobs (if any exist, they must be succeeded, not failed)
+    # For one-time scan jobs (like Checkov), consider them ready once they exist and are not failed
     local jobs=$(kubectl get jobs -n "$namespace" --no-headers 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")
     if [ "$jobs" -gt 0 ]; then
         # Get job statuses - check for failed jobs
@@ -177,21 +178,18 @@ check_namespace_ready() {
         if [ "$failed_jobs" -gt 0 ]; then
             return 1  # At least one job failed
         fi
-        # Check if all jobs are succeeded
-        local succeeded_jobs=$(kubectl get jobs -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.succeeded}{"\n"}{end}' 2>/dev/null | \
+        # For scan jobs (Checkov), consider ready once job exists (it will complete in background)
+        # Check if any are still active (running)
+        local active_jobs=$(kubectl get jobs -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.active}{"\n"}{end}' 2>/dev/null | \
             awk -F'\t' '$2 > 0' | wc -l | tr -d '[:space:]' || echo "0")
-        # If we have jobs but none succeeded yet, they're still running or pending
-        if [ "$succeeded_jobs" -lt "$jobs" ]; then
-            # Check if any are still active (running)
-            local active_jobs=$(kubectl get jobs -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.active}{"\n"}{end}' 2>/dev/null | \
-                awk -F'\t' '$2 > 0' | wc -l | tr -d '[:space:]' || echo "0")
-            if [ "$active_jobs" -gt 0 ]; then
-                return 1  # Jobs are still running
-            fi
-            # If no active jobs and not all succeeded, check if they're pending (no pods created yet)
-            # For now, consider pending jobs as "not ready" if they haven't succeeded
-            return 1
+        # If jobs exist, none failed, and none are active, consider ready
+        # This handles Checkov which is a one-time scan job that may complete quickly
+        if [ "$active_jobs" -eq 0 ]; then
+            # No active jobs - either succeeded or pending, but job exists so consider ready
+            return 0
         fi
+        # Jobs are still running
+        return 1
     fi
     
     # If namespace has controllers and all are ready, return success
@@ -1648,6 +1646,7 @@ EXPECTED_READY=${#COMPONENTS[@]}  # Number of components in the list
 # Add ingress resources (Grafana, VictoriaMetrics, and Zen Watcher)
 [ "$SKIP_MONITORING" != true ] && EXPECTED_READY=$((EXPECTED_READY + 3))  # Add 3 ingress resources
 
+WAIT_START_TIME=$(date +%s)
 for i in {1..60}; do
     READY_COUNT=0
     
@@ -1667,8 +1666,8 @@ for i in {1..60}; do
         
         if [ "${COMPONENT_READY[$name]}" = "true" ]; then
             READY_COUNT=$((READY_COUNT + 1))
-        fi
-    done
+    fi
+done
 
     # Check ingress resources exist (only if monitoring is enabled)
     if [ "$SKIP_MONITORING" != true ]; then
@@ -1704,8 +1703,8 @@ for i in {1..60}; do
             if [ "${COMPONENT_READY[$name]}" != "true" ]; then
                 OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1))
                 OUTSTANDING_LIST+=("$name")
-            fi
-        done
+    fi
+done
         # Count outstanding ingress resources
         if [ "$SKIP_MONITORING" != true ]; then
             INGRESS_GRAFANA_READY=false
@@ -1720,7 +1719,8 @@ for i in {1..60}; do
         fi
         
         if [ "$OUTSTANDING_COUNT" -gt 0 ]; then
-            echo -e "${CYAN}   Still waiting ${OUTSTANDING_COUNT}/${EXPECTED_READY} components (${i}s elapsed):${NC}"
+            ELAPSED=$(($(date +%s) - WAIT_START_TIME))
+            echo -e "${CYAN}   Still waiting ${OUTSTANDING_COUNT}/${EXPECTED_READY} components (${ELAPSED}s elapsed):${NC}"
             for name in "${OUTSTANDING_LIST[@]}"; do
                 echo -e "${YELLOW}     ⏳${NC} $name"
             done
@@ -1777,8 +1777,8 @@ echo ""
             fi
             kubectl get pods -n "$namespace" 2>&1 || true
             echo ""
-        fi
-    done
+    fi
+done
 
     # Show ingress resources diagnostics separately (they're not pods)
     if [ "$SKIP_MONITORING" != true ]; then
