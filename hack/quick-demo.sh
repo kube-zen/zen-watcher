@@ -1439,8 +1439,8 @@ fi
 
 # Namespace will be created by Helm when installing zen-watcher
 
-# Deploy security tools that aren't in Helmfile (Checkov, kube-bench)
-if [ "$INSTALL_CHECKOV" = true ] || [ "$INSTALL_KUBE_BENCH" = true ]; then
+# Deploy security tools that aren't in Helmfile (Checkov only - kube-bench is now in Helmfile)
+if [ "$INSTALL_CHECKOV" = true ]; then
 
     # Deploy Checkov as a Kubernetes Job
     if [ "$INSTALL_CHECKOV" = true ]; then
