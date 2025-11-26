@@ -1759,13 +1759,15 @@ done
 
 # Show all components that will be checked (so user knows what to expect)
 TOTAL_COMPONENTS=${#COMPONENTS[@]}
-[ "$SKIP_MONITORING" != true ] && TOTAL_COMPONENTS=$((TOTAL_COMPONENTS + 1))
+[ "$SKIP_MONITORING" != true ] && TOTAL_COMPONENTS=$((TOTAL_COMPONENTS + 3))  # Add 3 ingress resources
 echo -e "${CYAN}   Checking ${TOTAL_COMPONENTS} component(s):${NC}"
 for comp in "${COMPONENTS[@]}"; do
     IFS='|' read -r namespace name <<< "$comp"
     echo -e "${CYAN}     - ${name}${NC}"
 done
-[ "$SKIP_MONITORING" != true ] && echo -e "${CYAN}     - Ingress resources${NC}"
+[ "$SKIP_MONITORING" != true ] && echo -e "${CYAN}     - Grafana ingress${NC}"
+[ "$SKIP_MONITORING" != true ] && echo -e "${CYAN}     - VictoriaMetrics ingress${NC}"
+[ "$SKIP_MONITORING" != true ] && echo -e "${CYAN}     - Zen Watcher ingress${NC}"
 echo ""
 
 # Also track ingress resources separately (only if monitoring is enabled)
