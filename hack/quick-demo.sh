@@ -1709,7 +1709,8 @@ fi
 # Ensure namespace exists before Helm install
 kubectl create namespace ${NAMESPACE} 2>&1 | grep -v "already exists" > /dev/null || true
 
-helm upgrade --install zen-watcher ./charts/zen-watcher \
+# Deploy zen-watcher using Helm chart
+if ! helm upgrade --install zen-watcher ./charts/zen-watcher \
     --namespace ${NAMESPACE} \
     --create-namespace \
     --set image.repository="${IMAGE_REPO}" \
@@ -1725,7 +1726,9 @@ helm upgrade --install zen-watcher ./charts/zen-watcher \
     --set crd.install=true \
     --set rbac.create=true \
     --set serviceAccount.create=true \
-    > /dev/null 2>&1
+    2>&1 | grep -v "already exists\|unchanged" > /dev/null; then
+    echo -e "${YELLOW}⚠${NC}  Helm install had warnings (continuing anyway)"
+fi
 
 # Configure Grafana datasource via ingress (only if monitoring is enabled)
 if [ "$SKIP_MONITORING" != true ]; then
