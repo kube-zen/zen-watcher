@@ -1442,8 +1442,8 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: /victoriametrics/\$2
     nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/configuration-snippet: |
-      sub_filter '</head>' '<base href="/victoriametrics/"></head>';
-      sub_filter_once on;
+      sub_filter '<head>' '<head><base href="/victoriametrics/">';
+      sub_filter_once off;
 spec:
   ingressClassName: nginx
   rules:
