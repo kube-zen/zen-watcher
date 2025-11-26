@@ -1219,6 +1219,9 @@ for retry in {1..5}; do
     fi
 done
 
+# Suppress any kubectl output that might print kubeconfig path
+export KUBECONFIG=${KUBECONFIG_FILE}
+
 # Add ingress-nginx helm repo if not already added
 if ! timeout 10 helm repo list 2>/dev/null | grep -q ingress-nginx; then
     timeout 30 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx 2>&1 || true
@@ -1713,6 +1716,8 @@ fi
 
 # Wait for all components to be ready and verify endpoints
 echo ""
+show_section_time "Installing All Components"
+echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BLUE}  Waiting for Components to be Ready${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -1728,6 +1733,15 @@ for comp in "${COMPONENTS[@]}"; do
     COMPONENT_READY["$name"]=false
     COMPONENT_SHOWN["$name"]=false
 done
+
+# Show all components that will be checked (so user knows what to expect)
+echo -e "${CYAN}   Checking ${#COMPONENTS[@]} component(s):${NC}"
+for comp in "${COMPONENTS[@]}"; do
+    IFS='|' read -r namespace name <<< "$comp"
+    echo -e "${CYAN}     - ${name}${NC}"
+done
+[ "$SKIP_MONITORING" != true ] && echo -e "${CYAN}     - Ingress resources${NC}"
+echo ""
 
 # Also track ingress resources separately (only if monitoring is enabled)
 INGRESS_RESOURCES_READY=false
