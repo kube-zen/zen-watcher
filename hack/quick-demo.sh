@@ -1715,7 +1715,6 @@ if [ ! -d "./charts/zen-watcher" ]; then
     exit 1
 fi
 
-
 # Deploy zen-watcher using Helm chart
 # Temporarily disable exit on error to handle Helm warnings gracefully
 set +e
