@@ -843,7 +843,7 @@ create_cluster() {
                 export DOCKER_CONFIG=""
             fi
             if timeout 240 k3d "${k3d_create_args[@]}" 2>&1 | tee /tmp/k3d-create.log; then
-                echo -e "${GREEN}✓${NC} Cluster creation completed"
+                # Cluster creation completed (silently)
             else
                 local exit_code=$?
                 # Check if cluster was actually created despite timeout
@@ -940,18 +940,8 @@ EOF
     esac
 }
 
-SECTION_START_TIME=$(date +%s)
+CLUSTER_START_TIME=$(date +%s)
 create_cluster
-CLUSTER_END_TIME=$(date +%s)
-CLUSTER_ELAPSED=$((CLUSTER_END_TIME - SECTION_START_TIME))
-TOTAL_ELAPSED=$((CLUSTER_END_TIME - SCRIPT_START_TIME))
-TOTAL_MINUTES=$((TOTAL_ELAPSED / 60))
-TOTAL_SECONDS=$((TOTAL_ELAPSED % 60))
-if [ $TOTAL_MINUTES -gt 0 ]; then
-    echo -e "${GREEN}✓${NC} Cluster is ready (${CLUSTER_ELAPSED}s, total: ${TOTAL_MINUTES}m ${TOTAL_SECONDS}s)"
-else
-    echo -e "${GREEN}✓${NC} Cluster is ready (${CLUSTER_ELAPSED}s, total: ${TOTAL_SECONDS}s)"
-fi
 SECTION_START_TIME=$(date +%s)
 # Set up kubeconfig (silently)
 SECTION_START_TIME=$(date +%s)
@@ -1027,7 +1017,7 @@ case "$PLATFORM" in
         for wait_attempt in {1..60}; do
             # Test API access directly (more reliable than waiting for nodes)
             if timeout 5 kubectl get --raw /api/v1 2>/dev/null | grep -q "kind\|versions"; then
-                echo -e "${GREEN}✓${NC} Cluster API is accessible (after $((wait_attempt*2)) seconds)"
+                # Cluster API is accessible (silently)
                 CLUSTER_READY=true
                 break
             fi
@@ -1043,13 +1033,13 @@ case "$PLATFORM" in
         for retry in {1..20}; do
             # Test API access (more reliable than checking nodes)
             if timeout 10 kubectl get --raw /api/v1 --request-timeout=5s 2>/dev/null | grep -q "kind\|versions"; then
-                echo -e "${GREEN}✓${NC} Cluster API is accessible"
+                # Cluster API is accessible (silently)
                 CLUSTER_ACCESSIBLE=true
                 break
             fi
             # Also try nodes as fallback
             if timeout 10 kubectl get nodes --request-timeout=5s > /dev/null 2>&1; then
-                echo -e "${GREEN}✓${NC} Cluster is accessible"
+                # Cluster is accessible (silently)
                 CLUSTER_ACCESSIBLE=true
                 break
             fi
@@ -1070,7 +1060,7 @@ case "$PLATFORM" in
             exit 1
         fi
         if timeout 5 kubectl get nodes --request-timeout=5s --kubeconfig=${KUBECONFIG_FILE} &>/dev/null 2>&1; then
-            echo -e "${GREEN}✓${NC} Cluster connectivity verified"
+            # Cluster connectivity verified (silently)
         else
             echo -e "${YELLOW}⚠${NC}  Cluster connectivity check failed, but continuing...${NC}"
         fi
