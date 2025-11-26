@@ -64,8 +64,6 @@ releases:
           persistentVolume:
             enabled: false
           emptyDir: {}
-          extraArgs:
-            http.pathPrefix: /victoriametrics
 
   # Grafana (depends on VictoriaMetrics for datasource)
   - name: grafana
