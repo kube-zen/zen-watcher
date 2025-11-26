@@ -1742,7 +1742,9 @@ for comp in "${COMPONENTS[@]}"; do
 done
 
 # Show all components that will be checked (so user knows what to expect)
-echo -e "${CYAN}   Checking ${#COMPONENTS[@]} component(s):${NC}"
+TOTAL_COMPONENTS=${#COMPONENTS[@]}
+[ "$SKIP_MONITORING" != true ] && TOTAL_COMPONENTS=$((TOTAL_COMPONENTS + 1))
+echo -e "${CYAN}   Checking ${TOTAL_COMPONENTS} component(s):${NC}"
 for comp in "${COMPONENTS[@]}"; do
     IFS='|' read -r namespace name <<< "$comp"
     echo -e "${CYAN}     - ${name}${NC}"
