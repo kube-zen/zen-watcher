@@ -1358,6 +1358,35 @@ else
     fi
 fi
 
+# Install zen-watcher separately (local chart, will be moved to repository later)
+echo -e "${YELLOW}→${NC} Installing zen-watcher (local chart)..."
+VMS_ENABLED=$([ "$SKIP_MONITORING" != true ] && echo "true" || echo "false")
+if helm upgrade --install zen-watcher charts/zen-watcher \
+    --create-namespace \
+    --namespace "${NAMESPACE}" \
+    --set image.repository="${ZEN_IMAGE_REPO}" \
+    --set image.tag="${ZEN_IMAGE_TAG}" \
+    --set image.pullPolicy="${IMAGE_PULL_POLICY}" \
+    --set config.watchNamespace="${NAMESPACE}" \
+    --set config.trivyNamespace=trivy-system \
+    --set config.falcoNamespace=falco \
+    --set victoriametricsScrape.enabled="${VMS_ENABLED}" \
+    --set victoriametricsScrape.interval=15s \
+    --set service.type=ClusterIP \
+    --set service.port=8080 \
+    --set crd.install=true \
+    --set rbac.create=true \
+    --set serviceAccount.create=true \
+    --reset-values \
+    --history-max 10 \
+    --quiet \
+    2>&1; then
+    echo -e "${GREEN}✓${NC} zen-watcher installed"
+else
+    echo -e "${RED}✗${NC} Failed to install zen-watcher"
+    exit 1
+fi
+
 # Delete ingress admission webhooks if created (they cause TLS issues)
 sleep 2
 kubectl delete validatingwebhookconfiguration ingress-nginx-admission 2>&1 | grep -v "not found" > /dev/null || true
