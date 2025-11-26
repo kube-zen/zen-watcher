@@ -1219,21 +1219,23 @@ echo ""
 COMPONENTS=()
 
 # Always install ingress and zen-watcher
-COMPONENTS+=("ingress-nginx|Ingress Controller")
-COMPONENTS+=("${NAMESPACE}|Zen Watcher")
+# Format: "namespace|name|helm_release" (helm_release is optional, used for Helm-based components)
+COMPONENTS+=("ingress-nginx|Ingress Controller|ingress-nginx")
+COMPONENTS+=("${NAMESPACE}|Zen Watcher|zen-watcher")
 
 # Monitoring stack (Grafana and VictoriaMetrics go together, in separate namespaces)
 if [ "$SKIP_MONITORING" != true ]; then
-    COMPONENTS+=("victoriametrics|VictoriaMetrics")
-    COMPONENTS+=("grafana|Grafana")
+    COMPONENTS+=("victoriametrics|VictoriaMetrics|victoriametrics-cluster")
+    COMPONENTS+=("victoriametrics-operator|VictoriaMetrics Operator|victoriametrics-operator")
+    COMPONENTS+=("grafana|Grafana|grafana")
 fi
 
 # Security tools (flags are now set above)
-[ "$INSTALL_TRIVY" = true ] && COMPONENTS+=("trivy-system|Trivy Operator")
-[ "$INSTALL_FALCO" = true ] && COMPONENTS+=("falco|Falco")
-[ "$INSTALL_KYVERNO" = true ] && COMPONENTS+=("kyverno|Kyverno")
-[ "$INSTALL_CHECKOV" = true ] && COMPONENTS+=("checkov|Checkov")
-[ "$INSTALL_KUBE_BENCH" = true ] && COMPONENTS+=("kube-bench|kube-bench")
+[ "$INSTALL_TRIVY" = true ] && COMPONENTS+=("trivy-system|Trivy Operator|trivy-operator")
+[ "$INSTALL_FALCO" = true ] && COMPONENTS+=("falco|Falco|falco")
+[ "$INSTALL_KYVERNO" = true ] && COMPONENTS+=("kyverno|Kyverno|kyverno")
+[ "$INSTALL_CHECKOV" = true ] && COMPONENTS+=("checkov|Checkov|")
+[ "$INSTALL_KUBE_BENCH" = true ] && COMPONENTS+=("kube-bench|kube-bench|")
 
     SECTION_START_TIME=$(date +%s)
 
@@ -1633,7 +1635,7 @@ declare -A COMPONENT_SHOWN
 
 # Initialize all components as not ready and not shown
 for comp in "${COMPONENTS[@]}"; do
-    IFS='|' read -r namespace name <<< "$comp"
+    IFS='|' read -r namespace name helm_release <<< "$comp"
     COMPONENT_READY["$name"]=false
     COMPONENT_SHOWN["$name"]=false
 done
@@ -1643,7 +1645,7 @@ TOTAL_COMPONENTS=${#COMPONENTS[@]}
 [ "$SKIP_MONITORING" != true ] && TOTAL_COMPONENTS=$((TOTAL_COMPONENTS + 3))  # Add 3 ingress resources
 echo -e "${CYAN}   Checking ${TOTAL_COMPONENTS} component(s):${NC}"
 for comp in "${COMPONENTS[@]}"; do
-    IFS='|' read -r namespace name <<< "$comp"
+    IFS='|' read -r namespace name helm_release <<< "$comp"
     echo -e "${CYAN}     - ${name}${NC}"
 done
 [ "$SKIP_MONITORING" != true ] && echo -e "${CYAN}     - Grafana ingress${NC}"
@@ -1665,10 +1667,10 @@ for i in {1..60}; do
     
     # Check all components from the list
     for comp in "${COMPONENTS[@]}"; do
-        IFS='|' read -r namespace name <<< "$comp"
+        IFS='|' read -r namespace name helm_release <<< "$comp"
         
         if [ "${COMPONENT_READY[$name]}" != "true" ]; then
-            if check_namespace_ready "$namespace" "$name"; then
+            if check_namespace_ready "$namespace" "$name" "$helm_release"; then
                 COMPONENT_READY["$name"]=true
                 if [ "${COMPONENT_SHOWN[$name]}" != "true" ]; then
                     echo -e "${GREEN}     ✓${NC} $name"
@@ -1679,8 +1681,8 @@ for i in {1..60}; do
         
         if [ "${COMPONENT_READY[$name]}" = "true" ]; then
             READY_COUNT=$((READY_COUNT + 1))
-    fi
-done
+        fi
+    done
 
     # Check ingress resources exist (only if monitoring is enabled)
     if [ "$SKIP_MONITORING" != true ]; then
@@ -1712,12 +1714,12 @@ done
         OUTSTANDING_COUNT=0
         OUTSTANDING_LIST=()
         for comp in "${COMPONENTS[@]}"; do
-            IFS='|' read -r namespace name <<< "$comp"
+            IFS='|' read -r namespace name helm_release <<< "$comp"
             if [ "${COMPONENT_READY[$name]}" != "true" ]; then
                 OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1))
                 OUTSTANDING_LIST+=("$name")
-    fi
-done
+            fi
+        done
         # Count outstanding ingress resources
         if [ "$SKIP_MONITORING" != true ]; then
             INGRESS_GRAFANA_READY=false
@@ -1756,7 +1758,7 @@ done
 echo ""
 HAS_FAILURES=false
 for comp in "${COMPONENTS[@]}"; do
-    IFS='|' read -r namespace name <<< "$comp"
+    IFS='|' read -r namespace name helm_release <<< "$comp"
     if [ "${COMPONENT_READY[$name]}" != "true" ]; then
         HAS_FAILURES=true
         break
@@ -1780,13 +1782,17 @@ if [ "$HAS_FAILURES" = true ]; then
 echo ""
     
     for comp in "${COMPONENTS[@]}"; do
-        IFS='|' read -r namespace name <<< "$comp"
+        IFS='|' read -r namespace name helm_release <<< "$comp"
         if [ "${COMPONENT_READY[$name]}" != "true" ]; then
             echo -e "${YELLOW}  $name:${NC}"
+            # If it's a Helm release, show Helm status first
+            if [ -n "$helm_release" ]; then
+                helm ls -n "$namespace" 2>&1 | grep "$helm_release" || echo "    Helm release not found"
+            fi
             kubectl get pods -n "$namespace" 2>&1 || true
             echo ""
-    fi
-done
+        fi
+    done
 
     # Show ingress resources diagnostics separately (they're not pods)
     if [ "$SKIP_MONITORING" != true ]; then
