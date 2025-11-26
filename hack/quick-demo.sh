@@ -1308,7 +1308,13 @@ spec:
             port:
               number: 8080
 EOF
-    echo -e "${GREEN}✓${NC} Ingress resources created"
+    # Verify ingress resources were created
+    if kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && \
+       kubectl get ingress zen-demo-services -n victoriametrics >/dev/null 2>&1; then
+        echo -e "${GREEN}✓${NC} Ingress resources created"
+    else
+        echo -e "${YELLOW}⚠${NC}  Ingress resources may not have been created correctly"
+    fi
 fi
 
 # Create namespace
