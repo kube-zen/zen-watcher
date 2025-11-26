@@ -1786,21 +1786,20 @@ for i in {1..60}; do
     if [ $((i % 10)) -eq 0 ]; then
         # Only show outstanding (not ready) components
         OUTSTANDING_COUNT=0
+        OUTSTANDING_LIST=()
         for comp in "${COMPONENTS[@]}"; do
             IFS='|' read -r namespace name <<< "$comp"
             if [ "${COMPONENT_READY[$name]}" != "true" ]; then
                 OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1))
+                OUTSTANDING_LIST+=("$name")
             fi
         done
         [ "$SKIP_MONITORING" != true ] && [ "$INGRESS_RESOURCES_READY" = false ] && OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1))
         
         if [ "$OUTSTANDING_COUNT" -gt 0 ]; then
             echo -e "${CYAN}   Still waiting (${i}s elapsed):${NC}"
-            for comp in "${COMPONENTS[@]}"; do
-                IFS='|' read -r namespace name <<< "$comp"
-                if [ "${COMPONENT_READY[$name]}" != "true" ]; then
-                    echo -e "${YELLOW}     ⏳${NC} $name"
-                fi
+            for name in "${OUTSTANDING_LIST[@]}"; do
+                echo -e "${YELLOW}     ⏳${NC} $name"
             done
             [ "$SKIP_MONITORING" != true ] && [ "$INGRESS_RESOURCES_READY" = false ] && echo -e "${YELLOW}     ⏳${NC} Ingress resources"
         fi
@@ -1838,6 +1837,17 @@ if [ "$HAS_FAILURES" = true ]; then
             echo ""
         fi
     done
+    
+    # Show ingress resources diagnostics separately (they're not pods)
+    if [ "$SKIP_MONITORING" != true ] && [ "$INGRESS_RESOURCES_READY" = false ]; then
+        echo -e "${YELLOW}  Ingress resources:${NC}"
+        echo -e "${CYAN}    Checking Grafana ingress...${NC}"
+        kubectl get ingress zen-demo-grafana -n grafana 2>&1 || echo "    Ingress not found"
+        echo ""
+        echo -e "${CYAN}    Checking VictoriaMetrics ingress...${NC}"
+        kubectl get ingress zen-demo-services -n victoriametrics 2>&1 || echo "    Ingress not found"
+        echo ""
+    fi
 fi
 
 # Test endpoints
