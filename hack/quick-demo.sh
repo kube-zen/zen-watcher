@@ -1254,7 +1254,7 @@ fi
 [ "$INSTALL_FALCO" = true ] && COMPONENTS+=("falco|Falco|falco")
 [ "$INSTALL_KYVERNO" = true ] && COMPONENTS+=("kyverno|Kyverno|kyverno")
 [ "$INSTALL_CHECKOV" = true ] && COMPONENTS+=("checkov|Checkov|")
-[ "$INSTALL_KUBE_BENCH" = true ] && COMPONENTS+=("kube-bench|kube-bench|")
+[ "$INSTALL_KUBE_BENCH" = true ] && COMPONENTS+=("kube-bench|kube-bench|kube-bench")
 
     SECTION_START_TIME=$(date +%s)
 
@@ -1307,6 +1307,7 @@ fi
 export INSTALL_TRIVY=${INSTALL_TRIVY}
 export INSTALL_FALCO=${INSTALL_FALCO}
 export INSTALL_KYVERNO=${INSTALL_KYVERNO}
+export INSTALL_KUBE_BENCH=${INSTALL_KUBE_BENCH}
 export SKIP_MONITORING=${SKIP_MONITORING}
 
 # Check if helmfile.yaml.gotmpl exists

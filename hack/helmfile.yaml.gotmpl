@@ -10,6 +10,7 @@
 {{ $installTrivy := env "INSTALL_TRIVY" | default "false" }}
 {{ $installFalco := env "INSTALL_FALCO" | default "false" }}
 {{ $installKyverno := env "INSTALL_KYVERNO" | default "false" }}
+{{ $installKubeBench := env "INSTALL_KUBE_BENCH" | default "false" }}
 {{ $skipMonitoring := env "SKIP_MONITORING" | default "false" }}
 {{ $ingressPort := env "INGRESS_HTTP_PORT" | default "8080" }}
 {{ $grafanaPassword := env "GRAFANA_PASSWORD" | default (randAlphaNum 16) }}
@@ -185,4 +186,13 @@ releases:
     installed: {{ if eq $installKyverno "true" }}true{{ else }}false{{ end }}
     values:
       - replicaCount: 1
+
+  # kube-bench (CIS benchmark cronjob)
+  - name: kube-bench
+    namespace: kube-bench
+    chart: oci://ghcr.io/deliveryhero/helm-charts/kube-bench
+    version: 0.1.17
+    createNamespace: true
+    needs: []
+    installed: {{ if eq $installKubeBench "true" }}true{{ else }}false{{ end }}
 
