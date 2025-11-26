@@ -82,7 +82,15 @@ show_section_time() {
     local section_name="$1"
     local end_time=$(date +%s)
     local elapsed=$((end_time - SECTION_START_TIME))
-    echo -e "${CYAN}   ⏱  ${section_name} took ${elapsed} seconds${NC}"
+    local total_elapsed=$((end_time - SCRIPT_START_TIME))
+    local total_minutes=$((total_elapsed / 60))
+    local total_seconds=$((total_elapsed % 60))
+    
+    if [ $total_minutes -gt 0 ]; then
+        echo -e "${CYAN}   ⏱  ${section_name} took ${elapsed}s (total: ${total_minutes}m ${total_seconds}s)${NC}"
+    else
+        echo -e "${CYAN}   ⏱  ${section_name} took ${elapsed}s (total: ${total_seconds}s)${NC}"
+    fi
     SECTION_START_TIME=$(date +%s)
 }
 
@@ -934,7 +942,17 @@ EOF
 
 SECTION_START_TIME=$(date +%s)
 create_cluster
-show_section_time "Cluster creation"
+CLUSTER_END_TIME=$(date +%s)
+CLUSTER_ELAPSED=$((CLUSTER_END_TIME - SECTION_START_TIME))
+TOTAL_ELAPSED=$((CLUSTER_END_TIME - SCRIPT_START_TIME))
+TOTAL_MINUTES=$((TOTAL_ELAPSED / 60))
+TOTAL_SECONDS=$((TOTAL_ELAPSED % 60))
+if [ $TOTAL_MINUTES -gt 0 ]; then
+    echo -e "${GREEN}✓${NC} Cluster is ready (${CLUSTER_ELAPSED}s, total: ${TOTAL_MINUTES}m ${TOTAL_SECONDS}s)"
+else
+    echo -e "${GREEN}✓${NC} Cluster is ready (${CLUSTER_ELAPSED}s, total: ${TOTAL_SECONDS}s)"
+fi
+SECTION_START_TIME=$(date +%s)
 # Set up kubeconfig (silently)
 SECTION_START_TIME=$(date +%s)
 case "$PLATFORM" in
@@ -1085,32 +1103,15 @@ kubectl_retry() {
     return 1
 }
 
-# Wait for cluster to be ready (with retries and better error handling)
-echo -e "${YELLOW}→${NC} Waiting for cluster to be ready..."
+# Wait for cluster to be ready (silently, with retries)
 cluster_ready=false
 max_wait=20
 for i in $(seq 1 $max_wait); do
     # Try to check cluster readiness
     if kubectl get nodes --request-timeout=5s &>/dev/null 2>&1; then
         cluster_ready=true
-        echo -e "${GREEN}✓${NC} Cluster is ready"
-        show_section_time "Cluster readiness"
         break
     fi
-    
-    # Show progress every 5 iterations
-    if [ $((i % 5)) -eq 0 ]; then
-        echo -e "${CYAN}   ... still waiting ($((i*3)) seconds)${NC}"
-    fi
-    
-    # Break after max_wait iterations
-    if [ $i -eq $max_wait ]; then
-        echo -e "${YELLOW}⚠${NC}  Cluster API not fully ready after $((max_wait*3)) seconds"
-        echo -e "${CYAN}   Continuing anyway - operations will retry automatically...${NC}"
-        show_section_time "Cluster readiness (timeout)"
-        break
-    fi
-    
     sleep 3
 done
 
@@ -1153,33 +1154,12 @@ if [ -f "${KUBECONFIG_FILE}" ]; then
     chmod 600 ${KUBECONFIG_FILE} 2>/dev/null || true
 fi
 
-# Final attempt to verify cluster is ready
+# Final attempt to verify cluster is ready (silently)
 if [ "$cluster_ready" = false ] && [ "$PLATFORM" = "k3d" ]; then
-    echo -e "${CYAN}   Verifying cluster connectivity on port ${K3D_API_PORT}...${NC}"
     sleep 2
     if timeout 5 kubectl get nodes --request-timeout=5s &>/dev/null 2>&1; then
         cluster_ready=true
-        echo -e "${GREEN}✓${NC} Cluster is ready"
-    else
-        echo -e "${YELLOW}⚠${NC}  Cluster may not be fully ready, but continuing...${NC}"
     fi
-fi
-
-# Validate namespace now that we have cluster access
-echo ""
-validate_namespace
-echo ""
-
-# Deploy Security Tools (default: install all for comprehensive demo)
-# If no flags set, install all tools by default
-if [ "$INSTALL_TRIVY" = false ] && [ "$INSTALL_FALCO" = false ] && [ "$INSTALL_KYVERNO" = false ] && [ "$INSTALL_CHECKOV" = false ] && [ "$INSTALL_KUBE_BENCH" = false ]; then
-    # Default: install all tools for comprehensive demo
-    INSTALL_TRIVY=true
-    INSTALL_FALCO=true
-    INSTALL_KYVERNO=true
-    INSTALL_CHECKOV=true
-    INSTALL_KUBE_BENCH=true
-    echo -e "${CYAN}ℹ${NC}  No security tools specified - installing all tools for comprehensive demo"
 fi
 
 # Build component list based on flags
@@ -1207,6 +1187,19 @@ echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━�
 echo -e "${BLUE}  Installing All Components${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
+
+# Deploy Security Tools (default: install all for comprehensive demo)
+# If no flags set, install all tools by default
+if [ "$INSTALL_TRIVY" = false ] && [ "$INSTALL_FALCO" = false ] && [ "$INSTALL_KYVERNO" = false ] && [ "$INSTALL_CHECKOV" = false ] && [ "$INSTALL_KUBE_BENCH" = false ]; then
+    # Default: install all tools for comprehensive demo
+    INSTALL_TRIVY=true
+    INSTALL_FALCO=true
+    INSTALL_KYVERNO=true
+    INSTALL_CHECKOV=true
+    INSTALL_KUBE_BENCH=true
+    echo -e "${CYAN}ℹ${NC}  No security tools specified - installing all tools for comprehensive demo"
+fi
+
 SECTION_START_TIME=$(date +%s)
 
 # Install ingress first (other components may need it)
