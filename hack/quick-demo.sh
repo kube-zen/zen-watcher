@@ -1681,7 +1681,7 @@ DATASOURCE_RESULT=$(timeout 10 curl -s -X POST \
     -d '{
         "name": "VictoriaMetrics",
         "type": "prometheus",
-        "url": "http://victoriametrics:8428",
+        "url": "http://victoriametrics.victoriametrics.svc.cluster.local:8428",
         "access": "proxy",
         "isDefault": true,
         "jsonData": {
