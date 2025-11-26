@@ -1703,8 +1703,8 @@ done
             if [ "${COMPONENT_READY[$name]}" != "true" ]; then
                 OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1))
                 OUTSTANDING_LIST+=("$name")
-            fi
-        done
+    fi
+done
         # Count outstanding ingress resources (each ingress is a separate component)
         if [ "$SKIP_MONITORING" != true ]; then
             INGRESS_GRAFANA_READY=false
@@ -1806,12 +1806,13 @@ declare -A ENDPOINT_STATUS
 declare -A ENDPOINT_SHOWN
 
 # Define all endpoints to test
+# Note: Ingress uses regex rewriting, so paths need trailing slash or specific paths
 ENDPOINTS=(
     "Grafana:/grafana/api/health:200,401,403"
     "Grafana Dashboard:/grafana/d/zen-watcher:200,302,401,403"
-    "VictoriaMetrics:/victoriametrics:200,204"
+    "VictoriaMetrics:/victoriametrics/:200,204,301,302"
     "VictoriaMetrics API:/victoriametrics/api/v1/query:200,400,405"
-    "VictoriaMetrics VMUI:/victoriametrics/vmui:200,302"
+    "VictoriaMetrics VMUI:/victoriametrics/vmui/:200,301,302"
     "Zen Watcher Health:/zen-watcher/health:200"
     "Zen Watcher Metrics:/zen-watcher/metrics:200"
 )
@@ -1823,8 +1824,9 @@ for endpoint_def in "${ENDPOINTS[@]}"; do
     ENDPOINT_SHOWN["$name"]=false
 done
 
-MAX_WAIT=60  # 1 minute max
-for i in {1..60}; do
+MAX_WAIT=120  # 2 minutes max (services may need time to be ready)
+ENDPOINT_WAIT_START=$(date +%s)
+for i in {1..120}; do
     ALL_WORKING=true
     
     for endpoint_def in "${ENDPOINTS[@]}"; do
@@ -1832,7 +1834,8 @@ for i in {1..60}; do
         
         if [ "${ENDPOINT_STATUS[$name]}" != "working" ]; then
             ALL_WORKING=false
-            HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}${path} 2>/dev/null || echo "000")
+            # Use longer timeout and follow redirects for endpoints that may redirect
+            HTTP_CODE=$(timeout 5 curl -s -L -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}${path} 2>/dev/null || echo "000")
             
             # Check if HTTP code matches expected codes
             if echo ",${expected_codes}," | grep -q ",${HTTP_CODE},"; then
@@ -1863,19 +1866,20 @@ for i in {1..60}; do
         done
         
         if [ "$OUTSTANDING_COUNT" -gt 0 ]; then
-            echo -e "${CYAN}   Still waiting ${OUTSTANDING_COUNT}/${#ENDPOINTS[@]} endpoints (${i}s elapsed):${NC}"
+            ELAPSED=$(($(date +%s) - ENDPOINT_WAIT_START))
+            echo -e "${CYAN}   Still waiting ${OUTSTANDING_COUNT}/${#ENDPOINTS[@]} endpoints (${ELAPSED}s elapsed):${NC}"
             for name in "${OUTSTANDING_LIST[@]}"; do
                 # Get current HTTP code for this endpoint
                 for endpoint_def in "${ENDPOINTS[@]}"; do
                     IFS=':' read -r ep_name ep_path ep_codes <<< "$endpoint_def"
                     if [ "$ep_name" = "$name" ]; then
-                        HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}${ep_path} 2>/dev/null || echo "000")
+                        HTTP_CODE=$(timeout 5 curl -s -L -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}${ep_path} 2>/dev/null || echo "000")
                         echo -e "${YELLOW}     ⏳${NC} $name (HTTP ${HTTP_CODE})"
-        break
-    fi
+                        break
+                    fi
                 done
             done
-    fi
+        fi
     fi
     
     sleep 1
@@ -1888,7 +1892,7 @@ for endpoint_def in "${ENDPOINTS[@]}"; do
     IFS=':' read -r name path expected_codes <<< "$endpoint_def"
     if [ "${ENDPOINT_STATUS[$name]}" != "working" ]; then
         FAILED_COUNT=$((FAILED_COUNT + 1))
-        HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}${path} 2>/dev/null || echo "000")
+        HTTP_CODE=$(timeout 5 curl -s -L -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}${path} 2>/dev/null || echo "000")
         echo -e "${YELLOW}⚠${NC}  $name not accessible (HTTP ${HTTP_CODE})"
         FAILED_ENDPOINTS+=("$name:$path")
     fi
