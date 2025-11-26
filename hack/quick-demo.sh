@@ -1306,6 +1306,7 @@ spec:
         backend:
           service:
             name: zen-watcher
+            namespace: ${NAMESPACE}
             port:
               number: 8080
 EOF
@@ -1528,7 +1529,6 @@ data:
   scrape.yml: |
     global:
       scrape_interval: 15s
-      evaluation_interval: 15s
     
     scrape_configs:
       - job_name: 'zen-watcher'
