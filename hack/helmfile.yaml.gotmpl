@@ -36,44 +36,17 @@ releases:
             app: ingress-nginx
             app.kubernetes.io/name: ingress-nginx
 
-  # VictoriaMetrics Operator (needed for VMServiceScrape CRD)
-  - name: victoriametrics-operator
-    namespace: victoriametrics-operator
-    chart: vm/victoria-metrics-operator
-    version: 0.56.4
+  # VictoriaMetrics Single (simpler for demo, includes full UI with targets, etc.)
+  - name: victoriametrics-single
+    namespace: victoriametrics
+    chart: vm/victoria-metrics-single
+    version: 0.25.5
     createNamespace: true
     needs: []
     installed: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
-
-  # VictoriaMetrics Cluster (main metrics storage)
-  - name: victoriametrics-cluster
-    namespace: victoriametrics
-    chart: vm/victoria-metrics-cluster
-    version: 0.29.5
-    createNamespace: true
-    needs:
-      - victoriametrics-operator/victoriametrics-operator
-    installed: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
     values:
-      - vmselect:
-          replicaCount: 1
-          resources:
-            requests:
-              memory: 128Mi
-              cpu: 100m
-            limits:
-              memory: 512Mi
-              cpu: 500m
-        vminsert:
-          replicaCount: 1
-          resources:
-            requests:
-              memory: 128Mi
-              cpu: 100m
-            limits:
-              memory: 512Mi
-              cpu: 500m
-        vmstorage:
+      - server:
+          enabled: true
           replicaCount: 1
           resources:
             requests:
@@ -82,6 +55,14 @@ releases:
             limits:
               memory: 1Gi
               cpu: 1000m
+          service:
+            type: ClusterIP
+            servicePort: 8428
+          scrape:
+            enabled: true
+          persistentVolume:
+            enabled: false
+          emptyDir: {}
 
   # Grafana (depends on VictoriaMetrics for datasource)
   - name: grafana
@@ -90,7 +71,7 @@ releases:
     version: 10.2.0
     createNamespace: true
     needs:
-      - victoriametrics/victoriametrics-cluster
+      - victoriametrics/victoriametrics-single
     installed: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
     values:
       - adminUser: zen

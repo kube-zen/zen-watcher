@@ -1260,8 +1260,7 @@ COMPONENTS+=("${NAMESPACE}|Zen Watcher|zen-watcher")
 
 # Monitoring stack (Grafana and VictoriaMetrics go together, in separate namespaces)
 if [ "$SKIP_MONITORING" != true ]; then
-    COMPONENTS+=("victoriametrics|VictoriaMetrics|victoriametrics-cluster")
-    COMPONENTS+=("victoriametrics-operator|VictoriaMetrics Operator|victoriametrics-operator")
+    COMPONENTS+=("victoriametrics|VictoriaMetrics|victoriametrics-single")
     COMPONENTS+=("grafana|Grafana|grafana")
 fi
 
@@ -1452,9 +1451,9 @@ spec:
         pathType: ImplementationSpecific
         backend:
           service:
-            name: victoriametrics-cluster-victoria-metrics-cluster-vmselect
+            name: victoriametrics-single
             port:
-              number: 8481
+              number: 8428
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
