@@ -113,9 +113,10 @@ releases:
             cpu: 500m
 
   # Zen Watcher (local chart, depends on ingress for webhooks)
+  # Use file:// protocol to explicitly mark as local chart (Helmfile resolves paths relative to helmfile location)
   - name: zen-watcher
     namespace: {{ $namespace }}
-    chart: ./charts/zen-watcher
+    chart: file://../charts/zen-watcher
     createNamespace: true
     needs:
       - ingress-nginx/ingress-nginx
