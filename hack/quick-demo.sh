@@ -1441,6 +1441,9 @@ metadata:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/rewrite-target: /victoriametrics/\$2
     nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      sub_filter '</head>' '<base href="/victoriametrics/"></head>';
+      sub_filter_once on;
 spec:
   ingressClassName: nginx
   rules:
@@ -1462,7 +1465,7 @@ metadata:
   namespace: ${NAMESPACE}
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/rewrite-target: /victoriametrics/\$2
+    nginx.ingress.kubernetes.io/rewrite-target: /\$2
     nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
   ingressClassName: nginx
