@@ -115,7 +115,7 @@ releases:
   # Zen Watcher (local chart, depends on ingress for webhooks)
   - name: zen-watcher
     namespace: {{ $namespace }}
-    chart: charts/zen-watcher
+    chart: ./charts/zen-watcher
     createNamespace: true
     needs:
       - ingress-nginx/ingress-nginx
