@@ -1837,7 +1837,7 @@ ENDPOINTS=(
     "Grafana:/grafana/api/health:200,401,403"
     "Grafana Dashboard:/grafana/d/zen-watcher:200,302,401,403"
     "VictoriaMetrics:/victoriametrics/:200,204,301,302"
-    "VictoriaMetrics API:/victoriametrics/api/v1/query:200,400,405"
+    "VictoriaMetrics API:/victoriametrics/api/v1/query?query=up:200,400,405"
     "VictoriaMetrics VMUI:/victoriametrics/vmui/:200,301,302,400"
     "Zen Watcher Health:/zen-watcher/health:200"
     "Zen Watcher Metrics:/zen-watcher/metrics:200"
@@ -2036,7 +2036,7 @@ if [ "$FAILED_COUNT" -gt 0 ]; then
         fi
         
         # Only show diagnostics once per namespace
-        if [ -z "${DIAGNOSTICS_SHOWN[$ns]}" ]; then
+        if [ -z "${DIAGNOSTICS_SHOWN[$ns]:-}" ]; then
             echo -e "${CYAN}  Diagnostics for ${ns} namespace:${NC}"
             echo -e "${CYAN}    Checking ingress...${NC}"
             kubectl get ingress ${ingress_name} -n ${ns} 2>&1 | head -5 || echo "    Ingress not found"
