@@ -112,35 +112,8 @@ releases:
             memory: 512Mi
             cpu: 500m
 
-  # Zen Watcher (local chart, depends on ingress for webhooks)
-  # Use file:// protocol to explicitly mark as local chart (Helmfile resolves paths relative to helmfile location)
-  - name: zen-watcher
-    namespace: {{ $namespace }}
-    chart: file://../charts/zen-watcher
-    createNamespace: true
-    needs:
-      - ingress-nginx/ingress-nginx
-    values:
-      - image:
-          repository: {{ $imageRepo }}
-          tag: {{ $imageTag }}
-          pullPolicy: {{ $imagePullPolicy }}
-        config:
-          watchNamespace: {{ $namespace }}
-          trivyNamespace: trivy-system
-          falcoNamespace: falco
-        victoriametricsScrape:
-          enabled: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
-          interval: 15s
-        service:
-          type: ClusterIP
-          port: 8080
-        crd:
-          install: true
-        rbac:
-          create: true
-        serviceAccount:
-          create: true
+  # Zen Watcher is installed separately via helm install (see quick-demo.sh)
+  # This will be moved to a repository later
 
   # Trivy Operator
   - name: trivy-operator

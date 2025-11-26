@@ -1294,6 +1294,9 @@ export NAMESPACE=${NAMESPACE}
 export ZEN_WATCHER_IMAGE="${ZEN_WATCHER_IMAGE:-kubezen/zen-watcher:latest}"
 export INGRESS_HTTP_PORT=${INGRESS_HTTP_PORT}
 export GRAFANA_PASSWORD=${GRAFANA_PASSWORD}
+# Extract image repo and tag for helm install
+ZEN_IMAGE_REPO="${ZEN_WATCHER_IMAGE%:*}"
+ZEN_IMAGE_TAG="${ZEN_WATCHER_IMAGE#*:}"
 
 # Set image pull policy based on --no-docker-login flag
 if [ "$NO_DOCKER_LOGIN" = true ]; then
