@@ -20,7 +20,6 @@ releases:
   - name: victoriametrics-operator-crds
     namespace: victoriametrics
     chart: vm/victoria-metrics-operator-crds
-    version: 0.30.0
     createNamespace: true
     needs: []
     installed: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
