@@ -1991,8 +1991,7 @@ for i in {1..60}; do
         done
         
         if [ "$OUTSTANDING_COUNT" -gt 0 ]; then
-            WORKING_COUNT=$((${#ENDPOINTS[@]} - OUTSTANDING_COUNT))
-            echo -e "${CYAN}   Still waiting ${WORKING_COUNT}/${#ENDPOINTS[@]} endpoints (${i}s elapsed):${NC}"
+            echo -e "${CYAN}   Still waiting ${OUTSTANDING_COUNT}/${#ENDPOINTS[@]} endpoints (${i}s elapsed):${NC}"
             for name in "${OUTSTANDING_LIST[@]}"; do
                 # Get current HTTP code for this endpoint
                 for endpoint_def in "${ENDPOINTS[@]}"; do
