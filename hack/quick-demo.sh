@@ -119,10 +119,12 @@ check_namespace_ready() {
     # If helm_release is provided, check Helm release status first (simpler and more reliable)
     if [ -n "$helm_release" ]; then
         # Check if Helm release exists and is deployed
+        # Use helm ls to check status - simpler than checking individual pods
         if helm ls -n "$namespace" --short 2>/dev/null | grep -q "^${helm_release}$"; then
-            # Check if release status is "deployed"
-            local status=$(helm ls -n "$namespace" -o json 2>/dev/null | \
-                jq -r ".[] | select(.name==\"${helm_release}\") | .status" 2>/dev/null || echo "")
+            # Release exists, check status using helm ls output
+            # helm ls shows status in column 5 (STATUS column)
+            local status=$(helm ls -n "$namespace" 2>/dev/null | grep "^${helm_release}[[:space:]]" | awk '{print $9}' || echo "")
+            # If status is "deployed", component is ready
             if [ "$status" = "deployed" ]; then
                 return 0
             fi
