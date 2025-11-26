@@ -1235,7 +1235,7 @@ fi
 [ "$INSTALL_CHECKOV" = true ] && COMPONENTS+=("checkov|Checkov")
 [ "$INSTALL_KUBE_BENCH" = true ] && COMPONENTS+=("kube-bench|kube-bench")
 
-SECTION_START_TIME=$(date +%s)
+    SECTION_START_TIME=$(date +%s)
 
 # Install ingress first (other components may need it)
 echo -e "${YELLOW}→${NC} Installing Nginx Ingress Controller..."
@@ -1307,8 +1307,12 @@ helm repo add kyverno https://kyverno.github.io/kyverno/ 2>&1 | grep -v "already
 helm repo update > /dev/null 2>&1 || true
 
 # Run helmfile sync (this handles all Helm installations)
-cd "$(git rev-parse --show-toplevel)" 2>/dev/null || cd "$(dirname "$0")/.."
-if helmfile -f hack/helmfile.yaml.gotmpl sync 2>&1 | tee /tmp/helmfile-sync.log; then
+# Change to repo root so local chart paths work correctly
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO_ROOT"
+
+# Suppress verbose Helm output (NOTES, examples, etc.) but keep errors
+if helmfile -f hack/helmfile.yaml.gotmpl sync 2>&1 | grep -v "^Adding repo\|^Listing releases\|^Release.*does not exist\|^NAME:\|^LAST DEPLOYED:\|^NAMESPACE:\|^STATUS:\|^REVISION:\|^DESCRIPTION:\|^TEST SUITE:\|^NOTES:\|^Chart version:\|^Kyverno version:\|^Thank you for\|^The following\|^⚠\|^💡\|^Get the\|^You need\|^for example\|^Input this\|^Read API:\|^An example\|^apiVersion:\|^kind:\|^metadata:\|^spec:\|^rules:\|^host:\|^http:\|^paths:\|^pathType:\|^backend:\|^service:\|^name:\|^port:\|^number:\|^tls:\|^hosts:\|^secretName:\|^data:\|^tls.crt:\|^tls.key:\|^type:\|^  # This section\|^If TLS is\|^  apiVersion:" | tee /tmp/helmfile-sync.log; then
     echo -e "${GREEN}✓${NC} Helmfile sync completed"
 else
     HELMFILE_EXIT=$?
@@ -1675,9 +1679,9 @@ for i in {1..60}; do
         
         if [ "${COMPONENT_READY[$name]}" = "true" ]; then
             READY_COUNT=$((READY_COUNT + 1))
-        fi
-    done
-    
+    fi
+done
+
     # Check ingress resources exist (only if monitoring is enabled)
     if [ "$SKIP_MONITORING" != true ]; then
         INGRESS_GRAFANA_READY=false
@@ -1712,8 +1716,8 @@ for i in {1..60}; do
             if [ "${COMPONENT_READY[$name]}" != "true" ]; then
                 OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1))
                 OUTSTANDING_LIST+=("$name")
-            fi
-        done
+    fi
+done
         # Count outstanding ingress resources
         if [ "$SKIP_MONITORING" != true ]; then
             INGRESS_GRAFANA_READY=false
@@ -1773,7 +1777,7 @@ fi
 
 if [ "$HAS_FAILURES" = true ]; then
     echo -e "${YELLOW}⚠${NC}  Some components are not ready. Diagnostics:${NC}"
-    echo ""
+echo ""
     
     for comp in "${COMPONENTS[@]}"; do
         IFS='|' read -r namespace name <<< "$comp"
@@ -1781,9 +1785,9 @@ if [ "$HAS_FAILURES" = true ]; then
             echo -e "${YELLOW}  $name:${NC}"
             kubectl get pods -n "$namespace" 2>&1 || true
             echo ""
-        fi
-    done
-    
+    fi
+done
+
     # Show ingress resources diagnostics separately (they're not pods)
     if [ "$SKIP_MONITORING" != true ]; then
         INGRESS_GRAFANA_READY=false
@@ -1798,7 +1802,7 @@ if [ "$HAS_FAILURES" = true ]; then
             [ "$INGRESS_GRAFANA_READY" = false ] && echo -e "${CYAN}    Checking Grafana ingress...${NC}" && kubectl get ingress zen-demo-grafana -n grafana 2>&1 || echo "    Ingress not found"
             [ "$INGRESS_VM_READY" = false ] && echo -e "${CYAN}    Checking VictoriaMetrics ingress...${NC}" && kubectl get ingress zen-demo-victoriametrics -n victoriametrics 2>&1 || echo "    Ingress not found"
             [ "$INGRESS_ZW_READY" = false ] && echo -e "${CYAN}    Checking Zen Watcher ingress...${NC}" && kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} 2>&1 || echo "    Ingress not found"
-            echo ""
+echo ""
         fi
     fi
 fi
@@ -1851,8 +1855,8 @@ for i in {1..60}; do
     
     if [ "$ALL_WORKING" = true ]; then
         echo -e "${GREEN}✓${NC} All endpoints accessible"
-        break
-    fi
+            break
+        fi
     
     # Show outstanding endpoints every 10 seconds
     if [ $((i % 10)) -eq 0 ]; then
@@ -1875,11 +1879,11 @@ for i in {1..60}; do
                     if [ "$ep_name" = "$name" ]; then
                         HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}${ep_path} 2>/dev/null || echo "000")
                         echo -e "${YELLOW}     ⏳${NC} $name (HTTP ${HTTP_CODE})"
-                        break
-                    fi
+        break
+    fi
                 done
             done
-        fi
+    fi
     fi
     
     sleep 1
@@ -1951,8 +1955,8 @@ echo -e "${GREEN}  🎉 Demo Environment Ready!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 # Use ingress for all access via LoadBalancer
-GRAFANA_ACCESS_PORT=${INGRESS_HTTP_PORT}
-VM_ACCESS_PORT=${INGRESS_HTTP_PORT}
+    GRAFANA_ACCESS_PORT=${INGRESS_HTTP_PORT}
+    VM_ACCESS_PORT=${INGRESS_HTTP_PORT}
 ZEN_WATCHER_ACCESS_PORT=${INGRESS_HTTP_PORT}
 
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -1969,10 +1973,10 @@ echo -e "    ${GREEN}Metrics:${NC} ${CYAN}http://localhost:${ZEN_WATCHER_ACCESS_
 echo -e "    ${GREEN}Health:${NC}  ${CYAN}http://localhost:${ZEN_WATCHER_ACCESS_PORT}/zen-watcher/health${NC}"
 echo ""
 echo -e "${CYAN}  GRAFANA:${NC}"
-echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/grafana${NC}"
+    echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/grafana${NC}"
 echo -e "    ${GREEN}Username:${NC} ${CYAN}zen${NC}"
 echo -e "    ${GREEN}Password:${NC} ${CYAN}${GRAFANA_PASSWORD}${NC}"
-echo -e "    ${GREEN}Dashboard:${NC} ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/grafana/d/zen-watcher${NC}"
+    echo -e "    ${GREEN}Dashboard:${NC} ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/grafana/d/zen-watcher${NC}"
 echo ""
 echo -e "${CYAN}  KUBECONFIG:${NC}"
 echo -e "    ${GREEN}kubeconfig:${NC} ${CYAN}${KUBECONFIG_FILE}${NC}"
@@ -2003,13 +2007,13 @@ echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 echo ""
-echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  ✅ Demo environment is ready and accessible!${NC}"
-echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo ""
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
 echo -e "${CYAN}All services are accessible via ingress LoadBalancer on port ${INGRESS_HTTP_PORT}${NC}"
 echo -e "${CYAN}Endpoints will remain accessible until cluster is deleted.${NC}"
-echo ""
+    echo ""
 echo -e "${CYAN}To clean up the demo:${NC}"
 echo -e "  ${CYAN}./hack/cleanup-demo.sh${NC}"
 echo ""

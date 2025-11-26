@@ -63,7 +63,7 @@ releases:
             limits:
               memory: 512Mi
               cpu: 500m
-      - vminsert:
+        vminsert:
           replicaCount: 1
           resources:
             requests:
@@ -72,7 +72,7 @@ releases:
             limits:
               memory: 512Mi
               cpu: 500m
-      - vmstorage:
+        vmstorage:
           replicaCount: 1
           resources:
             requests:
@@ -114,7 +114,7 @@ releases:
   # Zen Watcher (local chart, depends on ingress for webhooks)
   - name: zen-watcher
     namespace: {{ $namespace }}
-    chart: ./charts/zen-watcher
+    chart: charts/zen-watcher
     createNamespace: true
     needs:
       - ingress-nginx/ingress-nginx
@@ -123,21 +123,21 @@ releases:
           repository: {{ $imageRepo }}
           tag: {{ $imageTag }}
           pullPolicy: {{ $imagePullPolicy }}
-      - config:
+        config:
           watchNamespace: {{ $namespace }}
           trivyNamespace: trivy-system
           falcoNamespace: falco
-      - victoriametricsScrape:
+        victoriametricsScrape:
           enabled: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
           interval: 15s
-      - service:
+        service:
           type: ClusterIP
           port: 8080
-      - crd:
+        crd:
           install: true
-      - rbac:
+        rbac:
           create: true
-      - serviceAccount:
+        serviceAccount:
           create: true
 
   # Trivy Operator
