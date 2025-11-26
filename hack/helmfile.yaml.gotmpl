@@ -1,16 +1,5 @@
-repositories:
-  - name: ingress-nginx
-    url: https://kubernetes.github.io/ingress-nginx
-  - name: vm
-    url: https://victoriametrics.github.io/helm-charts
-  - name: grafana
-    url: https://grafana.github.io/helm-charts
-  - name: aqua
-    url: https://aquasecurity.github.io/helm-charts
-  - name: falcosecurity
-    url: https://falcosecurity.github.io/charts
-  - name: kyverno
-    url: https://kyverno.github.io/kyverno/
+# Repositories are managed by quick-demo.sh to avoid conflicts
+# They are pre-added before running helmfile sync
 
 # Environment variables (set by quick-demo.sh)
 {{ $namespace := env "NAMESPACE" | default "zen-system" }}
