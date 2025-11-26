@@ -1282,6 +1282,23 @@ if ! timeout 10 helm list -n ingress-nginx 2>&1 | grep -q ingress-nginx; then
     kubectl delete mutatingwebhookconfiguration ingress-nginx-admission 2>&1 | grep -v "not found" > /dev/null || true
 fi
 
+# Install VictoriaMetrics Operator (provides VMServiceScrape CRD) - only if monitoring is enabled
+if [ "$SKIP_MONITORING" != true ]; then
+    echo -e "${YELLOW}→${NC} Installing VictoriaMetrics Operator..."
+    # Add VictoriaMetrics Operator Helm repo
+    if ! timeout 10 helm repo list 2>/dev/null | grep -q vm; then
+        timeout 30 helm repo add vm https://victoriametrics.github.io/helm-charts/ 2>&1 || true
+        timeout 30 helm repo update 2>&1 || true
+    fi
+    # Install VictoriaMetrics Operator (this provides the VMServiceScrape CRD)
+    if ! timeout 10 helm list -n victoriametrics-operator 2>&1 | grep -q victoriametrics-operator; then
+        timeout 120 helm install victoriametrics-operator vm/victoria-metrics-operator \
+            --namespace victoriametrics-operator \
+            --create-namespace \
+            >/dev/null 2>&1 &
+    fi
+fi
+
 # Create ingress resources (only if monitoring is enabled)
 if [ "$SKIP_MONITORING" != true ]; then
     echo -e "${YELLOW}→${NC} Creating ingress resources..."
@@ -1716,41 +1733,24 @@ if [ ! -d "./charts/zen-watcher" ]; then
     exit 1
 fi
 
-# Check if VMServiceScrape CRD exists (VictoriaMetrics Operator)
-VM_SERVICESCRAPE_CRD_EXISTS=false
-if kubectl get crd vmservicescrapes.operator.victoriametrics.com >/dev/null 2>&1; then
-    VM_SERVICESCRAPE_CRD_EXISTS=true
-fi
-
-# Build Helm command with conditional VMServiceScrape
-HELM_ARGS=(
-    "upgrade" "--install" "zen-watcher" "./charts/zen-watcher"
-    "--namespace" "${NAMESPACE}"
-    "--create-namespace"
-    "--set" "image.repository=${IMAGE_REPO}"
-    "--set" "image.tag=${IMAGE_TAG}"
-    "--set" "image.pullPolicy=${IMAGE_PULL_POLICY}"
-    "--set" "config.watchNamespace=${NAMESPACE}"
-    "--set" "config.trivyNamespace=trivy-system"
-    "--set" "config.falcoNamespace=falco"
-    "--set" "service.type=ClusterIP"
-    "--set" "service.port=8080"
-    "--set" "crd.install=true"
-    "--set" "rbac.create=true"
-    "--set" "serviceAccount.create=true"
-)
-
-# Only enable VMServiceScrape if the CRD exists
-if [ "$VM_SERVICESCRAPE_CRD_EXISTS" = true ]; then
-    HELM_ARGS+=("--set" "victoriametricsScrape.enabled=true")
-    HELM_ARGS+=("--set" "victoriametricsScrape.interval=15s")
-else
-    HELM_ARGS+=("--set" "victoriametricsScrape.enabled=false")
-    echo -e "${CYAN}   VMServiceScrape CRD not found - disabling VictoriaMetrics scraping${NC}"
-fi
-
 # Deploy zen-watcher using Helm chart
-helm "${HELM_ARGS[@]}" 2>&1 | grep -v "already exists\|unchanged" > /dev/null
+helm upgrade --install zen-watcher ./charts/zen-watcher \
+    --namespace ${NAMESPACE} \
+    --create-namespace \
+    --set image.repository="${IMAGE_REPO}" \
+    --set image.tag="${IMAGE_TAG}" \
+    --set image.pullPolicy="${IMAGE_PULL_POLICY}" \
+    --set config.watchNamespace="${NAMESPACE}" \
+    --set config.trivyNamespace="trivy-system" \
+    --set config.falcoNamespace="falco" \
+    --set victoriametricsScrape.enabled=true \
+    --set victoriametricsScrape.interval="15s" \
+    --set service.type=ClusterIP \
+    --set service.port=8080 \
+    --set crd.install=true \
+    --set rbac.create=true \
+    --set serviceAccount.create=true \
+    2>&1 | grep -v "already exists\|unchanged" > /dev/null
 
 # Configure Grafana datasource via ingress (only if monitoring is enabled)
 if [ "$SKIP_MONITORING" != true ]; then
