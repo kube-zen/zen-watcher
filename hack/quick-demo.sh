@@ -1360,10 +1360,9 @@ else
     fi
 fi
 
-# Install zen-watcher separately (local chart, will be moved to repository later)
-echo -e "${YELLOW}→${NC} Installing zen-watcher (local chart)..."
-VMS_ENABLED=$([ "$SKIP_MONITORING" != true ] && echo "true" || echo "false")
-if helm upgrade --install zen-watcher charts/zen-watcher \
+# Install zen-watcher from helm-charts repository
+echo -e "${YELLOW}→${NC} Installing zen-watcher from repository..."
+if helm upgrade --install zen-watcher kube-zen/zen-watcher \
     --create-namespace \
     --namespace "${NAMESPACE}" \
     --set image.repository="${ZEN_IMAGE_REPO}" \
@@ -1372,8 +1371,6 @@ if helm upgrade --install zen-watcher charts/zen-watcher \
     --set config.watchNamespace="${NAMESPACE}" \
     --set config.trivyNamespace=trivy-system \
     --set config.falcoNamespace=falco \
-    --set victoriametricsScrape.enabled="${VMS_ENABLED}" \
-    --set victoriametricsScrape.interval=15s \
     --set service.type=ClusterIP \
     --set service.port=8080 \
     --set crd.install=true \
