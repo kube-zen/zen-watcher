@@ -1388,6 +1388,9 @@ if helm upgrade --install zen-watcher kube-zen/zen-watcher \
     --set config.falcoNamespace=falco \
     --set service.type=ClusterIP \
     --set service.port=8080 \
+    --set service.annotations."prometheus\.io/scrape"="true" \
+    --set service.annotations."prometheus\.io/port"="8080" \
+    --set service.annotations."prometheus\.io/path"="/metrics" \
     --set crd.install=true \
     --set rbac.create=true \
     --set serviceAccount.create=true \
