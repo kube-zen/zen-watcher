@@ -182,10 +182,13 @@ check_namespace_ready() {
         # Check if any are still active (running)
         local active_jobs=$(kubectl get jobs -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.active}{"\n"}{end}' 2>/dev/null | \
             awk -F'\t' '$2 > 0' | wc -l | tr -d '[:space:]' || echo "0")
-        # If jobs exist, none failed, and none are active, consider ready
-        # This handles Checkov which is a one-time scan job that may complete quickly
-        if [ "$active_jobs" -eq 0 ]; then
-            # No active jobs - either succeeded or pending, but job exists so consider ready
+        # Check if jobs have succeeded
+        local succeeded_jobs=$(kubectl get jobs -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.succeeded}{"\n"}{end}' 2>/dev/null | \
+            awk -F'\t' '$2 > 0' | wc -l | tr -d '[:space:]' || echo "0")
+        # If jobs exist, none failed, and (none are active OR some have succeeded), consider ready
+        # This handles Checkov which is a one-time scan job
+        if [ "$active_jobs" -eq 0 ] || [ "$succeeded_jobs" -gt 0 ]; then
+            # No active jobs or some succeeded - job exists and is not failed, so consider ready
             return 0
         fi
         # Jobs are still running
@@ -1637,9 +1640,16 @@ done
 [ "$SKIP_MONITORING" != true ] && echo -e "${CYAN}     - Zen Watcher ingress${NC}"
 echo ""
 
-# Also track ingress resources separately (only if monitoring is enabled)
-INGRESS_RESOURCES_READY=false
-INGRESS_RESOURCES_SHOWN=false
+# Track ingress resources separately (only if monitoring is enabled)
+# Initialize ingress resource tracking
+if [ "$SKIP_MONITORING" != true ]; then
+    COMPONENT_READY["Grafana ingress"]=false
+    COMPONENT_SHOWN["Grafana ingress"]=false
+    COMPONENT_READY["VictoriaMetrics ingress"]=false
+    COMPONENT_SHOWN["VictoriaMetrics ingress"]=false
+    COMPONENT_READY["Zen Watcher ingress"]=false
+    COMPONENT_SHOWN["Zen Watcher ingress"]=false
+fi
 
 MAX_WAIT=60  # 1 minute max
 EXPECTED_READY=${#COMPONENTS[@]}  # Number of components in the list
@@ -1670,28 +1680,45 @@ for i in {1..60}; do
 done
 
     # Check ingress resources exist (only if monitoring is enabled)
+    # Track each ingress separately so they show up individually
     if [ "$SKIP_MONITORING" != true ]; then
-        INGRESS_GRAFANA_READY=false
-        INGRESS_VM_READY=false
-        INGRESS_ZW_READY=false
-        
-        kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && INGRESS_GRAFANA_READY=true
-        kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1 && INGRESS_VM_READY=true
-        kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1 && INGRESS_ZW_READY=true
-        
-        if [ "$INGRESS_GRAFANA_READY" = true ] && [ "$INGRESS_VM_READY" = true ] && [ "$INGRESS_ZW_READY" = true ]; then
-            if [ "$INGRESS_RESOURCES_READY" = false ]; then
-                INGRESS_RESOURCES_READY=true
-                if [ "$INGRESS_RESOURCES_SHOWN" = false ]; then
-                    echo -e "${GREEN}     ✓${NC} Ingress resources"
-                    INGRESS_RESOURCES_SHOWN=true
+        # Check Grafana ingress
+        if [ "${COMPONENT_READY[Grafana ingress]}" != "true" ]; then
+            if kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1; then
+                COMPONENT_READY["Grafana ingress"]=true
+                if [ "${COMPONENT_SHOWN[Grafana ingress]}" != "true" ]; then
+                    echo -e "${GREEN}     ✓${NC} Grafana ingress"
+                    COMPONENT_SHOWN["Grafana ingress"]=true
                 fi
             fi
         fi
         
-        [ "$INGRESS_GRAFANA_READY" = true ] && READY_COUNT=$((READY_COUNT + 1))
-        [ "$INGRESS_VM_READY" = true ] && READY_COUNT=$((READY_COUNT + 1))
-        [ "$INGRESS_ZW_READY" = true ] && READY_COUNT=$((READY_COUNT + 1))
+        # Check VictoriaMetrics ingress
+        if [ "${COMPONENT_READY[VictoriaMetrics ingress]}" != "true" ]; then
+            if kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1; then
+                COMPONENT_READY["VictoriaMetrics ingress"]=true
+                if [ "${COMPONENT_SHOWN[VictoriaMetrics ingress]}" != "true" ]; then
+                    echo -e "${GREEN}     ✓${NC} VictoriaMetrics ingress"
+                    COMPONENT_SHOWN["VictoriaMetrics ingress"]=true
+                fi
+            fi
+        fi
+        
+        # Check Zen Watcher ingress
+        if [ "${COMPONENT_READY[Zen Watcher ingress]}" != "true" ]; then
+            if kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1; then
+                COMPONENT_READY["Zen Watcher ingress"]=true
+                if [ "${COMPONENT_SHOWN[Zen Watcher ingress]}" != "true" ]; then
+                    echo -e "${GREEN}     ✓${NC} Zen Watcher ingress"
+                    COMPONENT_SHOWN["Zen Watcher ingress"]=true
+                fi
+            fi
+        fi
+        
+        # Count ready ingress resources
+        [ "${COMPONENT_READY[Grafana ingress]}" = "true" ] && READY_COUNT=$((READY_COUNT + 1))
+        [ "${COMPONENT_READY[VictoriaMetrics ingress]}" = "true" ] && READY_COUNT=$((READY_COUNT + 1))
+        [ "${COMPONENT_READY[Zen Watcher ingress]}" = "true" ] && READY_COUNT=$((READY_COUNT + 1))
     fi
     
     if [ $((i % 10)) -eq 0 ]; then
@@ -1707,15 +1734,9 @@ done
 done
         # Count outstanding ingress resources (each ingress is a separate component)
         if [ "$SKIP_MONITORING" != true ]; then
-            INGRESS_GRAFANA_READY=false
-            INGRESS_VM_READY=false
-            INGRESS_ZW_READY=false
-            kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && INGRESS_GRAFANA_READY=true
-            kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1 && INGRESS_VM_READY=true
-            kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1 && INGRESS_ZW_READY=true
-            [ "$INGRESS_GRAFANA_READY" = false ] && OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1))
-            [ "$INGRESS_VM_READY" = false ] && OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1))
-            [ "$INGRESS_ZW_READY" = false ] && OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1))
+            [ "${COMPONENT_READY[Grafana ingress]}" != "true" ] && OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1)) && OUTSTANDING_LIST+=("Grafana ingress")
+            [ "${COMPONENT_READY[VictoriaMetrics ingress]}" != "true" ] && OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1)) && OUTSTANDING_LIST+=("VictoriaMetrics ingress")
+            [ "${COMPONENT_READY[Zen Watcher ingress]}" != "true" ] && OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1)) && OUTSTANDING_LIST+=("Zen Watcher ingress")
         fi
         
         if [ "$OUTSTANDING_COUNT" -gt 0 ]; then
@@ -1724,11 +1745,6 @@ done
             for name in "${OUTSTANDING_LIST[@]}"; do
                 echo -e "${YELLOW}     ⏳${NC} $name"
             done
-            if [ "$SKIP_MONITORING" != true ]; then
-                [ "$INGRESS_GRAFANA_READY" = false ] && echo -e "${YELLOW}     ⏳${NC} Grafana ingress"
-                [ "$INGRESS_VM_READY" = false ] && echo -e "${YELLOW}     ⏳${NC} VictoriaMetrics ingress"
-                [ "$INGRESS_ZW_READY" = false ] && echo -e "${YELLOW}     ⏳${NC} Zen Watcher ingress"
-            fi
         fi
     fi
     
