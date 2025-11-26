@@ -1628,11 +1628,7 @@ kubectl set env deployment/grafana \
         -n ${NAMESPACE} 2>&1 | grep -v "already exists" > /dev/null || true
 fi
 
-# Deploy Zen Watcher CRDs
-echo -e "${YELLOW}→${NC} Deploying Zen Watcher CRDs..."
-kubectl apply -f deployments/crds/ --validate=false 2>&1 | grep -v "already exists\|unchanged" > /dev/null || true
-
-# Deploy Zen Watcher using Helm or direct deployment
+# Deploy Zen Watcher using Helm chart
 echo -e "${YELLOW}→${NC} Deploying Zen Watcher..."
 ZEN_WATCHER_IMAGE="${ZEN_WATCHER_IMAGE:-kubezen/zen-watcher:latest}"
 
@@ -1645,99 +1641,38 @@ else
     IMAGE_PULL_POLICY="IfNotPresent"
 fi
 
+# Extract image repository and tag from image string
+if echo "$ZEN_WATCHER_IMAGE" | grep -q ":"; then
+    IMAGE_TAG=$(echo "$ZEN_WATCHER_IMAGE" | cut -d: -f2)
+    IMAGE_REPO=$(echo "$ZEN_WATCHER_IMAGE" | cut -d: -f1)
+else
+    IMAGE_TAG="latest"
+    IMAGE_REPO="$ZEN_WATCHER_IMAGE"
+fi
+
 # Try to get latest image tag from Docker Hub or use latest
 if [ "$ZEN_WATCHER_IMAGE" = "kubezen/zen-watcher:latest" ]; then
     echo -e "${CYAN}   Using image: ${ZEN_WATCHER_IMAGE}${NC}"
 fi
 
-# Create zen-watcher deployment
-cat <<EOF | kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" > /dev/null || true
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: zen-watcher
-  namespace: ${NAMESPACE}
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: zen-watcher
-rules:
-- apiGroups: ["zen.kube-zen.io"]
-  resources: ["observations"]
-  verbs: ["get", "list", "watch", "create", "update", "patch"]
-- apiGroups: ["wgpolicyk8s.io"]
-  resources: ["policyreports", "clusterpolicyreports"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["aquasecurity.github.io"]
-  resources: ["vulnerabilityreports"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: [""]
-  resources: ["configmaps"]
-  verbs: ["get", "list", "watch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: zen-watcher
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: zen-watcher
-subjects:
-- kind: ServiceAccount
-  name: zen-watcher
-  namespace: ${NAMESPACE}
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: zen-watcher
-  namespace: ${NAMESPACE}
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: zen-watcher
-  template:
-    metadata:
-      labels:
-        app: zen-watcher
-    spec:
-      serviceAccountName: zen-watcher
-      containers:
-      - name: zen-watcher
-        image: ${ZEN_WATCHER_IMAGE}
-        imagePullPolicy: ${IMAGE_PULL_POLICY:-IfNotPresent}
-        ports:
-        - name: http
-          containerPort: 8080
-        - name: metrics
-          containerPort: 9090
-        env:
-        - name: HTTP_SHUTDOWN_TIMEOUT
-          value: "15s"
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 65532
-        fsGroup: 65532
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: zen-watcher
-  namespace: ${NAMESPACE}
-spec:
-  selector:
-    app: zen-watcher
-  ports:
-  - name: http
-    port: 8080
-    targetPort: 8080
-  - name: metrics
-    port: 9090
-    targetPort: 9090
-EOF
+# Deploy using Helm chart (includes CRDs, RBAC, Service, Deployment, and VMServiceScrape)
+helm upgrade --install zen-watcher ./charts/zen-watcher \
+    --namespace ${NAMESPACE} \
+    --create-namespace \
+    --set image.repository="${IMAGE_REPO}" \
+    --set image.tag="${IMAGE_TAG}" \
+    --set image.pullPolicy="${IMAGE_PULL_POLICY}" \
+    --set config.watchNamespace="${NAMESPACE}" \
+    --set config.trivyNamespace="trivy-system" \
+    --set config.falcoNamespace="falco" \
+    --set victoriametricsScrape.enabled=true \
+    --set victoriametricsScrape.interval="15s" \
+    --set service.type=ClusterIP \
+    --set service.port=8080 \
+    --set crd.install=true \
+    --set rbac.create=true \
+    --set serviceAccount.create=true \
+    > /dev/null 2>&1 &
 
 show_section_time "Installing All Components"
 
