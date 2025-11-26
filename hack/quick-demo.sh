@@ -1866,59 +1866,66 @@ if [ "$HAS_FAILURES" = true ]; then
     fi
 fi
 
-# Test endpoints
+# Test all endpoints that will be shown in final output
 echo ""
-echo -e "${YELLOW}→${NC} Testing endpoints..."
-GRAFANA_WORKING=false
-VM_WORKING=false
-ZW_WORKING=false
+echo -e "${YELLOW}→${NC} Testing all endpoints..."
+declare -A ENDPOINT_STATUS
 
-for retry in {1..20}; do
-    # Test Grafana
-    if [ "$GRAFANA_WORKING" = false ]; then
-        HTTP_CODE=$(timeout 2 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}/grafana/api/health 2>/dev/null || echo "000")
-        if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
-            GRAFANA_WORKING=true
-            echo -e "${GREEN}✓${NC} Grafana accessible (HTTP ${HTTP_CODE})"
-        fi
-    fi
+# Define all endpoints to test
+ENDPOINTS=(
+    "Grafana:/grafana/api/health:200,401,403"
+    "Grafana Dashboard:/grafana/d/zen-watcher:200,302,401,403"
+    "VictoriaMetrics:/victoriametrics:200,204"
+    "VictoriaMetrics API:/victoriametrics/api/v1/query:200,400,405"
+    "VictoriaMetrics VMUI:/victoriametrics/vmui:200,302"
+    "Zen Watcher Health:/zen-watcher/health:200"
+    "Zen Watcher Metrics:/zen-watcher/metrics:200"
+)
+
+# Test each endpoint
+for endpoint_def in "${ENDPOINTS[@]}"; do
+    IFS=':' read -r name path expected_codes <<< "$endpoint_def"
+    ENDPOINT_STATUS["$name"]="pending"
+done
+
+for retry in {1..30}; do
+    ALL_TESTED=true
     
-    # Test VictoriaMetrics - try multiple paths
-    if [ "$VM_WORKING" = false ]; then
-        # Try /victoriametrics/health first
-        HTTP_CODE=$(timeout 2 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}/victoriametrics/health 2>/dev/null || echo "000")
-        # If that fails, try root path
-        if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "204" ]; then
-            HTTP_CODE=$(timeout 2 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}/victoriametrics/ 2>/dev/null || echo "000")
+    for endpoint_def in "${ENDPOINTS[@]}"; do
+        IFS=':' read -r name path expected_codes <<< "$endpoint_def"
+        
+        if [ "${ENDPOINT_STATUS[$name]}" != "working" ]; then
+            ALL_TESTED=false
+            HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}${path} 2>/dev/null || echo "000")
+            
+            # Check if HTTP code matches expected codes
+            if echo ",${expected_codes}," | grep -q ",${HTTP_CODE},"; then
+                ENDPOINT_STATUS["$name"]="working"
+                echo -e "${GREEN}✓${NC} $name accessible (HTTP ${HTTP_CODE})"
+            fi
         fi
-        # Also try /victoriametrics without trailing slash
-        if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "204" ]; then
-            HTTP_CODE=$(timeout 2 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}/victoriametrics 2>/dev/null || echo "000")
-        fi
-        if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ]; then
-            VM_WORKING=true
-            echo -e "${GREEN}✓${NC} VictoriaMetrics accessible (HTTP ${HTTP_CODE})"
-        fi
-    fi
+    done
     
-    # Test Zen Watcher
-    if [ "$ZW_WORKING" = false ]; then
-        HTTP_CODE=$(timeout 2 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}/zen-watcher/health 2>/dev/null || echo "000")
-        if [ "$HTTP_CODE" = "200" ]; then
-            ZW_WORKING=true
-            echo -e "${GREEN}✓${NC} Zen Watcher accessible (HTTP ${HTTP_CODE})"
-        fi
-    fi
-    
-    if [ "$GRAFANA_WORKING" = true ] && [ "$VM_WORKING" = true ] && [ "$ZW_WORKING" = true ]; then
+    if [ "$ALL_TESTED" = true ]; then
         break
     fi
     
     sleep 1
 done
 
-if [ "$GRAFANA_WORKING" = false ] || [ "$VM_WORKING" = false ] || [ "$ZW_WORKING" = false ]; then
-    echo -e "${YELLOW}⚠${NC}  Some endpoints may need a few more seconds to become fully accessible"
+# Show any endpoints that failed
+FAILED_COUNT=0
+for endpoint_def in "${ENDPOINTS[@]}"; do
+    IFS=':' read -r name path expected_codes <<< "$endpoint_def"
+    if [ "${ENDPOINT_STATUS[$name]}" != "working" ]; then
+        FAILED_COUNT=$((FAILED_COUNT + 1))
+        HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}${path} 2>/dev/null || echo "000")
+        echo -e "${YELLOW}⚠${NC}  $name not accessible (HTTP ${HTTP_CODE}) - may need more time"
+    fi
+done
+
+if [ "$FAILED_COUNT" -gt 0 ]; then
+    echo -e "${YELLOW}⚠${NC}  ${FAILED_COUNT} endpoint(s) may need a few more seconds to become fully accessible"
 fi
 
 # Check observations
