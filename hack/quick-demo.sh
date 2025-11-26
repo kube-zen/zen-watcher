@@ -1955,11 +1955,18 @@ if [ "$OBSERVATION_COUNT" -gt 0 ]; then
     echo ""
 fi
 
+# Calculate cluster creation time
+CLUSTER_END_TIME=$(date +%s)
+CLUSTER_ELAPSED=$((CLUSTER_END_TIME - CLUSTER_START_TIME))
+TOTAL_ELAPSED=$((CLUSTER_END_TIME - SCRIPT_START_TIME))
+TOTAL_MINUTES=$((TOTAL_ELAPSED / 60))
+TOTAL_SECONDS=$((TOTAL_ELAPSED % 60))
+
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 if [ $TOTAL_MINUTES -gt 0 ]; then
-    echo -e "  ${GREEN}⏱  Deployment Time:${NC} ${CYAN}${TOTAL_MINUTES}m ${TOTAL_SECONDS}s${NC}"
+    echo -e "  ${GREEN}⏱  Cluster create, ready and accessible:${NC} ${CYAN}${CLUSTER_ELAPSED}s (total: ${TOTAL_MINUTES}m ${TOTAL_SECONDS}s)${NC}"
 else
-    echo -e "  ${GREEN}⏱  Deployment Time:${NC} ${CYAN}${TOTAL_SECONDS}s${NC}"
+    echo -e "  ${GREEN}⏱  Cluster create, ready and accessible:${NC} ${CYAN}${CLUSTER_ELAPSED}s (total: ${TOTAL_SECONDS}s)${NC}"
 fi
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
