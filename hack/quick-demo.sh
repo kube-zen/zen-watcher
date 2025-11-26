@@ -1288,14 +1288,16 @@ metadata:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/rewrite-target: /\$2
     nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Forwarded-Prefix: /victoriametrics";
 spec:
   ingressClassName: nginx
   rules:
   - host: localhost
     http:
       paths:
-      - path: /victoriametrics(/|$)(.*)
-        pathType: ImplementationSpecific
+      - path: /victoriametrics
+        pathType: Prefix
         backend:
           service:
             name: victoriametrics
