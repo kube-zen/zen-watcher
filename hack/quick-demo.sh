@@ -1911,6 +1911,89 @@ for i in {1..120}; do
     sleep 1
 done
 
+# Configure Grafana datasource and dashboard after endpoints are ready
+# Only configure if Grafana endpoint is working
+if [ "$SKIP_MONITORING" != true ] && [ "${ENDPOINT_STATUS[Grafana]}" = "working" ]; then
+    echo ""
+    echo -e "${YELLOW}→${NC} Configuring Grafana (datasource and dashboard)..."
+    
+    # Wait a bit more for Grafana to be fully ready
+    sleep 5
+    
+    # Configure VictoriaMetrics datasource
+    echo -e "${CYAN}  Configuring VictoriaMetrics datasource...${NC}"
+    DATASOURCE_RESULT=$(timeout 15 curl -s -X POST \
+        -H "Content-Type: application/json" \
+        -H "Host: localhost" \
+        -u zen:${GRAFANA_PASSWORD} \
+        -d '{
+            "name": "VictoriaMetrics",
+            "type": "prometheus",
+            "url": "http://victoriametrics-single-vms-server.victoriametrics.svc.cluster.local:8428/victoriametrics",
+            "access": "proxy",
+            "isDefault": true,
+            "jsonData": {
+                "httpMethod": "POST"
+            }
+        }' \
+        http://localhost:${INGRESS_HTTP_PORT}/grafana/api/datasources 2>&1 || echo "timeout or error")
+
+    if echo "$DATASOURCE_RESULT" | grep -qE "Datasource added|already exists|success|message.*VictoriaMetrics"; then
+        echo -e "${GREEN}    ✓${NC} Datasource configured"
+    else
+        echo -e "${YELLOW}    ⚠${NC}  Datasource configuration failed: $(echo "$DATASOURCE_RESULT" | head -1)"
+        # Try to get existing datasource ID if it already exists
+        EXISTING_DS=$(timeout 10 curl -s -H "Host: localhost" -u zen:${GRAFANA_PASSWORD} \
+            http://localhost:${INGRESS_HTTP_PORT}/grafana/api/datasources/name/VictoriaMetrics 2>&1 | jq -r '.id // empty' 2>/dev/null)
+        if [ -n "$EXISTING_DS" ]; then
+            echo -e "${CYAN}    →${NC} Datasource already exists (ID: $EXISTING_DS), updating..."
+            UPDATE_RESULT=$(timeout 15 curl -s -X PUT \
+                -H "Content-Type: application/json" \
+                -H "Host: localhost" \
+                -u zen:${GRAFANA_PASSWORD} \
+                -d "{
+                    \"id\": $EXISTING_DS,
+                    \"name\": \"VictoriaMetrics\",
+                    \"type\": \"prometheus\",
+                    \"url\": \"http://victoriametrics-single-vms-server.victoriametrics.svc.cluster.local:8428/victoriametrics\",
+                    \"access\": \"proxy\",
+                    \"isDefault\": true,
+                    \"jsonData\": {
+                        \"httpMethod\": \"POST\"
+                    }
+                }" \
+                http://localhost:${INGRESS_HTTP_PORT}/grafana/api/datasources/$EXISTING_DS 2>&1 || echo "timeout or error")
+            if echo "$UPDATE_RESULT" | grep -qE "Datasource updated|success|message"; then
+                echo -e "${GREEN}    ✓${NC} Datasource updated"
+            fi
+        fi
+    fi
+    
+    # Import dashboard
+    echo -e "${CYAN}  Importing Zen Watcher dashboard...${NC}"
+    if [ -f "config/dashboards/zen-watcher-dashboard.json" ]; then
+        DASHBOARD_RESULT=$(timeout 15 cat config/dashboards/zen-watcher-dashboard.json | \
+        jq '{dashboard: ., overwrite: true, message: "Demo Import"}' | \
+        curl -s -X POST \
+            -H "Content-Type: application/json" \
+            -H "Host: localhost" \
+            -u zen:${GRAFANA_PASSWORD} \
+            -d @- \
+            http://localhost:${INGRESS_HTTP_PORT}/grafana/api/dashboards/db 2>&1 || echo "timeout or error")
+        
+        if echo "$DASHBOARD_RESULT" | grep -qE "success|Dashboard.*imported|message.*success"; then
+            echo -e "${GREEN}    ✓${NC} Dashboard imported successfully"
+        else
+            echo -e "${YELLOW}    ⚠${NC}  Dashboard import failed: $(echo "$DASHBOARD_RESULT" | jq -r '.message // .' 2>/dev/null | head -1)"
+        fi
+    else
+        echo -e "${YELLOW}    ⚠${NC}  Dashboard file not found at config/dashboards/zen-watcher-dashboard.json"
+    fi
+elif [ "$SKIP_MONITORING" != true ]; then
+    echo ""
+    echo -e "${YELLOW}⚠${NC}  Skipping Grafana configuration (Grafana endpoint not ready)"
+fi
+
 # Show any endpoints that failed after max wait
 FAILED_COUNT=0
 FAILED_ENDPOINTS=()
