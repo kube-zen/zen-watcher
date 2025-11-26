@@ -1769,8 +1769,8 @@ for i in {1..60}; do
     
     # Check ingress resources exist (only if monitoring is enabled)
     if [ "$SKIP_MONITORING" != true ] && [ "$INGRESS_RESOURCES_READY" = false ]; then
-        if kubectl get ingress zen-demo-grafana -n ${NAMESPACE} >/dev/null 2>&1 && \
-           kubectl get ingress zen-demo-services -n ${NAMESPACE} >/dev/null 2>&1; then
+        if kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && \
+           kubectl get ingress zen-demo-services -n victoriametrics >/dev/null 2>&1; then
             INGRESS_RESOURCES_READY=true
             if [ "$INGRESS_RESOURCES_SHOWN" = false ]; then
                 echo -e "${GREEN}✓${NC} Ingress resources"
