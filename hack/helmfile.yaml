@@ -50,9 +50,77 @@ releases:
   - name: victoriametrics-operator
     namespace: victoriametrics-operator
     chart: vm/victoria-metrics-operator
+    version: 0.56.4
     createNamespace: true
     needs: []
-    installed: {{ ne $skipMonitoring "true" }}
+    installed: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
+
+  # VictoriaMetrics Cluster (main metrics storage)
+  - name: victoriametrics-cluster
+    namespace: victoriametrics
+    chart: vm/victoria-metrics-cluster
+    version: 0.29.5
+    createNamespace: true
+    needs:
+      - victoriametrics-operator/victoriametrics-operator
+    installed: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
+    values:
+      - vmselect:
+          replicaCount: 1
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+      - vminsert:
+          replicaCount: 1
+          resources:
+            requests:
+              memory: 128Mi
+              cpu: 100m
+            limits:
+              memory: 512Mi
+              cpu: 500m
+      - vmstorage:
+          replicaCount: 1
+          resources:
+            requests:
+              memory: 256Mi
+              cpu: 100m
+            limits:
+              memory: 1Gi
+              cpu: 1000m
+
+  # Grafana (depends on VictoriaMetrics for datasource)
+  - name: grafana
+    namespace: grafana
+    chart: grafana/grafana
+    version: 10.2.0
+    createNamespace: true
+    needs:
+      - victoriametrics/victoriametrics-cluster
+    installed: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
+    values:
+      - adminUser: zen
+      - adminPassword: {{ $grafanaPassword }}
+      - env:
+          GF_USERS_ALLOW_SIGN_UP: false
+          GF_USERS_DEFAULT_THEME: dark
+          GF_SERVER_ROOT_URL: http://localhost:{{ $ingressPort }}/grafana/
+          GF_SERVER_SERVE_FROM_SUB_PATH: true
+          GF_SERVER_DOMAIN: localhost
+      - service:
+          type: ClusterIP
+          port: 3000
+      - resources:
+          requests:
+            memory: 128Mi
+            cpu: 100m
+          limits:
+            memory: 512Mi
+            cpu: 500m
 
   # Zen Watcher (local chart, depends on ingress for webhooks)
   - name: zen-watcher
