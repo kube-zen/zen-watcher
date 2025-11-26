@@ -1901,7 +1901,7 @@ if [ "$GRAFANA_WORKING" = false ] || [ "$VM_WORKING" = false ] || [ "$ZW_WORKING
 fi
 
 # Check observations
-OBSERVATION_COUNT=$(kubectl get observations -A --kubeconfig=${KUBECONFIG_FILE} --no-headers 2>/dev/null | wc -l | tr -d ' ' || echo "0")
+OBSERVATION_COUNT=$(kubectl get observations -A --kubeconfig=${KUBECONFIG_FILE} --no-headers 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")
 if [ "$OBSERVATION_COUNT" -gt 0 ]; then
     echo -e "${GREEN}✓${NC} Observations created: ${OBSERVATION_COUNT}"
     if command -v jq >/dev/null 2>&1; then
@@ -1949,7 +1949,6 @@ echo ""
 echo -e "${CYAN}  KUBECONFIG:${NC}"
 echo -e "    ${GREEN}File:${NC}     ${CYAN}${KUBECONFIG_FILE}${NC}"
 echo -e "    ${GREEN}Usage:${NC}   ${CYAN}kubectl get observations --kubeconfig ${KUBECONFIG_FILE}${NC}"
-echo -e "    ${GREEN}Or:${NC}      ${CYAN}export KUBECONFIG=${KUBECONFIG_FILE} && kubectl get observations${NC}"
 echo ""
 if [ "$OBSERVATION_COUNT" -gt 0 ]; then
     echo -e "${CYAN}  OBSERVATIONS:${NC}"
