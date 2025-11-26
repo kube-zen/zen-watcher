@@ -1869,6 +1869,7 @@ fi
 echo ""
 echo -e "${YELLOW}→${NC} Testing all endpoints..."
 declare -A ENDPOINT_STATUS
+declare -A ENDPOINT_SHOWN
 
 # Define all endpoints to test
 ENDPOINTS=(
@@ -1881,50 +1882,76 @@ ENDPOINTS=(
     "Zen Watcher Metrics:/zen-watcher/metrics:200"
 )
 
-# Test each endpoint
+# Initialize status for all endpoints
 for endpoint_def in "${ENDPOINTS[@]}"; do
     IFS=':' read -r name path expected_codes <<< "$endpoint_def"
     ENDPOINT_STATUS["$name"]="pending"
+    ENDPOINT_SHOWN["$name"]=false
 done
 
-for retry in {1..30}; do
-    ALL_TESTED=true
+MAX_WAIT=120  # 2 minutes max
+for i in {1..120}; do
+    ALL_WORKING=true
     
     for endpoint_def in "${ENDPOINTS[@]}"; do
         IFS=':' read -r name path expected_codes <<< "$endpoint_def"
         
         if [ "${ENDPOINT_STATUS[$name]}" != "working" ]; then
-            ALL_TESTED=false
+            ALL_WORKING=false
             HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}${path} 2>/dev/null || echo "000")
             
             # Check if HTTP code matches expected codes
             if echo ",${expected_codes}," | grep -q ",${HTTP_CODE},"; then
                 ENDPOINT_STATUS["$name"]="working"
-                echo -e "${GREEN}✓${NC} $name accessible (HTTP ${HTTP_CODE})"
+                if [ "${ENDPOINT_SHOWN[$name]}" = false ]; then
+                    echo -e "${GREEN}     ✓${NC} $name (HTTP ${HTTP_CODE})"
+                    ENDPOINT_SHOWN["$name"]=true
+                fi
             fi
         fi
     done
     
-    if [ "$ALL_TESTED" = true ]; then
+    if [ "$ALL_WORKING" = true ]; then
+        echo -e "${GREEN}✓${NC} All endpoints accessible"
         break
+    fi
+    
+    # Show outstanding endpoints every 10 seconds
+    if [ $((i % 10)) -eq 0 ]; then
+        OUTSTANDING_COUNT=0
+        OUTSTANDING_LIST=()
+        for endpoint_def in "${ENDPOINTS[@]}"; do
+            IFS=':' read -r name path expected_codes <<< "$endpoint_def"
+            if [ "${ENDPOINT_STATUS[$name]}" != "working" ]; then
+                OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1))
+                OUTSTANDING_LIST+=("$name")
+            fi
+        done
+        
+        if [ "$OUTSTANDING_COUNT" -gt 0 ]; then
+            echo -e "${CYAN}   Still waiting (${i}s elapsed):${NC}"
+            for name in "${OUTSTANDING_LIST[@]}"; do
+                echo -e "${YELLOW}     ⏳${NC} $name"
+            done
+        fi
     fi
     
     sleep 1
 done
 
-# Show any endpoints that failed
+# Show any endpoints that failed after max wait
 FAILED_COUNT=0
 for endpoint_def in "${ENDPOINTS[@]}"; do
     IFS=':' read -r name path expected_codes <<< "$endpoint_def"
     if [ "${ENDPOINT_STATUS[$name]}" != "working" ]; then
         FAILED_COUNT=$((FAILED_COUNT + 1))
         HTTP_CODE=$(timeout 3 curl -s -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}${path} 2>/dev/null || echo "000")
-        echo -e "${YELLOW}⚠${NC}  $name not accessible (HTTP ${HTTP_CODE}) - may need more time"
+        echo -e "${YELLOW}⚠${NC}  $name not accessible (HTTP ${HTTP_CODE})"
     fi
 done
 
 if [ "$FAILED_COUNT" -gt 0 ]; then
-    echo -e "${YELLOW}⚠${NC}  ${FAILED_COUNT} endpoint(s) may need a few more seconds to become fully accessible"
+    echo -e "${YELLOW}⚠${NC}  ${FAILED_COUNT} endpoint(s) failed - check service status and ingress configuration"
 fi
 
 # Check observations
