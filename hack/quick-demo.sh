@@ -1330,8 +1330,8 @@ helm repo update > /dev/null 2>&1 || true
 
 # Run helmfile sync (this handles all Helm installations)
 # Change to repo root so local chart paths work correctly
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || cd "$(dirname "$0")/.." && pwd)"
-cd "$REPO_ROOT"
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$(cd "$(dirname "$0")/.." && pwd)")"
+cd "$REPO_ROOT" || { echo "Error: Failed to change to repo root: $REPO_ROOT" >&2; exit 1; }
 
 # Suppress verbose Helm output (NOTES, examples, etc.) but keep errors
 if helmfile -f hack/helmfile.yaml.gotmpl sync 2>&1 | grep -v "^Adding repo\|^Listing releases\|^Release.*does not exist\|^NAME:\|^LAST DEPLOYED:\|^NAMESPACE:\|^STATUS:\|^REVISION:\|^DESCRIPTION:\|^TEST SUITE:\|^NOTES:\|^Chart version:\|^Kyverno version:\|^Thank you for\|^The following\|^⚠\|^💡\|^Get the\|^You need\|^for example\|^Input this\|^Read API:\|^An example\|^apiVersion:\|^kind:\|^metadata:\|^spec:\|^rules:\|^host:\|^http:\|^paths:\|^pathType:\|^backend:\|^service:\|^name:\|^port:\|^number:\|^tls:\|^hosts:\|^secretName:\|^data:\|^tls.crt:\|^tls.key:\|^type:\|^  # This section\|^If TLS is\|^  apiVersion:" | tee /tmp/helmfile-sync.log; then
