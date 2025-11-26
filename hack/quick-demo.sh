@@ -1120,7 +1120,7 @@ if [ -z "${KUBECONFIG_FILE:-}" ]; then
 fi
 
 # Ensure kubeconfig file exists and is up to date
-echo -e "${YELLOW}→${NC} Setting up kubeconfig file..."
+# Set up kubeconfig file (silently)
 case "$PLATFORM" in
     k3d)
         # Update the separate kubeconfig file (don't touch default config)
@@ -1151,10 +1151,6 @@ case "$PLATFORM" in
 esac
 if [ -f "${KUBECONFIG_FILE}" ]; then
     chmod 600 ${KUBECONFIG_FILE} 2>/dev/null || true
-    echo -e "${GREEN}✓${NC} Kubeconfig saved to: ${KUBECONFIG_FILE}"
-    echo -e "${CYAN}   Use it with: kubectl get observations --kubeconfig ${KUBECONFIG_FILE}${NC}"
-else
-    echo -e "${YELLOW}⚠${NC}  Kubeconfig file could not be created, but cluster is accessible via default kubeconfig"
 fi
 
 # Final attempt to verify cluster is ready
