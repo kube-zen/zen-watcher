@@ -3,6 +3,8 @@ repositories:
     url: https://kubernetes.github.io/ingress-nginx
   - name: vm
     url: https://victoriametrics.github.io/helm-charts
+  - name: grafana
+    url: https://grafana.github.io/helm-charts
   - name: aqua
     url: https://aquasecurity.github.io/helm-charts
   - name: falcosecurity
@@ -20,6 +22,8 @@ repositories:
 {{ $installFalco := env "INSTALL_FALCO" | default "false" }}
 {{ $installKyverno := env "INSTALL_KYVERNO" | default "false" }}
 {{ $skipMonitoring := env "SKIP_MONITORING" | default "false" }}
+{{ $ingressPort := env "INGRESS_HTTP_PORT" | default "8080" }}
+{{ $grafanaPassword := env "GRAFANA_PASSWORD" | default (randAlphaNum 16) }}
 
 releases:
   # Ingress Controller (must be installed first)
