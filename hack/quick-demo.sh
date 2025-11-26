@@ -172,10 +172,13 @@ check_namespace_ready() {
     # For one-time scan jobs (like Checkov), consider them ready once they exist and are not failed
     local jobs=$(kubectl get jobs -n "$namespace" --no-headers 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")
     if [ "$jobs" -gt 0 ]; then
-        # Get job statuses - check for failed jobs
-        local failed_jobs=$(kubectl get jobs -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Failed")].status}{"\n"}{end}' 2>/dev/null | \
+        # Get job statuses - check for failed jobs using conditions
+        local failed_conditions=$(kubectl get jobs -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Failed")].status}{"\n"}{end}' 2>/dev/null | \
             grep -c "True" | tr -d '[:space:]' || echo "0")
-        if [ "$failed_jobs" -gt 0 ]; then
+        # Also check for failed pods in job status (jobs may have failed pods without Failed condition yet)
+        local failed_pods=$(kubectl get jobs -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.failed}{"\n"}{end}' 2>/dev/null | \
+            awk -F'\t' '$2 > 0' | wc -l | tr -d '[:space:]' || echo "0")
+        if [ "$failed_conditions" -gt 0 ] || [ "$failed_pods" -gt 0 ]; then
             return 1  # At least one job failed
         fi
         # For scan jobs (Checkov), consider ready once job exists (it will complete in background)
@@ -187,11 +190,19 @@ check_namespace_ready() {
             awk -F'\t' '$2 > 0' | wc -l | tr -d '[:space:]' || echo "0")
         # If jobs exist, none failed, and (none are active OR some have succeeded), consider ready
         # This handles Checkov which is a one-time scan job
+        # For scan jobs, we consider them ready if they exist and are not actively failing
+        # (they may still be running, but that's okay for readiness check)
         if [ "$active_jobs" -eq 0 ] || [ "$succeeded_jobs" -gt 0 ]; then
             # No active jobs or some succeeded - job exists and is not failed, so consider ready
             return 0
         fi
-        # Jobs are still running
+        # If job is still active but not failed, also consider ready (for scan jobs that take time)
+        # This allows Checkov to be marked ready even while it's still running
+        if [ "$active_jobs" -gt 0 ] && [ "$failed_conditions" -eq 0 ] && [ "$failed_pods" -eq 0 ]; then
+            # Job is active but not failed - for scan jobs, consider ready
+            return 0
+        fi
+        # Jobs are still running and we can't determine status
         return 1
     fi
     
