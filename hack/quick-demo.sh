@@ -1288,16 +1288,16 @@ export INSTALL_FALCO=${INSTALL_FALCO}
 export INSTALL_KYVERNO=${INSTALL_KYVERNO}
 export SKIP_MONITORING=${SKIP_MONITORING}
 
-# Check if helmfile.yaml exists
-if [ ! -f "./hack/helmfile.yaml" ]; then
-    echo -e "${RED}✗${NC} Helmfile configuration not found at ./hack/helmfile.yaml"
+# Check if helmfile.yaml.gotmpl exists
+if [ ! -f "./hack/helmfile.yaml.gotmpl" ]; then
+    echo -e "${RED}✗${NC} Helmfile configuration not found at ./hack/helmfile.yaml.gotmpl"
     echo -e "${YELLOW}   Please ensure you're running from the repository root${NC}"
     exit 1
 fi
 
 # Run helmfile sync (this handles all Helm installations)
 cd "$(git rev-parse --show-toplevel)" 2>/dev/null || cd "$(dirname "$0")/.."
-if helmfile -f hack/helmfile.yaml sync 2>&1 | tee /tmp/helmfile-sync.log; then
+if helmfile -f hack/helmfile.yaml.gotmpl sync 2>&1 | tee /tmp/helmfile-sync.log; then
     echo -e "${GREEN}✓${NC} Helmfile sync completed"
 else
     HELMFILE_EXIT=$?
