@@ -1249,6 +1249,9 @@ fi
 # Create ingress resources (only if monitoring is enabled)
 if [ "$SKIP_MONITORING" != true ]; then
     echo -e "${YELLOW}→${NC} Creating ingress resources..."
+    # Ensure namespaces exist before creating ingress resources
+    kubectl create namespace grafana 2>&1 | grep -v "already exists" > /dev/null || true
+    kubectl create namespace victoriametrics 2>&1 | grep -v "already exists" > /dev/null || true
     kubectl create namespace ${NAMESPACE} 2>/dev/null || true
     sleep 1
     
@@ -1760,7 +1763,7 @@ for i in {1..60}; do
             if check_namespace_ready "$namespace" "$name"; then
                 COMPONENT_READY["$name"]=true
                 if [ "${COMPONENT_SHOWN[$name]}" != "true" ]; then
-                    echo -e "${GREEN}✓${NC} $name"
+                    echo -e "${GREEN}     ✓${NC} $name"
                     COMPONENT_SHOWN["$name"]=true
                 fi
             fi
@@ -1777,7 +1780,7 @@ for i in {1..60}; do
            kubectl get ingress zen-demo-services -n victoriametrics >/dev/null 2>&1; then
             INGRESS_RESOURCES_READY=true
             if [ "$INGRESS_RESOURCES_SHOWN" = false ]; then
-                echo -e "${GREEN}✓${NC} Ingress resources"
+                echo -e "${GREEN}     ✓${NC} Ingress resources"
                 INGRESS_RESOURCES_SHOWN=true
             fi
         fi
