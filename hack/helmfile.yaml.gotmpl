@@ -126,13 +126,12 @@ releases:
       - trivy:
           ignoreUnfixed: true
 
-  # Falco (depends on zen-watcher for webhook URL)
+  # Falco (depends on zen-watcher for webhook URL, but zen-watcher is installed separately)
   - name: falco
     namespace: falco
     chart: falcosecurity/falco
     createNamespace: true
-    needs:
-      - {{ $namespace }}/zen-watcher
+    needs: []
     installed: {{ if eq $installFalco "true" }}true{{ else }}false{{ end }}
     values:
       - falcosidekick:
