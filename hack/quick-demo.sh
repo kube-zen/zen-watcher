@@ -1438,7 +1438,7 @@ spec:
         pathType: ImplementationSpecific
         backend:
           service:
-            name: victoriametrics-cluster-vmselect
+            name: victoriametrics-cluster-victoria-metrics-cluster-vmselect
             port:
               number: 8481
 ---
