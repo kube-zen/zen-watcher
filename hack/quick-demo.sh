@@ -1378,8 +1378,7 @@ if helm upgrade --install zen-watcher kube-zen/zen-watcher \
     --set serviceAccount.create=true \
     --reset-values \
     --history-max 10 \
-    -q \
-    2>&1; then
+    2>&1 | grep -v "^Release.*does not exist\|^NAME:\|^LAST DEPLOYED:\|^NAMESPACE:\|^STATUS:\|^REVISION:\|^DESCRIPTION:\|^TEST SUITE:\|^NOTES:"; then
     echo -e "${GREEN}✓${NC} zen-watcher installed"
 else
     echo -e "${RED}✗${NC} Failed to install zen-watcher"
