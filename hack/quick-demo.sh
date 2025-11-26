@@ -118,16 +118,18 @@ check_namespace_ready() {
     
     # If helm_release is provided, check Helm release status first (simpler and more reliable)
     if [ -n "$helm_release" ]; then
+        # Use the same kubeconfig as the rest of the script
+        local kubeconfig_arg=""
+        if [ -n "${KUBECONFIG_FILE:-}" ] && [ -f "${KUBECONFIG_FILE}" ]; then
+            kubeconfig_arg="--kubeconfig=${KUBECONFIG_FILE}"
+        fi
+        
         # Check if Helm release exists and is deployed
         # Use helm ls to check status - simpler than checking individual pods
-        if helm ls -n "$namespace" --short 2>/dev/null | grep -q "^${helm_release}$"; then
-            # Release exists, check status using helm ls output
-            # helm ls shows status in column 5 (STATUS column)
-            local status=$(helm ls -n "$namespace" 2>/dev/null | grep "^${helm_release}[[:space:]]" | awk '{print $9}' || echo "")
-            # If status is "deployed", component is ready
-            if [ "$status" = "deployed" ]; then
-                return 0
-            fi
+        local release_status=$(helm ls $kubeconfig_arg -n "$namespace" 2>/dev/null | grep "^${helm_release}[[:space:]]" | awk '{print $9}' || echo "")
+        # If status is "deployed", component is ready
+        if [ "$release_status" = "deployed" ]; then
+            return 0
         fi
         # Helm release not found or not deployed yet
         return 1
