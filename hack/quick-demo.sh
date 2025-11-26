@@ -758,6 +758,7 @@ check_command() {
 
 check_command "kubectl" "https://kubernetes.io/docs/tasks/tools/"
 check_command "helm" "https://helm.sh/docs/intro/install/"
+check_command "helmfile" "https://helmfile.readthedocs.io/en/latest/#installation"
 check_command "jq" "https://stedolan.github.io/jq/download/"
 check_command "openssl" "https://www.openssl.org/"
 
@@ -1264,48 +1265,51 @@ done
 # Suppress any kubectl output that might print kubeconfig path
 export KUBECONFIG=${KUBECONFIG_FILE}
 
-# Add ingress-nginx helm repo if not already added
-if ! timeout 10 helm repo list 2>/dev/null | grep -q ingress-nginx; then
-    timeout 30 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx 2>&1 || true
-    timeout 30 helm repo update 2>&1 || true
+# Deploy all Helm-managed components using Helmfile
+echo -e "${YELLOW}→${NC} Deploying components with Helmfile..."
+
+# Export environment variables for Helmfile
+export NAMESPACE=${NAMESPACE}
+export ZEN_WATCHER_IMAGE="${ZEN_WATCHER_IMAGE:-kubezen/zen-watcher:latest}"
+export INGRESS_HTTP_PORT=${INGRESS_HTTP_PORT}
+export GRAFANA_PASSWORD=${GRAFANA_PASSWORD}
+
+# Set image pull policy based on --no-docker-login flag
+if [ "$NO_DOCKER_LOGIN" = true ]; then
+    export IMAGE_PULL_POLICY="Always"
+    echo -e "${CYAN}   Using public registry (no docker login credentials)${NC}"
+else
+    export IMAGE_PULL_POLICY="IfNotPresent"
 fi
 
-# Install nginx ingress (non-blocking)
-if ! timeout 10 helm list -n ingress-nginx 2>&1 | grep -q ingress-nginx; then
-    timeout 120 helm install ingress-nginx ingress-nginx/ingress-nginx \
-        --namespace ingress-nginx \
-        --create-namespace \
-        --set controller.service.type=LoadBalancer \
-        --set controller.service.annotations."k3d\.io/loadbalancer"=true \
-        --set controller.admissionWebhooks.enabled=false \
-        --set controller.admissionWebhooks.patch.enabled=false \
-        --set controller.podLabels.app=ingress-nginx \
-        --set controller.podLabels."app\.kubernetes\.io/name"=ingress-nginx \
-        2>&1 | tee /tmp/helm-ingress.log > /dev/null &
-    HELM_INGRESS_PID=$!
-    # Delete admission webhooks if created
-    sleep 2
-    kubectl delete validatingwebhookconfiguration ingress-nginx-admission 2>&1 | grep -v "not found" > /dev/null || true
-    kubectl delete mutatingwebhookconfiguration ingress-nginx-admission 2>&1 | grep -v "not found" > /dev/null || true
+# Export flags for conditional releases
+export INSTALL_TRIVY=${INSTALL_TRIVY}
+export INSTALL_FALCO=${INSTALL_FALCO}
+export INSTALL_KYVERNO=${INSTALL_KYVERNO}
+export SKIP_MONITORING=${SKIP_MONITORING}
+
+# Check if helmfile.yaml exists
+if [ ! -f "./hack/helmfile.yaml" ]; then
+    echo -e "${RED}✗${NC} Helmfile configuration not found at ./hack/helmfile.yaml"
+    echo -e "${YELLOW}   Please ensure you're running from the repository root${NC}"
+    exit 1
 fi
 
-# Install VictoriaMetrics Operator (provides VMServiceScrape CRD) - only if monitoring is enabled
-if [ "$SKIP_MONITORING" != true ]; then
-    echo -e "${YELLOW}→${NC} Installing VictoriaMetrics Operator..."
-    # Add VictoriaMetrics Operator Helm repo
-    if ! timeout 10 helm repo list 2>/dev/null | grep -q "victoriametrics\|vm"; then
-        timeout 30 helm repo add vm https://victoriametrics.github.io/helm-charts/ 2>&1 || true
-        timeout 30 helm repo update 2>&1 || true
-    fi
-    # Install VictoriaMetrics Operator (this provides the VMServiceScrape CRD)
-    if ! timeout 10 helm list -n victoriametrics-operator 2>&1 | grep -q victoriametrics-operator; then
-        timeout 120 helm install victoriametrics-operator vm/victoria-metrics-operator \
-            --namespace victoriametrics-operator \
-            --create-namespace \
-            2>&1 | tee /tmp/helm-vm-operator.log > /dev/null &
-        HELM_VM_OPERATOR_PID=$!
-    fi
+# Run helmfile sync (this handles all Helm installations)
+cd "$(git rev-parse --show-toplevel)" 2>/dev/null || cd "$(dirname "$0")/.."
+if helmfile -f hack/helmfile.yaml sync 2>&1 | tee /tmp/helmfile-sync.log; then
+    echo -e "${GREEN}✓${NC} Helmfile sync completed"
+else
+    HELMFILE_EXIT=$?
+    echo -e "${YELLOW}⚠${NC}  Helmfile sync had errors (exit code: $HELMFILE_EXIT)"
+    echo -e "${CYAN}   Check logs: cat /tmp/helmfile-sync.log${NC}"
+    # Continue anyway - some components may have installed successfully
 fi
+
+# Delete ingress admission webhooks if created (they cause TLS issues)
+sleep 2
+kubectl delete validatingwebhookconfiguration ingress-nginx-admission 2>&1 | grep -v "not found" > /dev/null || true
+kubectl delete mutatingwebhookconfiguration ingress-nginx-admission 2>&1 | grep -v "not found" > /dev/null || true
 
 # Create ingress resources (only if monitoring is enabled)
 if [ "$SKIP_MONITORING" != true ]; then
@@ -1353,9 +1357,9 @@ spec:
         pathType: ImplementationSpecific
         backend:
           service:
-            name: victoriametrics
+            name: victoriametrics-cluster-vmselect
             port:
-              number: 8428
+              number: 8481
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -1392,77 +1396,8 @@ fi
 
 # Namespace will be created by Helm when installing zen-watcher
 
-if [ "$INSTALL_TRIVY" = true ] || [ "$INSTALL_FALCO" = true ] || [ "$INSTALL_KYVERNO" = true ] || [ "$INSTALL_CHECKOV" = true ] || [ "$INSTALL_KUBE_BENCH" = true ]; then
-
-    # Add Helm repositories (only if needed)
-    if [ "$INSTALL_TRIVY" = true ] || [ "$INSTALL_FALCO" = true ] || [ "$INSTALL_KYVERNO" = true ]; then
-        [ "$INSTALL_TRIVY" = true ] && helm repo add aqua https://aquasecurity.github.io/helm-charts 2>/dev/null || true
-        [ "$INSTALL_FALCO" = true ] && helm repo add falcosecurity https://falcosecurity.github.io/charts 2>/dev/null || true
-        [ "$INSTALL_KYVERNO" = true ] && helm repo add kyverno https://kyverno.github.io/kyverno/ 2>/dev/null || true
-        helm repo update > /dev/null 2>&1 &
-    fi
-
-    # Deploy Trivy Operator
-    if [ "$INSTALL_TRIVY" = true ]; then
-        echo -e "${YELLOW}→${NC} Deploying Trivy Operator..."
-        helm upgrade --install trivy-operator aqua/trivy-operator \
-            --namespace trivy-system \
-            --create-namespace \
-            --set="trivy.ignoreUnfixed=true" \
-            2>&1 | tee /tmp/helm-trivy.log > /dev/null &
-        HELM_TRIVY_PID=$!
-    fi
-
-    # Deploy Falco with resource limits to reduce CPU usage
-    if [ "$INSTALL_FALCO" = true ]; then
-        echo -e "${YELLOW}→${NC} Deploying Falco..."
-        helm upgrade --install falco falcosecurity/falco \
-            --namespace falco \
-            --create-namespace \
-            --set falcosidekick.enabled=false \
-            --set falco.httpOutput.enabled=true \
-            --set falco.httpOutput.url=http://zen-watcher.${NAMESPACE}.svc.cluster.local:8080/falco/webhook \
-            --set driver.enabled=false \
-            --set resources.requests.cpu=100m \
-            --set resources.requests.memory=128Mi \
-            --set resources.limits.cpu=500m \
-            --set resources.limits.memory=512Mi \
-            2>&1 | tee /tmp/helm-falco.log > /dev/null &
-        HELM_FALCO_PID=$!
-    fi
-
-    # Deploy Kyverno
-    if [ "$INSTALL_KYVERNO" = true ]; then
-        echo -e "${YELLOW}→${NC} Deploying Kyverno..."
-        helm upgrade --install kyverno kyverno/kyverno \
-            --namespace kyverno \
-            --create-namespace \
-            --set replicaCount=1 \
-            2>&1 | tee /tmp/helm-kyverno.log > /dev/null &
-        HELM_KYVERNO_PID=$!
-        
-        # Create a test Kyverno policy that requires labels
-        cat <<EOF | kubectl apply -f - 2>&1 | grep -v "already exists" > /dev/null || true
-apiVersion: kyverno.io/v1
-kind: ClusterPolicy
-metadata:
-  name: require-labels
-spec:
-  validationFailureAction: enforce
-  rules:
-  - name: check-label-app
-    match:
-      resources:
-        kinds:
-        - Pod
-    validate:
-      message: "The label 'app' is required."
-      pattern:
-        metadata:
-          labels:
-            app: "?*"
-EOF
-    fi
+# Deploy security tools that aren't in Helmfile (Checkov, kube-bench)
+if [ "$INSTALL_CHECKOV" = true ] || [ "$INSTALL_KUBE_BENCH" = true ]; then
 
     # Deploy Checkov as a Kubernetes Job
     if [ "$INSTALL_CHECKOV" = true ]; then
@@ -1587,179 +1522,29 @@ EOF
     fi
 fi
 
-# Deploy VictoriaMetrics (only if monitoring is enabled)
-if [ "$SKIP_MONITORING" != true ]; then
-    echo -e "${YELLOW}→${NC} Deploying VictoriaMetrics..."
-
-# Create ConfigMap for VictoriaMetrics scrape configuration
-cat <<EOF | kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" > /dev/null || true
-apiVersion: v1
-kind: ConfigMap
+# Create Kyverno test policy (if Kyverno is installed)
+if [ "$INSTALL_KYVERNO" = true ]; then
+    echo -e "${YELLOW}→${NC} Creating Kyverno test policy..."
+    cat <<EOF | kubectl apply -f - 2>&1 | grep -v "already exists" > /dev/null || true
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
 metadata:
-  name: victoriametrics-scrape-config
-  namespace: victoriametrics
-data:
-  scrape.yml: |
-    global:
-      scrape_interval: 15s
-    
-    scrape_configs:
-      - job_name: 'zen-watcher'
-        static_configs:
-          - targets: ['zen-watcher.${NAMESPACE}.svc.cluster.local:9090']
-        metrics_path: /metrics
-        scrape_interval: 15s
-EOF
-
-# Create namespace for VictoriaMetrics (kubectl create deployment doesn't create namespaces)
-kubectl create namespace victoriametrics 2>&1 | grep -v "already exists" > /dev/null || true
-
-# Deploy VictoriaMetrics with path prefix and scrape config using full YAML
-cat <<EOF | kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" > /dev/null || true
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: victoriametrics
-  namespace: victoriametrics
+  name: require-labels
 spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: victoriametrics
-  template:
-    metadata:
-      labels:
-        app: victoriametrics
-    spec:
-      containers:
-      - name: victoriametrics
-        image: victoriametrics/victoria-metrics:latest
-        args:
-          - -promscrape.config=/etc/vm/scrape.yml
-        ports:
-        - containerPort: 8428
-          name: http
-        volumeMounts:
-        - name: scrape-config
-          mountPath: /etc/vm
-          readOnly: true
-      volumes:
-      - name: scrape-config
-        configMap:
-          name: victoriametrics-scrape-config
+  validationFailureAction: enforce
+  rules:
+  - name: check-label-app
+    match:
+      resources:
+        kinds:
+        - Pod
+    validate:
+      message: "The label 'app' is required."
+      pattern:
+        metadata:
+          labels:
+            app: "?*"
 EOF
-
-# Expose VictoriaMetrics as ClusterIP (ingress will handle routing)
-if kubectl get svc victoriametrics -n victoriametrics &>/dev/null; then
-    kubectl delete svc victoriametrics -n victoriametrics 2>&1 | grep -v "not found" > /dev/null || true
-fi
-kubectl expose deployment victoriametrics \
-    --port=8428 --target-port=8428 \
-    --type=ClusterIP \
-    --name=victoriametrics \
-    -n victoriametrics 2>&1 | grep -v "already exists" > /dev/null || true
-
-# Deploy Grafana with zen user
-echo -e "${YELLOW}→${NC} Deploying Grafana..."
-
-# Create namespace for Grafana (kubectl create deployment doesn't create namespaces)
-kubectl create namespace grafana 2>&1 | grep -v "already exists" > /dev/null || true
-
-kubectl create deployment grafana \
-    --image=grafana/grafana:latest \
-    -n grafana \
-    --dry-run=client -o yaml 2>/dev/null | \
-kubectl set env --local -f - \
-    GF_SECURITY_ADMIN_USER=zen \
-    GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD} \
-    GF_USERS_ALLOW_SIGN_UP=false \
-    GF_USERS_DEFAULT_THEME=dark \
-    GF_SERVER_ROOT_URL=http://localhost:${INGRESS_HTTP_PORT}/grafana/ \
-    GF_SERVER_SERVE_FROM_SUB_PATH=true \
-    GF_SERVER_DOMAIN=localhost \
-    --dry-run=client -o yaml 2>/dev/null | \
-kubectl apply -f - 2>&1 | grep -v "already exists" > /dev/null || true
-
-# Update env vars if deployment exists
-kubectl set env deployment/grafana \
-    GF_SECURITY_ADMIN_USER=zen \
-    GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD} \
-    GF_USERS_ALLOW_SIGN_UP=false \
-    GF_USERS_DEFAULT_THEME=dark \
-    GF_SERVER_ROOT_URL=http://localhost:${INGRESS_HTTP_PORT}/grafana/ \
-    GF_SERVER_SERVE_FROM_SUB_PATH=true \
-    GF_SERVER_DOMAIN=localhost \
-    -n grafana 2>/dev/null || true
-
-# Expose Grafana as ClusterIP
-if kubectl get svc grafana -n grafana &>/dev/null; then
-    kubectl delete svc grafana -n grafana 2>&1 || true
-fi
-kubectl expose deployment grafana \
-    --port=3000 --target-port=3000 \
-    --type=ClusterIP \
-    --name=grafana \
-    -n grafana 2>&1 | grep -v "already exists" > /dev/null || true
-fi
-
-# Deploy Zen Watcher using Helm chart
-echo -e "${YELLOW}→${NC} Deploying Zen Watcher..."
-ZEN_WATCHER_IMAGE="${ZEN_WATCHER_IMAGE:-kubezen/zen-watcher:latest}"
-
-# Set image pull policy based on --no-docker-login flag
-if [ "$NO_DOCKER_LOGIN" = true ]; then
-    # Use Always to force pull from public registry without docker login
-    IMAGE_PULL_POLICY="Always"
-    echo -e "${CYAN}   Using public registry (no docker login credentials)${NC}"
-else
-    IMAGE_PULL_POLICY="IfNotPresent"
-fi
-
-# Extract image repository and tag from image string
-if echo "$ZEN_WATCHER_IMAGE" | grep -q ":"; then
-    IMAGE_TAG=$(echo "$ZEN_WATCHER_IMAGE" | cut -d: -f2)
-    IMAGE_REPO=$(echo "$ZEN_WATCHER_IMAGE" | cut -d: -f1)
-else
-    IMAGE_TAG="latest"
-    IMAGE_REPO="$ZEN_WATCHER_IMAGE"
-fi
-
-# Try to get latest image tag from Docker Hub or use latest
-if [ "$ZEN_WATCHER_IMAGE" = "kubezen/zen-watcher:latest" ]; then
-    echo -e "${CYAN}   Using image: ${ZEN_WATCHER_IMAGE}${NC}"
-fi
-
-# Check if Helm chart directory exists
-if [ ! -d "./charts/zen-watcher" ]; then
-    echo -e "${RED}✗${NC} Helm chart not found at ./charts/zen-watcher"
-    echo -e "${YELLOW}   Please ensure you're running from the repository root${NC}"
-    exit 1
-fi
-
-# Deploy zen-watcher using Helm chart
-# Temporarily disable exit on error to handle Helm warnings gracefully
-set +e
-helm upgrade --install zen-watcher ./charts/zen-watcher \
-    --namespace ${NAMESPACE} \
-    --create-namespace \
-    --set image.repository="${IMAGE_REPO}" \
-    --set image.tag="${IMAGE_TAG}" \
-    --set image.pullPolicy="${IMAGE_PULL_POLICY}" \
-    --set config.watchNamespace="${NAMESPACE}" \
-    --set config.trivyNamespace="trivy-system" \
-    --set config.falcoNamespace="falco" \
-    --set victoriametricsScrape.enabled=true \
-    --set victoriametricsScrape.interval="15s" \
-    --set service.type=ClusterIP \
-    --set service.port=8080 \
-    --set crd.install=true \
-    --set rbac.create=true \
-    --set serviceAccount.create=true \
-    2>&1 | grep -v "already exists\|unchanged" > /dev/null
-HELM_EXIT=$?
-set -e
-if [ $HELM_EXIT -ne 0 ]; then
-    echo -e "${YELLOW}⚠${NC}  Helm install had errors (exit code: $HELM_EXIT) - continuing anyway"
 fi
 
 # Configure Grafana datasource via ingress (only if monitoring is enabled)
@@ -1810,42 +1595,7 @@ if [ -f "config/dashboards/zen-watcher-dashboard.json" ]; then
     fi
 fi
 
-# Wait for background Helm processes and check for errors
-echo -e "${CYAN}   Waiting for Helm installations to complete...${NC}"
-HELM_ERRORS=0
-if [ -n "${HELM_INGRESS_PID:-}" ]; then
-    wait $HELM_INGRESS_PID 2>/dev/null || HELM_ERRORS=$((HELM_ERRORS + 1))
-    if [ -f /tmp/helm-ingress.log ] && grep -q -i "error\|failed" /tmp/helm-ingress.log; then
-        echo -e "${YELLOW}⚠${NC}  Ingress installation had errors. Check /tmp/helm-ingress.log"
-    fi
-fi
-if [ -n "${HELM_VM_OPERATOR_PID:-}" ]; then
-    wait $HELM_VM_OPERATOR_PID 2>/dev/null || HELM_ERRORS=$((HELM_ERRORS + 1))
-    if [ -f /tmp/helm-vm-operator.log ] && grep -q -i "error\|failed" /tmp/helm-vm-operator.log; then
-        echo -e "${YELLOW}⚠${NC}  VictoriaMetrics Operator installation had errors. Check /tmp/helm-vm-operator.log"
-    fi
-fi
-if [ -n "${HELM_TRIVY_PID:-}" ]; then
-    wait $HELM_TRIVY_PID 2>/dev/null || HELM_ERRORS=$((HELM_ERRORS + 1))
-    if [ -f /tmp/helm-trivy.log ] && grep -q -i "error\|failed" /tmp/helm-trivy.log; then
-        echo -e "${YELLOW}⚠${NC}  Trivy installation had errors. Check /tmp/helm-trivy.log"
-    fi
-fi
-if [ -n "${HELM_FALCO_PID:-}" ]; then
-    wait $HELM_FALCO_PID 2>/dev/null || HELM_ERRORS=$((HELM_ERRORS + 1))
-    if [ -f /tmp/helm-falco.log ] && grep -q -i "error\|failed" /tmp/helm-falco.log; then
-        echo -e "${YELLOW}⚠${NC}  Falco installation had errors. Check /tmp/helm-falco.log"
-    fi
-fi
-if [ -n "${HELM_KYVERNO_PID:-}" ]; then
-    wait $HELM_KYVERNO_PID 2>/dev/null || HELM_ERRORS=$((HELM_ERRORS + 1))
-    if [ -f /tmp/helm-kyverno.log ] && grep -q -i "error\|failed" /tmp/helm-kyverno.log; then
-        echo -e "${YELLOW}⚠${NC}  Kyverno installation had errors. Check /tmp/helm-kyverno.log"
-    fi
-fi
-if [ $HELM_ERRORS -gt 0 ]; then
-    echo -e "${YELLOW}⚠${NC}  $HELM_ERRORS Helm installation(s) had errors. Check log files in /tmp/helm-*.log"
-fi
+# Helmfile handles all installations synchronously, no need to wait for background processes
 
 # Wait for all components to be ready and verify endpoints
 echo ""
