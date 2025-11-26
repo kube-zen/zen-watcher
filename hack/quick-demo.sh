@@ -1851,7 +1851,7 @@ for i in {1..60}; do
         fi
         
         if [ "$OUTSTANDING_COUNT" -gt 0 ]; then
-            echo -e "${CYAN}   Still waiting (${i}s elapsed):${NC}"
+            echo -e "${CYAN}   Still waiting ${READY_COUNT}/${EXPECTED_READY} components (${i}s elapsed):${NC}"
             for name in "${OUTSTANDING_LIST[@]}"; do
                 echo -e "${YELLOW}     ⏳${NC} $name"
             done
@@ -1990,7 +1990,8 @@ for i in {1..120}; do
         done
         
         if [ "$OUTSTANDING_COUNT" -gt 0 ]; then
-            echo -e "${CYAN}   Still waiting (${i}s elapsed):${NC}"
+            WORKING_COUNT=$((${#ENDPOINTS[@]} - OUTSTANDING_COUNT))
+            echo -e "${CYAN}   Still waiting ${WORKING_COUNT}/${#ENDPOINTS[@]} endpoints (${i}s elapsed):${NC}"
             for name in "${OUTSTANDING_LIST[@]}"; do
                 echo -e "${YELLOW}     ⏳${NC} $name"
             done
