@@ -177,19 +177,25 @@ check_namespace_ready() {
         return 0
     fi
     
-    # If no controllers found but namespace exists (for ingress-only namespaces), return success
-    if kubectl get namespace "$namespace" >/dev/null 2>&1; then
-        # But if there are jobs, they must be succeeded
-        if [ "$jobs" -gt 0 ]; then
-            local succeeded_jobs=$(kubectl get jobs -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.succeeded}{"\n"}{end}' 2>/dev/null | \
-                awk -F'\t' '$2 > 0' | wc -l | tr -d ' ' || echo "0")
-            if [ "$succeeded_jobs" -lt "$jobs" ]; then
-                return 1
-            fi
+    # If there are jobs, check their status
+    if [ "$jobs" -gt 0 ]; then
+        local succeeded_jobs=$(kubectl get jobs -n "$namespace" -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.succeeded}{"\n"}{end}' 2>/dev/null | \
+            awk -F'\t' '$2 > 0' | wc -l | tr -d ' ' || echo "0")
+        if [ "$succeeded_jobs" -ge "$jobs" ]; then
+            return 0  # All jobs succeeded
         fi
-        return 0
+        return 1  # Jobs exist but not all succeeded yet
     fi
     
+    # If no controllers and no jobs found, the component is not ready yet
+    # (Helm might still be installing, or resources haven't been created)
+    # Only return success if namespace doesn't exist (component not expected)
+    if ! kubectl get namespace "$namespace" >/dev/null 2>&1; then
+        # Namespace doesn't exist - component not installed yet, consider not ready
+        return 1
+    fi
+    
+    # Namespace exists but no resources - component is being installed, not ready yet
     return 1
 }
 
