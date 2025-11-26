@@ -1286,7 +1286,7 @@ fi
 if [ "$SKIP_MONITORING" != true ]; then
     echo -e "${YELLOW}→${NC} Installing VictoriaMetrics Operator..."
     # Add VictoriaMetrics Operator Helm repo
-    if ! timeout 10 helm repo list 2>/dev/null | grep -q vm; then
+    if ! timeout 10 helm repo list 2>/dev/null | grep -q "victoriametrics\|vm"; then
         timeout 30 helm repo add vm https://victoriametrics.github.io/helm-charts/ 2>&1 || true
         timeout 30 helm repo update 2>&1 || true
     fi
