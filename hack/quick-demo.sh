@@ -1154,6 +1154,24 @@ if [ "$cluster_ready" = false ] && [ "$PLATFORM" = "k3d" ]; then
     fi
 fi
 
+# Deploy Security Tools (default: install all for comprehensive demo)
+# If no flags set, install all tools by default
+# IMPORTANT: Set flags BEFORE building COMPONENTS array
+if [ "$INSTALL_TRIVY" = false ] && [ "$INSTALL_FALCO" = false ] && [ "$INSTALL_KYVERNO" = false ] && [ "$INSTALL_CHECKOV" = false ] && [ "$INSTALL_KUBE_BENCH" = false ]; then
+    # Default: install all tools for comprehensive demo
+    INSTALL_TRIVY=true
+    INSTALL_FALCO=true
+    INSTALL_KYVERNO=true
+    INSTALL_CHECKOV=true
+    INSTALL_KUBE_BENCH=true
+    echo -e "${CYAN}ℹ${NC}  No security tools specified - installing all tools for comprehensive demo"
+fi
+
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}  Installing All Components${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+
 # Build component list based on flags
 # Format: "namespace|name"
 COMPONENTS=()
@@ -1168,29 +1186,12 @@ if [ "$SKIP_MONITORING" != true ]; then
     COMPONENTS+=("grafana|Grafana")
 fi
 
-# Security tools
+# Security tools (flags are now set above)
 [ "$INSTALL_TRIVY" = true ] && COMPONENTS+=("trivy-system|Trivy Operator")
 [ "$INSTALL_FALCO" = true ] && COMPONENTS+=("falco|Falco")
 [ "$INSTALL_KYVERNO" = true ] && COMPONENTS+=("kyverno|Kyverno")
 [ "$INSTALL_CHECKOV" = true ] && COMPONENTS+=("checkov|Checkov")
 [ "$INSTALL_KUBE_BENCH" = true ] && COMPONENTS+=("kube-bench|kube-bench")
-
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}  Installing All Components${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo ""
-
-# Deploy Security Tools (default: install all for comprehensive demo)
-# If no flags set, install all tools by default
-if [ "$INSTALL_TRIVY" = false ] && [ "$INSTALL_FALCO" = false ] && [ "$INSTALL_KYVERNO" = false ] && [ "$INSTALL_CHECKOV" = false ] && [ "$INSTALL_KUBE_BENCH" = false ]; then
-    # Default: install all tools for comprehensive demo
-    INSTALL_TRIVY=true
-    INSTALL_FALCO=true
-    INSTALL_KYVERNO=true
-    INSTALL_CHECKOV=true
-    INSTALL_KUBE_BENCH=true
-    echo -e "${CYAN}ℹ${NC}  No security tools specified - installing all tools for comprehensive demo"
-fi
 
 SECTION_START_TIME=$(date +%s)
 
