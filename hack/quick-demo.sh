@@ -1040,9 +1040,9 @@ case "$PLATFORM" in
                 # Update the separate kubeconfig file (don't touch default config)
                 timeout 10 k3d kubeconfig write ${CLUSTER_NAME} --output ${KUBECONFIG_FILE} 2>&1 | grep -v "ERRO" > /dev/null || true
                 # CRITICAL: Always fix 0.0.0.0 to 127.0.0.1
-                timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${K3D_API_PORT}" 2>&1 > /dev/null || true
-                timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true 2>&1 > /dev/null || true
-                timeout 5 kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data 2>&1 > /dev/null || true
+                timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.server "https://127.0.0.1:${K3D_API_PORT}" >/dev/null 2>&1 || true
+                timeout 5 kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true >/dev/null 2>&1 || true
+                timeout 5 kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data >/dev/null 2>&1 || true
                 sleep 2
             fi
         done
