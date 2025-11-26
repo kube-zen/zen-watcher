@@ -1664,8 +1664,6 @@ helm upgrade --install zen-watcher ./charts/zen-watcher \
     --set serviceAccount.create=true \
     > /dev/null 2>&1 &
 
-show_section_time "Installing All Components"
-
 # Configure Grafana datasource via ingress (only if monitoring is enabled)
 if [ "$SKIP_MONITORING" != true ]; then
     echo -e "${YELLOW}→${NC} Configuring VictoriaMetrics datasource..."
