@@ -1,0 +1,127 @@
+repositories:
+  - name: ingress-nginx
+    url: https://kubernetes.github.io/ingress-nginx
+  - name: vm
+    url: https://victoriametrics.github.io/helm-charts
+  - name: aqua
+    url: https://aquasecurity.github.io/helm-charts
+  - name: falcosecurity
+    url: https://falcosecurity.github.io/charts
+  - name: kyverno
+    url: https://kyverno.github.io/kyverno/
+
+# Environment variables (set by quick-demo.sh)
+{{ $namespace := env "NAMESPACE" | default "zen-system" }}
+{{ $zenWatcherImage := env "ZEN_WATCHER_IMAGE" | default "kubezen/zen-watcher:latest" }}
+{{ $imageRepo := regexReplaceAll ":[^:]*$" $zenWatcherImage "" }}
+{{ $imageTag := regexReplaceAll "^.*:" $zenWatcherImage "" }}
+{{ $imagePullPolicy := env "IMAGE_PULL_POLICY" | default "IfNotPresent" }}
+{{ $installTrivy := env "INSTALL_TRIVY" | default "false" }}
+{{ $installFalco := env "INSTALL_FALCO" | default "false" }}
+{{ $installKyverno := env "INSTALL_KYVERNO" | default "false" }}
+{{ $skipMonitoring := env "SKIP_MONITORING" | default "false" }}
+
+releases:
+  # Ingress Controller (must be installed first)
+  - name: ingress-nginx
+    namespace: ingress-nginx
+    chart: ingress-nginx/ingress-nginx
+    createNamespace: true
+    needs: []
+    values:
+      - controller:
+          service:
+            type: LoadBalancer
+            annotations:
+              k3d.io/loadbalancer: "true"
+          admissionWebhooks:
+            enabled: false
+            patch:
+              enabled: false
+          podLabels:
+            app: ingress-nginx
+            app.kubernetes.io/name: ingress-nginx
+
+  # VictoriaMetrics Operator (needed for VMServiceScrape CRD)
+  - name: victoriametrics-operator
+    namespace: victoriametrics-operator
+    chart: vm/victoria-metrics-operator
+    createNamespace: true
+    needs: []
+    installed: {{ ne $skipMonitoring "true" }}
+
+  # Zen Watcher (local chart, depends on ingress for webhooks)
+  - name: zen-watcher
+    namespace: {{ $namespace }}
+    chart: ./charts/zen-watcher
+    createNamespace: true
+    needs:
+      - ingress-nginx/ingress-nginx
+    values:
+      - image:
+          repository: {{ $imageRepo }}
+          tag: {{ $imageTag }}
+          pullPolicy: {{ $imagePullPolicy }}
+      - config:
+          watchNamespace: {{ $namespace }}
+          trivyNamespace: trivy-system
+          falcoNamespace: falco
+      - victoriametricsScrape:
+          enabled: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
+          interval: 15s
+      - service:
+          type: ClusterIP
+          port: 8080
+      - crd:
+          install: true
+      - rbac:
+          create: true
+      - serviceAccount:
+          create: true
+
+  # Trivy Operator
+  - name: trivy-operator
+    namespace: trivy-system
+    chart: aqua/trivy-operator
+    createNamespace: true
+    needs: []
+    installed: {{ if eq $installTrivy "true" }}true{{ else }}false{{ end }}
+    values:
+      - trivy:
+          ignoreUnfixed: true
+
+  # Falco (depends on zen-watcher for webhook URL)
+  - name: falco
+    namespace: falco
+    chart: falcosecurity/falco
+    createNamespace: true
+    needs:
+      - {{ $namespace }}/zen-watcher
+    installed: {{ if eq $installFalco "true" }}true{{ else }}false{{ end }}
+    values:
+      - falcosidekick:
+          enabled: false
+      - falco:
+          httpOutput:
+            enabled: true
+            url: http://zen-watcher.{{ $namespace }}.svc.cluster.local:8080/falco/webhook
+      - driver:
+          enabled: false
+      - resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+
+  # Kyverno
+  - name: kyverno
+    namespace: kyverno
+    chart: kyverno/kyverno
+    createNamespace: true
+    needs: []
+    installed: {{ if eq $installKyverno "true" }}true{{ else }}false{{ end }}
+    values:
+      - replicaCount: 1
+

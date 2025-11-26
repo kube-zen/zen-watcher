@@ -149,6 +149,11 @@ if git diff --cached --name-only | grep -q "\.yaml$\|\.yml$"; then
     echo "────────────────────────────────────────────────────"
     
     for file in $(git diff --cached --name-only | grep "\.yaml$\|\.yml$"); do
+        # Skip helmfile.yaml - it contains Go templates and isn't valid YAML until processed
+        if echo "$file" | grep -q "helmfile.yaml"; then
+            echo "  → Skipping $file (contains Go templates)"
+            continue
+        fi
         if [ -f "$file" ]; then
             echo "  → Validating $file..."
             if ! python3 -c "import yaml; yaml.safe_load(open('$file'))" 2>/dev/null; then
