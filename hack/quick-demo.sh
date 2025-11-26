@@ -935,7 +935,7 @@ EOF
 SECTION_START_TIME=$(date +%s)
 create_cluster
 show_section_time "Cluster creation"
-echo -e "${YELLOW}→${NC} Setting up kubeconfig..."
+# Set up kubeconfig (silently)
 SECTION_START_TIME=$(date +%s)
 case "$PLATFORM" in
     k3d)
@@ -977,7 +977,7 @@ case "$PLATFORM" in
             K3D_API_PORT=$ACTUAL_PORT
         fi
         
-        echo -e "${CYAN}   Setting up kubeconfig for port ${K3D_API_PORT}...${NC}"
+        # Setting up kubeconfig for port ${K3D_API_PORT}
         
         # Use separate kubeconfig file - don't modify default ~/.kube/config
         # Create separate kubeconfig file early to avoid touching default config
@@ -1137,8 +1137,8 @@ case "$PLATFORM" in
             sed -i.bak "s|server: https://.*:${K3D_API_PORT}|server: https://127.0.0.1:${K3D_API_PORT}|g" ${KUBECONFIG_FILE} 2>/dev/null || true
             rm -f ${KUBECONFIG_FILE}.bak 2>/dev/null || true
             # Remove certificate authority data and add insecure skip
-            kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data --kubeconfig=${KUBECONFIG_FILE} 2>/dev/null || true
-            kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true --kubeconfig=${KUBECONFIG_FILE} 2>/dev/null || true
+            kubectl config unset clusters.k3d-${CLUSTER_NAME}.certificate-authority-data --kubeconfig=${KUBECONFIG_FILE} >/dev/null 2>&1 || true
+            kubectl config set clusters.k3d-${CLUSTER_NAME}.insecure-skip-tls-verify true --kubeconfig=${KUBECONFIG_FILE} >/dev/null 2>&1 || true
         fi
         ;;
     kind)
