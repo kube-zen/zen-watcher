@@ -1170,10 +1170,10 @@ COMPONENTS=()
 COMPONENTS+=("ingress-nginx|Ingress Controller")
 COMPONENTS+=("${NAMESPACE}|Zen Watcher")
 
-# Monitoring stack (Grafana and VictoriaMetrics go together)
+# Monitoring stack (Grafana and VictoriaMetrics go together, in separate namespaces)
 if [ "$SKIP_MONITORING" != true ]; then
-    COMPONENTS+=("${NAMESPACE}|VictoriaMetrics")
-    COMPONENTS+=("${NAMESPACE}|Grafana")
+    COMPONENTS+=("victoriametrics|VictoriaMetrics")
+    COMPONENTS+=("grafana|Grafana")
 fi
 
 # Security tools
@@ -1263,7 +1263,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: zen-demo-grafana
-  namespace: ${NAMESPACE}
+  namespace: grafana
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
 spec:
@@ -1284,7 +1284,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: zen-demo-services
-  namespace: ${NAMESPACE}
+  namespace: victoriametrics
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
     nginx.ingress.kubernetes.io/rewrite-target: /\$2
@@ -1518,7 +1518,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: victoriametrics-scrape-config
-  namespace: ${NAMESPACE}
+  namespace: victoriametrics
 data:
   scrape.yml: |
     global:
@@ -1539,7 +1539,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: victoriametrics
-  namespace: ${NAMESPACE}
+  namespace: victoriametrics
 spec:
   replicas: 1
   selector:
@@ -1568,21 +1568,27 @@ spec:
         configMap:
           name: victoriametrics-scrape-config
 EOF
+# Create namespace for VictoriaMetrics
+kubectl create namespace victoriametrics 2>&1 | grep -v "already exists" > /dev/null || true
+
 # Expose VictoriaMetrics as ClusterIP (ingress will handle routing)
-if kubectl get svc victoriametrics -n ${NAMESPACE} &>/dev/null; then
-    kubectl delete svc victoriametrics -n ${NAMESPACE} 2>&1 | grep -v "not found" > /dev/null || true
+if kubectl get svc victoriametrics -n victoriametrics &>/dev/null; then
+    kubectl delete svc victoriametrics -n victoriametrics 2>&1 | grep -v "not found" > /dev/null || true
 fi
 kubectl expose deployment victoriametrics \
     --port=8428 --target-port=8428 \
     --type=ClusterIP \
     --name=victoriametrics \
-    -n ${NAMESPACE} 2>&1 | grep -v "already exists" > /dev/null || true
+    -n victoriametrics 2>&1 | grep -v "already exists" > /dev/null || true
 
 # Deploy Grafana with zen user
 echo -e "${YELLOW}→${NC} Deploying Grafana..."
+# Create namespace for Grafana
+kubectl create namespace grafana 2>&1 | grep -v "already exists" > /dev/null || true
+
 kubectl create deployment grafana \
     --image=grafana/grafana:latest \
-    -n ${NAMESPACE} \
+    -n grafana \
     --dry-run=client -o yaml 2>/dev/null | \
 kubectl set env --local -f - \
     GF_SECURITY_ADMIN_USER=zen \
@@ -1604,17 +1610,17 @@ kubectl set env deployment/grafana \
     GF_SERVER_ROOT_URL=http://localhost:${INGRESS_HTTP_PORT}/grafana/ \
     GF_SERVER_SERVE_FROM_SUB_PATH=true \
     GF_SERVER_DOMAIN=localhost \
-    -n ${NAMESPACE} 2>/dev/null || true
+    -n grafana 2>/dev/null || true
 
-    # Expose Grafana as ClusterIP
-    if kubectl get svc grafana -n ${NAMESPACE} &>/dev/null; then
-        kubectl delete svc grafana -n ${NAMESPACE} 2>&1 || true
-    fi
-    kubectl expose deployment grafana \
-        --port=3000 --target-port=3000 \
-        --type=ClusterIP \
-        --name=grafana \
-        -n ${NAMESPACE} 2>&1 | grep -v "already exists" > /dev/null || true
+# Expose Grafana as ClusterIP
+if kubectl get svc grafana -n grafana &>/dev/null; then
+    kubectl delete svc grafana -n grafana 2>&1 || true
+fi
+kubectl expose deployment grafana \
+    --port=3000 --target-port=3000 \
+    --type=ClusterIP \
+    --name=grafana \
+    -n grafana 2>&1 | grep -v "already exists" > /dev/null || true
 fi
 
 # Deploy Zen Watcher using Helm chart
@@ -1735,11 +1741,11 @@ done
 INGRESS_RESOURCES_READY=false
 INGRESS_RESOURCES_SHOWN=false
 
-MAX_WAIT=120  # 2 minutes max
+MAX_WAIT=60  # 1 minute max
 EXPECTED_READY=${#COMPONENTS[@]}  # Number of components in the list
 [ "$SKIP_MONITORING" != true ] && EXPECTED_READY=$((EXPECTED_READY + 1))  # Add ingress resources
 
-for i in {1..120}; do
+for i in {1..60}; do
     READY_COUNT=0
     
     # Check all components from the list
@@ -1964,13 +1970,6 @@ echo ""
 echo -e "${CYAN}All services are accessible via ingress LoadBalancer on port ${INGRESS_HTTP_PORT}${NC}"
 echo -e "${CYAN}Endpoints will remain accessible until cluster is deleted.${NC}"
 echo ""
-echo -e "${BLUE}To clean up the demo:${NC}"
-case "$PLATFORM" in
-    k3d) echo -e "  ${CYAN}k3d cluster delete ${CLUSTER_NAME}${NC}" ;;
-    kind) echo -e "  ${CYAN}kind delete cluster --name ${CLUSTER_NAME}${NC}" ;;
-    minikube) echo -e "  ${CYAN}minikube delete -p ${CLUSTER_NAME}${NC}" ;;
-esac
-echo ""
-echo -e "${CYAN}Or use the cleanup script:${NC}"
+echo -e "${CYAN}To clean up the demo:${NC}"
 echo -e "  ${CYAN}./hack/cleanup-demo.sh${NC}"
 echo ""
