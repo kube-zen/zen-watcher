@@ -1703,9 +1703,9 @@ done
             if [ "${COMPONENT_READY[$name]}" != "true" ]; then
                 OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1))
                 OUTSTANDING_LIST+=("$name")
-    fi
-done
-        # Count outstanding ingress resources
+            fi
+        done
+        # Count outstanding ingress resources (each ingress is a separate component)
         if [ "$SKIP_MONITORING" != true ]; then
             INGRESS_GRAFANA_READY=false
             INGRESS_VM_READY=false
