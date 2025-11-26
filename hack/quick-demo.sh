@@ -1295,15 +1295,32 @@ if [ ! -f "./hack/helmfile.yaml.gotmpl" ]; then
     exit 1
 fi
 
+# Pre-add Helm repositories to avoid Helmfile errors about existing repos
+# Helmfile will skip if they already exist, but this ensures they're available
+echo -e "${CYAN}   Ensuring Helm repositories are available...${NC}"
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx 2>&1 | grep -v "already exists" > /dev/null || true
+helm repo add vm https://victoriametrics.github.io/helm-charts 2>&1 | grep -v "already exists" > /dev/null || true
+helm repo add grafana https://grafana.github.io/helm-charts 2>&1 | grep -v "already exists" > /dev/null || true
+helm repo add aqua https://aquasecurity.github.io/helm-charts 2>&1 | grep -v "already exists" > /dev/null || true
+helm repo add falcosecurity https://falcosecurity.github.io/charts 2>&1 | grep -v "already exists" > /dev/null || true
+helm repo add kyverno https://kyverno.github.io/kyverno/ 2>&1 | grep -v "already exists" > /dev/null || true
+helm repo update > /dev/null 2>&1 || true
+
 # Run helmfile sync (this handles all Helm installations)
 cd "$(git rev-parse --show-toplevel)" 2>/dev/null || cd "$(dirname "$0")/.."
 if helmfile -f hack/helmfile.yaml.gotmpl sync 2>&1 | tee /tmp/helmfile-sync.log; then
     echo -e "${GREEN}✓${NC} Helmfile sync completed"
 else
     HELMFILE_EXIT=$?
-    echo -e "${YELLOW}⚠${NC}  Helmfile sync had errors (exit code: $HELMFILE_EXIT)"
-    echo -e "${CYAN}   Check logs: cat /tmp/helmfile-sync.log${NC}"
-    # Continue anyway - some components may have installed successfully
+    # Check if error is just about existing repos (non-fatal)
+    if grep -q "already exists" /tmp/helmfile-sync.log; then
+        echo -e "${YELLOW}⚠${NC}  Some repositories already exist (non-fatal)"
+        echo -e "${GREEN}✓${NC} Continuing with deployment..."
+    else
+        echo -e "${YELLOW}⚠${NC}  Helmfile sync had errors (exit code: $HELMFILE_EXIT)"
+        echo -e "${CYAN}   Check logs: cat /tmp/helmfile-sync.log${NC}"
+        # Continue anyway - some components may have installed successfully
+    fi
 fi
 
 # Delete ingress admission webhooks if created (they cause TLS issues)
