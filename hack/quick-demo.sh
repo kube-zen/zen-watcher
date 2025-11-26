@@ -1451,7 +1451,7 @@ spec:
         pathType: ImplementationSpecific
         backend:
           service:
-            name: victoriametrics-single
+            name: victoriametrics-single-victoria-metrics-single-server
             port:
               number: 8428
 ---
