@@ -45,6 +45,8 @@ releases:
           podLabels:
             app: ingress-nginx
             app.kubernetes.io/name: ingress-nginx
+          config:
+            allow-snippet-annotations: "true"
 
   # VictoriaMetrics Single (simpler for demo, includes full UI with targets, etc.)
   - name: victoriametrics-single
@@ -144,8 +146,36 @@ releases:
             memory: 512Mi
             cpu: 500m
 
-  # Zen Watcher is installed separately via helm install (see quick-demo.sh)
-  # This will be moved to a repository later
+  # Zen Watcher
+  - name: zen-watcher
+    namespace: {{ $namespace }}
+    chart: kube-zen/zen-watcher
+    createNamespace: true
+    needs: []
+    values:
+      - image:
+          repository: {{ $imageRepo }}
+          tag: {{ $imageTag }}
+          pullPolicy: {{ $imagePullPolicy }}
+      - config:
+          watchNamespace: {{ $namespace }}
+          trivyNamespace: trivy-system
+          falcoNamespace: falco
+      - service:
+          type: ClusterIP
+          port: 8080
+          annotations:
+            prometheus.io/scrape: "true"
+            prometheus.io/port: "8080"
+            prometheus.io/path: "/metrics"
+      - crd:
+          install: true
+      - rbac:
+          create: true
+      - serviceAccount:
+          create: true
+      - vmServiceScrape:
+          enabled: true
 
   # Trivy Operator
   - name: trivy-operator
@@ -158,12 +188,13 @@ releases:
       - trivy:
           ignoreUnfixed: true
 
-  # Falco (depends on zen-watcher for webhook URL, but zen-watcher is installed separately)
+  # Falco (depends on zen-watcher for webhook URL)
   - name: falco
     namespace: falco
     chart: falcosecurity/falco
     createNamespace: true
-    needs: []
+    needs:
+      - {{ $namespace }}/zen-watcher
     installed: {{ if eq $installFalco "true" }}true{{ else }}false{{ end }}
     values:
       - falcosidekick:

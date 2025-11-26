@@ -375,18 +375,18 @@ check_existing_demo_ports() {
     local default_watcher=8180
     
     # Check if default ports are in use (suggests existing demo)
+    # Returns 0 (success) if ports are in use, 1 (failure) if ports are free
     if ! check_port ${default_grafana} "Grafana" || \
        ! check_port ${default_vm} "VictoriaMetrics" || \
        ! check_port ${default_watcher} "Zen Watcher"; then
-        return 0  # Default ports are in use
+        return 0  # Default ports are in use (success = true)
     fi
     
-    return 1  # Default ports are free
+    return 1  # Default ports are free (failure = false)
 }
 
 # Function to validate and auto-adjust ports
 validate_ports() {
-    echo -e "${YELLOW}→${NC} Checking port availability..."
     
     ports_changed=false
     default_ports_in_use=false
@@ -411,7 +411,14 @@ validate_ports() {
     fi
     
     # Check if default ports are in use (might indicate existing demo)
-    if check_existing_demo_ports; then
+    # Note: check_existing_demo_ports returns 0 if ports are in use, 1 if free
+    # Temporarily disable exit on error to check return value safely
+    local ports_check_result=1
+    set +e
+    check_existing_demo_ports
+    ports_check_result=$?
+    set -e
+    if [ "${ports_check_result}" -eq 0 ]; then
         default_ports_in_use=true
     fi
     
@@ -463,10 +470,7 @@ validate_ports() {
                 # Even if default port is free, check if any k3d clusters exist that might conflict
                 local existing_k3d=$(k3d cluster list 2>/dev/null | grep -v "^NAME" | wc -l | tr -d '[:space:]' || echo "0")
                 existing_k3d=${existing_k3d:-0}
-                if [ "$existing_k3d" -gt 0 ] && [ "${K3D_API_PORT}" = "6443" ]; then
-                    echo -e "${CYAN}ℹ${NC}  Found ${existing_k3d} existing k3d cluster(s)"
-                    echo -e "${CYAN}   k3d will auto-select ports, but using explicit port ${K3D_API_PORT} to avoid conflicts${NC}"
-                fi
+                # Silently handle existing clusters - no need to inform user
             fi
             ;;
         kind)
@@ -481,10 +485,7 @@ validate_ports() {
                 # Check if any kind clusters exist that might conflict
                 local existing_kind=$(kind get clusters 2>/dev/null | wc -l | tr -d '[:space:]' || echo "0")
                 existing_kind=${existing_kind:-0}
-                if [ "$existing_kind" -gt 0 ] && [ "${KIND_API_PORT}" = "6443" ]; then
-                    echo -e "${CYAN}ℹ${NC}  Found ${existing_kind} existing kind cluster(s)"
-                    echo -e "${CYAN}   Using explicit API port ${KIND_API_PORT} to avoid conflicts${NC}"
-                fi
+                # Silently handle existing clusters - no need to inform user
             fi
             ;;
         minikube)
@@ -525,13 +526,19 @@ validate_ports() {
         if [ "$NON_INTERACTIVE" = true ]; then
             echo -e "${CYAN}   Non-interactive mode: continuing with adjusted ports${NC}"
         else
-            read -p "$(echo -e ${YELLOW}Continue with adjusted ports? [Y/n]${NC}) " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Nn]$ ]]; then
-                echo -e "${CYAN}Exiting. You can:${NC}"
-                echo -e "  - Use different ports via environment variables"
-                echo -e "  - Check for existing demo and use that cluster"
-                exit 0
+            # Check if stdin is a TTY before trying to read
+            if [ -t 0 ]; then
+                read -p "$(echo -e ${YELLOW}Continue with adjusted ports? [Y/n]${NC}) " -n 1 -r || REPLY="Y"
+                echo
+                if [[ $REPLY =~ ^[Nn]$ ]]; then
+                    echo -e "${CYAN}Exiting. You can:${NC}"
+                    echo -e "  - Use different ports via environment variables"
+                    echo -e "  - Check for existing demo and use that cluster"
+                    exit 0
+                fi
+            else
+                # Non-TTY stdin, default to continuing
+                echo -e "${CYAN}   Non-interactive input detected, continuing with adjusted ports${NC}"
             fi
         fi
     fi
@@ -543,8 +550,8 @@ validate_ports() {
         echo -e "   ${CYAN}export VICTORIA_METRICS_PORT=${VICTORIA_METRICS_PORT}${NC}"
         echo -e "   ${CYAN}export ZEN_WATCHER_PORT=${ZEN_WATCHER_PORT}${NC}"
     fi
-    
-    echo -e "${GREEN}✓${NC} Port configuration validated"
+    # Only show success message if there were issues, otherwise be quiet
+    [ "$ports_changed" = true ] && echo -e "${GREEN}✓${NC} Port configuration validated" || true
 }
 
 # Function to find available namespace name
@@ -630,7 +637,6 @@ validate_namespace() {
 
 # Function to validate cluster name and check for conflicts
 validate_cluster() {
-    echo -e "${YELLOW}→${NC} Validating cluster configuration..."
     
     case "$PLATFORM" in
         k3d)
@@ -686,10 +692,7 @@ validate_cluster() {
                 # Check if any k3d clusters exist (might indicate k3d is in use)
                 local existing_clusters=$(k3d cluster list 2>/dev/null | grep -v "^NAME" | wc -l | tr -d '[:space:]' || echo "0")
                 existing_clusters=${existing_clusters:-0}
-                if [ "$existing_clusters" -gt 0 ]; then
-                    echo -e "${CYAN}ℹ${NC}  Found ${existing_clusters} existing k3d cluster(s)"
-                    echo -e "${CYAN}   Cluster name '${CLUSTER_NAME}' will be used (no conflicts)${NC}"
-                fi
+                # Silently handle existing clusters - no need to inform user
             fi
             ;;
         kind)
@@ -768,8 +771,8 @@ validate_cluster() {
             fi
             ;;
     esac
-    
-    echo -e "${GREEN}✓${NC} Cluster configuration validated"
+    # Be quiet if no conflicts found - only show messages when there are actual issues
+    return 0
 }
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -817,11 +820,11 @@ esac
 
 echo ""
 
-# Validate everything upfront before making any changes
-echo -e "${YELLOW}→${NC} Validating configuration..."
+# Validate everything upfront before making any changes (quiet unless issues found)
 validate_ports
 validate_cluster
-echo ""
+
+# Create cluster
 create_cluster() {
     case "$PLATFORM" in
         k3d)
@@ -1019,6 +1022,7 @@ EOF
 }
 
 CLUSTER_START_TIME=$(date +%s)
+echo -e "${CYAN}→${NC} Creating cluster..."
 create_cluster
 SECTION_START_TIME=$(date +%s)
 # Set up kubeconfig (silently)
@@ -1375,33 +1379,7 @@ else
     fi
 fi
 
-# Install zen-watcher from helm-charts repository
-echo -e "${YELLOW}→${NC} Installing zen-watcher from repository..."
-if helm upgrade --install zen-watcher kube-zen/zen-watcher \
-    --create-namespace \
-    --namespace "${NAMESPACE}" \
-    --set image.repository="${ZEN_IMAGE_REPO}" \
-    --set image.tag="${ZEN_IMAGE_TAG}" \
-    --set image.pullPolicy="${IMAGE_PULL_POLICY}" \
-    --set config.watchNamespace="${NAMESPACE}" \
-    --set config.trivyNamespace=trivy-system \
-    --set config.falcoNamespace=falco \
-    --set service.type=ClusterIP \
-    --set service.port=8080 \
-    --set service.annotations."prometheus\.io/scrape"="true" \
-    --set service.annotations."prometheus\.io/port"="8080" \
-    --set service.annotations."prometheus\.io/path"="/metrics" \
-    --set crd.install=true \
-    --set rbac.create=true \
-    --set serviceAccount.create=true \
-    --reset-values \
-    --history-max 10 \
-    2>&1 | grep -v "^Release.*does not exist\|^NAME:\|^LAST DEPLOYED:\|^NAMESPACE:\|^STATUS:\|^REVISION:\|^DESCRIPTION:\|^TEST SUITE:\|^NOTES:"; then
-    echo -e "${GREEN}✓${NC} zen-watcher installed"
-else
-    echo -e "${RED}✗${NC} Failed to install zen-watcher"
-    exit 1
-fi
+# zen-watcher is now installed via helmfile (see helmfile.yaml.gotmpl)
 
 # Delete ingress admission webhooks if created (they cause TLS issues)
 sleep 2
@@ -1570,55 +1548,8 @@ spec:
 EOF
 fi
 
-# Configure Grafana datasource via ingress (only if monitoring is enabled)
-if [ "$SKIP_MONITORING" != true ]; then
-    echo -e "${YELLOW}→${NC} Configuring VictoriaMetrics datasource..."
-DATASOURCE_RESULT=$(timeout 10 curl -s -X POST \
-    -H "Content-Type: application/json" \
-    -H "Host: localhost" \
-    -u zen:${GRAFANA_PASSWORD} \
-    -d '{
-        "name": "VictoriaMetrics",
-        "type": "prometheus",
-        "url": "http://victoriametrics.victoriametrics.svc.cluster.local:8428",
-        "access": "proxy",
-        "isDefault": true,
-        "jsonData": {
-            "timeInterval": "15s",
-            "httpMethod": "POST"
-        }
-    }' \
-    http://localhost:${INGRESS_HTTP_PORT}/grafana/api/datasources 2>&1 || echo "timeout or error")
-
-if echo "$DATASOURCE_RESULT" | grep -q "Datasource added\|already exists\|success"; then
-    echo -e "${GREEN}✓${NC} Datasource configured"
-else
-    echo -e "${YELLOW}⚠${NC}  Datasource configuration skipped (Grafana may need manual setup)"
-fi
-
-# Import dashboard via ingress (with timeout to prevent hanging)
-echo -e "${YELLOW}→${NC} Importing Zen Watcher dashboard..."
-if [ -f "config/dashboards/zen-watcher-dashboard.json" ]; then
-    DASHBOARD_RESULT=$(timeout 10 cat config/dashboards/zen-watcher-dashboard.json | \
-    jq '{dashboard: ., overwrite: true, message: "Demo Import"}' | \
-    curl -s -X POST \
-        -H "Content-Type: application/json" \
-        -H "Host: localhost" \
-        -u zen:${GRAFANA_PASSWORD} \
-        -d @- \
-        http://localhost:${INGRESS_HTTP_PORT}/grafana/api/dashboards/db 2>&1 || echo "timeout or error")
-    
-    if echo "$DASHBOARD_RESULT" | grep -q "success"; then
-        echo -e "${GREEN}✓${NC} Dashboard imported successfully"
-        else
-            echo -e "${YELLOW}⚠${NC}  Dashboard import skipped (can be imported manually later)"
-        fi
-    else
-        echo -e "${YELLOW}⚠${NC}  Dashboard file not found at config/dashboards/zen-watcher-dashboard.json"
-    fi
-fi
-
 # Helmfile handles all installations synchronously, no need to wait for background processes
+# Grafana datasource and dashboard configuration happens after endpoints are ready (see below)
 
 # Wait for all components to be ready and verify endpoints
 echo ""
@@ -1787,9 +1718,9 @@ if [ "$SKIP_MONITORING" != true ]; then
     kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && INGRESS_GRAFANA_READY=true
     kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1 && INGRESS_VM_READY=true
     kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1 && INGRESS_ZW_READY=true
-    [ "$INGRESS_GRAFANA_READY" = false ] && HAS_FAILURES=true
-    [ "$INGRESS_VM_READY" = false ] && HAS_FAILURES=true
-    [ "$INGRESS_ZW_READY" = false ] && HAS_FAILURES=true
+    [ "$INGRESS_GRAFANA_READY" = false ] && HAS_FAILURES=true || true
+    [ "$INGRESS_VM_READY" = false ] && HAS_FAILURES=true || true
+    [ "$INGRESS_ZW_READY" = false ] && HAS_FAILURES=true || true
 fi
 
 if [ "$HAS_FAILURES" = true ]; then
@@ -1915,8 +1846,19 @@ for i in {1..120}; do
 done
 
 # Configure Grafana datasource and dashboard after endpoints are ready
-# Only configure if Grafana endpoint is working
-if [ "$SKIP_MONITORING" != true ] && [ "${ENDPOINT_STATUS[Grafana]}" = "working" ]; then
+# Wait for Grafana to be accessible before configuring
+if [ "$SKIP_MONITORING" != true ]; then
+    # Check if Grafana is accessible
+    GRAFANA_READY=false
+    for i in {1..30}; do
+        if curl -s -f -H "Host: localhost" "http://localhost:${INGRESS_HTTP_PORT}/grafana/api/health" >/dev/null 2>&1; then
+            GRAFANA_READY=true
+            break
+        fi
+        sleep 2
+    done
+    
+    if [ "$GRAFANA_READY" = true ]; then
     echo ""
     echo -e "${YELLOW}→${NC} Configuring Grafana (datasource and dashboard)..."
     
@@ -1992,9 +1934,10 @@ if [ -f "config/dashboards/zen-watcher-dashboard.json" ]; then
 else
         echo -e "${YELLOW}    ⚠${NC}  Dashboard file not found at config/dashboards/zen-watcher-dashboard.json"
     fi
-elif [ "$SKIP_MONITORING" != true ]; then
-    echo ""
-    echo -e "${YELLOW}⚠${NC}  Skipping Grafana configuration (Grafana endpoint not ready)"
+    else
+        echo ""
+        echo -e "${YELLOW}⚠${NC}  Grafana not accessible after waiting, skipping configuration"
+    fi
 fi
 
 # Show any endpoints that failed after max wait
@@ -2021,6 +1964,11 @@ if [ "$FAILED_COUNT" -gt 0 ]; then
     for failed_ep in "${FAILED_ENDPOINTS[@]}"; do
         IFS=':' read -r name path <<< "$failed_ep"
         
+        # Initialize variables
+        ns=""
+        ingress_name=""
+        svc_filter=""
+        
         # Determine namespace based on path
         if echo "$path" | grep -q "^/grafana"; then
             ns="grafana"
@@ -2031,10 +1979,13 @@ if [ "$FAILED_COUNT" -gt 0 ]; then
             ingress_name="zen-demo-victoriametrics"
             svc_filter="victoriametrics"
         elif echo "$path" | grep -q "^/zen-watcher"; then
-            ns="${NAMESPACE}"
+            ns="${NAMESPACE:-zen-system}"
             ingress_name="zen-demo-zen-watcher"
             svc_filter="zen-watcher"
-        else
+        fi
+        
+        # Skip if no namespace was determined
+        if [ -z "$ns" ] || [ -z "$ingress_name" ] || [ -z "$svc_filter" ]; then
             continue
         fi
         
@@ -2083,9 +2034,8 @@ echo -e "${CYAN}  📊 SERVICE ACCESS (via k3d LoadBalancer)${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "${CYAN}  VICTORIAMETRICS:${NC}"
-echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${VM_ACCESS_PORT}/victoriametrics${NC}"
-echo -e "    ${GREEN}Metrics API:${NC} ${CYAN}http://localhost:${VM_ACCESS_PORT}/victoriametrics/api/v1/query${NC}"
 echo -e "    ${GREEN}VMUI:${NC}    ${CYAN}http://localhost:${VM_ACCESS_PORT}/victoriametrics/vmui${NC}"
+echo -e "    ${GREEN}Targets:${NC}  ${CYAN}http://localhost:${VM_ACCESS_PORT}/victoriametrics/targets${NC}"
 echo ""
 echo -e "${CYAN}  ZEN WATCHER:${NC}"
 echo -e "    ${GREEN}Metrics:${NC} ${CYAN}http://localhost:${ZEN_WATCHER_ACCESS_PORT}/zen-watcher/metrics${NC}"
