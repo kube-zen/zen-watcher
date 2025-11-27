@@ -66,6 +66,7 @@ func main() {
 		gvrs.Observations,
 		eventProcessor,
 		webhookProcessor,
+		m.EventsTotal,
 	)
 
 	// WaitGroup for goroutines

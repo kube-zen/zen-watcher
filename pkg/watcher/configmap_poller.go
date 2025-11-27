@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -24,6 +25,7 @@ type ConfigMapPoller struct {
 	eventProcessor   *EventProcessor
 	webhookProcessor *WebhookProcessor
 	interval         time.Duration
+	eventsTotal      *prometheus.CounterVec
 }
 
 // NewConfigMapPoller creates a new ConfigMap poller
@@ -33,6 +35,7 @@ func NewConfigMapPoller(
 	eventGVR schema.GroupVersionResource,
 	eventProcessor *EventProcessor,
 	webhookProcessor *WebhookProcessor,
+	eventsTotal *prometheus.CounterVec,
 ) *ConfigMapPoller {
 	return &ConfigMapPoller{
 		clientSet:        clientSet,
@@ -41,6 +44,7 @@ func NewConfigMapPoller(
 		eventProcessor:   eventProcessor,
 		webhookProcessor: webhookProcessor,
 		interval:         5 * time.Minute,
+		eventsTotal:      eventsTotal,
 	}
 }
 
@@ -218,6 +222,10 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 					} else {
 						kubeBenchCount++
 						existingKeys[testNumber] = true
+						// Increment metrics
+						if p.eventsTotal != nil {
+							p.eventsTotal.WithLabelValues("kube-bench", "compliance", severity).Inc()
+						}
 					}
 				}
 			}
@@ -377,6 +385,10 @@ func (p *ConfigMapPoller) processCheckov(ctx context.Context) {
 			} else {
 				checkovCount++
 				existingKeys[dedupKey] = true
+				// Increment metrics
+				if p.eventsTotal != nil {
+					p.eventsTotal.WithLabelValues("checkov", category, severity).Inc()
+				}
 			}
 		}
 	}
