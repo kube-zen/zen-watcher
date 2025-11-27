@@ -182,6 +182,7 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 						severity = "HIGH"
 					}
 
+					log.Printf("  🔍 DEBUG: Creating kube-bench observation, eventsTotal is nil: %v", p.eventsTotal == nil)
 					event := &unstructured.Unstructured{
 						Object: map[string]interface{}{
 							"apiVersion": "zen.kube-zen.io/v1",
@@ -349,6 +350,7 @@ func (p *ConfigMapPoller) processCheckov(ctx context.Context) {
 				}
 			}
 
+			log.Printf("  🔍 DEBUG: Creating checkov observation, eventsTotal is nil: %v", p.eventsTotal == nil)
 			event := &unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"apiVersion": "zen.kube-zen.io/v1",
