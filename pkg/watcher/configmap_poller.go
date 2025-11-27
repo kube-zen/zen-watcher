@@ -37,6 +37,7 @@ func NewConfigMapPoller(
 	webhookProcessor *WebhookProcessor,
 	eventsTotal *prometheus.CounterVec,
 ) *ConfigMapPoller {
+	log.Printf("🔍 DEBUG: NewConfigMapPoller called, eventsTotal is nil: %v", eventsTotal == nil)
 	return &ConfigMapPoller{
 		clientSet:        clientSet,
 		dynClient:        dynClient,
