@@ -227,6 +227,7 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 							log.Printf("  ⚠️  CRITICAL: eventsTotal is nil! Metrics will not be incremented!")
 						} else {
 							p.eventsTotal.WithLabelValues("kube-bench", "compliance", severity).Inc()
+							log.Printf("  📊 METRIC INCREMENTED: kube-bench/compliance/%s", severity)
 						}
 					}
 				}
@@ -392,6 +393,7 @@ func (p *ConfigMapPoller) processCheckov(ctx context.Context) {
 					log.Printf("  ⚠️  CRITICAL: eventsTotal is nil! Metrics will not be incremented!")
 				} else {
 					p.eventsTotal.WithLabelValues("checkov", category, severity).Inc()
+					log.Printf("  📊 METRIC INCREMENTED: checkov/%s/%s", category, severity)
 				}
 			}
 		}
