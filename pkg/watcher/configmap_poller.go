@@ -197,7 +197,7 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 							},
 							"spec": map[string]interface{}{
 								"source":     "kube-bench",
-								"category":   "security",
+								"category":   "compliance",
 								"severity":   severity,
 								"eventType":  "cis-benchmark-fail",
 								"detectedAt": time.Now().Format(time.RFC3339),
