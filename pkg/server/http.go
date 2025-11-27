@@ -32,9 +32,11 @@ func NewServer(falcoChan, auditChan chan map[string]interface{}, webhookMetrics,
 		port = "8080"
 	}
 
+	mux := http.NewServeMux()
 	s := &Server{
 		server: &http.Server{
 			Addr:         ":" + port,
+			Handler:      mux,
 			ReadTimeout:  15 * time.Second,
 			WriteTimeout: 15 * time.Second,
 			IdleTimeout:  60 * time.Second,
@@ -45,20 +47,20 @@ func NewServer(falcoChan, auditChan chan map[string]interface{}, webhookMetrics,
 		webhookDropped:  webhookDropped,
 	}
 
-	s.registerHandlers()
+	s.registerHandlers(mux)
 	return s
 }
 
 // registerHandlers registers all HTTP handlers
-func (s *Server) registerHandlers() {
+func (s *Server) registerHandlers(mux *http.ServeMux) {
 	// Health check endpoint
-	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "healthy")
 	})
 
 	// Readiness probe endpoint
-	http.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
 		s.readyMu.RLock()
 		ready := s.ready
 		s.readyMu.RUnlock()
@@ -73,13 +75,13 @@ func (s *Server) registerHandlers() {
 	})
 
 	// Prometheus metrics endpoint
-	http.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/metrics", promhttp.Handler())
 
 	// Falco webhook handler
-	http.HandleFunc("/falco/webhook", s.handleFalcoWebhook)
+	mux.HandleFunc("/falco/webhook", s.handleFalcoWebhook)
 
 	// Audit webhook handler
-	http.HandleFunc("/audit/webhook", s.handleAuditWebhook)
+	mux.HandleFunc("/audit/webhook", s.handleAuditWebhook)
 }
 
 // handleFalcoWebhook handles POST /falco/webhook
