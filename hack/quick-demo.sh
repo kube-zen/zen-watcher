@@ -1386,6 +1386,62 @@ sleep 2
 kubectl delete validatingwebhookconfiguration ingress-nginx-admission 2>&1 | grep -v "not found" > /dev/null || true
 kubectl delete mutatingwebhookconfiguration ingress-nginx-admission 2>&1 | grep -v "not found" > /dev/null || true
 
+# Deploy mock data if requested (after components are installed but before validation)
+if [ "$DEPLOY_MOCK_DATA" = true ] || ([ "$SKIP_MOCK_DATA" != true ] && [ "$NON_INTERACTIVE" != true ]); then
+    # In interactive mode, prompt user
+    if [ "$NON_INTERACTIVE" != true ] && [ "$DEPLOY_MOCK_DATA" != true ]; then
+        echo ""
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${CYAN}  Deploy Mock Data?${NC}"
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${CYAN}  This will create mock observations from all 6 sources:${NC}"
+        echo -e "${CYAN}    - Kyverno (policy violations)${NC}"
+        echo -e "${CYAN}    - Trivy (vulnerability reports)${NC}"
+        echo -e "${CYAN}    - Falco (runtime security events)${NC}"
+        echo -e "${CYAN}    - Audit (K8s audit logs)${NC}"
+        echo -e "${CYAN}    - Checkov (IaC scanning)${NC}"
+        echo -e "${CYAN}    - kube-bench (CIS benchmarks)${NC}"
+        echo ""
+        if [ -t 0 ]; then
+            read -p "$(echo -e ${YELLOW}Deploy mock data? [Y/n]${NC}) " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Nn]$ ]]; then
+                echo -e "${CYAN}Skipping mock data deployment${NC}"
+                SKIP_MOCK_DATA=true
+            else
+                DEPLOY_MOCK_DATA=true
+            fi
+        else
+            # Non-TTY, assume yes
+            DEPLOY_MOCK_DATA=true
+        fi
+    fi
+    
+    if [ "$DEPLOY_MOCK_DATA" = true ] && [ "$SKIP_MOCK_DATA" != true ]; then
+        echo ""
+        echo -e "${YELLOW}→${NC} Deploying mock data..."
+        if [ -f "./hack/send-mock-webhooks.sh" ]; then
+            # Wait for zen-watcher to be ready before sending webhooks
+            echo -e "${CYAN}   Waiting for zen-watcher to be ready...${NC}"
+            for i in {1..60}; do
+                if kubectl get pod -n ${NAMESPACE} -l app.kubernetes.io/name=zen-watcher --field-selector=status.phase=Running 2>/dev/null | grep -q "zen-watcher"; then
+                    if kubectl exec -n ${NAMESPACE} $(kubectl get pod -n ${NAMESPACE} -l app.kubernetes.io/name=zen-watcher -o jsonpath='{.items[0].metadata.name}') -- wget -qO- http://localhost:8080/health 2>/dev/null | grep -q "ok"; then
+                        echo -e "${GREEN}   ✓${NC} zen-watcher ready"
+                        break
+                    fi
+                fi
+                sleep 2
+            done
+            
+            # Run mock data script
+            timeout 120 ./hack/send-mock-webhooks.sh ${NAMESPACE} 2>&1 || echo -e "${YELLOW}   ⚠${NC}  Mock data deployment had issues (this is OK if observations already exist)"
+            echo -e "${GREEN}✓${NC} Mock data deployment completed"
+        else
+            echo -e "${YELLOW}   ⚠${NC}  send-mock-webhooks.sh not found, skipping mock data"
+        fi
+    fi
+fi
+
 # Create ingress resources (only if monitoring is enabled)
 if [ "$SKIP_MONITORING" != true ]; then
     echo -e "${YELLOW}→${NC} Creating ingress resources..."
