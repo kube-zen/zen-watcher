@@ -37,7 +37,9 @@ func NewConfigMapPoller(
 	webhookProcessor *WebhookProcessor,
 	eventsTotal *prometheus.CounterVec,
 ) *ConfigMapPoller {
-	log.Printf("🔍 DEBUG: NewConfigMapPoller called, eventsTotal is nil: %v", eventsTotal == nil)
+	if eventsTotal == nil {
+		log.Printf("⚠️  WARNING: NewConfigMapPoller called with nil eventsTotal!")
+	}
 	return &ConfigMapPoller{
 		clientSet:        clientSet,
 		dynClient:        dynClient,
@@ -183,7 +185,6 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 						severity = "HIGH"
 					}
 
-					log.Printf("  🔍 DEBUG: Creating kube-bench observation, eventsTotal is nil: %v", p.eventsTotal == nil)
 					event := &unstructured.Unstructured{
 						Object: map[string]interface{}{
 							"apiVersion": "zen.kube-zen.io/v1",
@@ -224,13 +225,11 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 					} else {
 						kubeBenchCount++
 						existingKeys[testNumber] = true
-						// Increment metrics
-						log.Printf("  🔍 DEBUG: About to increment metric for kube-bench, eventsTotal is nil: %v", p.eventsTotal == nil)
+						// Increment metrics - always try to increment, log if nil
 						if p.eventsTotal != nil {
 							p.eventsTotal.WithLabelValues("kube-bench", "compliance", severity).Inc()
-							log.Printf("  📊 Incremented metric: kube-bench/compliance/%s", severity)
 						} else {
-							log.Printf("  ⚠️  eventsTotal is nil, cannot increment metrics")
+							log.Printf("  ⚠️  ERROR: eventsTotal is nil for kube-bench, cannot increment metrics!")
 						}
 					}
 				}
@@ -351,7 +350,6 @@ func (p *ConfigMapPoller) processCheckov(ctx context.Context) {
 				}
 			}
 
-			log.Printf("  🔍 DEBUG: Creating checkov observation, eventsTotal is nil: %v", p.eventsTotal == nil)
 			event := &unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"apiVersion": "zen.kube-zen.io/v1",
