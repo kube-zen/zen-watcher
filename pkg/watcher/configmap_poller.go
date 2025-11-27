@@ -223,9 +223,11 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 					if err != nil {
 						log.Printf("  ⚠️  Failed to create Observation: %v", err)
 					} else {
+						log.Printf("  🔍 DEBUG: Observation created successfully, about to increment metrics")
 						kubeBenchCount++
 						existingKeys[testNumber] = true
 						// Increment metrics - always try to increment, log if nil
+						log.Printf("  🔍 DEBUG: eventsTotal is nil: %v", p.eventsTotal == nil)
 						if p.eventsTotal != nil {
 							p.eventsTotal.WithLabelValues("kube-bench", "compliance", severity).Inc()
 							log.Printf("  ✅ Metrics incremented: kube-bench/compliance/%s", severity)
@@ -389,9 +391,11 @@ func (p *ConfigMapPoller) processCheckov(ctx context.Context) {
 			if err != nil {
 				log.Printf("  ⚠️  Failed to create Checkov Observation: %v", err)
 			} else {
+				log.Printf("  🔍 DEBUG: Checkov Observation created successfully, about to increment metrics")
 				checkovCount++
 				existingKeys[dedupKey] = true
 				// Increment metrics - always try to increment, log if nil
+				log.Printf("  🔍 DEBUG: eventsTotal is nil: %v", p.eventsTotal == nil)
 				if p.eventsTotal != nil {
 					p.eventsTotal.WithLabelValues("checkov", category, severity).Inc()
 					log.Printf("  ✅ Metrics incremented: checkov/%s/%s", category, severity)
