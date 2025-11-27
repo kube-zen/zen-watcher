@@ -131,6 +131,7 @@ func (wp *WebhookProcessor) ProcessFalcoAlert(ctx context.Context, alert map[str
 
 	if wp.eventsTotal != nil {
 		wp.eventsTotal.WithLabelValues("falco", "security", severity).Inc()
+		log.Printf("  📊 METRIC INCREMENTED: falco/security/%s", severity)
 	}
 
 	log.Printf("  ✅ Created Observation for Falco alert: %s (priority: %s)", rule, priority)
@@ -306,6 +307,7 @@ func (wp *WebhookProcessor) ProcessAuditEvent(ctx context.Context, auditEvent ma
 
 	if wp.eventsTotal != nil {
 		wp.eventsTotal.WithLabelValues("audit", category, severity).Inc()
+		log.Printf("  📊 METRIC INCREMENTED: audit/%s/%s", category, severity)
 	}
 
 	log.Printf("  ✅ Created Observation for Audit event: %s %s/%s", verb, resource, name)
