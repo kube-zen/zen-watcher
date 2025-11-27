@@ -391,13 +391,12 @@ func (p *ConfigMapPoller) processCheckov(ctx context.Context) {
 			} else {
 				checkovCount++
 				existingKeys[dedupKey] = true
-				// Increment metrics
-				log.Printf("  🔍 DEBUG: About to increment metric for checkov, eventsTotal is nil: %v", p.eventsTotal == nil)
+				// Increment metrics - always try to increment, log if nil
 				if p.eventsTotal != nil {
 					p.eventsTotal.WithLabelValues("checkov", category, severity).Inc()
-					log.Printf("  📊 Incremented metric: checkov/%s/%s", category, severity)
+					log.Printf("  ✅ Metrics incremented: checkov/%s/%s", category, severity)
 				} else {
-					log.Printf("  ⚠️  eventsTotal is nil, cannot increment metrics")
+					log.Printf("  ⚠️  ERROR: eventsTotal is nil for checkov, cannot increment metrics!")
 				}
 			}
 		}
