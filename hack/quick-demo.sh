@@ -2013,6 +2013,63 @@ if [ "$OBSERVATION_COUNT" -gt 0 ]; then
     fi
 fi
 
+# Validate all 6 sources appear in VictoriaMetrics (for Grafana dashboard)
+if [ "$SKIP_MONITORING" != true ]; then
+    echo ""
+    echo -e "${YELLOW}→${NC} Validating dashboard sources..."
+    VALIDATION_START=$(date +%s)
+    MAX_VALIDATION_WAIT=300  # 5 minutes max
+    VALIDATION_SUCCESS=false
+    
+    for i in {1..60}; do
+        # Query VictoriaMetrics for all sources
+        SOURCES_QUERY=$(timeout 10 curl -s "http://localhost:${INGRESS_HTTP_PORT}/victoriametrics/api/v1/query?query=zen_watcher_events_total" 2>/dev/null || echo "")
+        
+        if [ -n "$SOURCES_QUERY" ]; then
+            SOURCES_FOUND=$(echo "$SOURCES_QUERY" | jq -r '.data.result[] | .metric.source' 2>/dev/null | sort -u || echo "")
+            SOURCES_COUNT=$(echo "$SOURCES_FOUND" | grep -v '^$' | wc -l | tr -d '[:space:]' || echo "0")
+            
+            if [ "$SOURCES_COUNT" -ge 6 ]; then
+                VALIDATION_SUCCESS=true
+                echo -e "${GREEN}✓${NC} All 6 sources visible in VictoriaMetrics:"
+                echo "$SOURCES_FOUND" | while read -r source; do
+                    [ -n "$source" ] && echo -e "${GREEN}     ✓${NC} $source"
+                done
+                break
+            elif [ "$SOURCES_COUNT" -gt 0 ]; then
+                ELAPSED=$(($(date +%s) - VALIDATION_START))
+                if [ $((i % 10)) -eq 0 ]; then
+                    echo -e "${CYAN}   Found ${SOURCES_COUNT}/6 sources (${ELAPSED}s elapsed):${NC}"
+                    echo "$SOURCES_FOUND" | while read -r source; do
+                        [ -n "$source" ] && echo -e "${CYAN}     - ${source}${NC}"
+                    done
+                fi
+            fi
+        fi
+        
+        # Check if we've exceeded max wait time
+        ELAPSED=$(($(date +%s) - VALIDATION_START))
+        if [ "$ELAPSED" -ge "$MAX_VALIDATION_WAIT" ]; then
+            echo -e "${YELLOW}⚠${NC}  Validation timeout after ${MAX_VALIDATION_WAIT}s"
+            if [ "$SOURCES_COUNT" -gt 0 ]; then
+                echo -e "${YELLOW}   Found ${SOURCES_COUNT}/6 sources:${NC}"
+                echo "$SOURCES_FOUND" | while read -r source; do
+                    [ -n "$source" ] && echo -e "${YELLOW}     - ${source}${NC}"
+                done
+            fi
+            break
+        fi
+        
+        sleep 5
+    done
+    
+    if [ "$VALIDATION_SUCCESS" = false ] && [ "$SOURCES_COUNT" -lt 6 ]; then
+        echo -e "${YELLOW}⚠${NC}  Only ${SOURCES_COUNT}/6 sources visible in dashboard"
+        echo -e "${CYAN}   Expected sources: kyverno, trivy, falco, audit, checkov, kube-bench${NC}"
+        echo -e "${CYAN}   Run './hack/send-mock-webhooks.sh ${NAMESPACE}' to generate mock data${NC}"
+    fi
+fi
+
 # Calculate total time
 TOTAL_END_TIME=$(date +%s)
 TOTAL_ELAPSED=$((TOTAL_END_TIME - SCRIPT_START_TIME))
