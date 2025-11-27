@@ -94,7 +94,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "zen_watcher_health_status{cluster_id=\"$cluster\"}",
+          "expr": "up{job=\"zen-watcher\"}",
           "refId": "A"
         }
       ],
@@ -161,7 +161,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(zen_watcher_active_events{cluster_id=\"$cluster\"})",
+          "expr": "sum(zen_watcher_events_total)",
           "refId": "A"
         }
       ],
@@ -228,7 +228,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(zen_watcher_active_events{cluster_id=\"$cluster\",severity=\"critical\"})",
+          "expr": "sum(zen_watcher_events_total{severity=\"CRITICAL\"})",
           "refId": "A"
         }
       ],
@@ -295,7 +295,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(zen_watcher_active_events{cluster_id=\"$cluster\",severity=\"high\"})",
+          "expr": "sum(zen_watcher_events_total{severity=\"HIGH\"})",
           "refId": "A"
         }
       ],
@@ -382,7 +382,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "zen_watcher_active_events{cluster_id=\"$cluster\"}",
+          "expr": "zen_watcher_events_total",
           "legendFormat": "{{source}} - {{category}} - {{severity}}",
           "refId": "A"
         }
@@ -441,7 +441,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by(source)(zen_watcher_active_events{cluster_id=\"$cluster\"})",
+          "expr": "sum by(source)(zen_watcher_events_total)",
           "legendFormat": "{{source}}",
           "refId": "A"
         }
@@ -500,7 +500,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by(severity)(zen_watcher_active_events{cluster_id=\"$cluster\"})",
+          "expr": "sum by(severity)(zen_watcher_events_total)",
           "legendFormat": "{{severity}}",
           "refId": "A"
         }
@@ -634,7 +634,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by(source, severity)(zen_watcher_active_events{cluster_id=\"$cluster\"})",
+          "expr": "sum by(source, severity)(zen_watcher_events_total)",
           "legendFormat": "{{source}} - {{severity}}",
           "refId": "A"
         }
@@ -722,7 +722,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by(category)(zen_watcher_active_events{cluster_id=\"$cluster\"})",
+          "expr": "sum by(category)(zen_watcher_events_total)",
           "legendFormat": "{{category}}",
           "refId": "A"
         }
@@ -799,8 +799,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "zen_watcher_watcher_status{cluster_id=\"$cluster\"}",
-          "legendFormat": "{{watcher}}",
+          "expr": "zen_watcher_informer_cache_synced",
+          "legendFormat": "{{resource}}",
           "refId": "A"
         }
       ],
@@ -887,8 +887,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by(event_type)(zen_watcher_events_total{cluster_id=\"$cluster\"})",
-          "legendFormat": "{{event_type}}",
+          "expr": "sum by(source)(zen_watcher_events_total)",
+          "legendFormat": "{{source}}",
           "refId": "A"
         }
       ],
@@ -931,14 +931,14 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(zen_watcher_health_status, cluster_id)",
+        "definition": "label_values(zen_watcher_events_total, source)",
         "hide": 0,
         "includeAll": true,
         "multi": false,
-        "name": "cluster",
+        "name": "source",
         "options": [],
         "query": {
-          "query": "label_values(zen_watcher_health_status, cluster_id)",
+          "query": "label_values(zen_watcher_events_total, source)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
