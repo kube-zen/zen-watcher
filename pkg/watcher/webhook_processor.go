@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -23,16 +22,18 @@ type WebhookProcessor struct {
 	eventsTotal             *prometheus.CounterVec
 	eventProcessingDuration *prometheus.HistogramVec
 	totalCount              int64
+	observationCreator      *ObservationCreator
 }
 
 // NewWebhookProcessor creates a new webhook processor
-func NewWebhookProcessor(dynClient dynamic.Interface, eventGVR schema.GroupVersionResource, eventsTotal *prometheus.CounterVec, eventProcessingDuration *prometheus.HistogramVec) *WebhookProcessor {
+func NewWebhookProcessor(dynClient dynamic.Interface, eventGVR schema.GroupVersionResource, eventsTotal *prometheus.CounterVec, eventProcessingDuration *prometheus.HistogramVec, observationCreator *ObservationCreator) *WebhookProcessor {
 	return &WebhookProcessor{
 		dynClient:               dynClient,
 		eventGVR:                eventGVR,
 		dedupKeys:               make(map[string]map[string]bool),
 		eventsTotal:             eventsTotal,
 		eventProcessingDuration: eventProcessingDuration,
+		observationCreator:      observationCreator,
 	}
 }
 
@@ -119,7 +120,8 @@ func (wp *WebhookProcessor) ProcessFalcoAlert(ctx context.Context, alert map[str
 		},
 	}
 
-	_, err := wp.dynClient.Resource(wp.eventGVR).Namespace(k8sNs).Create(ctx, event, metav1.CreateOptions{})
+	// Use centralized observation creator - metrics are incremented automatically
+	err := wp.observationCreator.CreateObservation(ctx, event)
 	if err != nil {
 		return fmt.Errorf("failed to create Falco Observation: %v", err)
 	}
@@ -128,11 +130,6 @@ func (wp *WebhookProcessor) ProcessFalcoAlert(ctx context.Context, alert map[str
 	wp.dedupKeys["falco"][dedupKey] = true
 	wp.totalCount++
 	wp.mu.Unlock()
-
-	if wp.eventsTotal != nil {
-		wp.eventsTotal.WithLabelValues("falco", "security", severity).Inc()
-		log.Printf("  📊 METRIC INCREMENTED: falco/security/%s", severity)
-	}
 
 	log.Printf("  ✅ Created Observation for Falco alert: %s (priority: %s)", rule, priority)
 	return nil
@@ -295,7 +292,8 @@ func (wp *WebhookProcessor) ProcessAuditEvent(ctx context.Context, auditEvent ma
 		},
 	}
 
-	_, err := wp.dynClient.Resource(wp.eventGVR).Namespace(namespace).Create(ctx, event, metav1.CreateOptions{})
+	// Use centralized observation creator - metrics are incremented automatically
+	err := wp.observationCreator.CreateObservation(ctx, event)
 	if err != nil {
 		return fmt.Errorf("failed to create Audit Observation: %v", err)
 	}
@@ -304,11 +302,6 @@ func (wp *WebhookProcessor) ProcessAuditEvent(ctx context.Context, auditEvent ma
 	wp.dedupKeys["audit"][auditID] = true
 	wp.totalCount++
 	wp.mu.Unlock()
-
-	if wp.eventsTotal != nil {
-		wp.eventsTotal.WithLabelValues("audit", category, severity).Inc()
-		log.Printf("  📊 METRIC INCREMENTED: audit/%s/%s", category, severity)
-	}
 
 	log.Printf("  ✅ Created Observation for Audit event: %s %s/%s", verb, resource, name)
 	return nil

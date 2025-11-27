@@ -19,13 +19,14 @@ import (
 
 // ConfigMapPoller handles periodic polling of ConfigMaps for kube-bench and Checkov
 type ConfigMapPoller struct {
-	clientSet        kubernetes.Interface
-	dynClient        dynamic.Interface
-	eventGVR         schema.GroupVersionResource
-	eventProcessor   *EventProcessor
-	webhookProcessor *WebhookProcessor
-	interval         time.Duration
-	eventsTotal      *prometheus.CounterVec
+	clientSet          kubernetes.Interface
+	dynClient          dynamic.Interface
+	eventGVR           schema.GroupVersionResource
+	eventProcessor     *EventProcessor
+	webhookProcessor   *WebhookProcessor
+	interval           time.Duration
+	eventsTotal        *prometheus.CounterVec
+	observationCreator *ObservationCreator
 }
 
 // NewConfigMapPoller creates a new ConfigMap poller
@@ -36,15 +37,17 @@ func NewConfigMapPoller(
 	eventProcessor *EventProcessor,
 	webhookProcessor *WebhookProcessor,
 	eventsTotal *prometheus.CounterVec,
+	observationCreator *ObservationCreator,
 ) *ConfigMapPoller {
 	return &ConfigMapPoller{
-		clientSet:        clientSet,
-		dynClient:        dynClient,
-		eventGVR:         eventGVR,
-		eventProcessor:   eventProcessor,
-		webhookProcessor: webhookProcessor,
-		interval:         5 * time.Minute,
-		eventsTotal:      eventsTotal,
+		clientSet:          clientSet,
+		dynClient:          dynClient,
+		eventGVR:           eventGVR,
+		eventProcessor:     eventProcessor,
+		webhookProcessor:   webhookProcessor,
+		interval:           5 * time.Minute,
+		eventsTotal:        eventsTotal,
+		observationCreator: observationCreator,
 	}
 }
 
@@ -216,19 +219,13 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 						},
 					}
 
-					_, err := p.dynClient.Resource(p.eventGVR).Namespace(kubeBenchNs).Create(ctx, event, metav1.CreateOptions{})
+					// Use centralized observation creator - metrics are incremented automatically
+					err := p.observationCreator.CreateObservation(ctx, event)
 					if err != nil {
 						log.Printf("  ⚠️  Failed to create Observation: %v", err)
 					} else {
 						kubeBenchCount++
 						existingKeys[testNumber] = true
-						// Increment metrics
-						if p.eventsTotal == nil {
-							log.Printf("  ⚠️  CRITICAL: eventsTotal is nil! Metrics will not be incremented!")
-						} else {
-							p.eventsTotal.WithLabelValues("kube-bench", "compliance", severity).Inc()
-							log.Printf("  📊 METRIC INCREMENTED: kube-bench/compliance/%s", severity)
-						}
 					}
 				}
 			}
@@ -382,19 +379,13 @@ func (p *ConfigMapPoller) processCheckov(ctx context.Context) {
 				},
 			}
 
-			_, err := p.dynClient.Resource(p.eventGVR).Namespace(resourceNs).Create(ctx, event, metav1.CreateOptions{})
+			// Use centralized observation creator - metrics are incremented automatically
+			err := p.observationCreator.CreateObservation(ctx, event)
 			if err != nil {
 				log.Printf("  ⚠️  Failed to create Checkov Observation: %v", err)
 			} else {
 				checkovCount++
 				existingKeys[dedupKey] = true
-				// Increment metrics
-				if p.eventsTotal == nil {
-					log.Printf("  ⚠️  CRITICAL: eventsTotal is nil! Metrics will not be incremented!")
-				} else {
-					p.eventsTotal.WithLabelValues("checkov", category, severity).Inc()
-					log.Printf("  📊 METRIC INCREMENTED: checkov/%s/%s", category, severity)
-				}
 			}
 		}
 	}

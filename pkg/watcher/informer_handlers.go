@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -24,10 +23,11 @@ type EventProcessor struct {
 	eventsTotal             *prometheus.CounterVec
 	eventProcessingDuration *prometheus.HistogramVec
 	totalCount              int64
+	observationCreator      *ObservationCreator
 }
 
 // NewEventProcessor creates a new event processor
-func NewEventProcessor(dynClient dynamic.Interface, eventGVR schema.GroupVersionResource, eventsTotal *prometheus.CounterVec, eventProcessingDuration *prometheus.HistogramVec) *EventProcessor {
+func NewEventProcessor(dynClient dynamic.Interface, eventGVR schema.GroupVersionResource, eventsTotal *prometheus.CounterVec, eventProcessingDuration *prometheus.HistogramVec, observationCreator *ObservationCreator) *EventProcessor {
 	return &EventProcessor{
 		dynClient:               dynClient,
 		eventGVR:                eventGVR,
@@ -35,6 +35,7 @@ func NewEventProcessor(dynClient dynamic.Interface, eventGVR schema.GroupVersion
 		trivyDedup:              make(map[string]bool),
 		eventsTotal:             eventsTotal,
 		eventProcessingDuration: eventProcessingDuration,
+		observationCreator:      observationCreator,
 	}
 }
 
@@ -134,7 +135,8 @@ func (ep *EventProcessor) ProcessKyvernoPolicyReport(ctx context.Context, report
 			},
 		}
 
-		_, err := ep.dynClient.Resource(ep.eventGVR).Namespace(resourceNs).Create(ctx, event, metav1.CreateOptions{})
+		// Use centralized observation creator - metrics are incremented automatically
+		err := ep.observationCreator.CreateObservation(ctx, event)
 		if err != nil {
 			log.Printf("  ⚠️  Failed to create Kyverno Observation: %v", err)
 		} else {
@@ -143,9 +145,6 @@ func (ep *EventProcessor) ProcessKyvernoPolicyReport(ctx context.Context, report
 			ep.totalCount++
 			ep.mu.Unlock()
 			count++
-			if ep.eventsTotal != nil {
-				ep.eventsTotal.WithLabelValues("kyverno", "security", mappedSeverity).Inc()
-			}
 		}
 	}
 
@@ -228,7 +227,8 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 			},
 		}
 
-		_, err := ep.dynClient.Resource(ep.eventGVR).Namespace(report.GetNamespace()).Create(ctx, event, metav1.CreateOptions{})
+		// Use centralized observation creator - metrics are incremented automatically
+		err := ep.observationCreator.CreateObservation(ctx, event)
 		if err != nil {
 			log.Printf("  ⚠️  Failed to create Trivy Observation: %v", err)
 		} else {
@@ -237,9 +237,6 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 			ep.totalCount++
 			ep.mu.Unlock()
 			count++
-			if ep.eventsTotal != nil {
-				ep.eventsTotal.WithLabelValues("trivy", "security", fmt.Sprintf("%v", severity)).Inc()
-			}
 		}
 	}
 

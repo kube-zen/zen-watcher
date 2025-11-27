@@ -35,8 +35,8 @@ func main() {
 	// Create informer factory
 	informerFactory := kubernetes.NewInformerFactory(clients.Dynamic)
 
-	// Create processors
-	eventProcessor, webhookProcessor := watcher.NewProcessors(
+	// Create processors with centralized observation creator
+	eventProcessor, webhookProcessor, observationCreator := watcher.NewProcessors(
 		clients.Dynamic,
 		gvrs.Observations,
 		m.EventsTotal,
@@ -59,7 +59,7 @@ func main() {
 	// Create HTTP server
 	httpServer := server.NewServer(falcoAlertsChan, auditEventsChan, m.WebhookRequests, m.WebhookDropped)
 
-	// Create ConfigMap poller
+	// Create ConfigMap poller with centralized observation creator
 	configMapPoller := watcher.NewConfigMapPoller(
 		clients.Standard,
 		clients.Dynamic,
@@ -67,6 +67,7 @@ func main() {
 		eventProcessor,
 		webhookProcessor,
 		m.EventsTotal,
+		observationCreator,
 	)
 
 	// WaitGroup for goroutines
