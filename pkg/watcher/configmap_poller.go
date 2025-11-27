@@ -228,6 +228,7 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 						// Increment metrics - always try to increment, log if nil
 						if p.eventsTotal != nil {
 							p.eventsTotal.WithLabelValues("kube-bench", "compliance", severity).Inc()
+							log.Printf("  ✅ Metrics incremented: kube-bench/compliance/%s", severity)
 						} else {
 							log.Printf("  ⚠️  ERROR: eventsTotal is nil for kube-bench, cannot increment metrics!")
 						}
