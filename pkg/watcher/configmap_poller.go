@@ -223,6 +223,7 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 						kubeBenchCount++
 						existingKeys[testNumber] = true
 						// Increment metrics
+						log.Printf("  🔍 DEBUG: About to increment metric for kube-bench, eventsTotal is nil: %v", p.eventsTotal == nil)
 						if p.eventsTotal != nil {
 							p.eventsTotal.WithLabelValues("kube-bench", "compliance", severity).Inc()
 							log.Printf("  📊 Incremented metric: kube-bench/compliance/%s", severity)
@@ -389,6 +390,7 @@ func (p *ConfigMapPoller) processCheckov(ctx context.Context) {
 				checkovCount++
 				existingKeys[dedupKey] = true
 				// Increment metrics
+				log.Printf("  🔍 DEBUG: About to increment metric for checkov, eventsTotal is nil: %v", p.eventsTotal == nil)
 				if p.eventsTotal != nil {
 					p.eventsTotal.WithLabelValues("checkov", category, severity).Inc()
 					log.Printf("  📊 Incremented metric: checkov/%s/%s", category, severity)
