@@ -223,7 +223,9 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 						kubeBenchCount++
 						existingKeys[testNumber] = true
 						// Increment metrics
-						if p.eventsTotal != nil {
+						if p.eventsTotal == nil {
+							log.Printf("  ⚠️  CRITICAL: eventsTotal is nil! Metrics will not be incremented!")
+						} else {
 							p.eventsTotal.WithLabelValues("kube-bench", "compliance", severity).Inc()
 						}
 					}
@@ -386,7 +388,9 @@ func (p *ConfigMapPoller) processCheckov(ctx context.Context) {
 				checkovCount++
 				existingKeys[dedupKey] = true
 				// Increment metrics
-				if p.eventsTotal != nil {
+				if p.eventsTotal == nil {
+					log.Printf("  ⚠️  CRITICAL: eventsTotal is nil! Metrics will not be incremented!")
+				} else {
 					p.eventsTotal.WithLabelValues("checkov", category, severity).Inc()
 				}
 			}
