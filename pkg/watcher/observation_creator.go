@@ -45,22 +45,33 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 
 	// Extract source, category, and severity from spec for metrics
 	// Use NestedFieldCopy to handle interface{} types, then convert to string
-	sourceVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
-	categoryVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "category")
-	severityVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "severity")
+	sourceVal, sourceFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
+	categoryVal, categoryFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "category")
+	severityVal, severityFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "severity")
 
 	// Convert to strings, handling nil and interface{} types
 	source := ""
 	if sourceVal != nil {
 		source = fmt.Sprintf("%v", sourceVal)
+	} else if !sourceFound {
+		log.Printf("  ⚠️  DEBUG: source not found in spec")
 	}
 	category := ""
 	if categoryVal != nil {
 		category = fmt.Sprintf("%v", categoryVal)
+	} else if !categoryFound {
+		log.Printf("  ⚠️  DEBUG: category not found in spec")
 	}
 	severity := ""
 	if severityVal != nil {
 		severity = fmt.Sprintf("%v", severityVal)
+	} else if !severityFound {
+		log.Printf("  ⚠️  DEBUG: severity not found in spec")
+	}
+
+	// Debug logging
+	if source == "" || category == "" || severity == "" {
+		log.Printf("  ⚠️  DEBUG: Extracted values - source:'%s' category:'%s' severity:'%s'", source, category, severity)
 	}
 
 	// Normalize severity to uppercase for consistency
