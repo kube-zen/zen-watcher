@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"sync"
@@ -92,6 +93,7 @@ func main() {
 					}
 				}
 			case alert := <-falcoAlertsChan:
+				log.Printf("  🔄 [FALCO] Processing alert from channel: %v", alert["rule"])
 				if err := webhookProcessor.ProcessFalcoAlert(ctx, alert); err != nil {
 					log.Printf("⚠️  Failed to process Falco alert: %v", err)
 				}
@@ -113,6 +115,8 @@ func main() {
 					}
 				}
 			case auditEvent := <-auditEventsChan:
+				auditID := fmt.Sprintf("%v", auditEvent["auditID"])
+				log.Printf("  🔄 [AUDIT] Processing event from channel: auditID=%s", auditID)
 				if err := webhookProcessor.ProcessAuditEvent(ctx, auditEvent); err != nil {
 					log.Printf("⚠️  Failed to process audit event: %v", err)
 				}

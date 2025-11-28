@@ -59,7 +59,9 @@ func SetupInformers(
 				return
 			}
 			log.Printf("🔍 [TRIVY] VulnerabilityReport added: %s/%s", report.GetNamespace(), report.GetName())
+			log.Printf("🔍 [TRIVY] Calling ProcessTrivyVulnerabilityReport for: %s/%s", report.GetNamespace(), report.GetName())
 			eventProcessor.ProcessTrivyVulnerabilityReport(ctx, report)
+			log.Printf("🔍 [TRIVY] ProcessTrivyVulnerabilityReport returned for: %s/%s", report.GetNamespace(), report.GetName())
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			report, ok := newObj.(*unstructured.Unstructured)
@@ -68,7 +70,9 @@ func SetupInformers(
 				return
 			}
 			log.Printf("🔍 [TRIVY] VulnerabilityReport updated: %s/%s", report.GetNamespace(), report.GetName())
+			log.Printf("🔍 [TRIVY] Calling ProcessTrivyVulnerabilityReport (update) for: %s/%s", report.GetNamespace(), report.GetName())
 			eventProcessor.ProcessTrivyVulnerabilityReport(ctx, report)
+			log.Printf("🔍 [TRIVY] ProcessTrivyVulnerabilityReport returned (update) for: %s/%s", report.GetNamespace(), report.GetName())
 		},
 	})
 

@@ -197,7 +197,14 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 	resourceKind := report.GetLabels()["trivy-operator.resource.kind"]
 	resourceName := report.GetLabels()["trivy-operator.resource.name"]
 
+	if resourceKind == "" || resourceName == "" {
+		log.Printf("  ⚠️  [TRIVY] Missing resource labels: kind=%s, name=%s", resourceKind, resourceName)
+		return
+	}
+
 	count := 0
+	highCriticalCount := 0
+	skippedLow := 0
 	for _, v := range vulnerabilities {
 		vuln, ok := v.(map[string]interface{})
 		if !ok {
@@ -206,8 +213,10 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 		severity := vuln["severity"]
 		severityStr := fmt.Sprintf("%v", severity)
 		if severityStr != "HIGH" && severityStr != "CRITICAL" {
+			skippedLow++
 			continue
 		}
+		highCriticalCount++
 
 		vulnID := fmt.Sprintf("%v", vuln["vulnerabilityID"])
 
@@ -216,7 +225,9 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 			LabelSelector: "source=trivy",
 		})
 		exists := false
-		if err == nil {
+		if err != nil {
+			log.Printf("  ⚠️  [TRIVY] Error checking existing observations: %v", err)
+		} else {
 			for _, ev := range existingEvents.Items {
 				spec, ok := ev.Object["spec"].(map[string]interface{})
 				if !ok {
@@ -246,8 +257,11 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 		}
 
 		if exists {
+			log.Printf("  📋 [TRIVY] Skipping duplicate observation for %s/%s/%s/%s", report.GetNamespace(), resourceKind, resourceName, vulnID)
 			continue
 		}
+
+		log.Printf("  🔍 [TRIVY] Creating observation for %s/%s/%s/%s (severity: %s)", report.GetNamespace(), resourceKind, resourceName, vulnID, severityStr)
 
 		event := &unstructured.Unstructured{
 			Object: map[string]interface{}{
@@ -297,8 +311,14 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 		}
 	}
 
+	log.Printf("  📊 [TRIVY] Summary: %d total vulnerabilities, %d HIGH/CRITICAL, %d skipped (low severity), %d observations created", len(vulnerabilities), highCriticalCount, skippedLow, count)
+	if highCriticalCount > 0 {
+		log.Printf("  📊 [TRIVY] Processed %d HIGH/CRITICAL vulnerabilities, created %d observations", highCriticalCount, count)
+	}
 	if count > 0 {
 		log.Printf("  ✅ Created %d NEW Observations from Trivy vulnerabilities", count)
+	} else if highCriticalCount > 0 {
+		log.Printf("  ⚠️  [TRIVY] Found %d HIGH/CRITICAL vulnerabilities but created 0 observations (all duplicates?)", highCriticalCount)
 	}
 }
 

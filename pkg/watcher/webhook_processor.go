@@ -50,8 +50,11 @@ func (wp *WebhookProcessor) ProcessFalcoAlert(ctx context.Context, alert map[str
 
 	// Only process Warning, Error, Critical, Alert, Emergency
 	if priority != "Warning" && priority != "Error" && priority != "Critical" && priority != "Alert" && priority != "Emergency" {
+		log.Printf("  📋 [FALCO] Skipping alert with priority: %s", priority)
 		return nil
 	}
+
+	log.Printf("  🔍 [FALCO] Processing alert: %s (priority: %s)", rule, priority)
 
 	// Get K8s context if present
 	k8sPodName := fmt.Sprintf("%v", alert["k8s.pod.name"])
@@ -171,6 +174,7 @@ func (wp *WebhookProcessor) ProcessAuditEvent(ctx context.Context, auditEvent ma
 
 	// Only process ResponseComplete stage
 	if stage != "ResponseComplete" {
+		log.Printf("  📋 [AUDIT] Skipping event with stage: %s", stage)
 		return nil
 	}
 
@@ -184,11 +188,15 @@ func (wp *WebhookProcessor) ProcessAuditEvent(ctx context.Context, auditEvent ma
 	name := fmt.Sprintf("%v", objectRef["name"])
 	apiGroup := fmt.Sprintf("%v", objectRef["apiGroup"])
 
+	log.Printf("  🔍 [AUDIT] Processing event: %s %s/%s (auditID: %s)", verb, namespace, name, auditID)
+
 	// Filter logic: only important events
 	important := false
 	category := "compliance"
 	severity := "MEDIUM"
 	eventType := "audit-event"
+
+	log.Printf("  🔍 [AUDIT] Checking if event is important: verb=%s, resource=%s, namespace=%s, name=%s, apiGroup=%s", verb, resource, namespace, name, apiGroup)
 
 	// Delete operations (HIGH severity)
 	if verb == "delete" {

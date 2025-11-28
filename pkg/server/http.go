@@ -103,6 +103,7 @@ func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 	// Send to channel for processing (non-blocking)
 	select {
 	case s.falcoAlertsChan <- alert:
+		log.Printf("  ✅ [FALCO] Webhook received and queued for processing: %v", alert["rule"])
 		s.webhookMetrics.WithLabelValues("falco", "200").Inc()
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
@@ -137,6 +138,8 @@ func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
 	// Send to channel for processing (non-blocking)
 	select {
 	case s.auditEventsChan <- auditEvent:
+		auditID := fmt.Sprintf("%v", auditEvent["auditID"])
+		log.Printf("  ✅ [AUDIT] Webhook received and queued for processing: auditID=%s", auditID)
 		s.webhookMetrics.WithLabelValues("audit", "200").Inc()
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
