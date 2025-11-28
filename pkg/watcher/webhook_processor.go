@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -73,48 +72,6 @@ func (wp *WebhookProcessor) ProcessFalcoAlert(ctx context.Context, alert map[str
 		k8sNs = "default"
 	}
 
-	// Check if observation already exists in Kubernetes (same source AND same identifying fields)
-	existingEvents, err := wp.dynClient.Resource(wp.eventGVR).Namespace(k8sNs).List(ctx, metav1.ListOptions{
-		LabelSelector: "source=falco",
-	})
-	exists := false
-	if err == nil {
-		for _, ev := range existingEvents.Items {
-			spec, ok := ev.Object["spec"].(map[string]interface{})
-			if !ok {
-				continue
-			}
-			evSource := fmt.Sprintf("%v", spec["source"])
-			if evSource != "falco" {
-				continue
-			}
-			details, ok := spec["details"].(map[string]interface{})
-			if !ok {
-				continue
-			}
-			evRule := fmt.Sprintf("%v", details["rule"])
-			evPodName := fmt.Sprintf("%v", details["k8s_pod_name"])
-			evOutput := fmt.Sprintf("%v", details["output"])
-			// Truncate output for comparison (same as original logic)
-			evOutputKey := evOutput
-			if len(evOutput) > 50 {
-				evOutputKey = evOutput[:50]
-			}
-			outputKey := output
-			if len(output) > 50 {
-				outputKey = output[:50]
-			}
-			if evRule == rule && evPodName == k8sPodName && evOutputKey == outputKey {
-				exists = true
-				break
-			}
-		}
-	}
-
-	if exists {
-		return nil
-	}
-
 	// Map priority to severity
 	severity := "MEDIUM"
 	if priority == "Critical" || priority == "Alert" || priority == "Emergency" {
@@ -157,7 +114,7 @@ func (wp *WebhookProcessor) ProcessFalcoAlert(ctx context.Context, alert map[str
 	}
 
 	// Use centralized observation creator - metrics are incremented automatically
-	err = wp.observationCreator.CreateObservation(ctx, event)
+	err := wp.observationCreator.CreateObservation(ctx, event)
 	if err != nil {
 		return fmt.Errorf("failed to create Falco Observation: %v", err)
 	}
@@ -268,37 +225,6 @@ func (wp *WebhookProcessor) ProcessAuditEvent(ctx context.Context, auditEvent ma
 	}
 	log.Printf("  ✅ [AUDIT] Processing important event: %s %s/%s (severity: %s)", verb, resource, name, severity)
 
-	// Check if observation already exists in Kubernetes (same source AND same identifying fields)
-	existingEvents, err := wp.dynClient.Resource(wp.eventGVR).Namespace(namespace).List(ctx, metav1.ListOptions{
-		LabelSelector: "source=audit",
-	})
-	exists := false
-	if err == nil {
-		for _, ev := range existingEvents.Items {
-			spec, ok := ev.Object["spec"].(map[string]interface{})
-			if !ok {
-				continue
-			}
-			evSource := fmt.Sprintf("%v", spec["source"])
-			if evSource != "audit" {
-				continue
-			}
-			details, ok := spec["details"].(map[string]interface{})
-			if !ok {
-				continue
-			}
-			evAuditID := fmt.Sprintf("%v", details["auditID"])
-			if evAuditID == auditID {
-				exists = true
-				break
-			}
-		}
-	}
-
-	if exists {
-		return nil
-	}
-
 	// Extract user info
 	user, ok := auditEvent["user"].(map[string]interface{})
 	if !ok {
@@ -354,7 +280,7 @@ func (wp *WebhookProcessor) ProcessAuditEvent(ctx context.Context, auditEvent ma
 	}
 
 	// Use centralized observation creator - metrics are incremented automatically
-	err = wp.observationCreator.CreateObservation(ctx, event)
+	err := wp.observationCreator.CreateObservation(ctx, event)
 	if err != nil {
 		return fmt.Errorf("failed to create Audit Observation: %v", err)
 	}

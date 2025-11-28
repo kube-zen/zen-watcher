@@ -98,29 +98,6 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 
 	log.Printf("  ✓ Found %d kube-bench ConfigMaps", len(configMaps.Items))
 
-	// Get existing events for deduplication
-	existingEvents, err := p.dynClient.Resource(p.eventGVR).Namespace("").List(ctx, metav1.ListOptions{
-		LabelSelector: "source=kube-bench,category=compliance",
-	})
-	existingKeys := make(map[string]bool)
-	if err != nil {
-		log.Printf("  ⚠️  Cannot load existing events for dedup: %v", err)
-	} else {
-		for _, ev := range existingEvents.Items {
-			spec, ok := ev.Object["spec"].(map[string]interface{})
-			if !ok || spec == nil {
-				continue
-			}
-			details, ok := spec["details"].(map[string]interface{})
-			if !ok || details == nil {
-				continue
-			}
-			testNum := fmt.Sprintf("%v", details["testNumber"])
-			existingKeys[testNum] = true
-		}
-	}
-	log.Printf("  📋 Dedup: %d existing events, checking for new CIS benchmark failures...", len(existingKeys))
-
 	kubeBenchCount := 0
 	for _, cm := range configMaps.Items {
 		resultsJSON, found := cm.Data["results.json"]
@@ -172,9 +149,6 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 					}
 
 					testNumber := fmt.Sprintf("%v", result["test_number"])
-					if existingKeys[testNumber] {
-						continue
-					}
 
 					testDesc := fmt.Sprintf("%v", result["test_desc"])
 					remediation := fmt.Sprintf("%v", result["remediation"])
@@ -220,12 +194,12 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 					}
 
 					// Use centralized observation creator - metrics are incremented automatically
+					// Deduplication is handled by ObservationCreator
 					err := p.observationCreator.CreateObservation(ctx, event)
 					if err != nil {
 						log.Printf("  ⚠️  Failed to create Observation: %v", err)
 					} else {
 						kubeBenchCount++
-						existingKeys[testNumber] = true
 					}
 				}
 			}
@@ -254,31 +228,6 @@ func (p *ConfigMapPoller) processCheckov(ctx context.Context) {
 	}
 
 	log.Printf("  ✓ Found %d checkov ConfigMaps", len(checkovCMs.Items))
-
-	// Get existing Observations for deduplication
-	existingEvents, err := p.dynClient.Resource(p.eventGVR).Namespace("").List(ctx, metav1.ListOptions{
-		LabelSelector: "source=checkov,category=security",
-	})
-	existingKeys := make(map[string]bool)
-	if err != nil {
-		log.Printf("  ⚠️  Cannot load existing events for dedup: %v", err)
-	} else {
-		for _, ev := range existingEvents.Items {
-			spec, ok := ev.Object["spec"].(map[string]interface{})
-			if !ok || spec == nil {
-				continue
-			}
-			details, ok := spec["details"].(map[string]interface{})
-			if !ok || details == nil {
-				continue
-			}
-			checkID := fmt.Sprintf("%v", details["checkId"])
-			resource := fmt.Sprintf("%v", details["resource"])
-			key := fmt.Sprintf("%s/%s", checkID, resource)
-			existingKeys[key] = true
-		}
-	}
-	log.Printf("  📋 Dedup: %d existing events, checking for new Checkov failures...", len(existingKeys))
 
 	checkovCount := 0
 	for _, cm := range checkovCMs.Items {
@@ -330,10 +279,7 @@ func (p *ConfigMapPoller) processCheckov(ctx context.Context) {
 				resourceName = resourceParts[0]
 			}
 
-			dedupKey := fmt.Sprintf("%s/%s", checkID, resource)
-			if existingKeys[dedupKey] {
-				continue
-			}
+			// Deduplication is handled by ObservationCreator
 
 			// Map by check prefix - use strings.HasPrefix instead of unsafe slicing
 			category := "security"
@@ -380,12 +326,12 @@ func (p *ConfigMapPoller) processCheckov(ctx context.Context) {
 			}
 
 			// Use centralized observation creator - metrics are incremented automatically
+			// Deduplication is handled by ObservationCreator
 			err := p.observationCreator.CreateObservation(ctx, event)
 			if err != nil {
 				log.Printf("  ⚠️  Failed to create Checkov Observation: %v", err)
 			} else {
 				checkovCount++
-				existingKeys[dedupKey] = true
 			}
 		}
 	}
