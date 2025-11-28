@@ -212,7 +212,7 @@ releases:
       - image:
           repository: {{ $imageRepo }}
           tag: {{ $imageTag }}
-          pullPolicy: {{ $imagePullPolicy }}
+          pullPolicy: Always
       - config:
           watchNamespace: {{ $namespace }}
           trivyNamespace: trivy-system
