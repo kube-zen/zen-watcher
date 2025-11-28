@@ -219,9 +219,11 @@ echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━�
 # Create demo-manifests namespace if it doesn't exist (for Falco webhooks)
 kubectl create namespace demo-manifests 2>/dev/null || true
 
-send_falco_webhook "Critical" "Privileged container started" "Container running in privileged mode detected" "demo-insecure-pod" "demo-manifests"
-send_falco_webhook "Critical" "Write below binary dir" "File below a known binary directory opened for writing" "demo-pod" "default"
-send_falco_webhook "Error" "Sensitive file accessed" "File below /etc opened for reading" "demo-pod" "default"
+# Generate unique pod names and timestamps to avoid deduplication
+TIMESTAMP=$(date +%s)
+send_falco_webhook "Critical" "Privileged container started" "Container running in privileged mode detected - ${TIMESTAMP}" "demo-insecure-pod-${TIMESTAMP}" "demo-manifests"
+send_falco_webhook "Critical" "Write below binary dir" "File below a known binary directory opened for writing - ${TIMESTAMP}" "demo-pod-${TIMESTAMP}" "default"
+send_falco_webhook "Error" "Sensitive file accessed" "File below /etc opened for reading - ${TIMESTAMP}" "demo-pod-${TIMESTAMP}" "default"
 send_falco_webhook "Warning" "Unexpected network connection" "Connection to external IP 8.8.8.8 detected" "demo-pod" "default"
 send_falco_webhook "Alert" "Shell spawned in container" "A shell was spawned in a container" "demo-pod" "default"
 
