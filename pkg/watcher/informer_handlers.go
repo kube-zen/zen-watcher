@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -17,8 +18,6 @@ import (
 type EventProcessor struct {
 	dynClient               dynamic.Interface
 	eventGVR                schema.GroupVersionResource
-	kyvernoDedup            map[string]bool
-	trivyDedup              map[string]bool
 	mu                      sync.RWMutex
 	eventsTotal             *prometheus.CounterVec
 	eventProcessingDuration *prometheus.HistogramVec
@@ -31,8 +30,6 @@ func NewEventProcessor(dynClient dynamic.Interface, eventGVR schema.GroupVersion
 	return &EventProcessor{
 		dynClient:               dynClient,
 		eventGVR:                eventGVR,
-		kyvernoDedup:            make(map[string]bool),
-		trivyDedup:              make(map[string]bool),
 		eventsTotal:             eventsTotal,
 		eventProcessingDuration: eventProcessingDuration,
 		observationCreator:      observationCreator,
@@ -82,11 +79,40 @@ func (ep *EventProcessor) ProcessKyvernoPolicyReport(ctx context.Context, report
 		severity := fmt.Sprintf("%v", result["severity"])
 		message := fmt.Sprintf("%v", result["message"])
 
-		dedupKey := fmt.Sprintf("%s/%s/%s/%s/%s", resourceNs, resourceKind, resourceName, policy, rule)
-
-		ep.mu.RLock()
-		exists := ep.kyvernoDedup[dedupKey]
-		ep.mu.RUnlock()
+		// Check if observation already exists in Kubernetes (same source AND same identifying fields)
+		existingEvents, err := ep.dynClient.Resource(ep.eventGVR).Namespace(resourceNs).List(ctx, metav1.ListOptions{
+			LabelSelector: "source=kyverno",
+		})
+		exists := false
+		if err == nil {
+			for _, ev := range existingEvents.Items {
+				spec, ok := ev.Object["spec"].(map[string]interface{})
+				if !ok {
+					continue
+				}
+				evSource := fmt.Sprintf("%v", spec["source"])
+				if evSource != "kyverno" {
+					continue
+				}
+				details, ok := spec["details"].(map[string]interface{})
+				if !ok {
+					continue
+				}
+				evPolicy := fmt.Sprintf("%v", details["policy"])
+				evRule := fmt.Sprintf("%v", details["rule"])
+				evResource := spec["resource"].(map[string]interface{})
+				if evResource == nil {
+					continue
+				}
+				evNs := fmt.Sprintf("%v", evResource["namespace"])
+				evKind := fmt.Sprintf("%v", evResource["kind"])
+				evName := fmt.Sprintf("%v", evResource["name"])
+				if evNs == resourceNs && evKind == resourceKind && evName == resourceName && evPolicy == policy && evRule == rule {
+					exists = true
+					break
+				}
+			}
+		}
 
 		if exists {
 			continue
@@ -136,12 +162,11 @@ func (ep *EventProcessor) ProcessKyvernoPolicyReport(ctx context.Context, report
 		}
 
 		// Use centralized observation creator - metrics are incremented automatically
-		err := ep.observationCreator.CreateObservation(ctx, event)
+		err = ep.observationCreator.CreateObservation(ctx, event)
 		if err != nil {
 			log.Printf("  ⚠️  Failed to create Kyverno Observation: %v", err)
 		} else {
 			ep.mu.Lock()
-			ep.kyvernoDedup[dedupKey] = true
 			ep.totalCount++
 			ep.mu.Unlock()
 			count++
@@ -181,11 +206,40 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 		}
 
 		vulnID := fmt.Sprintf("%v", vuln["vulnerabilityID"])
-		dedupKey := fmt.Sprintf("%s/%s/%s/%s", report.GetNamespace(), resourceKind, resourceName, vulnID)
 
-		ep.mu.RLock()
-		exists := ep.trivyDedup[dedupKey]
-		ep.mu.RUnlock()
+		// Check if observation already exists in Kubernetes (same source AND same identifying fields)
+		existingEvents, err := ep.dynClient.Resource(ep.eventGVR).Namespace(report.GetNamespace()).List(ctx, metav1.ListOptions{
+			LabelSelector: "source=trivy",
+		})
+		exists := false
+		if err == nil {
+			for _, ev := range existingEvents.Items {
+				spec, ok := ev.Object["spec"].(map[string]interface{})
+				if !ok {
+					continue
+				}
+				evSource := fmt.Sprintf("%v", spec["source"])
+				if evSource != "trivy" {
+					continue
+				}
+				details, ok := spec["details"].(map[string]interface{})
+				if !ok {
+					continue
+				}
+				evVulnID := fmt.Sprintf("%v", details["vulnerabilityID"])
+				evResource := spec["resource"].(map[string]interface{})
+				if evResource == nil {
+					continue
+				}
+				evNs := fmt.Sprintf("%v", evResource["namespace"])
+				evKind := fmt.Sprintf("%v", evResource["kind"])
+				evName := fmt.Sprintf("%v", evResource["name"])
+				if evNs == report.GetNamespace() && evKind == resourceKind && evName == resourceName && evVulnID == vulnID {
+					exists = true
+					break
+				}
+			}
+		}
 
 		if exists {
 			continue
@@ -228,12 +282,11 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 		}
 
 		// Use centralized observation creator - metrics are incremented automatically
-		err := ep.observationCreator.CreateObservation(ctx, event)
+		err = ep.observationCreator.CreateObservation(ctx, event)
 		if err != nil {
 			log.Printf("  ⚠️  Failed to create Trivy Observation: %v", err)
 		} else {
 			ep.mu.Lock()
-			ep.trivyDedup[dedupKey] = true
 			ep.totalCount++
 			ep.mu.Unlock()
 			count++
