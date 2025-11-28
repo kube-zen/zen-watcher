@@ -205,7 +205,7 @@ releases:
   # Zen Watcher
   - name: zen-watcher
     namespace: {{ $namespace }}
-    chart: ./charts/zen-watcher
+    chart: /tmp/zen-watcher-1.0.0.tgz
     createNamespace: true
     needs: []
     values:

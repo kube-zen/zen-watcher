@@ -1363,6 +1363,12 @@ if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT" ]; then
 fi
 cd "$REPO_ROOT" || { echo "Error: Failed to change to repo root: $REPO_ROOT" >&2; exit 1; }
 
+# Package local zen-watcher chart for helmfile to use
+echo -e "${CYAN}   Packaging local zen-watcher chart...${NC}"
+helm package charts/zen-watcher -d /tmp > /dev/null 2>&1 || {
+    echo -e "${YELLOW}⚠${NC}  Failed to package chart, continuing anyway..."
+}
+
 # Suppress verbose Helm output using --quiet flag
 if helmfile -f hack/helmfile.yaml.gotmpl --quiet sync 2>&1 | tee /tmp/helmfile-sync.log; then
     echo -e "${GREEN}✓${NC} Helmfile sync completed"
