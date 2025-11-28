@@ -113,6 +113,9 @@ graph TB
 
 **Key Design:**
 - **Watches** multiple security tools
+- **Filters** events per-source (ConfigMap-based rules)
+- **Normalizes** to standard categories/severities
+- **Deduplicates** with sliding window (LRU + TTL)
 - **Aggregates** into unified CRD format
 - **Stores** in Kubernetes etcd (no external database)
 - **Exposes** via standard Kubernetes API
@@ -158,6 +161,11 @@ kubectl get observations -n zen-system
 | `BEHAVIOR_MODE` | Watching behavior | `all` |
 | `LOG_LEVEL` | Log level (DEBUG/INFO/WARN/ERROR/CRIT) | `INFO` |
 | `METRICS_PORT` | Prometheus metrics port | `9090` |
+| `DEDUP_WINDOW_SECONDS` | Deduplication window in seconds | `60` |
+| `DEDUP_MAX_SIZE` | Maximum deduplication cache size | `10000` |
+| `FILTER_CONFIGMAP_NAME` | Filter ConfigMap name | `zen-watcher-filter` |
+| `FILTER_CONFIGMAP_NAMESPACE` | Filter ConfigMap namespace | `zen-system` |
+| `FILTER_CONFIGMAP_KEY` | Filter ConfigMap data key | `filter.json` |
 
 ### Behavior Modes
 
@@ -166,11 +174,72 @@ kubectl get observations -n zen-system
 - `security-only` - Skip compliance tools
 - `custom` - Use tool-specific enable flags
 
+### Source-Level Filtering
+
+Zen Watcher supports **per-source filtering** via ConfigMap to reduce noise and cost. Filtering happens **before** normalization, deduplication, and CRD creation.
+
+**Create Filter ConfigMap:**
+
+```bash
+kubectl create configmap zen-watcher-filter -n zen-system --from-file=filter.json=filter.json
+```
+
+**Filter Configuration Example** (`filter.json`):
+
+```json
+{
+  "sources": {
+    "trivy": {
+      "minSeverity": "MEDIUM",
+      "excludeNamespaces": ["kube-system", "kube-public"]
+    },
+    "kyverno": {
+      "excludeEventTypes": ["audit", "info"],
+      "excludeKinds": ["ConfigMap", "Secret"]
+    },
+    "audit": {
+      "includeEventTypes": ["resource-deletion", "secret-access", "rbac-change"]
+    },
+    "falco": {
+      "includeNamespaces": ["production", "staging"]
+    },
+    "kube-bench": {
+      "excludeCategories": ["compliance"]
+    },
+    "checkov": {
+      "enabled": false
+    }
+  }
+}
+```
+
+**Filter Options (per source):**
+- `minSeverity`: Minimum severity level (CRITICAL, HIGH, MEDIUM, LOW)
+- `excludeEventTypes` / `includeEventTypes`: Filter by event type
+- `excludeNamespaces` / `includeNamespaces`: Filter by namespace
+- `excludeKinds` / `includeKinds`: Filter by resource kind
+- `excludeCategories` / `includeCategories`: Filter by category
+- `enabled`: Enable/disable source (default: true)
+
+**Benefits:**
+- Reduces noise and cost
+- Prevents cheap scanners (e.g., Trivy LOW) from polluting dataset
+- Saves CPU, memory, and disk churn
+- Reduces CRD count and agent noise
+- Keeps Observations meaningful
+
+**Note:** If ConfigMap is not found, zen-watcher defaults to "allow all" (no filtering).
+
 ---
 
 ## 📊 Observability
 
 ### Prometheus Metrics (:9090/metrics)
+
+**Observation Processing Metrics:**
+- `zen_watcher_observations_created_total{source=...}` - Total Observation CRDs successfully created (by source)
+- `zen_watcher_observations_filtered_total{source=...,reason=...}` - Total observations filtered out by source-level filtering (by source and reason)
+- `zen_watcher_observations_deduped_total` - Total observations skipped due to deduplication (within sliding window)
 
 **Core Metrics:**
 ```

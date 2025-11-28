@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/kube-zen/zen-watcher/pkg/dedup"
+	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -15,16 +16,29 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-// ObservationCreator handles creation of Observations with centralized metrics increment and deduplication
+// ObservationCreator handles creation of Observations with centralized filtering, normalization, deduplication, and metrics
+// Flow: filter() → normalize() → dedup() → create Observation CRD + update metrics + log
 type ObservationCreator struct {
-	dynClient   dynamic.Interface
-	eventGVR    schema.GroupVersionResource
-	eventsTotal *prometheus.CounterVec
-	deduper     *dedup.Deduper
+	dynClient            dynamic.Interface
+	eventGVR             schema.GroupVersionResource
+	eventsTotal          *prometheus.CounterVec
+	observationsCreated  *prometheus.CounterVec
+	observationsFiltered *prometheus.CounterVec
+	observationsDeduped  prometheus.Counter
+	deduper              *dedup.Deduper
+	filter               *filter.Filter
 }
 
-// NewObservationCreator creates a new observation creator
-func NewObservationCreator(dynClient dynamic.Interface, eventGVR schema.GroupVersionResource, eventsTotal *prometheus.CounterVec) *ObservationCreator {
+// NewObservationCreator creates a new observation creator with optional filter and metrics
+func NewObservationCreator(
+	dynClient dynamic.Interface,
+	eventGVR schema.GroupVersionResource,
+	eventsTotal *prometheus.CounterVec,
+	observationsCreated *prometheus.CounterVec,
+	observationsFiltered *prometheus.CounterVec,
+	observationsDeduped prometheus.Counter,
+	filter *filter.Filter,
+) *ObservationCreator {
 	// Get dedup window from env, default 60 seconds
 	windowSeconds := 60
 	if windowStr := os.Getenv("DEDUP_WINDOW_SECONDS"); windowStr != "" {
@@ -40,23 +54,55 @@ func NewObservationCreator(dynClient dynamic.Interface, eventGVR schema.GroupVer
 		}
 	}
 	return &ObservationCreator{
-		dynClient:   dynClient,
-		eventGVR:    eventGVR,
-		eventsTotal: eventsTotal,
-		deduper:     dedup.NewDeduper(windowSeconds, maxSize),
+		dynClient:            dynClient,
+		eventGVR:             eventGVR,
+		eventsTotal:          eventsTotal,
+		observationsCreated:  observationsCreated,
+		observationsFiltered: observationsFiltered,
+		observationsDeduped:  observationsDeduped,
+		deduper:              dedup.NewDeduper(windowSeconds, maxSize),
+		filter:               filter,
 	}
 }
 
 // CreateObservation creates an Observation CRD and increments metrics
-// This is the centralized place where all Observations are created, ensuring metrics are always incremented
+// This is the centralized place where all Observations are created
+// Flow: filter() → normalize() → dedup() → create Observation CRD + update metrics + log
 // First event always creates an observation; duplicates within window are skipped
 func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation *unstructured.Unstructured) error {
-	// Extract dedup key from observation
-	dedupKey := oc.extractDedupKey(observation)
+	// Extract source early for metrics
+	sourceVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
+	source := ""
+	if sourceVal != nil {
+		source = fmt.Sprintf("%v", sourceVal)
+	}
+	if source == "" {
+		source = "unknown"
+	}
 
-	// Check if we should create (first event always creates, duplicates within window are skipped)
+	// STEP 1: FILTER - Apply source-level filtering BEFORE normalization and deduplication
+	if oc.filter != nil {
+		allowed, reason := oc.filter.AllowWithReason(observation)
+		if !allowed {
+			// Filtered out - increment filtered metric and return early
+			if oc.observationsFiltered != nil {
+				oc.observationsFiltered.WithLabelValues(source, reason).Inc()
+			}
+			return nil
+		}
+	}
+
+	// STEP 2: NORMALIZE - Normalize severity to uppercase for consistency
+	// (Normalization happens inline during extraction below)
+
+	// STEP 3: DEDUP - Check if we should create (first event always creates, duplicates within window are skipped)
+	dedupKey := oc.extractDedupKey(observation)
 	if !oc.deduper.ShouldCreate(dedupKey) {
 		log.Printf("  📋 [DEDUP] Skipping duplicate observation within window: %s", dedupKey.String())
+		// Increment deduped metric
+		if oc.observationsDeduped != nil {
+			oc.observationsDeduped.Inc()
+		}
 		return nil // Skip duplicate, but don't error
 	}
 
@@ -72,19 +118,15 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 		return fmt.Errorf("failed to create Observation: %w", err)
 	}
 
-	// Extract source, category, and severity from spec for metrics
+	// Increment observations created metric
+	if oc.observationsCreated != nil {
+		oc.observationsCreated.WithLabelValues(source).Inc()
+	}
+
+	// Extract category and severity from spec for metrics
 	// Use NestedFieldCopy to handle interface{} types, then convert to string
-	sourceVal, sourceFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
 	categoryVal, categoryFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "category")
 	severityVal, severityFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "severity")
-
-	// Convert to strings, handling nil and interface{} types
-	source := ""
-	if sourceVal != nil {
-		source = fmt.Sprintf("%v", sourceVal)
-	} else if !sourceFound {
-		log.Printf("  ⚠️  DEBUG: source not found in spec")
-	}
 	category := ""
 	if categoryVal != nil {
 		category = fmt.Sprintf("%v", categoryVal)
@@ -108,12 +150,8 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 		severity = normalizeSeverity(severity)
 	}
 
-	// Increment metrics - this is the ONLY place where metrics are incremented
+	// Increment eventsTotal metric - this tracks events by source/category/severity
 	if oc.eventsTotal != nil {
-		if source == "" {
-			log.Printf("  ⚠️  WARNING: Observation created without source label, metrics may be incomplete")
-			source = "unknown"
-		}
 		if category == "" {
 			category = "unknown"
 		}

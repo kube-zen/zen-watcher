@@ -27,7 +27,7 @@ Complete guide to Zen Watcher documentation.
    - Technology stack
    - Use cases
 
-### Operations (3 files)
+### Operations (4 files)
 
 4. **[docs/OPERATIONAL_EXCELLENCE.md](docs/OPERATIONAL_EXCELLENCE.md)** - Ops best practices
    - Health checks
@@ -37,13 +37,19 @@ Complete guide to Zen Watcher documentation.
    - Backup & recovery
    - Troubleshooting runbooks
 
-5. **[monitoring/README.md](monitoring/README.md)** - Monitoring guide
+5. **[docs/FILTERING.md](docs/FILTERING.md)** - Source-level filtering guide
+   - Filter configuration
+   - Per-source filter rules
+   - Examples and best practices
+   - Troubleshooting
+
+6. **[monitoring/README.md](monitoring/README.md)** - Monitoring guide
    - Prometheus metrics
    - Alert rules
    - VictoriaMetrics setup
    - Query examples
 
-6. **[dashboards/README.md](dashboards/README.md)** - Dashboard documentation
+7. **[dashboards/README.md](dashboards/README.md)** - Dashboard documentation
    - Grafana setup
    - Dashboard features
    - Metrics reference
@@ -160,6 +166,7 @@ Complete guide to Zen Watcher documentation.
 
 ### Configuration
 - [README.md#configuration](README.md#configuration)
+- [docs/FILTERING.md](docs/FILTERING.md) - Source-level filtering
 - [helm/zen-watcher/values.yaml](helm/zen-watcher/values.yaml)
 - [docs/OPERATIONAL_EXCELLENCE.md](docs/OPERATIONAL_EXCELLENCE.md)
 
@@ -216,6 +223,7 @@ Complete guide to Zen Watcher documentation.
 | Getting Started | [README.md](README.md) |
 | 5-min Setup | [QUICK_START.md](QUICK_START.md) |
 | Helm Install | [charts/zen-watcher/README.md](charts/zen-watcher/README.md) |
+| Filtering | [docs/FILTERING.md](docs/FILTERING.md) |
 | Security | [docs/SECURITY.md](docs/SECURITY.md) |
 | Operations | [docs/OPERATIONAL_EXCELLENCE.md](docs/OPERATIONAL_EXCELLENCE.md) |
 | Monitoring | [monitoring/README.md](monitoring/README.md) |
@@ -227,10 +235,10 @@ Complete guide to Zen Watcher documentation.
 
 ## 📝 Document Statistics
 
-- **Total Documentation Files**: 15
-- **Total Lines**: 5,000+
+- **Total Documentation Files**: 16
+- **Total Lines**: 5,500+
 - **Getting Started**: 3 guides
-- **Operations**: 3 guides  
+- **Operations**: 4 guides (including filtering)
 - **Security**: 3 guides
 - **Deployment**: 2 guides
 - **Development**: 2 guides

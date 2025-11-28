@@ -142,51 +142,159 @@ configMaps, err := clientSet.CoreV1().ConfigMaps(namespace).List(...)
 
 ### Step 2: Implement Processor Method
 
-Add your processing logic to the appropriate processor:
+**Important:** All processors use the **centralized ObservationCreator** which handles:
+- **Filtering** (ConfigMap-based, per-source rules)
+- **Normalization** (severity to uppercase)
+- **Deduplication** (sliding window, LRU + TTL)
+- **CRD Creation** (Observation CRD)
+- **Metrics** (Prometheus counters)
+- **Logging** (structured logs)
 
 **For EventProcessor (CRD sources):**
 ```go
 func (ep *EventProcessor) ProcessMyTool(ctx context.Context, report *unstructured.Unstructured) {
     // 1. Extract data from report
-    // 2. Check deduplication
-    // 3. Create Observation
-    // 4. Update metrics
+    // 2. Create Observation structure
+    observation := &unstructured.Unstructured{
+        Object: map[string]interface{}{
+            "apiVersion": "zen.kube-zen.io/v1",
+            "kind":       "Observation",
+            "metadata": map[string]interface{}{
+                "generateName": "mytool-",
+                "namespace":    report.GetNamespace(),
+            },
+            "spec": map[string]interface{}{
+                "source":     "mytool",
+                "category":   "security",
+                "severity":   "HIGH",
+                "eventType":  "mytool-event",
+                "detectedAt": time.Now().Format(time.RFC3339),
+                // ... resource and details
+            },
+        },
+    }
+    
+    // 3. Use centralized observation creator
+    // Flow: filter() → normalize() → dedup() → create CRD + update metrics + log
+    err := ep.observationCreator.CreateObservation(ctx, observation)
+    if err != nil {
+        log.Printf("  ⚠️  Failed to create Observation: %v", err)
+    }
 }
 ```
 
 **For WebhookProcessor (webhook sources):**
 ```go
 func (wp *WebhookProcessor) ProcessMyTool(ctx context.Context, event map[string]interface{}) error {
-    // 1. Filter/validate event
-    // 2. Check deduplication
-    // 3. Create Observation
-    // 4. Update metrics
+    // 1. Extract data from webhook payload
+    // 2. Create Observation structure
+    observation := &unstructured.Unstructured{
+        Object: map[string]interface{}{
+            "apiVersion": "zen.kube-zen.io/v1",
+            "kind":       "Observation",
+            "spec": map[string]interface{}{
+                "source":     "mytool",
+                "category":   "security",
+                "severity":   "HIGH",
+                "eventType":  "mytool-event",
+                "detectedAt": time.Now().Format(time.RFC3339),
+                // ... resource and details
+            },
+        },
+    }
+    
+    // 3. Use centralized observation creator
+    // Flow: filter() → normalize() → dedup() → create CRD + update metrics + log
+    err := wp.observationCreator.CreateObservation(ctx, observation)
+    if err != nil {
+        return fmt.Errorf("failed to create Observation: %w", err)
+    }
     return nil
 }
 ```
 
-### Step 3: Add Deduplication
+**Key Points:**
+- **No manual deduplication** - Handled by `ObservationCreator`
+- **No manual metrics** - Handled by `ObservationCreator`
+- **No manual filtering** - Handled by `ObservationCreator` (ConfigMap-based)
+- **All sources use the same flow** - Consistent behavior across all processors
 
-Each processor maintains thread-safe deduplication maps:
+### Step 3: Understanding the Centralized Flow
+
+The `ObservationCreator.CreateObservation()` method implements the complete pipeline:
 
 ```go
-// In EventProcessor or WebhookProcessor
-dedupKey := fmt.Sprintf("%s/%s/%s", namespace, resource, eventID)
-ep.mu.RLock()
-exists := ep.dedupKeys["mytool"][dedupKey]
-ep.mu.RUnlock()
-if exists {
-    return // Skip duplicate
+func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation *unstructured.Unstructured) error {
+    // STEP 1: FILTER - Source-level filtering (ConfigMap-based)
+    if oc.filter != nil && !oc.filter.Allow(observation) {
+        return nil // Filtered out - no CRD, no metrics, no logs
+    }
+    
+    // STEP 2: NORMALIZE - Severity normalization
+    // (happens inline during extraction)
+    
+    // STEP 3: DEDUP - Sliding window deduplication
+    dedupKey := oc.extractDedupKey(observation)
+    if !oc.deduper.ShouldCreate(dedupKey) {
+        return nil // Duplicate - skip
+    }
+    
+    // STEP 4: CREATE - Observation CRD creation
+    _, err := oc.dynClient.Resource(oc.eventGVR).Namespace(namespace).Create(ctx, observation, metav1.CreateOptions{})
+    
+    // STEP 5: METRICS - Increment Prometheus counters
+    oc.eventsTotal.WithLabelValues(source, category, severity).Inc()
+    
+    // STEP 6: LOG - Structured logging
+    log.Printf("  ✅ Created Observation: %s/%s/%s", source, category, severity)
+    
+    return nil
 }
 ```
 
-### Step 4: Create Observation
+### Step 4: Create Observation Structure
 
 Follow the standard event structure:
 
 ```go
-event := &unstructured.Unstructured{
+observation := &unstructured.Unstructured{
     Object: map[string]interface{}{
+        "apiVersion": "zen.kube-zen.io/v1",
+        "kind":       "Observation",
+        "metadata": map[string]interface{}{
+            "generateName": "mytool-",
+            "namespace":    "default",
+            "labels": map[string]interface{}{
+                "source":   "mytool",
+                "category": "security",
+                "severity": "HIGH",
+            },
+        },
+        "spec": map[string]interface{}{
+            "source":     "mytool",
+            "category":   "security",
+            "severity":   "HIGH",
+            "eventType":  "mytool-event",
+            "detectedAt": time.Now().Format(time.RFC3339),
+            "resource": map[string]interface{}{
+                "kind":      "Pod",
+                "name":      "example-pod",
+                "namespace": "default",
+            },
+            "details": map[string]interface{}{
+                // Tool-specific details
+            },
+        },
+    },
+}
+```
+
+Then call the centralized creator:
+```go
+err := ep.observationCreator.CreateObservation(ctx, observation)
+```
+
+**That's it!** Filtering, deduplication, metrics, and logging are all handled automatically.
         "apiVersion": "zen.kube-zen.io/v1",
         "kind":       "Observation",
         "metadata": map[string]interface{}{

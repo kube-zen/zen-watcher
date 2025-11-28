@@ -7,6 +7,9 @@ import (
 // Metrics holds all Prometheus metrics for zen-watcher
 type Metrics struct {
 	EventsTotal             *prometheus.CounterVec
+	ObservationsCreated     *prometheus.CounterVec
+	ObservationsFiltered    *prometheus.CounterVec
+	ObservationsDeduped     prometheus.Counter
 	ToolsActive             *prometheus.GaugeVec
 	InformerCacheSync       *prometheus.GaugeVec
 	EventProcessingDuration *prometheus.HistogramVec
@@ -65,8 +68,34 @@ func NewMetrics() *Metrics {
 		[]string{"endpoint"},
 	)
 
+	observationsCreated := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_observations_created_total",
+			Help: "Total number of Observation CRDs successfully created",
+		},
+		[]string{"source"},
+	)
+
+	observationsFiltered := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_observations_filtered_total",
+			Help: "Total number of observations filtered out by source-level filtering rules",
+		},
+		[]string{"source", "reason"},
+	)
+
+	observationsDeduped := prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_observations_deduped_total",
+			Help: "Total number of observations skipped due to deduplication (within sliding window)",
+		},
+	)
+
 	// Register all metrics
 	prometheus.MustRegister(eventsTotal)
+	prometheus.MustRegister(observationsCreated)
+	prometheus.MustRegister(observationsFiltered)
+	prometheus.MustRegister(observationsDeduped)
 	prometheus.MustRegister(toolsActive)
 	prometheus.MustRegister(informerCacheSync)
 	prometheus.MustRegister(eventProcessingDuration)
@@ -75,6 +104,9 @@ func NewMetrics() *Metrics {
 
 	return &Metrics{
 		EventsTotal:             eventsTotal,
+		ObservationsCreated:     observationsCreated,
+		ObservationsFiltered:    observationsFiltered,
+		ObservationsDeduped:     observationsDeduped,
 		ToolsActive:             toolsActive,
 		InformerCacheSync:       informerCacheSync,
 		EventProcessingDuration: eventProcessingDuration,

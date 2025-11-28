@@ -1,0 +1,131 @@
+package filter
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	"strings"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+)
+
+// FilterConfig represents the filter configuration loaded from ConfigMap
+type FilterConfig struct {
+	Sources map[string]SourceFilter `json:"sources"`
+}
+
+// SourceFilter defines filtering rules for a specific source
+type SourceFilter struct {
+	// MinSeverity is the minimum severity level to allow (e.g., "MEDIUM", "HIGH", "CRITICAL")
+	// Severity levels: CRITICAL > HIGH > MEDIUM > LOW > UNKNOWN
+	MinSeverity string `json:"minSeverity,omitempty"`
+
+	// ExcludeEventTypes is a list of event types to exclude (e.g., ["audit", "info"])
+	ExcludeEventTypes []string `json:"excludeEventTypes,omitempty"`
+
+	// IncludeEventTypes is a list of event types to include (if set, only these are allowed)
+	IncludeEventTypes []string `json:"includeEventTypes,omitempty"`
+
+	// ExcludeNamespaces is a list of namespaces to exclude
+	ExcludeNamespaces []string `json:"excludeNamespaces,omitempty"`
+
+	// IncludeNamespaces is a list of namespaces to include (if set, only these are allowed)
+	IncludeNamespaces []string `json:"includeNamespaces,omitempty"`
+
+	// ExcludeKinds is a list of resource kinds to exclude (e.g., ["Pod", "Deployment"])
+	ExcludeKinds []string `json:"excludeKinds,omitempty"`
+
+	// IncludeKinds is a list of resource kinds to include (if set, only these are allowed)
+	IncludeKinds []string `json:"includeKinds,omitempty"`
+
+	// ExcludeCategories is a list of categories to exclude (e.g., ["compliance"])
+	ExcludeCategories []string `json:"excludeCategories,omitempty"`
+
+	// IncludeCategories is a list of categories to include (if set, only these are allowed)
+	IncludeCategories []string `json:"includeCategories,omitempty"`
+
+	// Enabled controls whether this source is enabled (default: true)
+	Enabled *bool `json:"enabled,omitempty"`
+}
+
+// LoadFilterConfig loads filter configuration from ConfigMap
+// ConfigMap name and namespace can be set via environment variables:
+// - FILTER_CONFIGMAP_NAME (default: "zen-watcher-filter")
+// - FILTER_CONFIGMAP_NAMESPACE (default: "zen-system")
+// - FILTER_CONFIGMAP_KEY (default: "filter.json")
+func LoadFilterConfig(clientSet kubernetes.Interface) (*FilterConfig, error) {
+	configMapName := os.Getenv("FILTER_CONFIGMAP_NAME")
+	if configMapName == "" {
+		configMapName = "zen-watcher-filter"
+	}
+
+	configMapNamespace := os.Getenv("FILTER_CONFIGMAP_NAMESPACE")
+	if configMapNamespace == "" {
+		configMapNamespace = os.Getenv("WATCH_NAMESPACE")
+		if configMapNamespace == "" {
+			configMapNamespace = "zen-system"
+		}
+	}
+
+	configMapKey := os.Getenv("FILTER_CONFIGMAP_KEY")
+	if configMapKey == "" {
+		configMapKey = "filter.json"
+	}
+
+	// Try to load ConfigMap
+	cm, err := clientSet.CoreV1().ConfigMaps(configMapNamespace).Get(
+		context.Background(),
+		configMapName,
+		metav1.GetOptions{},
+	)
+	if err != nil {
+		// ConfigMap not found - return default (allow all) config
+		log.Printf("  ℹ️  Filter ConfigMap '%s/%s' not found, using default (allow all) filter", configMapNamespace, configMapName)
+		return &FilterConfig{
+			Sources: make(map[string]SourceFilter),
+		}, nil
+	}
+
+	// Extract filter.json from ConfigMap
+	filterJSON, found := cm.Data[configMapKey]
+	if !found {
+		// Key not found - return default config
+		log.Printf("  ℹ️  Filter key '%s' not found in ConfigMap, using default (allow all) filter", configMapKey)
+		return &FilterConfig{
+			Sources: make(map[string]SourceFilter),
+		}, nil
+	}
+
+	// Parse JSON
+	var config FilterConfig
+	if err := json.Unmarshal([]byte(filterJSON), &config); err != nil {
+		return nil, fmt.Errorf("failed to parse filter config: %w", err)
+	}
+
+	log.Printf("  ✅ Loaded filter configuration from ConfigMap '%s/%s'", configMapNamespace, configMapName)
+	return &config, nil
+}
+
+// GetSourceFilter returns the filter configuration for a specific source
+// Returns nil if no filter is configured (allow all)
+func (fc *FilterConfig) GetSourceFilter(source string) *SourceFilter {
+	if fc == nil || fc.Sources == nil {
+		return nil
+	}
+	filter, exists := fc.Sources[strings.ToLower(source)]
+	if !exists {
+		return nil
+	}
+	return &filter
+}
+
+// IsSourceEnabled checks if a source is enabled (default: true)
+func (sf *SourceFilter) IsSourceEnabled() bool {
+	if sf == nil || sf.Enabled == nil {
+		return true // Default: enabled
+	}
+	return *sf.Enabled
+}

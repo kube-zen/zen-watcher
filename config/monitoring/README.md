@@ -100,6 +100,32 @@ zen_watcher_events_total{source="falco",category="security",severity="HIGH"} 12
 zen_watcher_events_total{source="kube-bench",category="compliance",severity="HIGH"} 8
 ```
 
+### Observation Processing Metrics
+
+```
+# Total Observation CRDs successfully created (by source)
+zen_watcher_observations_created_total{source="trivy"}
+
+# Total observations filtered out by source-level filtering (by source and reason)
+zen_watcher_observations_filtered_total{source="trivy",reason="min_severity"}
+zen_watcher_observations_filtered_total{source="kyverno",reason="exclude_event_type"}
+
+# Total observations skipped due to deduplication (within sliding window)
+zen_watcher_observations_deduped_total
+
+# Filter reasons:
+# - source_disabled: Source is disabled in filter config
+# - min_severity: Severity below minimum threshold
+# - exclude_event_type: Event type is in exclude list
+# - include_event_type: Event type not in include list
+# - exclude_namespace: Namespace is in exclude list
+# - include_namespace: Namespace not in include list
+# - exclude_kind: Resource kind is in exclude list
+# - include_kind: Resource kind not in include list
+# - exclude_category: Category is in exclude list
+# - include_category: Category not in include list
+```
+
 ### Tool Detection
 
 ```

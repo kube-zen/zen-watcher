@@ -125,27 +125,47 @@ Zen Watcher uses a **modular, scalable architecture** following Kubernetes best 
 
 #### Modular Processor Architecture
 
-Each event source type has a dedicated processor:
+Each event source type has a dedicated processor that **normalizes events** and passes them to the **centralized ObservationCreator**:
 
 - **EventProcessor**: Handles CRD-based events (Kyverno, Trivy)
-  - Thread-safe deduplication
-  - Automatic event creation
-  - Prometheus metrics integration
+  - Extracts data from CRDs
+  - Creates Observation structure
+  - Calls `ObservationCreator.CreateObservation()` (centralized flow)
 
 - **WebhookProcessor**: Handles webhook-based events (Falco, Audit)
-  - Per-source deduplication maps
-  - Event filtering and classification
-  - Non-blocking channel processing
+  - Parses webhook payloads
+  - Creates Observation structure
+  - Calls `ObservationCreator.CreateObservation()` (centralized flow)
 
-#### Deduplication Strategy
+- **ConfigMapPoller**: Handles batch sources (Kube-bench, Checkov)
+  - Polls ConfigMaps periodically
+  - Parses JSON results
+  - Calls `ObservationCreator.CreateObservation()` (centralized flow)
 
-Each processor maintains its own deduplication map:
-- **Trivy**: `namespace/kind/name/vulnID`
-- **Kyverno**: `namespace/kind/name/policy/rule`
-- **Falco**: `rule/pod/output[:50]`
-- **Audit**: `auditID`
-- **Kube-bench**: `testNumber`
-- **Checkov**: `checkId/resource`
+**All processors share the same centralized ObservationCreator**, ensuring:
+- Consistent filtering (ConfigMap-based, per-source rules)
+- Consistent deduplication (sliding window, LRU)
+- Consistent metrics (same counter, same labels)
+- Consistent logging (same format)
+
+#### Centralized Processing Architecture
+
+All event sources (informer, webhook, configmap) use the **same centralized flow**:
+
+**ObservationCreator** (`pkg/watcher/observation_creator.go`):
+- **Filter**: Source-level filtering via ConfigMap (before any processing)
+- **Normalize**: Severity normalization to uppercase
+- **Dedup**: Sliding window deduplication with LRU eviction
+- **Create**: Observation CRD creation
+- **Metrics**: Prometheus metrics increment
+- **Log**: Structured logging
+
+**Deduplication Strategy** (Centralized):
+- **DedupKey**: `source/namespace/kind/name/reason/messageHash`
+- **Window**: 60 seconds (configurable via `DEDUP_WINDOW_SECONDS`)
+- **Max Size**: 10,000 entries (configurable via `DEDUP_MAX_SIZE`)
+- **Algorithm**: Sliding window with LRU eviction and TTL cleanup
+- **Thread-safe**: All processors share the same deduper instance
 
 ---
 
@@ -216,41 +236,58 @@ Create Observation with category=compliance
 
 ### 2. Event Processing Pipeline
 
+**Centralized Flow (All Sources):**
 ```
 ┌─────────────────┐
 │  Event Source   │
+│ (informer/cm/   │
+│  webhook)       │
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│ Auto-Detection  │ ← Check if tool is installed
+│   FILTER()      │ ← Source-level filtering (ConfigMap-based)
+│                 │   • MinSeverity per source
+│                 │   • Exclude/Include event types
+│                 │   • Exclude/Include namespaces
+│                 │   • Exclude/Include kinds
+│                 │   • Exclude/Include categories
+│                 │   • Enable/Disable sources
+└────────┬────────┘
+         │ (if allowed)
+         ▼
+┌─────────────────┐
+│  NORMALIZE()    │ ← Map to standard categories/severities
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│ Fetch Events    │ ← Read from CRD/ConfigMap/Webhook
+│   DEDUP()       │ ← Sliding window deduplication (LRU + TTL)
+│                 │   • Window: 60s (configurable)
+│                 │   • Max cache: 10k entries (configurable)
+│                 │   • Key: source/namespace/kind/name/reason/messageHash
+└────────┬────────┘
+         │ (if not duplicate)
+         ▼
+┌─────────────────┐
+│ CRD Creation    │ ← Create Observation CRD
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│ Deduplication   │ ← Check if event already exists
+│ Metrics Update  │ ← Increment counters (source/category/severity)
 └────────┬────────┘
          │
          ▼
 ┌─────────────────┐
-│ Normalization   │ ← Map to standard categories/severities
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ CRD Creation    │ ← Create Observation
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Metrics Update  │ ← Increment counters
+│     LOG()       │ ← Structured logging
 └─────────────────┘
 ```
+
+**Key Architectural Principle:**
+- **Filtering MUST happen before CRD creation** - Filtered events never create CRDs, update metrics, or generate logs
+- **All components inside () are centralized** - No duplicated code across informer/webhook/configmap handlers
+- **Single point of control** - `ObservationCreator.CreateObservation()` is the ONLY place where Observations are created
 
 ### 3. Storage Model
 

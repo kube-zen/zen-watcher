@@ -403,31 +403,52 @@ func (ep *EventProcessor) ProcessMyTool(ctx context.Context, report *unstructure
     spec, found, _ := unstructured.NestedMap(report.Object, "spec")
     if !found { return }
     
-    // 2. Generate deduplication key
-    dedupKey := fmt.Sprintf("%s/%s/%s", 
-        report.GetNamespace(),
-        report.GetName(),
-        fmt.Sprintf("%v", spec["eventID"]))
-    
-    // 3. Check deduplication (thread-safe)
-    ep.mu.Lock()
-    if ep.mytoolDedup[dedupKey] {
-        ep.mu.Unlock()
-        return // Skip duplicate
+    // 2. Create Observation structure
+    event := &unstructured.Unstructured{
+        Object: map[string]interface{}{
+            "apiVersion": "zen.kube-zen.io/v1",
+            "kind":       "Observation",
+            "metadata": map[string]interface{}{
+                "generateName": "mytool-",
+                "namespace":    report.GetNamespace(),
+                "labels": map[string]interface{}{
+                    "source":   "mytool",
+                    "category": "security",
+                    "severity": "HIGH",
+                },
+            },
+            "spec": map[string]interface{}{
+                "source":     "mytool",
+                "category":   "security",
+                "severity":   "HIGH",
+                "eventType":  "mytool-event",
+                "detectedAt": time.Now().Format(time.RFC3339),
+                "resource": map[string]interface{}{
+                    "kind":      "Pod",
+                    "name":      report.GetName(),
+                    "namespace": report.GetNamespace(),
+                },
+                "details": map[string]interface{}{
+                    // Your tool-specific details
+                },
+            },
+        },
     }
-    ep.mytoolDedup[dedupKey] = true
-    ep.mu.Unlock()
     
-    // 4. Create Observation
-    event := &unstructured.Unstructured{...}
-    _, err := ep.dynClient.Resource(ep.eventGVR).Create(ctx, event, metav1.CreateOptions{})
-    
-    // 5. Update metrics
-    if ep.eventsTotal != nil {
-        ep.eventsTotal.WithLabelValues("mytool", "security", "HIGH").Inc()
+    // 3. Use centralized observation creator
+    // Flow: filter() → normalize() → dedup() → create CRD + update metrics + log
+    err := ep.observationCreator.CreateObservation(ctx, event)
+    if err != nil {
+        log.Printf("  ⚠️  Failed to create Observation: %v", err)
     }
 }
 ```
+
+**Key Points:**
+- **No manual deduplication** - Handled by `ObservationCreator`
+- **No manual metrics** - Handled by `ObservationCreator`
+- **Filtering happens automatically** - Before deduplication and CRD creation
+- **All sources use the same flow** - Consistent behavior
 
 **For WebhookProcessor (webhook sources):**
 
@@ -435,8 +456,48 @@ Add to `pkg/watcher/webhook_processor.go`:
 
 ```go
 func (wp *WebhookProcessor) ProcessMyTool(ctx context.Context, event map[string]interface{}) error {
-    // 1. Filter/validate event
-    if !shouldProcess(event) { return nil }
+    // 1. Extract data from webhook payload
+    // (Basic validation only - filtering happens in ObservationCreator)
+    
+    // 2. Create Observation structure
+    observation := &unstructured.Unstructured{
+        Object: map[string]interface{}{
+            "apiVersion": "zen.kube-zen.io/v1",
+            "kind":       "Observation",
+            "metadata": map[string]interface{}{
+                "generateName": "mytool-",
+                "namespace":    "default",
+                "labels": map[string]interface{}{
+                    "source":   "mytool",
+                    "category": "security",
+                    "severity": "HIGH",
+                },
+            },
+            "spec": map[string]interface{}{
+                "source":     "mytool",
+                "category":   "security",
+                "severity":   "HIGH",
+                "eventType":  "mytool-event",
+                "detectedAt": time.Now().Format(time.RFC3339),
+                "resource": map[string]interface{}{
+                    // Extract from webhook payload
+                },
+                "details": map[string]interface{}{
+                    // Webhook-specific details
+                },
+            },
+        },
+    }
+    
+    // 3. Use centralized observation creator
+    // Flow: filter() → normalize() → dedup() → create CRD + update metrics + log
+    err := wp.observationCreator.CreateObservation(ctx, observation)
+    if err != nil {
+        return fmt.Errorf("failed to create Observation: %w", err)
+    }
+    
+    return nil
+}
     
     // 2. Generate deduplication key
     dedupKey := fmt.Sprintf("%s/%s", 
