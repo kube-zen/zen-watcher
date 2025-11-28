@@ -216,6 +216,9 @@ echo -e "${CYAN}  1. Sending Falco Webhooks${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 # Send Falco webhooks
+# Create demo-manifests namespace if it doesn't exist (for Falco webhooks)
+kubectl create namespace demo-manifests 2>/dev/null || true
+
 send_falco_webhook "Critical" "Privileged container started" "Container running in privileged mode detected" "demo-insecure-pod" "demo-manifests"
 send_falco_webhook "Critical" "Write below binary dir" "File below a known binary directory opened for writing" "demo-pod" "default"
 send_falco_webhook "Error" "Sensitive file accessed" "File below /etc opened for reading" "demo-pod" "default"
@@ -240,6 +243,9 @@ echo -e "${CYAN}  3. Creating Checkov ConfigMaps${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 # Create Checkov ConfigMaps
+# Create demo-manifests namespace if it doesn't exist
+kubectl create namespace demo-manifests 2>/dev/null || true
+
 create_checkov_configmap "checkov-pod-security-1" "CKV_K8S_24" "Pod Security Policy" "high" "Ensure that the Pod Security Policy is set" "Pod.demo-manifests.demo-insecure-pod" "checkov"
 create_checkov_configmap "checkov-resource-limits-1" "CKV_K8S_12" "Resource Limits" "medium" "CPU limits should be set" "Pod.demo-manifests.demo-no-security-context" "checkov"
 create_checkov_configmap "checkov-secret-mount-1" "CKV_K8S_14" "Service Account Token" "high" "Ensure that the Service Account token is not mounted" "ServiceAccount.demo-manifests.demo-excessive-permissions" "checkov"
