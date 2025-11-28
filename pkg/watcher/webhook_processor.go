@@ -56,9 +56,19 @@ func (wp *WebhookProcessor) ProcessFalcoAlert(ctx context.Context, alert map[str
 
 	log.Printf("  🔍 [FALCO] Processing alert: %s (priority: %s)", rule, priority)
 
-	// Get K8s context if present
-	k8sPodName := fmt.Sprintf("%v", alert["k8s.pod.name"])
-	k8sNs := fmt.Sprintf("%v", alert["k8s.ns.name"])
+	// Get K8s context if present (check output_fields first, then top level)
+	var k8sPodName, k8sNs string
+	if outputFields, ok := alert["output_fields"].(map[string]interface{}); ok {
+		k8sPodName = fmt.Sprintf("%v", outputFields["k8s.pod.name"])
+		k8sNs = fmt.Sprintf("%v", outputFields["k8s.ns.name"])
+	}
+	// Fallback to top-level fields if not in output_fields
+	if k8sPodName == "" || k8sPodName == "<nil>" {
+		k8sPodName = fmt.Sprintf("%v", alert["k8s.pod.name"])
+	}
+	if k8sNs == "" || k8sNs == "<nil>" {
+		k8sNs = fmt.Sprintf("%v", alert["k8s.ns.name"])
+	}
 	if k8sNs == "<nil>" || k8sNs == "" {
 		k8sNs = "default"
 	}
