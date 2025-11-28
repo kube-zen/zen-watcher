@@ -180,6 +180,7 @@ func (ep *EventProcessor) ProcessKyvernoPolicyReport(ctx context.Context, report
 
 // ProcessTrivyVulnerabilityReport processes a Trivy VulnerabilityReport
 func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, report *unstructured.Unstructured) {
+	log.Printf("🔍 [TRIVY] ProcessTrivyVulnerabilityReport called for: %s/%s", report.GetNamespace(), report.GetName())
 	startTime := time.Now()
 	defer func() {
 		if ep.eventProcessingDuration != nil {
@@ -188,8 +189,10 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 	}()
 	vulnerabilities, found, _ := unstructured.NestedSlice(report.Object, "report", "vulnerabilities")
 	if !found || len(vulnerabilities) == 0 {
+		log.Printf("  ⚠️  [TRIVY] No vulnerabilities found in report %s/%s", report.GetNamespace(), report.GetName())
 		return
 	}
+	log.Printf("  📋 [TRIVY] Found %d vulnerabilities in report %s/%s", len(vulnerabilities), report.GetNamespace(), report.GetName())
 
 	resourceKind := report.GetLabels()["trivy-operator.resource.kind"]
 	resourceName := report.GetLabels()["trivy-operator.resource.name"]
@@ -201,7 +204,8 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 			continue
 		}
 		severity := vuln["severity"]
-		if severity != "HIGH" && severity != "CRITICAL" {
+		severityStr := fmt.Sprintf("%v", severity)
+		if severityStr != "HIGH" && severityStr != "CRITICAL" {
 			continue
 		}
 

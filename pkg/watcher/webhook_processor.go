@@ -245,8 +245,10 @@ func (wp *WebhookProcessor) ProcessAuditEvent(ctx context.Context, auditEvent ma
 	}
 
 	if !important {
+		log.Printf("  ⚠️  [AUDIT] Event filtered out (not important): %s %s/%s", verb, resource, name)
 		return nil
 	}
+	log.Printf("  ✅ [AUDIT] Processing important event: %s %s/%s (severity: %s)", verb, resource, name, severity)
 
 	// Check if observation already exists in Kubernetes (same source AND same identifying fields)
 	existingEvents, err := wp.dynClient.Resource(wp.eventGVR).Namespace(namespace).List(ctx, metav1.ListOptions{
