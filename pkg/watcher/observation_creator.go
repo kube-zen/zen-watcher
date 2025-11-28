@@ -44,9 +44,15 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 	}
 
 	// Extract source, category, and severity from spec for metrics
-	source, _, _ := unstructured.NestedString(observation.Object, "spec", "source")
-	category, _, _ := unstructured.NestedString(observation.Object, "spec", "category")
-	severity, _, _ := unstructured.NestedString(observation.Object, "spec", "severity")
+	// Use NestedString but handle interface{} types by converting to string
+	sourceVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
+	categoryVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "category")
+	severityVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "severity")
+
+	// Convert to strings, handling interface{} types
+	source := fmt.Sprintf("%v", sourceVal)
+	category := fmt.Sprintf("%v", categoryVal)
+	severity := fmt.Sprintf("%v", severityVal)
 
 	// Normalize severity to uppercase for consistency
 	if severity != "" {

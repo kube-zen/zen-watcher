@@ -207,7 +207,7 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 				"spec": map[string]interface{}{
 					"source":     "trivy",
 					"category":   "security",
-					"severity":   severity,
+					"severity":   fmt.Sprintf("%v", severity),
 					"eventType":  "vulnerability",
 					"detectedAt": time.Now().Format(time.RFC3339),
 					"resource": map[string]interface{}{
