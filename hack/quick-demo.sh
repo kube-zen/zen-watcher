@@ -529,12 +529,12 @@ validate_ports() {
             # Check if stdin is a TTY before trying to read
             if [ -t 0 ]; then
                 read -p "$(echo -e ${YELLOW}Continue with adjusted ports? [Y/n]${NC}) " -n 1 -r || REPLY="Y"
-                echo
-                if [[ $REPLY =~ ^[Nn]$ ]]; then
-                    echo -e "${CYAN}Exiting. You can:${NC}"
-                    echo -e "  - Use different ports via environment variables"
-                    echo -e "  - Check for existing demo and use that cluster"
-                    exit 0
+            echo
+            if [[ $REPLY =~ ^[Nn]$ ]]; then
+                echo -e "${CYAN}Exiting. You can:${NC}"
+                echo -e "  - Use different ports via environment variables"
+                echo -e "  - Check for existing demo and use that cluster"
+                exit 0
                 fi
             else
                 # Non-TTY stdin, default to continuing
@@ -1891,11 +1891,11 @@ for i in {1..120}; do
                     if [ "$ep_name" = "$name" ]; then
                         HTTP_CODE=$(timeout 5 curl -s -L -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}${ep_path} 2>/dev/null || echo "000")
                         echo -e "${YELLOW}     ⏳${NC} $name (HTTP ${HTTP_CODE})"
-                        break
-                    fi
+        break
+    fi
                 done
             done
-        fi
+    fi
     fi
     
     sleep 1
@@ -2011,7 +2011,7 @@ done
 
 if [ "$FAILED_COUNT" -gt 0 ]; then
     echo -e "${YELLOW}⚠${NC}  ${FAILED_COUNT} endpoint(s) failed - showing diagnostics..."
-    echo ""
+echo ""
     
     # Track which namespaces we've already shown diagnostics for
     declare -A DIAGNOSTICS_SHOWN
@@ -2052,7 +2052,7 @@ if [ "$FAILED_COUNT" -gt 0 ]; then
             kubectl get ingress ${ingress_name} -n ${ns} 2>&1 | head -5 || echo "    Ingress not found"
             echo -e "${CYAN}    Checking service...${NC}"
             kubectl get svc -n ${ns} 2>&1 | grep -E "${svc_filter}|NAME" || echo "    Service not found"
-            echo ""
+echo ""
             DIAGNOSTICS_SHOWN[$ns]=true
         fi
     done
@@ -2091,7 +2091,7 @@ if [ "$SKIP_MONITORING" != true ]; then
                 echo "$SOURCES_FOUND" | while read -r source; do
                     [ -n "$source" ] && echo -e "${GREEN}     ✓${NC} $source"
                 done
-                break
+        break
             elif [ "$SOURCES_COUNT" -gt 0 ]; then
                 ELAPSED=$(($(date +%s) - VALIDATION_START))
                 if [ $((i % 10)) -eq 0 ]; then
@@ -2113,11 +2113,14 @@ if [ "$SKIP_MONITORING" != true ]; then
                     [ -n "$source" ] && echo -e "${YELLOW}     - ${source}${NC}"
                 done
             fi
-            break
-        fi
+        break
+    fi
         
         sleep 5
     done
+    
+    # Ensure SOURCES_COUNT is set even if loop didn't execute
+    SOURCES_COUNT=${SOURCES_COUNT:-0}
     
     if [ "$VALIDATION_SUCCESS" = false ] && [ "$SOURCES_COUNT" -lt 6 ]; then
         echo -e "${YELLOW}⚠${NC}  Only ${SOURCES_COUNT}/6 sources visible in dashboard"
@@ -2133,10 +2136,10 @@ TOTAL_MINUTES=$((TOTAL_ELAPSED / 60))
 TOTAL_SECONDS=$((TOTAL_ELAPSED % 60))
 
 echo ""
-echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  🎉 Demo Environment Ready!${NC}"
-echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo ""
+    echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
 # Use ingress for all access via LoadBalancer
     GRAFANA_ACCESS_PORT=${INGRESS_HTTP_PORT}
     VM_ACCESS_PORT=${INGRESS_HTTP_PORT}
@@ -2145,15 +2148,15 @@ ZEN_WATCHER_ACCESS_PORT=${INGRESS_HTTP_PORT}
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${CYAN}  📊 SERVICE ACCESS (via k3d LoadBalancer)${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo ""
+    echo ""
 echo -e "${CYAN}  VICTORIAMETRICS:${NC}"
 echo -e "    ${GREEN}VMUI:${NC}    ${CYAN}http://localhost:${VM_ACCESS_PORT}/victoriametrics/vmui${NC}"
 echo -e "    ${GREEN}Targets:${NC}  ${CYAN}http://localhost:${VM_ACCESS_PORT}/victoriametrics/targets${NC}"
-echo ""
+    echo ""
 echo -e "${CYAN}  ZEN WATCHER:${NC}"
 echo -e "    ${GREEN}Metrics:${NC} ${CYAN}http://localhost:${ZEN_WATCHER_ACCESS_PORT}/zen-watcher/metrics${NC}"
 echo -e "    ${GREEN}Health:${NC}  ${CYAN}http://localhost:${ZEN_WATCHER_ACCESS_PORT}/zen-watcher/health${NC}"
-echo ""
+    echo ""
 echo -e "${CYAN}  GRAFANA:${NC}"
     echo -e "    ${GREEN}URL:${NC}     ${CYAN}http://localhost:${GRAFANA_ACCESS_PORT}/grafana${NC}"
 echo -e "    ${GREEN}Username:${NC} ${CYAN}zen${NC}"
@@ -2188,7 +2191,7 @@ fi
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-echo ""
+    echo ""
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  ✅ Demo environment is ready and accessible!${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
