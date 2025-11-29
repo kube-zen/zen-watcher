@@ -37,6 +37,7 @@ func NewEventProcessor(dynClient dynamic.Interface, eventGVR schema.GroupVersion
 
 // ProcessKyvernoPolicyReport processes a Kyverno PolicyReport
 func (ep *EventProcessor) ProcessKyvernoPolicyReport(ctx context.Context, report *unstructured.Unstructured) {
+	log.Printf("  🔍 [KYVERNO] ProcessKyvernoPolicyReport called for: %s/%s", report.GetNamespace(), report.GetName())
 	startTime := time.Now()
 	defer func() {
 		if ep.eventProcessingDuration != nil {
@@ -44,20 +45,27 @@ func (ep *EventProcessor) ProcessKyvernoPolicyReport(ctx context.Context, report
 		}
 	}()
 	results, found, _ := unstructured.NestedSlice(report.Object, "results")
+	log.Printf("  🔍 [KYVERNO] Results extraction: found=%v, count=%d", found, len(results))
 	if !found || len(results) == 0 {
+		log.Printf("  ⚠️  [KYVERNO] PolicyReport %s/%s has no results", report.GetNamespace(), report.GetName())
 		return
 	}
+	log.Printf("  📋 [KYVERNO] Processing PolicyReport %s/%s with %d results", report.GetNamespace(), report.GetName(), len(results))
 
+	// Try to get scope (for scoped PolicyReports)
 	scope, scopeFound, _ := unstructured.NestedMap(report.Object, "scope")
-	if !scopeFound {
-		return
-	}
 
-	resourceKind := fmt.Sprintf("%v", scope["kind"])
-	resourceName := fmt.Sprintf("%v", scope["name"])
-	resourceNs := fmt.Sprintf("%v", scope["namespace"])
-	if resourceNs == "" {
-		resourceNs = report.GetNamespace()
+	// Default resource info from report namespace
+	resourceNs := report.GetNamespace()
+	resourceKind := ""
+	resourceName := ""
+
+	if scopeFound && scope != nil {
+		resourceKind = fmt.Sprintf("%v", scope["kind"])
+		resourceName = fmt.Sprintf("%v", scope["name"])
+		if ns := fmt.Sprintf("%v", scope["namespace"]); ns != "" && ns != "<nil>" {
+			resourceNs = ns
+		}
 	}
 
 	count := 0
@@ -77,6 +85,29 @@ func (ep *EventProcessor) ProcessKyvernoPolicyReport(ctx context.Context, report
 		rule := fmt.Sprintf("%v", result["rule"])
 		severity := fmt.Sprintf("%v", result["severity"])
 		message := fmt.Sprintf("%v", result["message"])
+
+		// Try to get resource info from result.resources if scope not available
+		if resourceKind == "" || resourceName == "" {
+			if resources, found, _ := unstructured.NestedSlice(result, "resources"); found && len(resources) > 0 {
+				if res, ok := resources[0].(map[string]interface{}); ok {
+					if k := fmt.Sprintf("%v", res["kind"]); k != "" && k != "<nil>" {
+						resourceKind = k
+					}
+					if n := fmt.Sprintf("%v", res["name"]); n != "" && n != "<nil>" {
+						resourceName = n
+					}
+					if ns := fmt.Sprintf("%v", res["namespace"]); ns != "" && ns != "<nil>" {
+						resourceNs = ns
+					}
+				}
+			}
+		}
+
+		// Skip if we still don't have resource info
+		if resourceKind == "" || resourceName == "" {
+			log.Printf("  ⚠️  [KYVERNO] Skipping result - missing resource info (kind=%s, name=%s)", resourceKind, resourceName)
+			continue
+		}
 
 		// Map severity to standard levels
 		mappedSeverity := "MEDIUM"

@@ -36,7 +36,9 @@ func SetupInformers(
 				return
 			}
 			log.Printf("📊 [KYVERNO] PolicyReport added: %s/%s", report.GetNamespace(), report.GetName())
+			log.Printf("  🔍 [KYVERNO] Calling ProcessKyvernoPolicyReport for: %s/%s", report.GetNamespace(), report.GetName())
 			eventProcessor.ProcessKyvernoPolicyReport(ctx, report)
+			log.Printf("  🔍 [KYVERNO] ProcessKyvernoPolicyReport returned for: %s/%s", report.GetNamespace(), report.GetName())
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			report, ok := newObj.(*unstructured.Unstructured)
