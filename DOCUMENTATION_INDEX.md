@@ -39,6 +39,7 @@ Complete guide to Zen Watcher documentation.
 
 5. **[docs/FILTERING.md](docs/FILTERING.md)** - Source-level filtering guide
    - Filter configuration
+   - Dynamic ConfigMap reloading (no restart required)
    - Per-source filter rules
    - Examples and best practices
    - Troubleshooting

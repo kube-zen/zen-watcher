@@ -1,0 +1,143 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zen-watcher-alerts
+  namespace: zen-system
+  labels:
+    app.kubernetes.io/name: zen-watcher
+    app.kubernetes.io/component: monitoring
+spec:
+  groups:
+  - name: zen-watcher-critical
+    interval: 30s
+    rules:
+    - alert: ZenWatcherDown
+      expr: up{job="zen-watcher"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        component: availability
+      annotations:
+        summary: "zen-watcher is down"
+        description: "zen-watcher pod is not responding. Check pod status: kubectl get pods -n zen-system -l app.kubernetes.io/name=zen-watcher"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/TROUBLESHOOTING.md"
+
+    - alert: ZenWatcherHighErrorRate
+      expr: |
+        (
+          sum(rate(zen_watcher_observations_create_errors_total[5m])) +
+          sum(rate(zen_watcher_gc_errors_total[5m]))
+        ) > 10
+      for: 5m
+      labels:
+        severity: critical
+        component: reliability
+      annotations:
+        summary: "High error rate in zen-watcher"
+        description: "{{$value}} errors/sec detected. Check logs: kubectl logs -n zen-system -l app.kubernetes.io/name=zen-watcher --tail=100"
+
+    - alert: ZenWatcherCriticalEventsSpike
+      expr: sum(rate(zen_watcher_events_total{severity="CRITICAL"}[5m])) * 60 > 20
+      for: 2m
+      labels:
+        severity: critical
+        component: security
+      annotations:
+        summary: "Critical security events spike detected"
+        description: "{{$value}} CRITICAL events/min detected. Potential security incident."
+
+  - name: zen-watcher-warning
+    interval: 30s
+    rules:
+    - alert: ZenWatcherNoEvents
+      expr: sum(rate(zen_watcher_observations_created_total[10m])) == 0
+      for: 10m
+      labels:
+        severity: warning
+        component: functionality
+      annotations:
+        summary: "No observations being created"
+        description: "No observations created in last 10 minutes. Check if sources are active and filters aren't too restrictive."
+
+    - alert: ZenWatcherHighFilterRate
+      expr: |
+        sum(rate(zen_watcher_observations_filtered_total[5m])) /
+        (sum(rate(zen_watcher_observations_created_total[5m])) + sum(rate(zen_watcher_observations_filtered_total[5m]))) > 0.9
+      for: 10m
+      labels:
+        severity: warning
+        component: configuration
+      annotations:
+        summary: "High filter rate (>90%)"
+        description: "{{$value | humanizePercentage}} of observations are being filtered. Consider reviewing filter configuration."
+
+    - alert: ZenWatcherToolOffline
+      expr: zen_watcher_tools_active == 0
+      for: 5m
+      labels:
+        severity: warning
+        component: integration
+      annotations:
+        summary: "Security tool {{$labels.tool}} not detected"
+        description: "Tool {{$labels.tool}} has been offline for 5+ minutes. Check if tool is installed and running."
+
+    - alert: ZenWatcherSlowProcessing
+      expr: |
+        histogram_quantile(0.95, 
+          sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le)
+        ) > 5
+      for: 10m
+      labels:
+        severity: warning
+        component: performance
+      annotations:
+        summary: "Slow event processing (p95 > 5s)"
+        description: "p95 processing latency is {{$value}}s. Check resource constraints and API server load."
+
+    - alert: ZenWatcherWebhookFailing
+      expr: |
+        sum(rate(zen_watcher_webhook_requests_total{status!="200"}[5m])) /
+        sum(rate(zen_watcher_webhook_requests_total[5m])) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        component: integration
+      annotations:
+        summary: "Webhook endpoint {{$labels.endpoint}} failing"
+        description: "{{$value | humanizePercentage}} of requests to {{$labels.endpoint}} are failing (status: {{$labels.status}})"
+
+    - alert: ZenWatcherGCErrors
+      expr: rate(zen_watcher_gc_errors_total[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        component: gc
+      annotations:
+        summary: "Garbage collection errors detected"
+        description: "{{$value}} GC errors/sec. Operation: {{$labels.operation}}, Error: {{$labels.error_type}}"
+
+  - name: zen-watcher-info
+    interval: 1m
+    rules:
+    - alert: ZenWatcherHighDeduplicationRate
+      expr: |
+        rate(zen_watcher_observations_deduped_total[5m]) /
+        (rate(zen_watcher_observations_created_total[5m]) + rate(zen_watcher_observations_deduped_total[5m])) > 0.5
+      for: 10m
+      labels:
+        severity: info
+        component: deduplication
+      annotations:
+        summary: "High deduplication rate (>50%)"
+        description: "Many duplicate observations detected. Consider adjusting dedup window or investigating source behavior."
+
+    - alert: ZenWatcherGCFrequent
+      expr: rate(zen_watcher_gc_runs_total[1h]) > 2
+      for: 1h
+      labels:
+        severity: info
+        component: gc
+      annotations:
+        summary: "GC running more frequently than expected"
+        description: "GC running {{$value}} times/hour. Consider adjusting GC_INTERVAL."
+

@@ -8,7 +8,9 @@ import (
 
 	"github.com/kube-zen/zen-watcher/internal/kubernetes"
 	"github.com/kube-zen/zen-watcher/internal/lifecycle"
+	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
+	"github.com/kube-zen/zen-watcher/pkg/gc"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/server"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
@@ -37,13 +39,16 @@ func main() {
 	// Create informer factory
 	informerFactory := kubernetes.NewInformerFactory(clients.Dynamic)
 
-	// Load filter configuration from ConfigMap
+	// Load filter configuration from ConfigMap (initial load)
 	filterConfig, err := filter.LoadFilterConfig(clients.Standard)
 	if err != nil {
 		log.Printf("⚠️  Failed to load filter config: %v (continuing without filter)", err)
 		filterConfig = &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	}
 	filterInstance := filter.NewFilter(filterConfig)
+
+	// Create ConfigMap loader for dynamic reloading
+	configMapLoader := config.NewConfigMapLoader(clients.Standard, filterInstance)
 
 	// Create processors with centralized observation creator and filter
 	// Flow: filter() → normalize() → dedup() → create Observation CRD + update metrics + log
@@ -54,6 +59,7 @@ func main() {
 		m.ObservationsCreated,
 		m.ObservationsFiltered,
 		m.ObservationsDeduped,
+		m.ObservationsCreateErrors,
 		m.EventProcessingDuration,
 		filterInstance,
 	)
@@ -143,6 +149,30 @@ func main() {
 
 	// Start ConfigMap poller
 	go configMapPoller.Start(ctx)
+
+	// Start ConfigMap loader for dynamic filter config reloading
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := configMapLoader.Start(ctx); err != nil {
+			log.Printf("⚠️  ConfigMap loader stopped: %v", err)
+		}
+	}()
+
+	// Create and start garbage collector
+	gcCollector := gc.NewCollector(
+		clients.Dynamic,
+		gvrs.Observations,
+		m.ObservationsDeleted,
+		m.GCRunsTotal,
+		m.GCDuration,
+		m.GCErrors,
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		gcCollector.Start(ctx)
+	}()
 
 	// Log configuration
 	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")

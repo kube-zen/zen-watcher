@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // Filter provides filtering functionality for observations
+// Thread-safe: config can be updated dynamically via UpdateConfig()
 type Filter struct {
+	mu     sync.RWMutex
 	config *FilterConfig
 }
 
@@ -18,6 +21,28 @@ func NewFilter(config *FilterConfig) *Filter {
 	return &Filter{
 		config: config,
 	}
+}
+
+// UpdateConfig updates the filter configuration atomically (thread-safe)
+func (f *Filter) UpdateConfig(config *FilterConfig) {
+	if f == nil {
+		return
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	// Validate config - ensure Sources map is initialized
+	if config != nil && config.Sources == nil {
+		config.Sources = make(map[string]SourceFilter)
+	}
+	f.config = config
+	log.Printf("  🔄 [FILTER] Configuration updated dynamically")
+}
+
+// getConfig returns the current filter configuration (thread-safe read)
+func (f *Filter) getConfig() *FilterConfig {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	return f.config
 }
 
 // Allow checks if an observation should be allowed based on filter rules
@@ -31,7 +56,14 @@ func (f *Filter) Allow(observation *unstructured.Unstructured) bool {
 // AllowWithReason checks if an observation should be allowed and returns the reason if filtered
 // Returns (true, "") if allowed, (false, reason) if filtered
 func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, string) {
-	if f == nil || f.config == nil {
+	if f == nil {
+		// No filter configured - allow all
+		return true, ""
+	}
+
+	// Get config atomically (thread-safe read)
+	config := f.getConfig()
+	if config == nil {
 		// No filter configured - allow all
 		return true, ""
 	}
@@ -45,7 +77,7 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	source := strings.ToLower(fmt.Sprintf("%v", sourceVal))
 
 	// Get source-specific filter
-	sourceFilter := f.config.GetSourceFilter(source)
+	sourceFilter := config.GetSourceFilter(source)
 	if sourceFilter == nil {
 		// No filter for this source - allow
 		return true, ""

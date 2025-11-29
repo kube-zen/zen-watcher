@@ -25,6 +25,34 @@ kubectl create configmap zen-watcher-filter -n zen-system \
   --from-file=filter.json=filter.json
 ```
 
+### Dynamic Reloading
+
+**✨ Filter configuration reloads automatically without restart!**
+
+Zen Watcher watches the ConfigMap for changes and reloads the filter configuration dynamically. This means you can update filters without restarting the pod:
+
+```bash
+# Update the ConfigMap
+kubectl edit configmap zen-watcher-filter -n zen-system
+
+# Or apply a new filter.json
+kubectl create configmap zen-watcher-filter -n zen-system \
+  --from-file=filter.json=filter.json \
+  --dry-run=client -o yaml | kubectl apply -f -
+```
+
+**Features:**
+- ✅ **No restart required** - Changes take effect within seconds
+- ✅ **Last-good-config fallback** - Invalid configs don't break the filter
+- ✅ **Thread-safe** - Updates happen atomically without blocking operations
+- ✅ **Kubernetes-native** - Uses standard informer pattern
+
+**Reload Behavior:**
+- Valid config changes → Filter updates immediately
+- Invalid JSON → Last known good config is preserved
+- Missing key → Last known good config is preserved
+- ConfigMap deleted → Last known good config is preserved (no reset to default)
+
 ### Environment Variables
 
 | Variable | Description | Default |
@@ -276,7 +304,8 @@ When an observation is filtered out, zen-watcher logs:
 ### Code Location
 
 - **Filter Config Loading**: `pkg/filter/config.go`
-- **Filter Rules**: `pkg/filter/rules.go`
+- **Filter Rules**: `pkg/filter/rules.go` (thread-safe with dynamic updates)
+- **ConfigMap Watcher**: `pkg/config/configmap_loader.go` (dynamic reloading)
 - **Filter Integration**: `pkg/watcher/observation_creator.go`
 
 ### Filter Interface
@@ -346,6 +375,16 @@ Tests cover:
 4. **Verify filter is loaded:**
    ```bash
    kubectl logs -n zen-system deployment/zen-watcher | grep "Loaded filter configuration"
+   ```
+
+5. **Check for dynamic reload:**
+   ```bash
+   kubectl logs -n zen-system deployment/zen-watcher | grep "Reloaded filter configuration"
+   ```
+
+6. **Verify ConfigMap watcher is running:**
+   ```bash
+   kubectl logs -n zen-system deployment/zen-watcher | grep "ConfigMap watcher started"
    ```
 
 ### Filter Too Restrictive

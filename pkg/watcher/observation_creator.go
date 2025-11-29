@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
@@ -19,14 +20,15 @@ import (
 // ObservationCreator handles creation of Observations with centralized filtering, normalization, deduplication, and metrics
 // Flow: filter() → normalize() → dedup() → create Observation CRD + update metrics + log
 type ObservationCreator struct {
-	dynClient            dynamic.Interface
-	eventGVR             schema.GroupVersionResource
-	eventsTotal          *prometheus.CounterVec
-	observationsCreated  *prometheus.CounterVec
-	observationsFiltered *prometheus.CounterVec
-	observationsDeduped  prometheus.Counter
-	deduper              *dedup.Deduper
-	filter               *filter.Filter
+	dynClient                dynamic.Interface
+	eventGVR                 schema.GroupVersionResource
+	eventsTotal              *prometheus.CounterVec
+	observationsCreated      *prometheus.CounterVec
+	observationsFiltered     *prometheus.CounterVec
+	observationsDeduped      prometheus.Counter
+	observationsCreateErrors *prometheus.CounterVec
+	deduper                  *dedup.Deduper
+	filter                   *filter.Filter
 }
 
 // NewObservationCreator creates a new observation creator with optional filter and metrics
@@ -37,6 +39,7 @@ func NewObservationCreator(
 	observationsCreated *prometheus.CounterVec,
 	observationsFiltered *prometheus.CounterVec,
 	observationsDeduped prometheus.Counter,
+	observationsCreateErrors *prometheus.CounterVec,
 	filter *filter.Filter,
 ) *ObservationCreator {
 	// Get dedup window from env, default 60 seconds
@@ -54,14 +57,15 @@ func NewObservationCreator(
 		}
 	}
 	return &ObservationCreator{
-		dynClient:            dynClient,
-		eventGVR:             eventGVR,
-		eventsTotal:          eventsTotal,
-		observationsCreated:  observationsCreated,
-		observationsFiltered: observationsFiltered,
-		observationsDeduped:  observationsDeduped,
-		deduper:              dedup.NewDeduper(windowSeconds, maxSize),
-		filter:               filter,
+		dynClient:                dynClient,
+		eventGVR:                 eventGVR,
+		eventsTotal:              eventsTotal,
+		observationsCreated:      observationsCreated,
+		observationsFiltered:     observationsFiltered,
+		observationsDeduped:      observationsDeduped,
+		observationsCreateErrors: observationsCreateErrors,
+		deduper:                  dedup.NewDeduper(windowSeconds, maxSize),
+		filter:                   filter,
 	}
 }
 
@@ -112,9 +116,35 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 		namespace = "default"
 	}
 
+	// Ensure metadata.annotations exists for TTL annotation support
+	metadata, _, _ := unstructured.NestedMap(observation.Object, "metadata")
+	if metadata == nil {
+		metadata = make(map[string]interface{})
+		unstructured.SetNestedMap(observation.Object, metadata, "metadata")
+	}
+	annotations, _, _ := unstructured.NestedStringMap(observation.Object, "metadata", "annotations")
+	if annotations == nil {
+		annotations = make(map[string]string)
+		unstructured.SetNestedStringMap(observation.Object, annotations, "metadata", "annotations")
+	}
+
 	// Create the Observation (first event always creates)
 	_, err := oc.dynClient.Resource(oc.eventGVR).Namespace(namespace).Create(ctx, observation, metav1.CreateOptions{})
 	if err != nil {
+		// Track creation errors
+		if oc.observationsCreateErrors != nil {
+			errorType := "create_failed"
+			errMsg := strings.ToLower(err.Error())
+			// Extract error type from error message
+			if strings.Contains(errMsg, "already exists") {
+				errorType = "already_exists"
+			} else if strings.Contains(errMsg, "forbidden") {
+				errorType = "forbidden"
+			} else if strings.Contains(errMsg, "not found") {
+				errorType = "not_found"
+			}
+			oc.observationsCreateErrors.WithLabelValues(source, errorType).Inc()
+		}
 		return fmt.Errorf("failed to create Observation: %w", err)
 	}
 

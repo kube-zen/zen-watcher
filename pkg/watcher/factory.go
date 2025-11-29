@@ -15,6 +15,7 @@ func NewProcessors(
 	observationsCreated *prometheus.CounterVec,
 	observationsFiltered *prometheus.CounterVec,
 	observationsDeduped prometheus.Counter,
+	observationsCreateErrors *prometheus.CounterVec,
 	eventProcessingDuration *prometheus.HistogramVec,
 	filter *filter.Filter,
 ) (*EventProcessor, *WebhookProcessor, *ObservationCreator) {
@@ -27,6 +28,7 @@ func NewProcessors(
 		observationsCreated,
 		observationsFiltered,
 		observationsDeduped,
+		observationsCreateErrors,
 		filter,
 	)
 

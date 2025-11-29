@@ -849,9 +849,13 @@ create_cluster() {
             # Use single server (no agents) for demo - more reliable
             # Disable Traefik (we'll use nginx ingress)
             # Map ingress port for LoadBalancer access
+            # Use --host-pid-mode to help with Falco/eBPF (partial privileged access)
+            # Note: Full privileged mode requires Docker daemon configuration
+            # For Falco, we use modern_ebpf driver which works better in containerized environments
             k3d_create_args=(
                 "cluster" "create" "${CLUSTER_NAME}"
                 "--agents" "0"
+                "--host-pid-mode"
                 "--k3s-arg" "--disable=traefik@server:0"
                 "--port" "${INGRESS_HTTP_PORT}:80@loadbalancer"
                 "--port" "$((INGRESS_HTTP_PORT + 1)):443@loadbalancer"

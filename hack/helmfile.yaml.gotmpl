@@ -255,14 +255,29 @@ releases:
     values:
       - falcosidekick:
           enabled: false
-      - falco:
-          httpOutput:
-            enabled: true
-            url: http://zen-watcher.{{ $namespace }}.svc.cluster.local:8080/falco/webhook
       - driver:
           enabled: false
       - ebpf:
+          enabled: false
+      - modern_ebpf:
           enabled: true
+      - falco:
+          priority: debug
+          grpc:
+            enabled: true
+          http_output:
+            enabled: true
+            url: http://zen-watcher.{{ $namespace }}.svc.cluster.local:8080/falco/webhook
+          json_output: true
+      - extra:
+          env: []
+      - controller:
+          daemonset:
+            updateStrategy:
+              type: RollingUpdate
+      - podLabels:
+          app: falco
+          app.kubernetes.io/name: falco
       - resources:
           requests:
             cpu: 100m
@@ -270,6 +285,19 @@ releases:
           limits:
             cpu: 500m
             memory: 512Mi
+    hooks:
+      - events: ["postsync"]
+        showlogs: true
+        command: kubectl
+        args:
+          - patch
+          - daemonset
+          - falco
+          - -n
+          - falco
+          - --type=json
+          - -p
+          - '[{"op": "add", "path": "/spec/template/spec/hostPID", "value": true}]'
 
   # Kyverno
   - name: kyverno

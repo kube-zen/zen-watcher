@@ -6,15 +6,20 @@ import (
 
 // Metrics holds all Prometheus metrics for zen-watcher
 type Metrics struct {
-	EventsTotal             *prometheus.CounterVec
-	ObservationsCreated     *prometheus.CounterVec
-	ObservationsFiltered    *prometheus.CounterVec
-	ObservationsDeduped     prometheus.Counter
-	ToolsActive             *prometheus.GaugeVec
-	InformerCacheSync       *prometheus.GaugeVec
-	EventProcessingDuration *prometheus.HistogramVec
-	WebhookRequests         *prometheus.CounterVec
-	WebhookDropped          *prometheus.CounterVec
+	EventsTotal              *prometheus.CounterVec
+	ObservationsCreated      *prometheus.CounterVec
+	ObservationsFiltered     *prometheus.CounterVec
+	ObservationsDeduped      prometheus.Counter
+	ObservationsDeleted      *prometheus.CounterVec
+	ObservationsCreateErrors *prometheus.CounterVec
+	GCRunsTotal              prometheus.Counter
+	GCDuration               *prometheus.HistogramVec
+	GCErrors                 *prometheus.CounterVec
+	ToolsActive              *prometheus.GaugeVec
+	InformerCacheSync        *prometheus.GaugeVec
+	EventProcessingDuration  *prometheus.HistogramVec
+	WebhookRequests          *prometheus.CounterVec
+	WebhookDropped           *prometheus.CounterVec
 }
 
 // NewMetrics creates and registers all Prometheus metrics
@@ -22,7 +27,7 @@ func NewMetrics() *Metrics {
 	eventsTotal := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "zen_watcher_events_total",
-			Help: "Total number of Observations created by source",
+			Help: "Total number of events that resulted in Observation CRD creation (after filtering and deduplication), grouped by source, category, and severity",
 		},
 		[]string{"source", "category", "severity"},
 	)
@@ -91,11 +96,56 @@ func NewMetrics() *Metrics {
 		},
 	)
 
+	observationsDeleted := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_observations_deleted_total",
+			Help: "Total number of Observations deleted by garbage collector",
+		},
+		[]string{"source", "reason"},
+	)
+
+	gcRunsTotal := prometheus.NewCounter(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_gc_runs_total",
+			Help: "Total number of garbage collection runs",
+		},
+	)
+
+	gcDuration := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "zen_watcher_gc_duration_seconds",
+			Help:    "Time taken to run garbage collection",
+			Buckets: []float64{0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0},
+		},
+		[]string{"operation"},
+	)
+
+	observationsCreateErrors := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_observations_create_errors_total",
+			Help: "Total number of errors encountered while creating Observation CRDs",
+		},
+		[]string{"source", "error_type"},
+	)
+
+	gcErrors := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_gc_errors_total",
+			Help: "Total number of errors encountered during garbage collection",
+		},
+		[]string{"operation", "error_type"},
+	)
+
 	// Register all metrics
 	prometheus.MustRegister(eventsTotal)
 	prometheus.MustRegister(observationsCreated)
 	prometheus.MustRegister(observationsFiltered)
 	prometheus.MustRegister(observationsDeduped)
+	prometheus.MustRegister(observationsDeleted)
+	prometheus.MustRegister(observationsCreateErrors)
+	prometheus.MustRegister(gcRunsTotal)
+	prometheus.MustRegister(gcDuration)
+	prometheus.MustRegister(gcErrors)
 	prometheus.MustRegister(toolsActive)
 	prometheus.MustRegister(informerCacheSync)
 	prometheus.MustRegister(eventProcessingDuration)
@@ -103,14 +153,19 @@ func NewMetrics() *Metrics {
 	prometheus.MustRegister(webhookDropped)
 
 	return &Metrics{
-		EventsTotal:             eventsTotal,
-		ObservationsCreated:     observationsCreated,
-		ObservationsFiltered:    observationsFiltered,
-		ObservationsDeduped:     observationsDeduped,
-		ToolsActive:             toolsActive,
-		InformerCacheSync:       informerCacheSync,
-		EventProcessingDuration: eventProcessingDuration,
-		WebhookRequests:         webhookRequests,
-		WebhookDropped:          webhookDropped,
+		EventsTotal:              eventsTotal,
+		ObservationsCreated:      observationsCreated,
+		ObservationsFiltered:     observationsFiltered,
+		ObservationsDeduped:      observationsDeduped,
+		ObservationsDeleted:      observationsDeleted,
+		ObservationsCreateErrors: observationsCreateErrors,
+		GCRunsTotal:              gcRunsTotal,
+		GCDuration:               gcDuration,
+		GCErrors:                 gcErrors,
+		ToolsActive:              toolsActive,
+		InformerCacheSync:        informerCacheSync,
+		EventProcessingDuration:  eventProcessingDuration,
+		WebhookRequests:          webhookRequests,
+		WebhookDropped:           webhookDropped,
 	}
 }

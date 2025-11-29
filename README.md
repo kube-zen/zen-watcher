@@ -228,6 +228,11 @@ kubectl create configmap zen-watcher-filter -n zen-system --from-file=filter.jso
 - Reduces CRD count and agent noise
 - Keeps Observations meaningful
 
+**Dynamic Reloading:**
+- Filter configuration reloads automatically when the ConfigMap changes
+- No restart required - changes take effect within seconds
+- Invalid configs preserve the last known good configuration
+
 **Note:** If ConfigMap is not found, zen-watcher defaults to "allow all" (no filtering).
 
 ---
