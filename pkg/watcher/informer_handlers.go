@@ -3,10 +3,10 @@ package watcher
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
+	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -37,7 +37,6 @@ func NewEventProcessor(dynClient dynamic.Interface, eventGVR schema.GroupVersion
 
 // ProcessKyvernoPolicyReport processes a Kyverno PolicyReport
 func (ep *EventProcessor) ProcessKyvernoPolicyReport(ctx context.Context, report *unstructured.Unstructured) {
-	log.Printf("  🔍 [KYVERNO] ProcessKyvernoPolicyReport called for: %s/%s", report.GetNamespace(), report.GetName())
 	startTime := time.Now()
 	defer func() {
 		if ep.eventProcessingDuration != nil {
@@ -45,12 +44,31 @@ func (ep *EventProcessor) ProcessKyvernoPolicyReport(ctx context.Context, report
 		}
 	}()
 	results, found, _ := unstructured.NestedSlice(report.Object, "results")
-	log.Printf("  🔍 [KYVERNO] Results extraction: found=%v, count=%d", found, len(results))
+	logger.Debug("Processing Kyverno PolicyReport",
+		logger.Fields{
+			Component:    "watcher",
+			Operation:    "process_kyverno_report",
+			Source:       "kyverno",
+			ResourceKind: "PolicyReport",
+			Namespace:    report.GetNamespace(),
+			ResourceName: report.GetName(),
+			Count:        len(results),
+			Additional: map[string]interface{}{
+				"results_found": found,
+			},
+		})
 	if !found || len(results) == 0 {
-		log.Printf("  ⚠️  [KYVERNO] PolicyReport %s/%s has no results", report.GetNamespace(), report.GetName())
+		logger.Debug("PolicyReport has no results",
+			logger.Fields{
+				Component:    "watcher",
+				Operation:    "process_kyverno_report",
+				Source:       "kyverno",
+				ResourceKind: "PolicyReport",
+				Namespace:    report.GetNamespace(),
+				ResourceName: report.GetName(),
+			})
 		return
 	}
-	log.Printf("  📋 [KYVERNO] Processing PolicyReport %s/%s with %d results", report.GetNamespace(), report.GetName(), len(results))
 
 	// Try to get scope (for scoped PolicyReports)
 	scope, scopeFound, _ := unstructured.NestedMap(report.Object, "scope")
@@ -105,7 +123,15 @@ func (ep *EventProcessor) ProcessKyvernoPolicyReport(ctx context.Context, report
 
 		// Skip if we still don't have resource info
 		if resourceKind == "" || resourceName == "" {
-			log.Printf("  ⚠️  [KYVERNO] Skipping result - missing resource info (kind=%s, name=%s)", resourceKind, resourceName)
+			logger.Debug("Skipping result - missing resource info",
+				logger.Fields{
+					Component:    "watcher",
+					Operation:    "process_kyverno_report",
+					Source:       "kyverno",
+					ResourceKind: resourceKind,
+					ResourceName: resourceName,
+					Reason:       "missing_resource_info",
+				})
 			continue
 		}
 
@@ -155,7 +181,16 @@ func (ep *EventProcessor) ProcessKyvernoPolicyReport(ctx context.Context, report
 		// Use centralized observation creator - metrics are incremented automatically
 		err := ep.observationCreator.CreateObservation(ctx, event)
 		if err != nil {
-			log.Printf("  ⚠️  Failed to create Kyverno Observation: %v", err)
+			logger.Warn("Failed to create Kyverno Observation",
+				logger.Fields{
+					Component:    "watcher",
+					Operation:    "observation_create",
+					Source:       "kyverno",
+					ResourceKind: resourceKind,
+					ResourceName: resourceName,
+					Namespace:    resourceNs,
+					Error:        err,
+				})
 		} else {
 			ep.mu.Lock()
 			ep.totalCount++
@@ -165,13 +200,18 @@ func (ep *EventProcessor) ProcessKyvernoPolicyReport(ctx context.Context, report
 	}
 
 	if count > 0 {
-		log.Printf("  ✅ Created %d NEW Observations from Kyverno policy violations", count)
+		logger.Info("Created Observations from Kyverno policy violations",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "process_kyverno_report",
+				Source:    "kyverno",
+				Count:     count,
+			})
 	}
 }
 
 // ProcessTrivyVulnerabilityReport processes a Trivy VulnerabilityReport
 func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, report *unstructured.Unstructured) {
-	log.Printf("🔍 [TRIVY] ProcessTrivyVulnerabilityReport called for: %s/%s", report.GetNamespace(), report.GetName())
 	startTime := time.Now()
 	defer func() {
 		if ep.eventProcessingDuration != nil {
@@ -180,16 +220,42 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 	}()
 	vulnerabilities, found, _ := unstructured.NestedSlice(report.Object, "report", "vulnerabilities")
 	if !found || len(vulnerabilities) == 0 {
-		log.Printf("  ⚠️  [TRIVY] No vulnerabilities found in report %s/%s", report.GetNamespace(), report.GetName())
+		logger.Debug("No vulnerabilities found in report",
+			logger.Fields{
+				Component:    "watcher",
+				Operation:    "process_trivy_report",
+				Source:       "trivy",
+				ResourceKind: "VulnerabilityReport",
+				Namespace:    report.GetNamespace(),
+				ResourceName: report.GetName(),
+			})
 		return
 	}
-	log.Printf("  📋 [TRIVY] Found %d vulnerabilities in report %s/%s", len(vulnerabilities), report.GetNamespace(), report.GetName())
+	logger.Debug("Found vulnerabilities in report",
+		logger.Fields{
+			Component:    "watcher",
+			Operation:    "process_trivy_report",
+			Source:       "trivy",
+			ResourceKind: "VulnerabilityReport",
+			Namespace:    report.GetNamespace(),
+			ResourceName: report.GetName(),
+			Count:        len(vulnerabilities),
+		})
 
 	resourceKind := report.GetLabels()["trivy-operator.resource.kind"]
 	resourceName := report.GetLabels()["trivy-operator.resource.name"]
 
 	if resourceKind == "" || resourceName == "" {
-		log.Printf("  ⚠️  [TRIVY] Missing resource labels: kind=%s, name=%s", resourceKind, resourceName)
+		logger.Warn("Missing resource labels in VulnerabilityReport",
+			logger.Fields{
+				Component:    "watcher",
+				Operation:    "process_trivy_report",
+				Source:       "trivy",
+				ResourceKind: resourceKind,
+				ResourceName: resourceName,
+				Namespace:    report.GetNamespace(),
+				Reason:       "missing_labels",
+			})
 		return
 	}
 
@@ -250,7 +316,16 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 		// Use centralized observation creator - metrics are incremented automatically
 		err := ep.observationCreator.CreateObservation(ctx, event)
 		if err != nil {
-			log.Printf("  ⚠️  Failed to create Trivy Observation: %v", err)
+			logger.Warn("Failed to create Trivy Observation",
+				logger.Fields{
+					Component:    "watcher",
+					Operation:    "observation_create",
+					Source:       "trivy",
+					ResourceKind: resourceKind,
+					ResourceName: resourceName,
+					Namespace:    report.GetNamespace(),
+					Error:        err,
+				})
 		} else {
 			ep.mu.Lock()
 			ep.totalCount++
@@ -259,14 +334,28 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 		}
 	}
 
-	log.Printf("  📊 [TRIVY] Summary: %d total vulnerabilities, %d HIGH/CRITICAL, %d skipped (low severity), %d observations created", len(vulnerabilities), highCriticalCount, skippedLow, count)
-	if highCriticalCount > 0 {
-		log.Printf("  📊 [TRIVY] Processed %d HIGH/CRITICAL vulnerabilities, created %d observations", highCriticalCount, count)
-	}
-	if count > 0 {
-		log.Printf("  ✅ Created %d NEW Observations from Trivy vulnerabilities", count)
-	} else if highCriticalCount > 0 {
-		log.Printf("  ⚠️  [TRIVY] Found %d HIGH/CRITICAL vulnerabilities but created 0 observations (all duplicates?)", highCriticalCount)
+	logger.Info("Processed Trivy VulnerabilityReport",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "process_trivy_report",
+			Source:    "trivy",
+			Count:     count,
+			Additional: map[string]interface{}{
+				"total_vulnerabilities": len(vulnerabilities),
+				"high_critical_count":   highCriticalCount,
+				"skipped_low":           skippedLow,
+				"observations_created":  count,
+			},
+		})
+	if count == 0 && highCriticalCount > 0 {
+		logger.Warn("Found HIGH/CRITICAL vulnerabilities but created 0 observations (all duplicates?)",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "process_trivy_report",
+				Source:    "trivy",
+				Reason:    "all_duplicates",
+				Count:     highCriticalCount,
+			})
 	}
 }
 

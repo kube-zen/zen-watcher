@@ -2,10 +2,10 @@ package filter
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"sync"
 
+	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -35,7 +35,11 @@ func (f *Filter) UpdateConfig(config *FilterConfig) {
 		config.Sources = make(map[string]SourceFilter)
 	}
 	f.config = config
-	log.Printf("  🔄 [FILTER] Configuration updated dynamically")
+	logger.Debug("Filter configuration updated dynamically",
+		logger.Fields{
+			Component: "filter",
+			Operation: "config_update",
+		})
 }
 
 // getConfig returns the current filter configuration (thread-safe read)
@@ -85,7 +89,13 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 
 	// Check if source is enabled
 	if !sourceFilter.IsSourceEnabled() {
-		log.Printf("  🚫 [FILTER] Source '%s' is disabled, filtering out observation", source)
+		logger.Debug("Source disabled, filtering out observation",
+			logger.Fields{
+				Component: "filter",
+				Operation: "filter_check",
+				Source:    source,
+				Reason:    "source_disabled",
+			})
 		return false, "source_disabled"
 	}
 
@@ -127,7 +137,17 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	// 1. MinSeverity filter
 	if sourceFilter.MinSeverity != "" {
 		if !f.meetsMinSeverity(severity, sourceFilter.MinSeverity) {
-			log.Printf("  🚫 [FILTER] Source '%s': severity '%s' below minimum '%s'", source, severity, sourceFilter.MinSeverity)
+			logger.Debug("Severity below minimum, filtering out observation",
+				logger.Fields{
+					Component: "filter",
+					Operation: "filter_check",
+					Source:    source,
+					Severity:  severity,
+					Reason:    "min_severity",
+					Additional: map[string]interface{}{
+						"min_severity": sourceFilter.MinSeverity,
+					},
+				})
 			return false, "min_severity"
 		}
 	}
@@ -136,7 +156,14 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	if len(sourceFilter.ExcludeEventTypes) > 0 {
 		for _, excluded := range sourceFilter.ExcludeEventTypes {
 			if strings.EqualFold(eventType, excluded) {
-				log.Printf("  🚫 [FILTER] Source '%s': eventType '%s' is excluded", source, eventType)
+				logger.Debug("EventType excluded, filtering out observation",
+					logger.Fields{
+						Component: "filter",
+						Operation: "filter_check",
+						Source:    source,
+						EventType: eventType,
+						Reason:    "exclude_event_type",
+					})
 				return false, "exclude_event_type"
 			}
 		}
@@ -150,7 +177,14 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			}
 		}
 		if !allowed {
-			log.Printf("  🚫 [FILTER] Source '%s': eventType '%s' not in include list", source, eventType)
+			logger.Debug("EventType not in include list, filtering out observation",
+				logger.Fields{
+					Component: "filter",
+					Operation: "filter_check",
+					Source:    source,
+					EventType: eventType,
+					Reason:    "include_event_type",
+				})
 			return false, "include_event_type"
 		}
 	}
@@ -159,7 +193,14 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	if len(sourceFilter.ExcludeNamespaces) > 0 {
 		for _, excluded := range sourceFilter.ExcludeNamespaces {
 			if strings.EqualFold(namespace, excluded) {
-				log.Printf("  🚫 [FILTER] Source '%s': namespace '%s' is excluded", source, namespace)
+				logger.Debug("Namespace excluded, filtering out observation",
+					logger.Fields{
+						Component: "filter",
+						Operation: "filter_check",
+						Source:    source,
+						Namespace: namespace,
+						Reason:    "exclude_namespace",
+					})
 				return false, "exclude_namespace"
 			}
 		}
@@ -173,7 +214,14 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			}
 		}
 		if !allowed {
-			log.Printf("  🚫 [FILTER] Source '%s': namespace '%s' not in include list", source, namespace)
+			logger.Debug("Namespace not in include list, filtering out observation",
+				logger.Fields{
+					Component: "filter",
+					Operation: "filter_check",
+					Source:    source,
+					Namespace: namespace,
+					Reason:    "include_namespace",
+				})
 			return false, "include_namespace"
 		}
 	}
@@ -182,7 +230,14 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	if len(sourceFilter.ExcludeKinds) > 0 {
 		for _, excluded := range sourceFilter.ExcludeKinds {
 			if strings.EqualFold(kind, excluded) {
-				log.Printf("  🚫 [FILTER] Source '%s': kind '%s' is excluded", source, kind)
+				logger.Debug("Kind excluded, filtering out observation",
+					logger.Fields{
+						Component:    "filter",
+						Operation:    "filter_check",
+						Source:       source,
+						ResourceKind: kind,
+						Reason:       "exclude_kind",
+					})
 				return false, "exclude_kind"
 			}
 		}
@@ -196,7 +251,14 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			}
 		}
 		if !allowed {
-			log.Printf("  🚫 [FILTER] Source '%s': kind '%s' not in include list", source, kind)
+			logger.Debug("Kind not in include list, filtering out observation",
+				logger.Fields{
+					Component:    "filter",
+					Operation:    "filter_check",
+					Source:       source,
+					ResourceKind: kind,
+					Reason:       "include_kind",
+				})
 			return false, "include_kind"
 		}
 	}
@@ -205,7 +267,16 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	if len(sourceFilter.ExcludeCategories) > 0 {
 		for _, excluded := range sourceFilter.ExcludeCategories {
 			if strings.EqualFold(category, excluded) {
-				log.Printf("  🚫 [FILTER] Source '%s': category '%s' is excluded", source, category)
+				logger.Debug("Category excluded, filtering out observation",
+					logger.Fields{
+						Component: "filter",
+						Operation: "filter_check",
+						Source:    source,
+						Additional: map[string]interface{}{
+							"category": category,
+						},
+						Reason: "exclude_category",
+					})
 				return false, "exclude_category"
 			}
 		}
@@ -219,7 +290,16 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			}
 		}
 		if !allowed {
-			log.Printf("  🚫 [FILTER] Source '%s': category '%s' not in include list", source, category)
+			logger.Debug("Category not in include list, filtering out observation",
+				logger.Fields{
+					Component: "filter",
+					Operation: "filter_check",
+					Source:    source,
+					Additional: map[string]interface{}{
+						"category": category,
+					},
+					Reason: "include_category",
+				})
 			return false, "include_category"
 		}
 	}

@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"time"
 
+	"github.com/kube-zen/zen-watcher/pkg/logger"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -86,11 +86,22 @@ func NewKubeBenchWatcher(clientSet *kubernetes.Clientset, namespace string, acti
 
 // Start starts the kube-bench watcher
 func (kbw *KubeBenchWatcher) Start(ctx context.Context) error {
-	log.Println("🔍 Starting kube-bench watcher...")
+	logger.Info("Starting kube-bench watcher",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "kube_bench_start",
+			Source:    "kube-bench",
+		})
 
 	// Run initial scan
 	if err := kbw.runKubeBenchScan(ctx); err != nil {
-		log.Printf("❌ Initial kube-bench scan failed: %v", err)
+		logger.Error("Initial kube-bench scan failed",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "kube_bench_scan",
+				Source:    "kube-bench",
+				Error:     err,
+			})
 	}
 
 	// Start periodic scanning
@@ -100,11 +111,22 @@ func (kbw *KubeBenchWatcher) Start(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("🛑 Kube-bench watcher stopped")
+			logger.Info("Kube-bench watcher stopped",
+				logger.Fields{
+					Component: "watcher",
+					Operation: "kube_bench_stop",
+					Source:    "kube-bench",
+				})
 			return ctx.Err()
 		case <-ticker.C:
 			if err := kbw.runKubeBenchScan(ctx); err != nil {
-				log.Printf("❌ Kube-bench scan failed: %v", err)
+				logger.Error("Kube-bench scan failed",
+					logger.Fields{
+						Component: "watcher",
+						Operation: "kube_bench_scan",
+						Source:    "kube-bench",
+						Error:     err,
+					})
 			}
 		}
 	}
@@ -112,7 +134,12 @@ func (kbw *KubeBenchWatcher) Start(ctx context.Context) error {
 
 // runKubeBenchScan runs kube-bench and processes the results
 func (kbw *KubeBenchWatcher) runKubeBenchScan(ctx context.Context) error {
-	log.Println("🔍 Running kube-bench security scan...")
+	logger.Debug("Running kube-bench security scan",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "kube_bench_scan",
+			Source:    "kube-bench",
+		})
 
 	// Get cluster nodes
 	nodes, err := kbw.clientSet.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
@@ -126,7 +153,16 @@ func (kbw *KubeBenchWatcher) runKubeBenchScan(ctx context.Context) error {
 	for _, node := range nodes.Items {
 		nodeFindings, err := kbw.scanNode(ctx, node.Name)
 		if err != nil {
-			log.Printf("⚠️ Failed to scan node %s: %v", node.Name, err)
+			logger.Warn("Failed to scan node",
+				logger.Fields{
+					Component: "watcher",
+					Operation: "kube_bench_scan",
+					Source:    "kube-bench",
+					Additional: map[string]interface{}{
+						"node_name": node.Name,
+					},
+					Error: err,
+				})
 			continue
 		}
 		findings = append(findings, nodeFindings...)
@@ -135,17 +171,37 @@ func (kbw *KubeBenchWatcher) runKubeBenchScan(ctx context.Context) error {
 	// Process findings
 	for _, finding := range findings {
 		if err := kbw.actionHandler.HandleKubeBenchFinding(ctx, finding); err != nil {
-			log.Printf("❌ Failed to handle kube-bench finding: %v", err)
+			logger.Error("Failed to handle kube-bench finding",
+				logger.Fields{
+					Component: "watcher",
+					Operation: "handle_kube_bench_finding",
+					Source:    "kube-bench",
+					Error:     err,
+				})
 		}
 	}
 
-	log.Printf("✅ Kube-bench scan completed. Found %d security findings", len(findings))
+	logger.Info("Kube-bench scan completed",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "kube_bench_scan",
+			Source:    "kube-bench",
+			Count:     len(findings),
+		})
 	return nil
 }
 
 // scanNode runs kube-bench on a specific node
 func (kbw *KubeBenchWatcher) scanNode(ctx context.Context, nodeName string) ([]KubeBenchFinding, error) {
-	log.Printf("🔍 Scanning node: %s", nodeName)
+	logger.Debug("Scanning node",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "scan_node",
+			Source:    "kube-bench",
+			Additional: map[string]interface{}{
+				"node_name": nodeName,
+			},
+		})
 
 	// Create a kube-bench job for this node
 	job := kbw.createKubeBenchJob(nodeName)
@@ -169,7 +225,16 @@ func (kbw *KubeBenchWatcher) scanNode(ctx context.Context, nodeName string) ([]K
 
 	// Clean up the job
 	if err := kbw.clientSet.BatchV1().Jobs(kbw.namespace).Delete(ctx, createdJob.Name, metav1.DeleteOptions{}); err != nil {
-		log.Printf("⚠️ Failed to delete kube-bench job: %v", err)
+		logger.Warn("Failed to delete kube-bench job",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "cleanup_kube_bench_job",
+				Source:    "kube-bench",
+				Additional: map[string]interface{}{
+					"job_name": createdJob.Name,
+				},
+				Error: err,
+			})
 	}
 
 	return findings, nil
@@ -385,7 +450,12 @@ func (kbw *KubeBenchWatcher) getSeverityFromLevel(level int) string {
 
 // RunKubeBenchLocally runs kube-bench locally (for testing)
 func (kbw *KubeBenchWatcher) RunKubeBenchLocally(ctx context.Context) ([]KubeBenchFinding, error) {
-	log.Println("🔍 Running kube-bench locally...")
+	logger.Debug("Running kube-bench locally",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "kube_bench_local",
+			Source:    "kube-bench",
+		})
 
 	// Run kube-bench command
 	cmd := exec.CommandContext(ctx, "kube-bench", "run", "--targets", "master,node", "--json")
@@ -425,6 +495,12 @@ func (kbw *KubeBenchWatcher) RunKubeBenchLocally(ctx context.Context) ([]KubeBen
 		}
 	}
 
-	log.Printf("✅ Local kube-bench scan completed. Found %d security findings", len(findings))
+	logger.Info("Local kube-bench scan completed",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "kube_bench_local",
+			Source:    "kube-bench",
+			Count:     len(findings),
+		})
 	return findings, nil
 }

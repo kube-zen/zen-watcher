@@ -63,6 +63,25 @@ spec:
           value: {{ .Values.config.trivyNamespace | quote }}
         - name: FALCO_NAMESPACE
           value: {{ .Values.config.falcoNamespace | quote }}
+        {{- if .Values.webhookSecurity.authToken.enabled }}
+        {{- if .Values.webhookSecurity.authToken.secretName }}
+        - name: WEBHOOK_AUTH_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.webhookSecurity.authToken.secretName }}
+              key: {{ .Values.webhookSecurity.authToken.secretKey }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.webhookSecurity.ipAllowlist.enabled }}
+        {{- if .Values.webhookSecurity.ipAllowlist.allowedIPs }}
+        - name: WEBHOOK_ALLOWED_IPS
+          value: {{ range $index, $ip := .Values.webhookSecurity.ipAllowlist.allowedIPs }}{{ if $index }},{{ end }}{{ $ip }}{{ end | quote }}
+        {{- end }}
+        {{- end }}
+        {{- if .Values.webhookSecurity.rateLimit.enabled }}
+        - name: WEBHOOK_RATE_LIMIT
+          value: {{ .Values.webhookSecurity.rateLimit.requestsPerMinute | quote }}
+        {{- end }}
         {{- with .Values.extraEnv }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

@@ -3,12 +3,12 @@ package gc
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -76,7 +76,15 @@ func NewCollector(
 
 // Start starts the garbage collection loop
 func (gc *Collector) Start(ctx context.Context) {
-	log.Printf("🗑️  Starting Observation garbage collector (TTL: %d days, interval: %v)", gc.ttlDays, gc.gcInterval)
+	logger.Info("Starting Observation garbage collector",
+		logger.Fields{
+			Component: "gc",
+			Operation: "gc_start",
+			Additional: map[string]interface{}{
+				"ttl_days": gc.ttlDays,
+				"interval": gc.gcInterval.String(),
+			},
+		})
 
 	ticker := time.NewTicker(gc.gcInterval)
 	defer ticker.Stop()
@@ -87,7 +95,11 @@ func (gc *Collector) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("🛑 Observation garbage collector stopped")
+			logger.Info("Observation garbage collector stopped",
+				logger.Fields{
+					Component: "gc",
+					Operation: "gc_stop",
+				})
 			return
 		case <-ticker.C:
 			gc.runGC(ctx)
@@ -109,7 +121,14 @@ func (gc *Collector) runGC(ctx context.Context) {
 		gc.gcRunsTotal.Inc()
 	}
 
-	log.Printf("🗑️  Running garbage collection (TTL: %d days)...", gc.ttlDays)
+	logger.Debug("Running garbage collection",
+		logger.Fields{
+			Component: "gc",
+			Operation: "gc_run",
+			Additional: map[string]interface{}{
+				"ttl_days": gc.ttlDays,
+			},
+		})
 
 	// List all namespaces (or use watch namespace if set)
 	namespaces := gc.getNamespacesToScan()
@@ -125,16 +144,34 @@ func (gc *Collector) runGC(ctx context.Context) {
 			deleted, err = gc.collectNamespace(ctx, ns)
 		}
 		if err != nil {
-			log.Printf("⚠️  Failed to collect Observations in namespace %s: %v", ns, err)
+			logger.Warn("Failed to collect Observations in namespace",
+				logger.Fields{
+					Component: "gc",
+					Operation: "gc_run",
+					Namespace: ns,
+					Error:     err,
+				})
 			continue
 		}
 		totalDeleted += deleted
 	}
 
 	if totalDeleted > 0 {
-		log.Printf("✅ Garbage collection completed: deleted %d Observations", totalDeleted)
+		logger.Info("Garbage collection completed",
+			logger.Fields{
+				Component: "gc",
+				Operation: "gc_run",
+				Count:     totalDeleted,
+				Additional: map[string]interface{}{
+					"deleted": totalDeleted,
+				},
+			})
 	} else {
-		log.Printf("✅ Garbage collection completed: no Observations to delete")
+		logger.Debug("Garbage collection completed, no Observations to delete",
+			logger.Fields{
+				Component: "gc",
+				Operation: "gc_run",
+			})
 	}
 }
 
@@ -180,7 +217,16 @@ func (gc *Collector) collectNamespace(ctx context.Context, namespace string) (in
 				}
 				gc.gcErrors.WithLabelValues("delete", errorType).Inc()
 			}
-			log.Printf("⚠️  Failed to delete Observation %s/%s: %v", namespace, name, err)
+			logger.Warn("Failed to delete Observation",
+				logger.Fields{
+					Component:    "gc",
+					Operation:    "gc_delete",
+					Namespace:    namespace,
+					ResourceName: name,
+					Source:       source,
+					Reason:       reason,
+					Error:        err,
+				})
 			continue
 		}
 
@@ -188,7 +234,15 @@ func (gc *Collector) collectNamespace(ctx context.Context, namespace string) (in
 		if gc.observationsDeleted != nil {
 			gc.observationsDeleted.WithLabelValues(source, reason).Inc()
 		}
-		log.Printf("  🗑️  Deleted Observation %s/%s (reason: %s)", namespace, name, reason)
+		logger.Debug("Deleted Observation",
+			logger.Fields{
+				Component:    "gc",
+				Operation:    "gc_delete",
+				Namespace:    namespace,
+				ResourceName: name,
+				Source:       source,
+				Reason:       reason,
+			})
 	}
 
 	return deletedCount, nil
@@ -230,7 +284,16 @@ func (gc *Collector) collectAllNamespaces(ctx context.Context) (int, error) {
 
 		err := gc.dynClient.Resource(gc.eventGVR).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
 		if err != nil {
-			log.Printf("⚠️  Failed to delete Observation %s/%s: %v", namespace, name, err)
+			logger.Warn("Failed to delete Observation",
+				logger.Fields{
+					Component:    "gc",
+					Operation:    "gc_delete",
+					Namespace:    namespace,
+					ResourceName: name,
+					Source:       source,
+					Reason:       reason,
+					Error:        err,
+				})
 			continue
 		}
 
@@ -238,7 +301,15 @@ func (gc *Collector) collectAllNamespaces(ctx context.Context) (int, error) {
 		if gc.observationsDeleted != nil {
 			gc.observationsDeleted.WithLabelValues(source, reason).Inc()
 		}
-		log.Printf("  🗑️  Deleted Observation %s/%s (reason: %s)", namespace, name, reason)
+		logger.Debug("Deleted Observation",
+			logger.Fields{
+				Component:    "gc",
+				Operation:    "gc_delete",
+				Namespace:    namespace,
+				ResourceName: name,
+				Source:       source,
+				Reason:       reason,
+			})
 	}
 
 	return deletedCount, nil

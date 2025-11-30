@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"sync"
 
@@ -11,15 +10,36 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/gc"
+	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/server"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
 )
 
 func main() {
-	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	log.Println("🚀 zen-watcher v1.0.22 (Go 1.24, Apache 2.0)")
-	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	// Initialize structured logger
+	logLevel := os.Getenv("LOG_LEVEL")
+	if logLevel == "" {
+		logLevel = "INFO"
+	}
+	development := os.Getenv("LOG_DEVELOPMENT") == "true"
+	if err := logger.Init(logLevel, development); err != nil {
+		// Fallback to standard log if zap init fails
+		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
+		os.Exit(1)
+	}
+	defer logger.Sync()
+
+	log := logger.GetLogger()
+	log.Info("zen-watcher starting",
+		logger.Fields{
+			Component: "main",
+			Additional: map[string]interface{}{
+				"version":    "1.0.22",
+				"go_version": "1.24",
+				"license":    "Apache 2.0",
+			},
+		})
 
 	// Setup signal handling and context
 	ctx, stopCh := lifecycle.SetupSignalHandler()
@@ -30,7 +50,12 @@ func main() {
 	// Initialize Kubernetes clients
 	clients, err := kubernetes.NewClients()
 	if err != nil {
-		log.Fatalf("❌ Failed to initialize Kubernetes clients: %v", err)
+		log.Fatal("Failed to initialize Kubernetes clients",
+			logger.Fields{
+				Component: "main",
+				Operation: "kubernetes_init",
+				Error:     err,
+			})
 	}
 
 	// Get GVRs
@@ -42,7 +67,12 @@ func main() {
 	// Load filter configuration from ConfigMap (initial load)
 	filterConfig, err := filter.LoadFilterConfig(clients.Standard)
 	if err != nil {
-		log.Printf("⚠️  Failed to load filter config: %v (continuing without filter)", err)
+		log.Warn("Failed to load filter config, continuing without filter",
+			logger.Fields{
+				Component: "main",
+				Operation: "filter_load",
+				Error:     err,
+			})
 		filterConfig = &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	}
 	filterInstance := filter.NewFilter(filterConfig)
@@ -66,7 +96,12 @@ func main() {
 
 	// Setup informers
 	if err := kubernetes.SetupInformers(ctx, informerFactory, gvrs, eventProcessor, stopCh); err != nil {
-		log.Fatalf("❌ Failed to setup informers: %v", err)
+		log.Fatal("Failed to setup informers",
+			logger.Fields{
+				Component: "main",
+				Operation: "setup_informers",
+				Error:     err,
+			})
 	}
 
 	// Update informer cache sync metrics
@@ -113,9 +148,24 @@ func main() {
 					}
 				}
 			case alert := <-falcoAlertsChan:
-				log.Printf("  🔄 [FALCO] Processing alert from channel: %v", alert["rule"])
+				rule, _ := alert["rule"].(string)
+				log.Debug("Processing Falco alert from channel",
+					logger.Fields{
+						Component: "main",
+						Operation: "process_falco_channel",
+						Source:    "falco",
+						Additional: map[string]interface{}{
+							"rule": rule,
+						},
+					})
 				if err := webhookProcessor.ProcessFalcoAlert(ctx, alert); err != nil {
-					log.Printf("⚠️  Failed to process Falco alert: %v", err)
+					log.Error("Failed to process Falco alert",
+						logger.Fields{
+							Component: "main",
+							Operation: "process_falco_channel",
+							Source:    "falco",
+							Error:     err,
+						})
 				}
 			}
 		}
@@ -136,9 +186,23 @@ func main() {
 				}
 			case auditEvent := <-auditEventsChan:
 				auditID := fmt.Sprintf("%v", auditEvent["auditID"])
-				log.Printf("  🔄 [AUDIT] Processing event from channel: auditID=%s", auditID)
+				log.Debug("Processing audit event from channel",
+					logger.Fields{
+						Component: "main",
+						Operation: "process_audit_channel",
+						Source:    "audit",
+						Additional: map[string]interface{}{
+							"audit_id": auditID,
+						},
+					})
 				if err := webhookProcessor.ProcessAuditEvent(ctx, auditEvent); err != nil {
-					log.Printf("⚠️  Failed to process audit event: %v", err)
+					log.Error("Failed to process audit event",
+						logger.Fields{
+							Component: "main",
+							Operation: "process_audit_channel",
+							Source:    "audit",
+							Error:     err,
+						})
 				}
 			}
 		}
@@ -155,7 +219,12 @@ func main() {
 	go func() {
 		defer wg.Done()
 		if err := configMapLoader.Start(ctx); err != nil {
-			log.Printf("⚠️  ConfigMap loader stopped: %v", err)
+			log.Error("ConfigMap loader stopped",
+				logger.Fields{
+					Component: "main",
+					Operation: "configmap_loader",
+					Error:     err,
+				})
 		}
 	}()
 
@@ -175,19 +244,34 @@ func main() {
 	}()
 
 	// Log configuration
-	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
-	log.Println("✅ zen-watcher READY")
-	log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	log.Info("zen-watcher ready",
+		logger.Fields{
+			Component: "main",
+			Operation: "startup_complete",
+		})
 	autoDetect := os.Getenv("AUTO_DETECT_ENABLED")
 	if autoDetect == "" {
 		autoDetect = "true"
 	}
-	log.Printf("🔍 Auto-detect: %s", autoDetect)
+	log.Info("Configuration loaded",
+		logger.Fields{
+			Component: "main",
+			Operation: "config_load",
+			Additional: map[string]interface{}{
+				"auto_detect_enabled": autoDetect,
+			},
+		})
 
 	// Wait for shutdown
 	lifecycle.WaitForShutdown(ctx, &wg, func() {
 		totalCount := eventProcessor.GetTotalCount() + webhookProcessor.GetTotalCount()
-		log.Printf("✅ zen-watcher stopped (created %d events)", totalCount)
-		log.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+		log.Info("zen-watcher stopped",
+			logger.Fields{
+				Component: "main",
+				Operation: "shutdown",
+				Additional: map[string]interface{}{
+					"events_created": totalCount,
+				},
+			})
 	})
 }

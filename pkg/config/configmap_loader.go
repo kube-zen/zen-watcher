@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"sync"
 
 	"github.com/kube-zen/zen-watcher/pkg/filter"
+	"github.com/kube-zen/zen-watcher/pkg/logger"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
@@ -61,17 +61,39 @@ func NewConfigMapLoader(
 
 // Start starts watching the ConfigMap for changes
 func (cml *ConfigMapLoader) Start(ctx context.Context) error {
-	log.Printf("🔍 Starting ConfigMap watcher for filter config: %s/%s", cml.configMapNamespace, cml.configMapName)
+	logger.Info("Starting ConfigMap watcher for filter config",
+		logger.Fields{
+			Component: "config",
+			Operation: "configmap_watcher_start",
+			Namespace: cml.configMapNamespace,
+			Additional: map[string]interface{}{
+				"configmap_name": cml.configMapName,
+			},
+		})
 
 	// Load initial config (use context to respect cancellation)
 	initialConfig, err := cml.loadConfigWithContext(ctx)
 	if err != nil {
-		log.Printf("⚠️  Failed to load initial filter config: %v (will retry on ConfigMap creation)", err)
+		logger.Warn("Failed to load initial filter config, will retry on ConfigMap creation",
+			logger.Fields{
+				Component: "config",
+				Operation: "configmap_load_initial",
+				Namespace: cml.configMapNamespace,
+				Error:     err,
+			})
 		// Continue - we'll watch for ConfigMap creation
 	} else {
 		cml.updateFilter(initialConfig)
 		cml.setLastGoodConfig(initialConfig)
-		log.Printf("✅ Loaded initial filter configuration from ConfigMap '%s/%s'", cml.configMapNamespace, cml.configMapName)
+		logger.Info("Loaded initial filter configuration from ConfigMap",
+			logger.Fields{
+				Component: "config",
+				Operation: "configmap_load_initial",
+				Namespace: cml.configMapNamespace,
+				Additional: map[string]interface{}{
+					"configmap_name": cml.configMapName,
+				},
+			})
 	}
 
 	// Create informer factory for the specific namespace
@@ -91,7 +113,15 @@ func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 			if !ok || cm.Name != cml.configMapName {
 				return
 			}
-			log.Printf("📝 ConfigMap '%s/%s' added", cm.Namespace, cm.Name)
+			logger.Info("ConfigMap added",
+				logger.Fields{
+					Component: "config",
+					Operation: "configmap_added",
+					Namespace: cm.Namespace,
+					Additional: map[string]interface{}{
+						"configmap_name": cm.Name,
+					},
+				})
 			cml.handleConfigMapChange(cm)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
@@ -99,7 +129,15 @@ func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 			if !ok || cm.Name != cml.configMapName {
 				return
 			}
-			log.Printf("📝 ConfigMap '%s/%s' updated", cm.Namespace, cm.Name)
+			logger.Info("ConfigMap updated",
+				logger.Fields{
+					Component: "config",
+					Operation: "configmap_updated",
+					Namespace: cm.Namespace,
+					Additional: map[string]interface{}{
+						"configmap_name": cm.Name,
+					},
+				})
 			cml.handleConfigMapChange(cm)
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -119,7 +157,15 @@ func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 			if cm.Name != cml.configMapName {
 				return
 			}
-			log.Printf("📝 ConfigMap '%s/%s' deleted, keeping last good config", cm.Namespace, cm.Name)
+			logger.Info("ConfigMap deleted, keeping last good config",
+				logger.Fields{
+					Component: "config",
+					Operation: "configmap_deleted",
+					Namespace: cm.Namespace,
+					Additional: map[string]interface{}{
+						"configmap_name": cm.Name,
+					},
+				})
 			// Keep last good config - don't reset to default
 		},
 	})
@@ -132,7 +178,15 @@ func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to sync ConfigMap informer cache")
 	}
 
-	log.Printf("✅ ConfigMap watcher started and synced for '%s/%s'", cml.configMapNamespace, cml.configMapName)
+	logger.Info("ConfigMap watcher started and synced",
+		logger.Fields{
+			Component: "config",
+			Operation: "configmap_watcher_synced",
+			Namespace: cml.configMapNamespace,
+			Additional: map[string]interface{}{
+				"configmap_name": cml.configMapName,
+			},
+		})
 
 	// Block until context is cancelled
 	<-ctx.Done()
@@ -144,14 +198,33 @@ func (cml *ConfigMapLoader) handleConfigMapChange(cm *corev1.ConfigMap) {
 	// Extract filter.json from ConfigMap
 	filterJSON, found := cm.Data[cml.configMapKey]
 	if !found {
-		log.Printf("⚠️  Filter key '%s' not found in ConfigMap '%s/%s', keeping last good config", cml.configMapKey, cm.Namespace, cm.Name)
+		logger.Warn("Filter key not found in ConfigMap, keeping last good config",
+			logger.Fields{
+				Component: "config",
+				Operation: "configmap_reload",
+				Namespace: cm.Namespace,
+				Reason:    "key_not_found",
+				Additional: map[string]interface{}{
+					"configmap_name": cm.Name,
+					"key":            cml.configMapKey,
+				},
+			})
 		return
 	}
 
 	// Parse JSON
 	var config filter.FilterConfig
 	if err := json.Unmarshal([]byte(filterJSON), &config); err != nil {
-		log.Printf("❌ Failed to parse filter config from ConfigMap '%s/%s': %v (keeping last good config)", cm.Namespace, cm.Name, err)
+		logger.Error("Failed to parse filter config from ConfigMap, keeping last good config",
+			logger.Fields{
+				Component: "config",
+				Operation: "configmap_reload",
+				Namespace: cm.Namespace,
+				Error:     err,
+				Additional: map[string]interface{}{
+					"configmap_name": cm.Name,
+				},
+			})
 		return
 	}
 
@@ -163,7 +236,15 @@ func (cml *ConfigMapLoader) handleConfigMapChange(cm *corev1.ConfigMap) {
 	// Update filter with new config
 	cml.updateFilter(&config)
 	cml.setLastGoodConfig(&config)
-	log.Printf("✅ Reloaded filter configuration from ConfigMap '%s/%s'", cm.Namespace, cm.Name)
+	logger.Info("Reloaded filter configuration from ConfigMap",
+		logger.Fields{
+			Component: "config",
+			Operation: "configmap_reload",
+			Namespace: cm.Namespace,
+			Additional: map[string]interface{}{
+				"configmap_name": cm.Name,
+			},
+		})
 }
 
 // loadConfig loads the current ConfigMap configuration (uses context.Background for backward compatibility)

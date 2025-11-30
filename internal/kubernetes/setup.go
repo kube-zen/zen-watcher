@@ -1,9 +1,9 @@
 package kubernetes
 
 import (
-	"log"
 	"time"
 
+	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -27,7 +27,11 @@ type GVRs struct {
 
 // NewClients creates Kubernetes clients from in-cluster config
 func NewClients() (*Clients, error) {
-	log.Println("📡 Initializing Kubernetes client...")
+	logger.Info("Initializing Kubernetes client",
+		logger.Fields{
+			Component: "kubernetes",
+			Operation: "client_init",
+		})
 
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -44,7 +48,11 @@ func NewClients() (*Clients, error) {
 		return nil, err
 	}
 
-	log.Println("✅ Kubernetes client ready")
+	logger.Info("Kubernetes client ready",
+		logger.Fields{
+			Component: "kubernetes",
+			Operation: "client_init",
+		})
 
 	return &Clients{
 		Dynamic:  dynClient,

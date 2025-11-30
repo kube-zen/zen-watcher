@@ -2,11 +2,12 @@ package lifecycle
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
+
+	"github.com/kube-zen/zen-watcher/pkg/logger"
 )
 
 // SetupSignalHandler creates a context that cancels on SIGINT/SIGTERM
@@ -20,7 +21,14 @@ func SetupSignalHandler() (context.Context, chan struct{}) {
 
 	go func() {
 		sig := <-sigChan
-		log.Printf("⚠️  Shutdown signal received: %v", sig)
+		logger.Info("Shutdown signal received",
+			logger.Fields{
+				Component: "lifecycle",
+				Operation: "signal_handler",
+				Additional: map[string]interface{}{
+					"signal": sig.String(),
+				},
+			})
 		close(stopCh)
 		cancel()
 	}()
@@ -31,10 +39,18 @@ func SetupSignalHandler() (context.Context, chan struct{}) {
 // WaitForShutdown waits for all goroutines to finish and performs final cleanup
 func WaitForShutdown(ctx context.Context, wg *sync.WaitGroup, cleanup func()) {
 	<-ctx.Done()
-	log.Println("⏳ Waiting for goroutines to finish...")
+	logger.Info("Waiting for goroutines to finish",
+		logger.Fields{
+			Component: "lifecycle",
+			Operation: "shutdown_wait",
+		})
 	wg.Wait()
 	if cleanup != nil {
 		cleanup()
 	}
-	log.Println("✅ Shutdown complete")
+	logger.Info("Shutdown complete",
+		logger.Fields{
+			Component: "lifecycle",
+			Operation: "shutdown_complete",
+		})
 }

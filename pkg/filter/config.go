@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
+	"github.com/kube-zen/zen-watcher/pkg/logger"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
@@ -83,7 +83,15 @@ func LoadFilterConfig(clientSet kubernetes.Interface) (*FilterConfig, error) {
 	)
 	if err != nil {
 		// ConfigMap not found - return default (allow all) config
-		log.Printf("  ℹ️  Filter ConfigMap '%s/%s' not found, using default (allow all) filter", configMapNamespace, configMapName)
+		logger.Debug("Filter ConfigMap not found, using default (allow all) filter",
+			logger.Fields{
+				Component: "filter",
+				Operation: "config_load",
+				Namespace: configMapNamespace,
+				Additional: map[string]interface{}{
+					"configmap_name": configMapName,
+				},
+			})
 		return &FilterConfig{
 			Sources: make(map[string]SourceFilter),
 		}, nil
@@ -93,7 +101,16 @@ func LoadFilterConfig(clientSet kubernetes.Interface) (*FilterConfig, error) {
 	filterJSON, found := cm.Data[configMapKey]
 	if !found {
 		// Key not found - return default config
-		log.Printf("  ℹ️  Filter key '%s' not found in ConfigMap, using default (allow all) filter", configMapKey)
+		logger.Debug("Filter key not found in ConfigMap, using default (allow all) filter",
+			logger.Fields{
+				Component: "filter",
+				Operation: "config_load",
+				Namespace: configMapNamespace,
+				Additional: map[string]interface{}{
+					"configmap_name": configMapName,
+					"key":            configMapKey,
+				},
+			})
 		return &FilterConfig{
 			Sources: make(map[string]SourceFilter),
 		}, nil
@@ -105,7 +122,15 @@ func LoadFilterConfig(clientSet kubernetes.Interface) (*FilterConfig, error) {
 		return nil, fmt.Errorf("failed to parse filter config: %w", err)
 	}
 
-	log.Printf("  ✅ Loaded filter configuration from ConfigMap '%s/%s'", configMapNamespace, configMapName)
+	logger.Info("Loaded filter configuration from ConfigMap",
+		logger.Fields{
+			Component: "filter",
+			Operation: "config_load",
+			Namespace: configMapNamespace,
+			Additional: map[string]interface{}{
+				"configmap_name": configMapName,
+			},
+		})
 	return &config, nil
 }
 

@@ -2,9 +2,9 @@ package kubernetes
 
 import (
 	"context"
-	"log"
 	"time"
 
+	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
@@ -24,7 +24,11 @@ func SetupInformers(
 	eventProcessor EventProcessor,
 	stopCh chan struct{},
 ) error {
-	log.Println("🚀 Starting informers...")
+	logger.Info("Starting informers",
+		logger.Fields{
+			Component: "kubernetes",
+			Operation: "informers_start",
+		})
 
 	// Setup Kyverno PolicyReport informer
 	policyInformer := factory.ForResource(gvrs.PolicyReport).Informer()
@@ -32,21 +36,45 @@ func SetupInformers(
 		AddFunc: func(obj interface{}) {
 			report, ok := obj.(*unstructured.Unstructured)
 			if !ok {
-				log.Printf("⚠️  Invalid object type in Kyverno PolicyReport AddFunc")
+				logger.Warn("Invalid object type in Kyverno PolicyReport AddFunc",
+					logger.Fields{
+						Component: "kubernetes",
+						Operation: "informer_add",
+						Source:    "kyverno",
+					})
 				return
 			}
-			log.Printf("📊 [KYVERNO] PolicyReport added: %s/%s", report.GetNamespace(), report.GetName())
-			log.Printf("  🔍 [KYVERNO] Calling ProcessKyvernoPolicyReport for: %s/%s", report.GetNamespace(), report.GetName())
+			logger.Debug("PolicyReport added",
+				logger.Fields{
+					Component:    "kubernetes",
+					Operation:    "informer_add",
+					Source:       "kyverno",
+					ResourceKind: "PolicyReport",
+					Namespace:    report.GetNamespace(),
+					ResourceName: report.GetName(),
+				})
 			eventProcessor.ProcessKyvernoPolicyReport(ctx, report)
-			log.Printf("  🔍 [KYVERNO] ProcessKyvernoPolicyReport returned for: %s/%s", report.GetNamespace(), report.GetName())
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			report, ok := newObj.(*unstructured.Unstructured)
 			if !ok {
-				log.Printf("⚠️  Invalid object type in Kyverno PolicyReport UpdateFunc")
+				logger.Warn("Invalid object type in Kyverno PolicyReport UpdateFunc",
+					logger.Fields{
+						Component: "kubernetes",
+						Operation: "informer_update",
+						Source:    "kyverno",
+					})
 				return
 			}
-			log.Printf("📊 [KYVERNO] PolicyReport updated: %s/%s", report.GetNamespace(), report.GetName())
+			logger.Debug("PolicyReport updated",
+				logger.Fields{
+					Component:    "kubernetes",
+					Operation:    "informer_update",
+					Source:       "kyverno",
+					ResourceKind: "PolicyReport",
+					Namespace:    report.GetNamespace(),
+					ResourceName: report.GetName(),
+				})
 			eventProcessor.ProcessKyvernoPolicyReport(ctx, report)
 		},
 	})
@@ -57,24 +85,46 @@ func SetupInformers(
 		AddFunc: func(obj interface{}) {
 			report, ok := obj.(*unstructured.Unstructured)
 			if !ok {
-				log.Printf("⚠️  Invalid object type in Trivy VulnerabilityReport AddFunc")
+				logger.Warn("Invalid object type in Trivy VulnerabilityReport AddFunc",
+					logger.Fields{
+						Component: "kubernetes",
+						Operation: "informer_add",
+						Source:    "trivy",
+					})
 				return
 			}
-			log.Printf("🔍 [TRIVY] VulnerabilityReport added: %s/%s", report.GetNamespace(), report.GetName())
-			log.Printf("🔍 [TRIVY] Calling ProcessTrivyVulnerabilityReport for: %s/%s", report.GetNamespace(), report.GetName())
+			logger.Debug("VulnerabilityReport added",
+				logger.Fields{
+					Component:    "kubernetes",
+					Operation:    "informer_add",
+					Source:       "trivy",
+					ResourceKind: "VulnerabilityReport",
+					Namespace:    report.GetNamespace(),
+					ResourceName: report.GetName(),
+				})
 			eventProcessor.ProcessTrivyVulnerabilityReport(ctx, report)
-			log.Printf("🔍 [TRIVY] ProcessTrivyVulnerabilityReport returned for: %s/%s", report.GetNamespace(), report.GetName())
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			report, ok := newObj.(*unstructured.Unstructured)
 			if !ok {
-				log.Printf("⚠️  Invalid object type in Trivy VulnerabilityReport UpdateFunc")
+				logger.Warn("Invalid object type in Trivy VulnerabilityReport UpdateFunc",
+					logger.Fields{
+						Component: "kubernetes",
+						Operation: "informer_update",
+						Source:    "trivy",
+					})
 				return
 			}
-			log.Printf("🔍 [TRIVY] VulnerabilityReport updated: %s/%s", report.GetNamespace(), report.GetName())
-			log.Printf("🔍 [TRIVY] Calling ProcessTrivyVulnerabilityReport (update) for: %s/%s", report.GetNamespace(), report.GetName())
+			logger.Debug("VulnerabilityReport updated",
+				logger.Fields{
+					Component:    "kubernetes",
+					Operation:    "informer_update",
+					Source:       "trivy",
+					ResourceKind: "VulnerabilityReport",
+					Namespace:    report.GetNamespace(),
+					ResourceName: report.GetName(),
+				})
 			eventProcessor.ProcessTrivyVulnerabilityReport(ctx, report)
-			log.Printf("🔍 [TRIVY] ProcessTrivyVulnerabilityReport returned (update) for: %s/%s", report.GetNamespace(), report.GetName())
 		},
 	})
 
@@ -86,10 +136,23 @@ func SetupInformers(
 	defer syncCancel()
 
 	if !cache.WaitForCacheSync(syncCtx.Done(), policyInformer.HasSynced, trivyInformer.HasSynced) {
-		log.Println("⚠️  Informer caches did not sync within timeout (CRDs may not be installed - this is OK)")
-		log.Println("   Informers will continue running and will sync when CRDs become available")
+		logger.Warn("Informer caches did not sync within timeout (CRDs may not be installed - this is OK)",
+			logger.Fields{
+				Component: "kubernetes",
+				Operation: "informers_sync",
+				Reason:    "timeout",
+			})
+		logger.Info("Informers will continue running and will sync when CRDs become available",
+			logger.Fields{
+				Component: "kubernetes",
+				Operation: "informers_sync",
+			})
 	} else {
-		log.Println("✅ Informers started and synced - real-time event processing enabled")
+		logger.Info("Informers started and synced - real-time event processing enabled",
+			logger.Fields{
+				Component: "kubernetes",
+				Operation: "informers_sync",
+			})
 	}
 
 	return nil

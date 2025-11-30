@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -71,14 +71,23 @@ func (p *ConfigMapPoller) Start(ctx context.Context) {
 
 // poll performs a single polling cycle
 func (p *ConfigMapPoller) poll(ctx context.Context) {
-	log.Println("🔍 Checking ConfigMap-based reports (kube-bench, checkov)...")
+	logger.Debug("Checking ConfigMap-based reports",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "configmap_poll",
+		})
 
 	p.processKubeBench(ctx)
 	p.processCheckov(ctx)
 
 	// Update totals
 	totalCount := p.eventProcessor.GetTotalCount() + p.webhookProcessor.GetTotalCount()
-	log.Printf("📊 Total Observations: %d", totalCount)
+	logger.Debug("Total Observations",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "configmap_poll",
+			Count:     int(totalCount),
+		})
 }
 
 // processKubeBench processes kube-bench ConfigMaps
@@ -92,11 +101,25 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 		LabelSelector: "app=kube-bench",
 	})
 	if err != nil || len(configMaps.Items) == 0 {
-		log.Println("  ℹ️  No kube-bench ConfigMaps found (run kube-bench job to generate reports)")
+		logger.Debug("No kube-bench ConfigMaps found",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "process_kube_bench",
+				Source:    "kube-bench",
+				Namespace: kubeBenchNs,
+				Reason:    "no_configmaps",
+			})
 		return
 	}
 
-	log.Printf("  ✓ Found %d kube-bench ConfigMaps", len(configMaps.Items))
+	logger.Debug("Found kube-bench ConfigMaps",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "process_kube_bench",
+			Source:    "kube-bench",
+			Namespace: kubeBenchNs,
+			Count:     len(configMaps.Items),
+		})
 
 	kubeBenchCount := 0
 	for _, cm := range configMaps.Items {
@@ -107,7 +130,14 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 
 		var benchResults map[string]interface{}
 		if err := json.Unmarshal([]byte(resultsJSON), &benchResults); err != nil {
-			log.Printf("  ⚠️  Failed to parse kube-bench JSON: %v", err)
+			logger.Warn("Failed to parse kube-bench JSON",
+				logger.Fields{
+					Component: "watcher",
+					Operation: "process_kube_bench",
+					Source:    "kube-bench",
+					Namespace: kubeBenchNs,
+					Error:     err,
+				})
 			continue
 		}
 
@@ -197,7 +227,14 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 					// Deduplication is handled by ObservationCreator
 					err := p.observationCreator.CreateObservation(ctx, event)
 					if err != nil {
-						log.Printf("  ⚠️  Failed to create Observation: %v", err)
+						logger.Warn("Failed to create Observation",
+							logger.Fields{
+								Component: "watcher",
+								Operation: "observation_create",
+								Source:    "kube-bench",
+								Namespace: kubeBenchNs,
+								Error:     err,
+							})
 					} else {
 						kubeBenchCount++
 					}
@@ -207,13 +244,18 @@ func (p *ConfigMapPoller) processKubeBench(ctx context.Context) {
 	}
 
 	if kubeBenchCount > 0 {
-		log.Printf("  ✅ Created %d NEW Observations from kube-bench CIS failures", kubeBenchCount)
+		logger.Info("Created Observations from kube-bench CIS failures",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "process_kube_bench",
+				Source:    "kube-bench",
+				Count:     kubeBenchCount,
+			})
 	}
 }
 
 // processCheckov processes Checkov ConfigMaps
 func (p *ConfigMapPoller) processCheckov(ctx context.Context) {
-	log.Println("  → Checking Checkov reports...")
 	checkovNs := os.Getenv("CHECKOV_NAMESPACE")
 	if checkovNs == "" {
 		checkovNs = "checkov"
@@ -223,11 +265,25 @@ func (p *ConfigMapPoller) processCheckov(ctx context.Context) {
 		LabelSelector: "app=checkov",
 	})
 	if err != nil || len(checkovCMs.Items) == 0 {
-		log.Println("  ℹ️  No Checkov ConfigMaps found (run checkov scan to generate reports)")
+		logger.Debug("No Checkov ConfigMaps found",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "process_checkov",
+				Source:    "checkov",
+				Namespace: checkovNs,
+				Reason:    "no_configmaps",
+			})
 		return
 	}
 
-	log.Printf("  ✓ Found %d checkov ConfigMaps", len(checkovCMs.Items))
+	logger.Debug("Found Checkov ConfigMaps",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "process_checkov",
+			Source:    "checkov",
+			Namespace: checkovNs,
+			Count:     len(checkovCMs.Items),
+		})
 
 	checkovCount := 0
 	for _, cm := range checkovCMs.Items {
@@ -238,7 +294,14 @@ func (p *ConfigMapPoller) processCheckov(ctx context.Context) {
 
 		var checkovResults map[string]interface{}
 		if err := json.Unmarshal([]byte(resultsJSON), &checkovResults); err != nil {
-			log.Printf("  ⚠️  Failed to parse Checkov JSON: %v", err)
+			logger.Warn("Failed to parse Checkov JSON",
+				logger.Fields{
+					Component: "watcher",
+					Operation: "process_checkov",
+					Source:    "checkov",
+					Namespace: checkovNs,
+					Error:     err,
+				})
 			continue
 		}
 
@@ -329,7 +392,14 @@ func (p *ConfigMapPoller) processCheckov(ctx context.Context) {
 			// Deduplication is handled by ObservationCreator
 			err := p.observationCreator.CreateObservation(ctx, event)
 			if err != nil {
-				log.Printf("  ⚠️  Failed to create Checkov Observation: %v", err)
+				logger.Warn("Failed to create Checkov Observation",
+					logger.Fields{
+						Component: "watcher",
+						Operation: "observation_create",
+						Source:    "checkov",
+						Namespace: resourceNs,
+						Error:     err,
+					})
 			} else {
 				checkovCount++
 			}
@@ -337,6 +407,12 @@ func (p *ConfigMapPoller) processCheckov(ctx context.Context) {
 	}
 
 	if checkovCount > 0 {
-		log.Printf("  ✅ Created %d NEW Observations from Checkov static analysis failures", checkovCount)
+		logger.Info("Created Observations from Checkov static analysis failures",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "process_checkov",
+				Source:    "checkov",
+				Count:     checkovCount,
+			})
 	}
 }

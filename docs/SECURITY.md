@@ -1,5 +1,43 @@
 # Security Policy and Best Practices
 
+> **Note:** For detailed security documentation, see:
+> - [RBAC Security Documentation](./SECURITY_RBAC.md) - Detailed RBAC permissions and rationale
+> - [Threat Model](./SECURITY_THREAT_MODEL.md) - Threat vectors, mitigations, and security boundaries
+
+## Quick Security Checklist
+
+- ✅ Non-root container execution
+- ✅ Read-only root filesystem
+- ✅ Least-privilege RBAC
+- ✅ NetworkPolicy restrictions
+- ✅ Webhook authentication (token-based, IP allowlist)
+- ✅ Rate limiting (100 req/min per IP)
+- ✅ Garbage collection (prevents CRD bloat)
+- ✅ Resource quotas (recommended)
+
+## Webhook Security
+
+Zen Watcher exposes webhook endpoints for Falco and Audit events. **In production, enable authentication:**
+
+```yaml
+webhookSecurity:
+  authToken:
+    enabled: true
+    secretName: "zen-watcher-webhook-token"
+  ipAllowlist:
+    enabled: true
+    allowedIPs: ["10.0.0.0/8"]
+  rateLimit:
+    enabled: true
+    requestsPerMinute: 100
+```
+
+See [Threat Model](./SECURITY_THREAT_MODEL.md) for details.
+
+---
+
+# Security Policy and Best Practices
+
 ## Security Commitment
 
 Zen Watcher is a security tool and therefore must maintain the highest security standards. We take security seriously and follow industry best practices.

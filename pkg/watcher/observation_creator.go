@@ -3,13 +3,13 @@ package watcher
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 	"strings"
 
 	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
+	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -102,7 +102,16 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 	// STEP 3: DEDUP - Check if we should create (first event always creates, duplicates within window are skipped)
 	dedupKey := oc.extractDedupKey(observation)
 	if !oc.deduper.ShouldCreate(dedupKey) {
-		log.Printf("  📋 [DEDUP] Skipping duplicate observation within window: %s", dedupKey.String())
+		logger.Debug("Skipping duplicate observation within window",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "observation_dedup",
+				Source:    source,
+				Reason:    "duplicate_within_window",
+				Additional: map[string]interface{}{
+					"dedup_key": dedupKey.String(),
+				},
+			})
 		// Increment deduped metric
 		if oc.observationsDeduped != nil {
 			oc.observationsDeduped.Inc()
@@ -161,18 +170,37 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 	if categoryVal != nil {
 		category = fmt.Sprintf("%v", categoryVal)
 	} else if !categoryFound {
-		log.Printf("  ⚠️  DEBUG: category not found in spec")
+		logger.Debug("Category not found in spec",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "observation_create",
+				Source:    source,
+			})
 	}
 	severity := ""
 	if severityVal != nil {
 		severity = fmt.Sprintf("%v", severityVal)
 	} else if !severityFound {
-		log.Printf("  ⚠️  DEBUG: severity not found in spec")
+		logger.Debug("Severity not found in spec",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "observation_create",
+				Source:    source,
+			})
 	}
 
 	// Debug logging
 	if source == "" || category == "" || severity == "" {
-		log.Printf("  ⚠️  DEBUG: Extracted values - source:'%s' category:'%s' severity:'%s'", source, category, severity)
+		logger.Debug("Extracted values",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "observation_create",
+				Source:    source,
+				Additional: map[string]interface{}{
+					"category": category,
+					"severity": severity,
+				},
+			})
 	}
 
 	// Normalize severity to uppercase for consistency
@@ -189,9 +217,23 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 			severity = "UNKNOWN"
 		}
 		oc.eventsTotal.WithLabelValues(source, category, severity).Inc()
-		log.Printf("  📊 METRIC INCREMENTED: %s/%s/%s", source, category, severity)
+		logger.Debug("Metric incremented",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "observation_create",
+				Source:    source,
+				Additional: map[string]interface{}{
+					"category": category,
+					"severity": severity,
+				},
+			})
 	} else {
-		log.Printf("  ⚠️  CRITICAL: eventsTotal is nil! Metrics will not be incremented!")
+		logger.Error("eventsTotal metric is nil, metrics will not be incremented",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "observation_create",
+				Source:    source,
+			})
 	}
 
 	return nil

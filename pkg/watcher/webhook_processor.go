@@ -3,10 +3,10 @@ package watcher
 import (
 	"context"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
+	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -49,11 +49,30 @@ func (wp *WebhookProcessor) ProcessFalcoAlert(ctx context.Context, alert map[str
 
 	// Only process Warning, Error, Critical, Alert, Emergency
 	if priority != "Warning" && priority != "Error" && priority != "Critical" && priority != "Alert" && priority != "Emergency" {
-		log.Printf("  📋 [FALCO] Skipping alert with priority: %s", priority)
+		logger.Debug("Skipping alert with low priority",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "process_falco",
+				Source:    "falco",
+				Reason:    "priority_below_threshold",
+				Additional: map[string]interface{}{
+					"priority": priority,
+					"rule":     rule,
+				},
+			})
 		return nil
 	}
 
-	log.Printf("  🔍 [FALCO] Processing alert: %s (priority: %s)", rule, priority)
+	logger.Debug("Processing Falco alert",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "process_falco",
+			Source:    "falco",
+			Additional: map[string]interface{}{
+				"rule":     rule,
+				"priority": priority,
+			},
+		})
 
 	// Get K8s context if present (check output_fields first, then top level)
 	var k8sPodName, k8sNs string
@@ -123,7 +142,18 @@ func (wp *WebhookProcessor) ProcessFalcoAlert(ctx context.Context, alert map[str
 	wp.totalCount++
 	wp.mu.Unlock()
 
-	log.Printf("  ✅ Created Observation for Falco alert: %s (priority: %s)", rule, priority)
+	logger.Info("Created Observation for Falco alert",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "observation_create",
+			Source:    "falco",
+			EventType: "runtime-security",
+			Severity:  severity,
+			Additional: map[string]interface{}{
+				"rule":     rule,
+				"priority": priority,
+			},
+		})
 	return nil
 }
 
@@ -141,7 +171,17 @@ func (wp *WebhookProcessor) ProcessAuditEvent(ctx context.Context, auditEvent ma
 
 	// Only process ResponseComplete stage
 	if stage != "ResponseComplete" {
-		log.Printf("  📋 [AUDIT] Skipping event with stage: %s", stage)
+		logger.Debug("Skipping audit event with non-ResponseComplete stage",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "process_audit",
+				Source:    "audit",
+				Reason:    "stage_not_response_complete",
+				Additional: map[string]interface{}{
+					"stage":    stage,
+					"audit_id": auditID,
+				},
+			})
 		return nil
 	}
 
@@ -155,15 +195,25 @@ func (wp *WebhookProcessor) ProcessAuditEvent(ctx context.Context, auditEvent ma
 	name := fmt.Sprintf("%v", objectRef["name"])
 	apiGroup := fmt.Sprintf("%v", objectRef["apiGroup"])
 
-	log.Printf("  🔍 [AUDIT] Processing event: %s %s/%s (auditID: %s)", verb, namespace, name, auditID)
+	logger.Debug("Processing audit event",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "process_audit",
+			Source:    "audit",
+			Namespace: namespace,
+			Additional: map[string]interface{}{
+				"verb":     verb,
+				"resource": resource,
+				"name":     name,
+				"audit_id": auditID,
+			},
+		})
 
 	// Filter logic: only important events
 	important := false
 	category := "compliance"
 	severity := "MEDIUM"
 	eventType := "audit-event"
-
-	log.Printf("  🔍 [AUDIT] Checking if event is important: verb=%s, resource=%s, namespace=%s, name=%s, apiGroup=%s", verb, resource, namespace, name, apiGroup)
 
 	// Delete operations (HIGH severity)
 	if verb == "delete" {
@@ -220,10 +270,34 @@ func (wp *WebhookProcessor) ProcessAuditEvent(ctx context.Context, auditEvent ma
 	}
 
 	if !important {
-		log.Printf("  ⚠️  [AUDIT] Event filtered out (not important): %s %s/%s", verb, resource, name)
+		logger.Debug("Audit event filtered out (not important)",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "process_audit",
+				Source:    "audit",
+				Reason:    "not_important",
+				Namespace: namespace,
+				Additional: map[string]interface{}{
+					"verb":     verb,
+					"resource": resource,
+					"name":     name,
+				},
+			})
 		return nil
 	}
-	log.Printf("  ✅ [AUDIT] Processing important event: %s %s/%s (severity: %s)", verb, resource, name, severity)
+	logger.Debug("Processing important audit event",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "process_audit",
+			Source:    "audit",
+			Severity:  severity,
+			Namespace: namespace,
+			Additional: map[string]interface{}{
+				"verb":     verb,
+				"resource": resource,
+				"name":     name,
+			},
+		})
 
 	// Extract user info
 	user, ok := auditEvent["user"].(map[string]interface{})
@@ -289,7 +363,20 @@ func (wp *WebhookProcessor) ProcessAuditEvent(ctx context.Context, auditEvent ma
 	wp.totalCount++
 	wp.mu.Unlock()
 
-	log.Printf("  ✅ Created Observation for Audit event: %s %s/%s", verb, resource, name)
+	logger.Info("Created Observation for Audit event",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "observation_create",
+			Source:    "audit",
+			EventType: eventType,
+			Severity:  severity,
+			Namespace: namespace,
+			Additional: map[string]interface{}{
+				"verb":     verb,
+				"resource": resource,
+				"name":     name,
+			},
+		})
 	return nil
 }
 
