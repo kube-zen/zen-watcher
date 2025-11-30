@@ -1,3 +1,17 @@
+// Copyright 2024 The Zen Watcher Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package watcher
 
 import (
@@ -7,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kube-zen/zen-watcher/pkg/logger"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -52,7 +67,13 @@ func NewAuditWatcher(clientSet *kubernetes.Clientset, namespace string, actionHa
 
 // WatchAuditLogs watches Kubernetes audit logs for security events
 func (aw *AuditWatcher) WatchAuditLogs(ctx context.Context) error {
-	fmt.Printf("🔍 Watching Kubernetes audit logs in namespace %s\n", aw.namespace)
+	logger.Info("Watching Kubernetes audit logs",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "watch_audit_logs",
+			Source:    "audit",
+			Namespace: aw.namespace,
+		})
 
 	// For now, we'll watch the API server logs since audit logs might not be available
 	// In a production environment, you'd typically watch audit log files or use audit webhooks
@@ -75,7 +96,16 @@ func (aw *AuditWatcher) watchAPIServerLogs(ctx context.Context) error {
 
 	// Watch logs from the first API server pod
 	pod := pods.Items[0]
-	fmt.Printf("✅ Watching API server logs from pod %s\n", pod.Name)
+	logger.Info("Watching API server logs from pod",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "watch_audit_logs",
+			Source:    "audit",
+			Additional: map[string]interface{}{
+				"pod_name":  pod.Name,
+				"namespace": "kube-system",
+			},
+		})
 
 	return aw.watchPodLogs(ctx, pod.Name, "kube-system")
 }
@@ -101,15 +131,35 @@ func (aw *AuditWatcher) watchPodLogs(ctx context.Context, podName, namespace str
 		}
 
 		line := scanner.Text()
-		fmt.Println("Audit Log:", line)
+		logger.Debug("Audit log line",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "watch_audit_logs",
+				Source:    "audit",
+				Additional: map[string]interface{}{
+					"log_line": line,
+				},
+			})
 
 		// Check for security-relevant audit events
 		if aw.isSecurityRelevantEvent(line) {
-			fmt.Println(">>> Detected security-relevant audit event! Processing...")
+			logger.Info("Detected security-relevant audit event, processing",
+				logger.Fields{
+					Component: "watcher",
+					Operation: "watch_audit_logs",
+					Source:    "audit",
+					EventType: "audit_security_event",
+				})
 			event := aw.parseAuditEvent(line)
 			if event != nil {
 				if err := aw.actionHandler.HandleAuditEvent(ctx, event); err != nil {
-					fmt.Printf("❌ Failed to handle audit event: %v\n", err)
+					logger.Error("Failed to handle audit event",
+						logger.Fields{
+							Component: "watcher",
+							Operation: "handle_audit_event",
+							Source:    "audit",
+							Error:     err,
+						})
 				}
 			}
 		}
@@ -266,6 +316,11 @@ func (aw *AuditWatcher) parseResponseCode(codeStr string) int {
 
 // WatchAuditSecurityEvents is the main entry point for watching audit events
 func (aw *AuditWatcher) WatchAuditSecurityEvents(ctx context.Context) error {
-	fmt.Printf("🔍 Starting Kubernetes audit security monitoring\n")
+	logger.Info("Starting Kubernetes audit security monitoring",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "watch_audit_security_events",
+			Source:    "audit",
+		})
 	return aw.WatchAuditLogs(ctx)
 }

@@ -202,10 +202,10 @@ releases:
             memory: 512Mi
             cpu: 500m
 
-  # Zen Watcher
+  # Zen Watcher (from helm-charts repo)
   - name: zen-watcher
     namespace: {{ $namespace }}
-    chart: /tmp/zen-watcher-1.0.0.tgz
+    chart: kube-zen/zen-watcher
     createNamespace: true
     needs: []
     values:

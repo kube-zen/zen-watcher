@@ -1,3 +1,17 @@
+// Copyright 2024 The Zen Watcher Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package watcher
 
 import (
@@ -137,32 +151,7 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 		unstructured.SetNestedStringMap(observation.Object, annotations, "metadata", "annotations")
 	}
 
-	// Create the Observation (first event always creates)
-	_, err := oc.dynClient.Resource(oc.eventGVR).Namespace(namespace).Create(ctx, observation, metav1.CreateOptions{})
-	if err != nil {
-		// Track creation errors
-		if oc.observationsCreateErrors != nil {
-			errorType := "create_failed"
-			errMsg := strings.ToLower(err.Error())
-			// Extract error type from error message
-			if strings.Contains(errMsg, "already exists") {
-				errorType = "already_exists"
-			} else if strings.Contains(errMsg, "forbidden") {
-				errorType = "forbidden"
-			} else if strings.Contains(errMsg, "not found") {
-				errorType = "not_found"
-			}
-			oc.observationsCreateErrors.WithLabelValues(source, errorType).Inc()
-		}
-		return fmt.Errorf("failed to create Observation: %w", err)
-	}
-
-	// Increment observations created metric
-	if oc.observationsCreated != nil {
-		oc.observationsCreated.WithLabelValues(source).Inc()
-	}
-
-	// Extract category and severity from spec for metrics
+	// Extract category and severity from spec for metrics BEFORE creation
 	// Use NestedFieldCopy to handle interface{} types, then convert to string
 	categoryVal, categoryFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "category")
 	severityVal, severityFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "severity")
@@ -189,26 +178,40 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 			})
 	}
 
-	// Debug logging
-	if source == "" || category == "" || severity == "" {
-		logger.Debug("Extracted values",
-			logger.Fields{
-				Component: "watcher",
-				Operation: "observation_create",
-				Source:    source,
-				Additional: map[string]interface{}{
-					"category": category,
-					"severity": severity,
-				},
-			})
-	}
-
 	// Normalize severity to uppercase for consistency
 	if severity != "" {
 		severity = normalizeSeverity(severity)
 	}
 
+	// STEP 1: CREATE OBSERVATION CRD FIRST (before metrics)
+	// Create the Observation (first event always creates)
+	createdObservation, err := oc.dynClient.Resource(oc.eventGVR).Namespace(namespace).Create(ctx, observation, metav1.CreateOptions{})
+	if err != nil {
+		// Track creation errors
+		if oc.observationsCreateErrors != nil {
+			errorType := "create_failed"
+			errMsg := strings.ToLower(err.Error())
+			// Extract error type from error message
+			if strings.Contains(errMsg, "already exists") {
+				errorType = "already_exists"
+			} else if strings.Contains(errMsg, "forbidden") {
+				errorType = "forbidden"
+			} else if strings.Contains(errMsg, "not found") {
+				errorType = "not_found"
+			}
+			oc.observationsCreateErrors.WithLabelValues(source, errorType).Inc()
+		}
+		return fmt.Errorf("failed to create Observation: %w", err)
+	}
+
+	// STEP 2: UPDATE METRICS ONLY AFTER SUCCESSFUL CREATION
+	// Increment observations created metric
+	if oc.observationsCreated != nil {
+		oc.observationsCreated.WithLabelValues(source).Inc()
+	}
+
 	// Increment eventsTotal metric - this tracks events by source/category/severity
+	// Only increment AFTER observation CRD is successfully created
 	if oc.eventsTotal != nil {
 		if category == "" {
 			category = "unknown"
@@ -217,14 +220,16 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 			severity = "UNKNOWN"
 		}
 		oc.eventsTotal.WithLabelValues(source, category, severity).Inc()
-		logger.Debug("Metric incremented",
+		logger.Debug("Metric incremented after observation creation",
 			logger.Fields{
 				Component: "watcher",
 				Operation: "observation_create",
 				Source:    source,
 				Additional: map[string]interface{}{
-					"category": category,
-					"severity": severity,
+					"category":              category,
+					"severity":              severity,
+					"observation_name":      createdObservation.GetName(),
+					"observation_namespace": namespace,
 				},
 			})
 	} else {
@@ -235,6 +240,20 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 				Source:    source,
 			})
 	}
+
+	// STEP 3: LOG SUCCESS
+	logger.Debug("Observation created successfully",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "observation_create",
+			Source:    source,
+			Namespace: namespace,
+			Additional: map[string]interface{}{
+				"observation_name": createdObservation.GetName(),
+				"category":         category,
+				"severity":         severity,
+			},
+		})
 
 	return nil
 }

@@ -1,3 +1,17 @@
+// Copyright 2024 The Zen Watcher Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package watcher
 
 import (
@@ -6,6 +20,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/kube-zen/zen-watcher/pkg/logger"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -44,7 +59,14 @@ func (tw *TrivyWatcher) WatchPods(ctx context.Context) error {
 		return fmt.Errorf("no pods found in namespace %s", tw.namespace)
 	}
 
-	fmt.Printf("📋 Found %d pods in namespace %s\n", len(allPods.Items), tw.namespace)
+	logger.Debug("Found pods in namespace",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "watch_trivy_pods",
+			Source:    "trivy",
+			Namespace: tw.namespace,
+			Count:     len(allPods.Items),
+		})
 
 	// Look for Trivy-related pods (more flexible matching)
 	var trivyPods []corev1.Pod
@@ -60,14 +82,30 @@ func (tw *TrivyWatcher) WatchPods(ctx context.Context) error {
 
 	// Watch logs from the first Trivy pod
 	pod := trivyPods[0]
-	fmt.Printf("✅ Watching logs from Trivy pod %s in namespace %s\n", pod.Name, tw.namespace)
+	logger.Info("Watching logs from Trivy pod",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "watch_trivy_pods",
+			Source:    "trivy",
+			Namespace: tw.namespace,
+			Additional: map[string]interface{}{
+				"pod_name": pod.Name,
+			},
+		})
 
 	return tw.watchPodLogs(ctx, pod.Name)
 }
 
 // WatchVulnerabilityReports watches for new VulnerabilityReport resources
 func (tw *TrivyWatcher) WatchVulnerabilityReports(ctx context.Context) error {
-	fmt.Printf("🔍 Watching VulnerabilityReport resources in namespace %s\n", tw.namespace)
+	logger.Info("Watching VulnerabilityReport resources",
+		logger.Fields{
+			Component:    "watcher",
+			Operation:    "watch_vulnerability_reports",
+			Source:       "trivy",
+			Namespace:    tw.namespace,
+			ResourceKind: "VulnerabilityReport",
+		})
 
 	// List existing VulnerabilityReports using the Trivy operator API
 	reports, err := tw.clientSet.CoreV1().ConfigMaps(tw.namespace).List(ctx, metav1.ListOptions{
@@ -77,70 +115,177 @@ func (tw *TrivyWatcher) WatchVulnerabilityReports(ctx context.Context) error {
 		return fmt.Errorf("failed to list VulnerabilityReports: %v", err)
 	}
 
-	fmt.Printf("📊 Found %d existing VulnerabilityReports\n", len(reports.Items))
+	logger.Debug("Found existing VulnerabilityReports",
+		logger.Fields{
+			Component:    "watcher",
+			Operation:    "watch_vulnerability_reports",
+			Source:       "trivy",
+			Namespace:    tw.namespace,
+			ResourceKind: "VulnerabilityReport",
+			Count:        len(reports.Items),
+		})
 
 	// Process existing reports
 	for _, report := range reports.Items {
 		if err := tw.processVulnerabilityReport(ctx, &report); err != nil {
-			fmt.Printf("❌ Failed to process report %s: %v\n", report.Name, err)
+			logger.Error("Failed to process VulnerabilityReport",
+				logger.Fields{
+					Component:    "watcher",
+					Operation:    "process_vulnerability_report",
+					Source:       "trivy",
+					Namespace:    tw.namespace,
+					ResourceKind: "VulnerabilityReport",
+					ResourceName: report.Name,
+					Error:        err,
+				})
 		}
 	}
 
-	// TODO: Implement watch for new VulnerabilityReports
-	// This would require using the Kubernetes informer pattern
-	// For now, we'll just process existing reports
+	// Note: Real-time watching of VulnerabilityReports is implemented via informers
+	// in internal/kubernetes/informers.go. This method processes existing reports
+	// as a one-time operation. For continuous watching, use the informer-based approach.
 
 	return nil
 }
 
 // WatchTrivyResources watches for Trivy security resources
 func (tw *TrivyWatcher) WatchTrivyResources(ctx context.Context) error {
-	fmt.Printf("🔍 Watching Trivy security resources in namespace %s\n", tw.namespace)
+	logger.Info("Watching Trivy security resources",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "watch_trivy_resources",
+			Source:    "trivy",
+			Namespace: tw.namespace,
+		})
 
 	// List VulnerabilityReports
-	fmt.Printf("📊 Checking VulnerabilityReports...\n")
+	logger.Debug("Checking VulnerabilityReports",
+		logger.Fields{
+			Component:    "watcher",
+			Operation:    "watch_trivy_resources",
+			Source:       "trivy",
+			ResourceKind: "VulnerabilityReport",
+		})
 	vulnReports, err := tw.clientSet.CoreV1().ConfigMaps(tw.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: "trivy-operator.resource.kind=VulnerabilityReport",
 	})
 	if err != nil {
-		fmt.Printf("❌ Failed to list VulnerabilityReports: %v\n", err)
+		logger.Error("Failed to list VulnerabilityReports",
+			logger.Fields{
+				Component:    "watcher",
+				Operation:    "watch_trivy_resources",
+				Source:       "trivy",
+				ResourceKind: "VulnerabilityReport",
+				Error:        err,
+			})
 	} else {
-		fmt.Printf("📊 Found %d VulnerabilityReports\n", len(vulnReports.Items))
+		logger.Debug("Found VulnerabilityReports",
+			logger.Fields{
+				Component:    "watcher",
+				Operation:    "watch_trivy_resources",
+				Source:       "trivy",
+				ResourceKind: "VulnerabilityReport",
+				Count:        len(vulnReports.Items),
+			})
 		for _, report := range vulnReports.Items {
 			if err := tw.processVulnerabilityReport(ctx, &report); err != nil {
-				fmt.Printf("❌ Failed to process report %s: %v\n", report.Name, err)
+				logger.Error("Failed to process VulnerabilityReport",
+					logger.Fields{
+						Component:    "watcher",
+						Operation:    "process_vulnerability_report",
+						Source:       "trivy",
+						ResourceKind: "VulnerabilityReport",
+						ResourceName: report.Name,
+						Error:        err,
+					})
 			}
 		}
 	}
 
 	// List ClusterVulnerabilityReports
-	fmt.Printf("📊 Checking ClusterVulnerabilityReports...\n")
+	logger.Debug("Checking ClusterVulnerabilityReports",
+		logger.Fields{
+			Component:    "watcher",
+			Operation:    "watch_trivy_resources",
+			Source:       "trivy",
+			ResourceKind: "ClusterVulnerabilityReport",
+		})
 	clusterVulnReports, err := tw.clientSet.CoreV1().ConfigMaps(tw.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: "trivy-operator.resource.kind=ClusterVulnerabilityReport",
 	})
 	if err != nil {
-		fmt.Printf("❌ Failed to list ClusterVulnerabilityReports: %v\n", err)
+		logger.Error("Failed to list ClusterVulnerabilityReports",
+			logger.Fields{
+				Component:    "watcher",
+				Operation:    "watch_trivy_resources",
+				Source:       "trivy",
+				ResourceKind: "ClusterVulnerabilityReport",
+				Error:        err,
+			})
 	} else {
-		fmt.Printf("📊 Found %d ClusterVulnerabilityReports\n", len(clusterVulnReports.Items))
+		logger.Debug("Found ClusterVulnerabilityReports",
+			logger.Fields{
+				Component:    "watcher",
+				Operation:    "watch_trivy_resources",
+				Source:       "trivy",
+				ResourceKind: "ClusterVulnerabilityReport",
+				Count:        len(clusterVulnReports.Items),
+			})
 		for _, report := range clusterVulnReports.Items {
 			if err := tw.processVulnerabilityReport(ctx, &report); err != nil {
-				fmt.Printf("❌ Failed to process cluster report %s: %v\n", report.Name, err)
+				logger.Error("Failed to process ClusterVulnerabilityReport",
+					logger.Fields{
+						Component:    "watcher",
+						Operation:    "process_vulnerability_report",
+						Source:       "trivy",
+						ResourceKind: "ClusterVulnerabilityReport",
+						ResourceName: report.Name,
+						Error:        err,
+					})
 			}
 		}
 	}
 
 	// List ConfigAuditReports
-	fmt.Printf("📊 Checking ConfigAuditReports...\n")
+	logger.Debug("Checking ConfigAuditReports",
+		logger.Fields{
+			Component:    "watcher",
+			Operation:    "watch_trivy_resources",
+			Source:       "trivy",
+			ResourceKind: "ConfigAuditReport",
+		})
 	configAuditReports, err := tw.clientSet.CoreV1().ConfigMaps(tw.namespace).List(ctx, metav1.ListOptions{
 		LabelSelector: "trivy-operator.resource.kind=ConfigAuditReport",
 	})
 	if err != nil {
-		fmt.Printf("❌ Failed to list ConfigAuditReports: %v\n", err)
+		logger.Error("Failed to list ConfigAuditReports",
+			logger.Fields{
+				Component:    "watcher",
+				Operation:    "watch_trivy_resources",
+				Source:       "trivy",
+				ResourceKind: "ConfigAuditReport",
+				Error:        err,
+			})
 	} else {
-		fmt.Printf("📊 Found %d ConfigAuditReports\n", len(configAuditReports.Items))
+		logger.Debug("Found ConfigAuditReports",
+			logger.Fields{
+				Component:    "watcher",
+				Operation:    "watch_trivy_resources",
+				Source:       "trivy",
+				ResourceKind: "ConfigAuditReport",
+				Count:        len(configAuditReports.Items),
+			})
 		for _, report := range configAuditReports.Items {
 			if err := tw.processVulnerabilityReport(ctx, &report); err != nil {
-				fmt.Printf("❌ Failed to process config audit report %s: %v\n", report.Name, err)
+				logger.Error("Failed to process ConfigAuditReport",
+					logger.Fields{
+						Component:    "watcher",
+						Operation:    "process_vulnerability_report",
+						Source:       "trivy",
+						ResourceKind: "ConfigAuditReport",
+						ResourceName: report.Name,
+						Error:        err,
+					})
 			}
 		}
 	}
@@ -197,13 +342,33 @@ func (tw *TrivyWatcher) watchPodLogs(ctx context.Context, podName string) error 
 		}
 
 		line := scanner.Text()
-		fmt.Println("Trivy Log:", line)
+		logger.Debug("Trivy log line",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "watch_trivy_logs",
+				Source:    "trivy",
+				Additional: map[string]interface{}{
+					"log_line": line,
+				},
+			})
 
 		// Check for Trivy-specific patterns
 		if tw.isTrivyUpdate(line) {
-			fmt.Println(">>> Detected Trivy update! Triggering action...")
+			logger.Info("Detected Trivy update, triggering action",
+				logger.Fields{
+					Component: "watcher",
+					Operation: "watch_trivy_logs",
+					Source:    "trivy",
+					EventType: "trivy_update_detected",
+				})
 			if err := tw.actionHandler.HandleTrivyUpdate(ctx, line); err != nil {
-				fmt.Printf("❌ Failed to handle Trivy update: %v\n", err)
+				logger.Error("Failed to handle Trivy update",
+					logger.Fields{
+						Component: "watcher",
+						Operation: "handle_trivy_update",
+						Source:    "trivy",
+						Error:     err,
+					})
 			}
 		}
 	}
@@ -242,17 +407,40 @@ func (tw *TrivyWatcher) isTrivyUpdate(line string) bool {
 
 // processVulnerabilityReport processes a VulnerabilityReport ConfigMap
 func (tw *TrivyWatcher) processVulnerabilityReport(ctx context.Context, report *corev1.ConfigMap) error {
-	fmt.Printf("🔍 Processing VulnerabilityReport: %s\n", report.Name)
+	logger.Debug("Processing VulnerabilityReport",
+		logger.Fields{
+			Component:    "watcher",
+			Operation:    "process_vulnerability_report",
+			Source:       "trivy",
+			ResourceKind: "VulnerabilityReport",
+			ResourceName: report.Name,
+			Namespace:    report.Namespace,
+		})
 
 	// Extract vulnerability data from the report
 	if report.Data != nil {
 		for key, value := range report.Data {
 			if strings.Contains(key, "vulnerability") || strings.Contains(key, "report") {
-				fmt.Printf("📄 Found vulnerability data in key: %s\n", key)
+				logger.Debug("Found vulnerability data",
+					logger.Fields{
+						Component:    "watcher",
+						Operation:    "process_vulnerability_report",
+						Source:       "trivy",
+						ResourceKind: "VulnerabilityReport",
+						Additional: map[string]interface{}{
+							"data_key": key,
+						},
+					})
 
 				// Parse the vulnerability data
 				if err := tw.parseVulnerabilityData(ctx, value); err != nil {
-					fmt.Printf("❌ Failed to parse vulnerability data: %v\n", err)
+					logger.Error("Failed to parse vulnerability data",
+						logger.Fields{
+							Component: "watcher",
+							Operation: "parse_vulnerability_data",
+							Source:    "trivy",
+							Error:     err,
+						})
 				}
 			}
 		}
@@ -268,11 +456,29 @@ func (tw *TrivyWatcher) parseVulnerabilityData(ctx context.Context, data string)
 		// Extract CVEs
 		cves := tw.extractCVEs(data)
 		for _, cve := range cves {
-			fmt.Printf("🚨 Found CVE: %s\n", cve)
+			logger.Info("Found CVE",
+				logger.Fields{
+					Component: "watcher",
+					Operation: "parse_vulnerability_data",
+					Source:    "trivy",
+					Severity:  "HIGH",
+					Additional: map[string]interface{}{
+						"cve": cve,
+					},
+				})
 
 			// Trigger action for each CVE
 			if err := tw.actionHandler.HandleTrivyUpdate(ctx, fmt.Sprintf("CVE detected: %s", cve)); err != nil {
-				fmt.Printf("❌ Failed to handle CVE %s: %v\n", cve, err)
+				logger.Error("Failed to handle CVE",
+					logger.Fields{
+						Component: "watcher",
+						Operation: "handle_cve",
+						Source:    "trivy",
+						Additional: map[string]interface{}{
+							"cve": cve,
+						},
+						Error: err,
+					})
 			}
 		}
 	}

@@ -16,6 +16,8 @@ Zen Watcher will always maintain its **pure core**:
 - Prometheus metrics and Grafana dashboard
 - Modular, extensible architecture
 - Production-ready security (non-root, read-only filesystem)
+- Structured logging with correlation IDs (zap-based, production-ready)
+- Deduplication cache with LRU eviction for event deduplication
 
 ## Future Enhancements
 
@@ -49,14 +51,14 @@ Add support for forwarding Observation events to external systems via optional, 
 ### Observability Enhancements
 
 - **OpenTelemetry** - Distributed tracing support
-- **Structured Logging** - Enhanced log format with correlation IDs
+- ~~**Structured Logging**~~ ✅ **Complete** - Enhanced log format with correlation IDs (implemented with zap)
 - **Metrics Export** - Support for additional metric backends
 
 ### Performance & Scale
 
 - **Horizontal Scaling** - Support for multiple replicas with leader election
 - **Event Batching** - Batch Observation creation for high-volume sources
-- **Caching** - In-memory caching for frequently accessed data
+- ~~**Caching**~~ ✅ **Partially Complete** - Deduplication cache with LRU eviction implemented; general-purpose caching for frequently accessed data still planned
 
 ### Developer Experience
 

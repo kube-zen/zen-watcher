@@ -1,7 +1,7 @@
 # Zen Watcher
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://go.dev/)
 
 > **Kubernetes Observation Collector: Turn Any Signal into a CRD**
 
@@ -39,13 +39,16 @@ Collects events from popular security and compliance tools:
 - 📝 Structured logging: `2025-11-08T16:30:00.000Z [INFO] zen-watcher: message`
 - 🏥 Health and readiness probes
 
-### Production-Ready
+### Production-Ready Features
 - Non-privileged containers
 - Read-only filesystem
 - Minimal footprint (~15MB image, <10m CPU, <50MB RAM)
 - Pod Security Standards (restricted)
 - **Zero egress**: No outbound network traffic, no external dependencies
 - **Zero secrets**: No credentials or API keys required
+- Structured logging with correlation IDs
+- Comprehensive metrics and health checks
+- **Note**: Core features are production-ready. Some alternative code paths may exist for compatibility or future enhancements.
 
 ---
 
@@ -126,11 +129,45 @@ graph TB
 ## 📦 Installation
 
 ### Prerequisites
-- Kubernetes 1.28+
+- Kubernetes 1.26-1.29 (tested on 1.26-1.29)
 - kubectl configured
 - Security tools installed (optional: Trivy, Falco, Kyverno, etc.)
 
-### Quick Install
+### Installation via Helm (Recommended)
+
+**The official Helm chart for zen-watcher lives in a separate repository:**
+
+🔗 **[kube-zen/helm-charts](https://github.com/kube-zen/helm-charts)**
+
+See that repository for:
+- Chart values and configuration
+- Upgrade paths and migration notes
+- Version compatibility matrix
+
+**Quick Install:**
+
+```bash
+# Add Helm repository
+helm repo add kube-zen https://kube-zen.github.io/helm-charts
+helm repo update
+
+# Install zen-watcher
+helm install zen-watcher kube-zen/zen-watcher \
+  --namespace zen-system \
+  --create-namespace
+```
+
+**Version Compatibility:**
+
+| Chart Version | App Version (Image Tag) | Kubernetes | Go Version |
+|---------------|-------------------------|------------|------------|
+| 1.0.0         | 1.0.0                   | 1.26-1.29  | 1.23+      |
+
+See the [helm-charts repository](https://github.com/kube-zen/helm-charts) for the latest compatibility matrix.
+
+### Manual Installation (Alternative)
+
+For development or custom deployments:
 
 ```bash
 # 1. Apply CRDs
@@ -436,6 +473,19 @@ curl http://localhost:9090/metrics
 
 ---
 
+## 📋 Custom Resource Definitions (CRDs)
+
+The `Observation` CRD is defined in this repository and synced to the Helm charts repository.
+
+- **Canonical location**: `deployments/crds/observation_crd.yaml` (this repository)
+- **Helm charts location**: Synced to `helm-charts/charts/zen-watcher/templates/observation_crd.yaml`
+
+**To sync CRD changes**: Run `make sync-crd-to-chart` from this repository.
+
+See [docs/CRD.md](docs/CRD.md) for detailed CRD documentation and sync process.
+
+---
+
 ## 🔌 Extending Zen Watcher
 
 **Zen Watcher stays pure**: Only watches sources → writes Observation CRDs. Zero egress, zero secrets, zero external dependencies.
@@ -499,6 +549,8 @@ Apache License 2.0 - See [LICENSE](LICENSE) for details.
 
 ---
 
-**Repository:** github.com/kube-zen/zen-watcher  
-**Go Version:** 1.24+  
-**Status:** ✅ Production-ready, standalone, independently useful
+**Repository:** [github.com/kube-zen/zen-watcher](https://github.com/kube-zen/zen-watcher)  
+**Helm Charts:** [github.com/kube-zen/helm-charts](https://github.com/kube-zen/helm-charts)  
+**Go Version:** 1.23+ (tested on 1.23 and 1.24)  
+**Kubernetes:** Client libs v0.28.15 (tested on clusters 1.26-1.29)  
+**Status:** ✅ Core features production-ready, standalone, independently useful

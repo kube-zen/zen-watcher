@@ -1,3 +1,17 @@
+// Copyright 2024 The Zen Watcher Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package watcher
 
 import (
@@ -8,6 +22,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"github.com/kube-zen/zen-watcher/pkg/models"
 
 	corev1 "k8s.io/api/core/v1"
@@ -48,7 +63,14 @@ func (fw *FalcoWatcher) WatchFalcoPods(ctx context.Context) error {
 		return fmt.Errorf("no pods found in namespace %s", fw.namespace)
 	}
 
-	fmt.Printf("📋 Found %d pods in namespace %s\n", len(allPods.Items), fw.namespace)
+	logger.Debug("Found pods in namespace",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "watch_falco_pods",
+			Source:    "falco",
+			Namespace: fw.namespace,
+			Count:     len(allPods.Items),
+		})
 
 	// Look for Falco-related pods
 	var falcoPods []corev1.Pod
@@ -64,7 +86,16 @@ func (fw *FalcoWatcher) WatchFalcoPods(ctx context.Context) error {
 
 	// Watch logs from the first Falco pod
 	pod := falcoPods[0]
-	fmt.Printf("✅ Watching Falco logs from pod %s in namespace %s\n", pod.Name, fw.namespace)
+	logger.Info("Watching Falco logs from pod",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "watch_falco_pods",
+			Source:    "falco",
+			Namespace: fw.namespace,
+			Additional: map[string]interface{}{
+				"pod_name": pod.Name,
+			},
+		})
 
 	return fw.watchFalcoLogs(ctx, pod.Name)
 }
@@ -107,15 +138,35 @@ func (fw *FalcoWatcher) watchFalcoLogs(ctx context.Context, podName string) erro
 		}
 
 		line := scanner.Text()
-		fmt.Println("Falco Log:", line)
+		logger.Debug("Falco log line",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "watch_falco_logs",
+				Source:    "falco",
+				Additional: map[string]interface{}{
+					"log_line": line,
+				},
+			})
 
 		// Check for Falco security events
 		if fw.isFalcoSecurityEvent(line) {
-			fmt.Println(">>> Detected Falco security event! Processing...")
+			logger.Info("Detected Falco security event, processing",
+				logger.Fields{
+					Component: "watcher",
+					Operation: "watch_falco_logs",
+					Source:    "falco",
+					EventType: "falco_security_event",
+				})
 			event := fw.parseFalcoEvent(line, podName)
 			if event != nil {
 				if err := fw.actionHandler.HandleFalcoEvent(ctx, event); err != nil {
-					fmt.Printf("❌ Failed to handle Falco event: %v\n", err)
+					logger.Error("Failed to handle Falco event",
+						logger.Fields{
+							Component: "watcher",
+							Operation: "handle_falco_event",
+							Source:    "falco",
+							Error:     err,
+						})
 				}
 			}
 		}
@@ -322,7 +373,13 @@ func (fw *FalcoWatcher) extractField(line, field string) string {
 
 // WatchFalcoSecurityEvents watches for Falco security events
 func (fw *FalcoWatcher) WatchFalcoSecurityEvents(ctx context.Context) error {
-	fmt.Printf("🔍 Watching Falco security events in namespace %s\n", fw.namespace)
+	logger.Info("Watching Falco security events",
+		logger.Fields{
+			Component: "watcher",
+			Operation: "watch_falco_security_events",
+			Source:    "falco",
+			Namespace: fw.namespace,
+		})
 
 	// Start monitoring Falco pods
 	return fw.WatchFalcoPods(ctx)

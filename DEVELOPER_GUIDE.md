@@ -1,7 +1,7 @@
 # Zen Watcher Developer Guide
 
 **Version:** 1.0.19+  
-**Go Version:** 1.24+  
+**Go Version:** 1.23+ (tested on 1.23 and 1.24)  
 **License:** Apache 2.0
 
 ---
@@ -22,7 +22,7 @@
 
 ### Prerequisites
 
-- **Go 1.24+** installed
+- **Go 1.23+** installed (tested on 1.23 and 1.24)
 - **Docker or Podman** for building images
 - **kubectl** for Kubernetes access
 - **Kubernetes cluster 1.28+** (any distribution)
@@ -723,7 +723,7 @@ docker push kubezen/zen-watcher:1.0.19
 
 **Dockerfile optimization:**
 - Multi-stage build (builder + distroless)
-- Uses `golang:1.24-alpine` for small builder image
+- Uses `golang:1.23-alpine` for small builder image
 - Final image based on `gcr.io/distroless/static:nonroot` (~15MB)
 - No shell, no package manager in final image
 
@@ -978,7 +978,7 @@ _, err := dynClient.Resource(eventGVR).Namespace(namespace).Create(ctx, event, m
 
 1. Update version in `main.go`:
    ```go
-   log.Println("🚀 zen-watcher v1.0.22 (Go 1.24, Apache 2.0)")
+   log.Println("🚀 zen-watcher v1.0.22 (Go 1.23+, Apache 2.0)")
    ```
 
 2. Update `CHANGELOG.md` with changes

@@ -1,5 +1,5 @@
 # Build stage - Use official Go image with build tools
-FROM golang:1.24-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 # Install build dependencies
 # git: Required for go mod download with private repos

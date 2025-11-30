@@ -24,18 +24,48 @@ echo -e "${CYAN}  Sending Mock Webhooks to zen-watcher${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Check if zen-watcher is accessible
-if ! curl -s -f "${ZEN_WATCHER_URL}/health" >/dev/null 2>&1; then
-    echo -e "${YELLOW}⚠${NC}  zen-watcher not accessible at ${ZEN_WATCHER_URL}"
-    echo -e "${CYAN}   Trying port-forward...${NC}"
-    kubectl port-forward -n ${NAMESPACE} svc/zen-watcher 8080:8080 >/dev/null 2>&1 &
-    PF_PID=$!
-    sleep 2
-    ZEN_WATCHER_URL="http://localhost:8080"
-    trap "kill $PF_PID 2>/dev/null || true" EXIT
-fi
+# Check if zen-watcher is accessible from within cluster
+# Use a pod with PodSecurity compliance to test connectivity
+cat <<EOF | kubectl apply -f - >/dev/null 2>&1
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-zen-watcher-connectivity
+  namespace: ${NAMESPACE}
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+  - name: curl
+    image: curlimages/curl:latest
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      runAsNonRoot: true
+      runAsUser: 65534
+      seccompProfile:
+        type: RuntimeDefault
+    command: ["sh", "-c", "curl -s -f ${ZEN_WATCHER_URL}/health || exit 1"]
+  restartPolicy: Never
+EOF
 
-echo -e "${GREEN}✓${NC} zen-watcher accessible at ${ZEN_WATCHER_URL}"
+# Wait for pod to complete
+if kubectl wait --for=condition=Ready pod/test-zen-watcher-connectivity -n ${NAMESPACE} --timeout=30s >/dev/null 2>&1; then
+    sleep 2
+    if kubectl logs test-zen-watcher-connectivity -n ${NAMESPACE} >/dev/null 2>&1; then
+        echo -e "${GREEN}✓${NC} zen-watcher accessible at ${ZEN_WATCHER_URL} (internal service)"
+    else
+        echo -e "${YELLOW}⚠${NC}  zen-watcher connectivity check inconclusive, continuing..."
+    fi
+    kubectl delete pod test-zen-watcher-connectivity -n ${NAMESPACE} >/dev/null 2>&1 || true
+else
+    echo -e "${YELLOW}⚠${NC}  zen-watcher connectivity check timed out, continuing anyway..."
+    kubectl delete pod test-zen-watcher-connectivity -n ${NAMESPACE} >/dev/null 2>&1 || true
+fi
 echo ""
 
 # Function to send Falco webhook
@@ -65,12 +95,46 @@ EOF
 )
     
     echo -e "${CYAN}  →${NC} Sending Falco webhook: ${rule} (${priority})"
-    curl -s -X POST \
-        -H "Content-Type: application/json" \
-        -d "${payload}" \
-        "${ZEN_WATCHER_URL}/falco/webhook" >/dev/null 2>&1 && \
-        echo -e "    ${GREEN}✓${NC} Sent" || \
+    # Send webhook from within cluster using a PodSecurity-compliant pod with app label
+    POD_NAME="send-falco-webhook-$(date +%s)"
+    # Escape payload for shell
+    ESCAPED_PAYLOAD=$(echo "${payload}" | sed "s/'/'\"'\"'/g")
+    cat <<EOF | kubectl apply -f - >/dev/null 2>&1
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${POD_NAME}
+  namespace: ${NAMESPACE}
+  labels:
+    app: webhook-sender
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+  - name: curl
+    image: curlimages/curl:latest
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      runAsNonRoot: true
+      runAsUser: 65534
+      seccompProfile:
+        type: RuntimeDefault
+    command: ["sh", "-c", "curl -s -X POST -H 'Content-Type: application/json' -d '${ESCAPED_PAYLOAD}' ${ZEN_WATCHER_URL}/falco/webhook"]
+  restartPolicy: Never
+EOF
+    if kubectl wait --for=condition=Ready pod/${POD_NAME} -n ${NAMESPACE} --timeout=15s >/dev/null 2>&1; then
+        sleep 2
+        kubectl delete pod/${POD_NAME} -n ${NAMESPACE} >/dev/null 2>&1
+        echo -e "    ${GREEN}✓${NC} Sent"
+    else
+        kubectl delete pod/${POD_NAME} -n ${NAMESPACE} >/dev/null 2>&1
         echo -e "    ${RED}✗${NC} Failed"
+    fi
     sleep 0.5
 }
 
@@ -81,6 +145,8 @@ send_audit_webhook() {
     local name=$3
     local namespace=${4:-"default"}
     local event_type=${5:-"audit-event"}
+    local api_group=${6:-""}
+    local privileged=${7:-"false"}
     
     local payload=$(cat <<EOF
 {
@@ -96,7 +162,7 @@ send_audit_webhook() {
     "namespace": "${namespace}",
     "name": "${name}",
     "apiVersion": "v1",
-    "apiGroup": ""
+    "apiGroup": "${api_group}"
   },
   "responseStatus": {
     "code": 201
@@ -105,6 +171,17 @@ send_audit_webhook() {
     "metadata": {
       "name": "${name}",
       "namespace": "${namespace}"
+    },
+    "spec": {
+      "containers": [
+        {
+          "name": "test-container",
+          "image": "nginx:latest",
+          "securityContext": {
+            "privileged": ${privileged}
+          }
+        }
+      ]
     }
   }
 }
@@ -112,12 +189,42 @@ EOF
 )
     
     echo -e "${CYAN}  →${NC} Sending Audit webhook: ${verb} ${resource}/${name}"
-    curl -s -X POST \
-        -H "Content-Type: application/json" \
-        -d "${payload}" \
-        "${ZEN_WATCHER_URL}/audit/webhook" >/dev/null 2>&1 && \
-        echo -e "    ${GREEN}✓${NC} Sent" || \
+    # Send webhook from within cluster using a PodSecurity-compliant pod
+    POD_NAME="send-audit-webhook-$(date +%s)"
+    cat <<EOF | kubectl apply -f - >/dev/null 2>&1
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ${POD_NAME}
+  namespace: ${NAMESPACE}
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65534
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+  - name: curl
+    image: curlimages/curl:latest
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+      runAsNonRoot: true
+      runAsUser: 65534
+      seccompProfile:
+        type: RuntimeDefault
+    command: ["sh", "-c", "curl -s -X POST -H 'Content-Type: application/json' -d '${payload}' ${ZEN_WATCHER_URL}/audit/webhook"]
+  restartPolicy: Never
+EOF
+    if kubectl wait --for=condition=Ready pod/${POD_NAME} -n ${NAMESPACE} --timeout=10s >/dev/null 2>&1; then
+        sleep 1
+        kubectl delete pod/${POD_NAME} -n ${NAMESPACE} >/dev/null 2>&1
+        echo -e "    ${GREEN}✓${NC} Sent"
+    else
+        kubectl delete pod/${POD_NAME} -n ${NAMESPACE} >/dev/null 2>&1
         echo -e "    ${RED}✗${NC} Failed"
+    fi
     sleep 0.5
 }
 
@@ -233,11 +340,11 @@ echo -e "${CYAN}  2. Sending Audit Webhooks${NC}"
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 # Send Audit webhooks
-send_audit_webhook "delete" "pods" "demo-pod" "default" "resource-deletion"
-send_audit_webhook "create" "secrets" "demo-secret" "default" "secret-access"
-send_audit_webhook "update" "configmaps" "demo-config" "default" "secret-access"
-send_audit_webhook "create" "clusterrolebindings" "demo-binding" "" "rbac-change"
-send_audit_webhook "create" "pods" "privileged-pod" "default" "privileged-pod-creation"
+send_audit_webhook "delete" "pods" "demo-pod" "default" "resource-deletion" "" "false"
+send_audit_webhook "create" "secrets" "demo-secret" "default" "secret-access" "" "false"
+send_audit_webhook "update" "configmaps" "demo-config" "default" "secret-access" "" "false"
+send_audit_webhook "create" "clusterrolebindings" "demo-binding" "" "rbac-change" "rbac.authorization.k8s.io" "false"
+send_audit_webhook "create" "pods" "privileged-pod" "default" "privileged-pod-creation" "" "true"
 
 echo ""
 echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

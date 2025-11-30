@@ -1,3 +1,17 @@
+// Copyright 2024 The Zen Watcher Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package server
 
 import (
@@ -64,12 +78,14 @@ func (a *WebhookAuth) Authenticate(r *http.Request) bool {
 	if a.tokenEnabled {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			logger.Warn("Webhook request missing Authorization header",
+			logger.Warn("Webhook request rejected: missing Authorization header",
 				logger.Fields{
 					Component: "server",
 					Operation: "auth_validate",
+					Reason:    "missing_auth_header",
 					Additional: map[string]interface{}{
 						"remote_addr": r.RemoteAddr,
+						"path":        r.URL.Path,
 					},
 				})
 			return false
@@ -80,12 +96,14 @@ func (a *WebhookAuth) Authenticate(r *http.Request) bool {
 		token = strings.TrimSpace(token)
 
 		if subtle.ConstantTimeCompare([]byte(token), []byte(a.token)) != 1 {
-			logger.Warn("Webhook request invalid token",
+			logger.Warn("Webhook request rejected: invalid token",
 				logger.Fields{
 					Component: "server",
 					Operation: "auth_validate",
+					Reason:    "invalid_token",
 					Additional: map[string]interface{}{
 						"remote_addr": r.RemoteAddr,
+						"path":        r.URL.Path,
 					},
 				})
 			return false
@@ -103,12 +121,15 @@ func (a *WebhookAuth) Authenticate(r *http.Request) bool {
 			}
 		}
 		if !allowed {
-			logger.Warn("Webhook request from unauthorized IP",
+			logger.Warn("Webhook request rejected: unauthorized IP",
 				logger.Fields{
 					Component: "server",
 					Operation: "auth_validate",
+					Reason:    "ip_not_allowed",
 					Additional: map[string]interface{}{
-						"client_ip": clientIP,
+						"client_ip":   clientIP,
+						"path":        r.URL.Path,
+						"allowed_ips": a.allowedIPs,
 					},
 				})
 			return false
@@ -145,10 +166,29 @@ func getClientIP(r *http.Request) string {
 func (a *WebhookAuth) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !a.Authenticate(r) {
+			logger.Debug("Webhook request authentication failed",
+				logger.Fields{
+					Component: "server",
+					Operation: "auth_middleware",
+					Reason:    "authentication_failed",
+					Additional: map[string]interface{}{
+						"path":        r.URL.Path,
+						"remote_addr": r.RemoteAddr,
+					},
+				})
 			w.WriteHeader(http.StatusUnauthorized)
 			w.Write([]byte(`{"error":"unauthorized"}`))
 			return
 		}
+		logger.Debug("Webhook request authentication successful",
+			logger.Fields{
+				Component: "server",
+				Operation: "auth_middleware",
+				Additional: map[string]interface{}{
+					"path":        r.URL.Path,
+					"remote_addr": r.RemoteAddr,
+				},
+			})
 		next(w, r)
 	}
 }

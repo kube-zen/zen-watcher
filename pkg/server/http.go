@@ -1,3 +1,17 @@
+// Copyright 2024 The Zen Watcher Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package server
 
 import (
@@ -109,7 +123,31 @@ func (s *Server) registerHandlers(mux *http.ServeMux) {
 
 // handleFalcoWebhook handles POST /falco/webhook
 func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
+	// Log webhook request received (before any processing)
+	logger.Info("Falco webhook request received",
+		logger.Fields{
+			Component: "server",
+			Operation: "falco_webhook",
+			Source:    "falco",
+			EventType: "webhook_request",
+			Additional: map[string]interface{}{
+				"method":      r.Method,
+				"remote_addr": r.RemoteAddr,
+				"user_agent":  r.UserAgent(),
+			},
+		})
+
 	if r.Method != http.MethodPost {
+		logger.Warn("Falco webhook rejected: invalid method",
+			logger.Fields{
+				Component: "server",
+				Operation: "falco_webhook",
+				Source:    "falco",
+				Reason:    "invalid_method",
+				Additional: map[string]interface{}{
+					"method": r.Method,
+				},
+			})
 		s.webhookMetrics.WithLabelValues("falco", "405").Inc()
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -123,6 +161,7 @@ func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 				Operation: "falco_webhook",
 				Source:    "falco",
 				Error:     err,
+				Reason:    "parse_error",
 			})
 		s.webhookMetrics.WithLabelValues("falco", "400").Inc()
 		w.WriteHeader(http.StatusBadRequest)
@@ -140,15 +179,16 @@ func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 	// Send to channel for processing (non-blocking)
 	select {
 	case s.falcoAlertsChan <- alert:
-		logger.Info("Falco webhook received and queued",
+		logger.Info("Falco webhook received and queued for processing",
 			logger.Fields{
 				Component:     "server",
 				Operation:     "falco_webhook",
 				Source:        "falco",
-				EventType:     "webhook_received",
+				EventType:     "webhook_queued",
 				CorrelationID: correlationID,
 				Additional: map[string]interface{}{
-					"rule": rule,
+					"rule":     rule,
+					"priority": fmt.Sprintf("%v", alert["priority"]),
 				},
 			})
 		s.webhookMetrics.WithLabelValues("falco", "200").Inc()
@@ -164,7 +204,7 @@ func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 				})
 		}
 	default:
-		logger.Warn("Falco alerts channel full, dropping alert",
+		logger.Error("Falco alerts channel full, dropping alert",
 			logger.Fields{
 				Component:     "server",
 				Operation:     "falco_webhook",
@@ -172,6 +212,10 @@ func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 				EventType:     "channel_full",
 				CorrelationID: correlationID,
 				Reason:        "channel_buffer_full",
+				Additional: map[string]interface{}{
+					"rule":     rule,
+					"priority": fmt.Sprintf("%v", alert["priority"]),
+				},
 			})
 		s.webhookMetrics.WithLabelValues("falco", "503").Inc()
 		if s.webhookDropped != nil {
@@ -183,7 +227,31 @@ func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 
 // handleAuditWebhook handles POST /audit/webhook
 func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
+	// Log webhook request received (before any processing)
+	logger.Info("Audit webhook request received",
+		logger.Fields{
+			Component: "server",
+			Operation: "audit_webhook",
+			Source:    "audit",
+			EventType: "webhook_request",
+			Additional: map[string]interface{}{
+				"method":      r.Method,
+				"remote_addr": r.RemoteAddr,
+				"user_agent":  r.UserAgent(),
+			},
+		})
+
 	if r.Method != http.MethodPost {
+		logger.Warn("Audit webhook rejected: invalid method",
+			logger.Fields{
+				Component: "server",
+				Operation: "audit_webhook",
+				Source:    "audit",
+				Reason:    "invalid_method",
+				Additional: map[string]interface{}{
+					"method": r.Method,
+				},
+			})
 		s.webhookMetrics.WithLabelValues("audit", "405").Inc()
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -197,6 +265,7 @@ func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
 				Operation: "audit_webhook",
 				Source:    "audit",
 				Error:     err,
+				Reason:    "parse_error",
 			})
 		s.webhookMetrics.WithLabelValues("audit", "400").Inc()
 		w.WriteHeader(http.StatusBadRequest)
@@ -204,6 +273,9 @@ func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 
 	auditID := fmt.Sprintf("%v", auditEvent["auditID"])
+	verb := fmt.Sprintf("%v", auditEvent["verb"])
+	objectRef, _ := auditEvent["objectRef"].(map[string]interface{})
+	resource := fmt.Sprintf("%v", objectRef["resource"])
 	correlationID := logger.GetCorrelationID(r.Context())
 	if correlationID == "" {
 		correlationID = fmt.Sprintf("audit-%s", auditID)
@@ -214,15 +286,18 @@ func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
 	// Send to channel for processing (non-blocking)
 	select {
 	case s.auditEventsChan <- auditEvent:
-		logger.Info("Audit webhook received and queued",
+		logger.Info("Audit webhook received and queued for processing",
 			logger.Fields{
 				Component:     "server",
 				Operation:     "audit_webhook",
 				Source:        "audit",
-				EventType:     "webhook_received",
+				EventType:     "webhook_queued",
 				CorrelationID: correlationID,
 				Additional: map[string]interface{}{
 					"audit_id": auditID,
+					"verb":     verb,
+					"resource": resource,
+					"stage":    fmt.Sprintf("%v", auditEvent["stage"]),
 				},
 			})
 		s.webhookMetrics.WithLabelValues("audit", "200").Inc()
@@ -238,7 +313,7 @@ func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
 				})
 		}
 	default:
-		logger.Warn("Audit events channel full, dropping event",
+		logger.Error("Audit events channel full, dropping event",
 			logger.Fields{
 				Component:     "server",
 				Operation:     "audit_webhook",
@@ -246,6 +321,11 @@ func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
 				EventType:     "channel_full",
 				CorrelationID: correlationID,
 				Reason:        "channel_buffer_full",
+				Additional: map[string]interface{}{
+					"audit_id": auditID,
+					"verb":     verb,
+					"resource": resource,
+				},
 			})
 		s.webhookMetrics.WithLabelValues("audit", "503").Inc()
 		if s.webhookDropped != nil {

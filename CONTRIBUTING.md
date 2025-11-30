@@ -362,7 +362,7 @@ Zen Watcher is licensed under Apache 2.0. All contributions must:
 ## How to Run Tests Locally
 
 ### Prerequisites
-- Go 1.24 or later
+- Go 1.23+ (tested on 1.23 and 1.24)
 - Make (optional, but recommended)
 
 ### Running Tests

@@ -1,3 +1,17 @@
+// Copyright 2024 The Zen Watcher Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
@@ -149,13 +163,16 @@ func main() {
 				}
 			case alert := <-falcoAlertsChan:
 				rule, _ := alert["rule"].(string)
-				log.Debug("Processing Falco alert from channel",
+				priority := fmt.Sprintf("%v", alert["priority"])
+				log.Info("Processing Falco alert from channel",
 					logger.Fields{
 						Component: "main",
 						Operation: "process_falco_channel",
 						Source:    "falco",
+						EventType: "channel_consumed",
 						Additional: map[string]interface{}{
-							"rule": rule,
+							"rule":     rule,
+							"priority": priority,
 						},
 					})
 				if err := webhookProcessor.ProcessFalcoAlert(ctx, alert); err != nil {
@@ -165,6 +182,21 @@ func main() {
 							Operation: "process_falco_channel",
 							Source:    "falco",
 							Error:     err,
+							Additional: map[string]interface{}{
+								"rule":     rule,
+								"priority": priority,
+							},
+						})
+				} else {
+					log.Debug("Falco alert processed successfully",
+						logger.Fields{
+							Component: "main",
+							Operation: "process_falco_channel",
+							Source:    "falco",
+							Additional: map[string]interface{}{
+								"rule":     rule,
+								"priority": priority,
+							},
 						})
 				}
 			}
@@ -186,13 +218,20 @@ func main() {
 				}
 			case auditEvent := <-auditEventsChan:
 				auditID := fmt.Sprintf("%v", auditEvent["auditID"])
-				log.Debug("Processing audit event from channel",
+				verb := fmt.Sprintf("%v", auditEvent["verb"])
+				objectRef, _ := auditEvent["objectRef"].(map[string]interface{})
+				resource := fmt.Sprintf("%v", objectRef["resource"])
+				log.Info("Processing audit event from channel",
 					logger.Fields{
 						Component: "main",
 						Operation: "process_audit_channel",
 						Source:    "audit",
+						EventType: "channel_consumed",
 						Additional: map[string]interface{}{
 							"audit_id": auditID,
+							"verb":     verb,
+							"resource": resource,
+							"stage":    fmt.Sprintf("%v", auditEvent["stage"]),
 						},
 					})
 				if err := webhookProcessor.ProcessAuditEvent(ctx, auditEvent); err != nil {
@@ -202,6 +241,23 @@ func main() {
 							Operation: "process_audit_channel",
 							Source:    "audit",
 							Error:     err,
+							Additional: map[string]interface{}{
+								"audit_id": auditID,
+								"verb":     verb,
+								"resource": resource,
+							},
+						})
+				} else {
+					log.Debug("Audit event processed successfully",
+						logger.Fields{
+							Component: "main",
+							Operation: "process_audit_channel",
+							Source:    "audit",
+							Additional: map[string]interface{}{
+								"audit_id": auditID,
+								"verb":     verb,
+								"resource": resource,
+							},
 						})
 				}
 			}

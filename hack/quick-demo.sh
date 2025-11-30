@@ -1367,11 +1367,8 @@ if [ -z "$REPO_ROOT" ] || [ ! -d "$REPO_ROOT" ]; then
 fi
 cd "$REPO_ROOT" || { echo "Error: Failed to change to repo root: $REPO_ROOT" >&2; exit 1; }
 
-# Package local zen-watcher chart for helmfile to use
-echo -e "${CYAN}   Packaging local zen-watcher chart...${NC}"
-helm package charts/zen-watcher -d /tmp > /dev/null 2>&1 || {
-    echo -e "${YELLOW}⚠${NC}  Failed to package chart, continuing anyway..."
-}
+# Use zen-watcher chart from helm-charts repo (already added above)
+echo -e "${CYAN}   Using zen-watcher chart from helm-charts repository...${NC}"
 
 # Suppress verbose Helm output using --quiet flag
 if helmfile -f hack/helmfile.yaml.gotmpl --quiet sync 2>&1 | tee /tmp/helmfile-sync.log; then
@@ -1501,34 +1498,10 @@ spec:
             name: victoriametrics-single-vms-server
             port:
               number: 8428
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: zen-demo-zen-watcher
-  namespace: ${NAMESPACE}
-  annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "false"
-    nginx.ingress.kubernetes.io/rewrite-target: /\$2
-    nginx.ingress.kubernetes.io/use-regex: "true"
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: localhost
-    http:
-      paths:
-      - path: /zen-watcher(/|$)(.*)
-        pathType: ImplementationSpecific
-        backend:
-          service:
-            name: zen-watcher
-            port:
-              number: 8080
 EOF
     # Verify ingress resources were created
     if kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && \
-       kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1 && \
-       kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1; then
+       kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1; then
         echo -e "${GREEN}✓${NC} Ingress resources created"
     else
         echo -e "${YELLOW}⚠${NC}  Ingress resources may not have been created correctly"
@@ -1647,7 +1620,6 @@ for comp in "${COMPONENTS[@]}"; do
 done
 [ "$SKIP_MONITORING" != true ] && echo -e "${CYAN}     - Grafana ingress${NC}"
 [ "$SKIP_MONITORING" != true ] && echo -e "${CYAN}     - VictoriaMetrics ingress${NC}"
-[ "$SKIP_MONITORING" != true ] && echo -e "${CYAN}     - Zen Watcher ingress${NC}"
 echo ""
 
 # Track ingress resources separately (only if monitoring is enabled)
@@ -1657,8 +1629,6 @@ if [ "$SKIP_MONITORING" != true ]; then
     COMPONENT_SHOWN["Grafana ingress"]=false
     COMPONENT_READY["VictoriaMetrics ingress"]=false
     COMPONENT_SHOWN["VictoriaMetrics ingress"]=false
-    COMPONENT_READY["Zen Watcher ingress"]=false
-    COMPONENT_SHOWN["Zen Watcher ingress"]=false
 fi
 
 MAX_WAIT=60  # 1 minute max
@@ -1714,21 +1684,9 @@ done
             fi
         fi
         
-        # Check Zen Watcher ingress
-        if [ "${COMPONENT_READY[Zen Watcher ingress]}" != "true" ]; then
-            if kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1; then
-                COMPONENT_READY["Zen Watcher ingress"]=true
-                if [ "${COMPONENT_SHOWN[Zen Watcher ingress]}" != "true" ]; then
-                    echo -e "${GREEN}     ✓${NC} Zen Watcher ingress"
-                    COMPONENT_SHOWN["Zen Watcher ingress"]=true
-            fi
-        fi
-    fi
-        
         # Count ready ingress resources
         [ "${COMPONENT_READY[Grafana ingress]}" = "true" ] && READY_COUNT=$((READY_COUNT + 1))
         [ "${COMPONENT_READY[VictoriaMetrics ingress]}" = "true" ] && READY_COUNT=$((READY_COUNT + 1))
-        [ "${COMPONENT_READY[Zen Watcher ingress]}" = "true" ] && READY_COUNT=$((READY_COUNT + 1))
     fi
     
     if [ $((i % 10)) -eq 0 ]; then
@@ -1746,7 +1704,6 @@ done
         if [ "$SKIP_MONITORING" != true ]; then
             [ "${COMPONENT_READY[Grafana ingress]}" != "true" ] && OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1)) && OUTSTANDING_LIST+=("Grafana ingress")
             [ "${COMPONENT_READY[VictoriaMetrics ingress]}" != "true" ] && OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1)) && OUTSTANDING_LIST+=("VictoriaMetrics ingress")
-            [ "${COMPONENT_READY[Zen Watcher ingress]}" != "true" ] && OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1)) && OUTSTANDING_LIST+=("Zen Watcher ingress")
         fi
         
         if [ "$OUTSTANDING_COUNT" -gt 0 ]; then
@@ -1780,13 +1737,10 @@ done
 if [ "$SKIP_MONITORING" != true ]; then
     INGRESS_GRAFANA_READY=false
     INGRESS_VM_READY=false
-    INGRESS_ZW_READY=false
     kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && INGRESS_GRAFANA_READY=true
     kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1 && INGRESS_VM_READY=true
-    kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1 && INGRESS_ZW_READY=true
     [ "$INGRESS_GRAFANA_READY" = false ] && HAS_FAILURES=true || true
     [ "$INGRESS_VM_READY" = false ] && HAS_FAILURES=true || true
-    [ "$INGRESS_ZW_READY" = false ] && HAS_FAILURES=true || true
 fi
 
 if [ "$HAS_FAILURES" = true ]; then
@@ -1810,16 +1764,13 @@ done
     if [ "$SKIP_MONITORING" != true ]; then
         INGRESS_GRAFANA_READY=false
         INGRESS_VM_READY=false
-        INGRESS_ZW_READY=false
         kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && INGRESS_GRAFANA_READY=true
         kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1 && INGRESS_VM_READY=true
-        kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1 && INGRESS_ZW_READY=true
         
-        if [ "$INGRESS_GRAFANA_READY" = false ] || [ "$INGRESS_VM_READY" = false ] || [ "$INGRESS_ZW_READY" = false ]; then
+        if [ "$INGRESS_GRAFANA_READY" = false ] || [ "$INGRESS_VM_READY" = false ]; then
             echo -e "${YELLOW}  Ingress resources:${NC}"
             [ "$INGRESS_GRAFANA_READY" = false ] && echo -e "${CYAN}    Checking Grafana ingress...${NC}" && kubectl get ingress zen-demo-grafana -n grafana 2>&1 || echo "    Ingress not found"
             [ "$INGRESS_VM_READY" = false ] && echo -e "${CYAN}    Checking VictoriaMetrics ingress...${NC}" && kubectl get ingress zen-demo-victoriametrics -n victoriametrics 2>&1 || echo "    Ingress not found"
-            [ "$INGRESS_ZW_READY" = false ] && echo -e "${CYAN}    Checking Zen Watcher ingress...${NC}" && kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} 2>&1 || echo "    Ingress not found"
 echo ""
         fi
     fi
@@ -1839,8 +1790,6 @@ ENDPOINTS=(
     "VictoriaMetrics:/victoriametrics/:200,204,301,302"
     "VictoriaMetrics API:/victoriametrics/api/v1/query?query=up:200,400,405"
     "VictoriaMetrics VMUI:/victoriametrics/vmui/:200,301,302,400"
-    "Zen Watcher Health:/zen-watcher/health:200"
-    "Zen Watcher Metrics:/zen-watcher/metrics:200"
 )
 
 # Initialize status for all endpoints
@@ -2044,10 +1993,6 @@ echo ""
             ns="victoriametrics"
             ingress_name="zen-demo-victoriametrics"
             svc_filter="victoriametrics"
-        elif echo "$path" | grep -q "^/zen-watcher"; then
-            ns="${NAMESPACE:-zen-system}"
-            ingress_name="zen-demo-zen-watcher"
-            svc_filter="zen-watcher"
         fi
         
         # Skip if no namespace was determined

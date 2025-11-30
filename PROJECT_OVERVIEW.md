@@ -2,12 +2,12 @@
 
 ## What is Zen Watcher?
 
-Zen Watcher is an open-source, production-ready Kubernetes operator that aggregates security, compliance, and observability events from multiple sources into a unified, extensible CRD-based system.
+Zen Watcher is an open-source Kubernetes operator that aggregates security, compliance, and observability events from multiple sources into a unified, extensible CRD-based system. Core features are production-ready and battle-tested.
 
 **Version**: 1.0.0  
 **License**: Apache 2.0  
-**Language**: Go 1.24+  
-**Platform**: Kubernetes 1.28+
+**Language**: Go 1.23+ (tested on 1.23 and 1.24)  
+**Platform**: Kubernetes 1.26-1.29 (client libs: k8s.io/* v0.28.15)
 
 ---
 
@@ -233,7 +233,7 @@ kubectl apply -f deploy/k8s-deployment.yaml
 
 ## 🔧 Technology Stack
 
-- **Language**: Go 1.24
+- **Language**: Go 1.23+ (tested on 1.23 and 1.24)
 - **Platform**: Kubernetes 1.28+
 - **Storage**: Kubernetes CRDs
 - **Metrics**: Prometheus format

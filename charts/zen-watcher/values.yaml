@@ -91,6 +91,14 @@ networkPolicy:
       ports:
       - protocol: TCP
         port: 8080
+    # Allow from ingress-nginx for ingress access
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      ports:
+      - protocol: TCP
+        port: 8080
     # Allow Falco webhooks (from Falco namespace only)
     - from:
       - namespaceSelector:
