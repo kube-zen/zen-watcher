@@ -147,6 +147,11 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 		unstructured.SetNestedMap(observation.Object, metadata, "metadata")
 	}
 
+	// Enrich with cluster/tenant metadata (optional - if CLUSTER_ID or TENANT_ID env vars are set)
+	// This is implemented centrally here to ensure consistency across all adapters.
+	// Cluster/tenant metadata is added as labels for easy filtering/querying, not in spec.
+	oc.enrichClusterMetadata(observation, metadata)
+
 	// Extract category and severity from spec for metrics BEFORE creation
 	// Use NestedFieldCopy to handle interface{} types, then convert to string
 	categoryVal, categoryFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "category")
@@ -431,4 +436,59 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 	// Set TTL in spec (only if not already set)
 	spec["ttlSecondsAfterCreation"] = defaultTTLSeconds
 	unstructured.SetNestedMap(observation.Object, spec, "spec")
+}
+
+// enrichClusterMetadata adds cluster and tenant metadata as labels and annotations if environment variables are set.
+// This is an optional enrichment feature for multi-cluster/tenant deployments.
+// Cluster/tenant metadata is stored as labels (for filtering) and annotations (for metadata) - NOT in spec.
+// This keeps the CRD core cluster-blind while allowing optional enrichment when needed.
+//
+// Labels added (if CLUSTER_ID or TENANT_ID env vars are set):
+//   - cluster-id: <value> (for kubectl filtering: kubectl get observations -l cluster-id=cluster-001)
+//   - tenant-id: <value> (for kubectl filtering: kubectl get observations -l tenant-id=tenant-001)
+//
+// Annotations added (if CLUSTER_ID or TENANT_ID env vars are set):
+//   - zen.kube-zen.io/cluster-id: <value>
+//   - zen.kube-zen.io/tenant-id: <value>
+//
+// This is implemented centrally in ObservationCreator to ensure consistency across all adapters.
+// Individual adapters should NOT add cluster/tenant metadata directly - it's handled here.
+func (oc *ObservationCreator) enrichClusterMetadata(observation *unstructured.Unstructured, metadata map[string]interface{}) {
+	// Get cluster ID from environment (optional)
+	if clusterID := os.Getenv("CLUSTER_ID"); clusterID != "" {
+		// Add as label for easy filtering: kubectl get observations -l cluster-id=cluster-001
+		labels, _, _ := unstructured.NestedStringMap(observation.Object, "metadata", "labels")
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+		labels["cluster-id"] = clusterID
+		unstructured.SetNestedStringMap(observation.Object, labels, "metadata", "labels")
+
+		// Also add as annotation for metadata (annotations are more flexible for metadata)
+		annotations, _, _ := unstructured.NestedStringMap(observation.Object, "metadata", "annotations")
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		annotations["zen.kube-zen.io/cluster-id"] = clusterID
+		unstructured.SetNestedStringMap(observation.Object, annotations, "metadata", "annotations")
+	}
+
+	// Get tenant ID from environment (optional)
+	if tenantID := os.Getenv("TENANT_ID"); tenantID != "" {
+		// Add as label for easy filtering: kubectl get observations -l tenant-id=tenant-001
+		labels, _, _ := unstructured.NestedStringMap(observation.Object, "metadata", "labels")
+		if labels == nil {
+			labels = make(map[string]string)
+		}
+		labels["tenant-id"] = tenantID
+		unstructured.SetNestedStringMap(observation.Object, labels, "metadata", "labels")
+
+		// Also add as annotation for metadata
+		annotations, _, _ := unstructured.NestedStringMap(observation.Object, "metadata", "annotations")
+		if annotations == nil {
+			annotations = make(map[string]string)
+		}
+		annotations["zen.kube-zen.io/tenant-id"] = tenantID
+		unstructured.SetNestedStringMap(observation.Object, annotations, "metadata", "annotations")
+	}
 }
