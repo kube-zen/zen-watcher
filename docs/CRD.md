@@ -66,7 +66,7 @@ The Observation CRD defines:
 - `spec.resource` - Affected Kubernetes resource
 - `spec.details` - Event-specific details (flexible JSON)
 - `spec.detectedAt` - Timestamp when event was detected
-- `spec.ttlSecondsAfterCreation` - TTL in seconds after creation (Kubernetes native style, like Jobs). Observation will be deleted by GC after this duration. If not set, uses default TTL from GC configuration. Priority: spec field > annotation > default.
+- `spec.ttlSecondsAfterCreation` - TTL in seconds after creation (Kubernetes native style, like Jobs). Observation will be deleted by GC after this duration. If not set, uses default TTL from GC configuration.
 - `status.processed` - Whether this event has been processed
 - `status.lastProcessedAt` - Timestamp when event was last processed
 
@@ -77,16 +77,13 @@ Observations support TTL (Time To Live) to prevent CRD bloat and etcd pressure:
 1. **`spec.ttlSecondsAfterCreation`** (Kubernetes native) - Per-Observation TTL in seconds
    - Highest priority - set per observation
    - Example: `spec.ttlSecondsAfterCreation: 3600` (1 hour)
+   - If not set, uses default TTL from GC configuration
 
-2. **Annotation `zen.kube-zen.io/ttl-seconds`** (Legacy) - Per-Observation override
-   - Medium priority - annotation-based
-   - Backward compatible with existing deployments
+2. **Default TTL** (Global) - Set via `OBSERVATION_TTL_DAYS` or `OBSERVATION_TTL_SECONDS`
+   - Fallback if `spec.ttlSecondsAfterCreation` is not set per-observation
+   - Default: 7 days (604800 seconds)
 
-3. **Default TTL** (Global) - Set via `OBSERVATION_TTL_DAYS` or `OBSERVATION_TTL_SECONDS`
-   - Lowest priority - fallback if not set per-observation
-   - Default: 7 days
-
-The garbage collector checks TTL in priority order and deletes Observations after their TTL expires.
+The garbage collector checks `spec.ttlSecondsAfterCreation` first, then falls back to the default TTL. Observations are deleted after their TTL expires.
 
 ### Versioning
 

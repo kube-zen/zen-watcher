@@ -170,9 +170,9 @@ spec:
 
 ### Garbage Collection
 
-- **Default TTL:** 7 days (configurable via `GC_TTL_HOURS`)
-- **GC Interval:** 1 hour (configurable via `GC_INTERVAL_MINUTES`)
-- **Per-Observation Override:** Via `zen.kube-zen.io/ttl-seconds` annotation
+- **Default TTL:** 7 days (configurable via `OBSERVATION_TTL_DAYS` or `OBSERVATION_TTL_SECONDS`)
+- **GC Interval:** 1 hour (configurable via `GC_INTERVAL`)
+- **Per-Observation Override:** Via `spec.ttlSecondsAfterCreation` field (Kubernetes native style)
 
 ### Rate Limiting
 

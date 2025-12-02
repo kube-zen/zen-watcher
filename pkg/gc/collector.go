@@ -35,8 +35,6 @@ const (
 	DefaultTTLDays = 7
 	// DefaultGCInterval is the default interval between GC runs
 	DefaultGCInterval = 1 * time.Hour
-	// TTLAnnotationKey is the annotation key for per-Observation TTL
-	TTLAnnotationKey = "zen.kube-zen.io/ttl-seconds"
 )
 
 // Collector handles garbage collection of old Observations
@@ -330,13 +328,13 @@ func (gc *Collector) collectAllNamespaces(ctx context.Context) (int, error) {
 }
 
 // shouldDeleteObservation determines if an Observation should be deleted
-// Priority: 1) spec.ttlSecondsAfterCreation, 2) annotation ttl-seconds, 3) default TTL
+// Priority: 1) spec.ttlSecondsAfterCreation, 2) default TTL
 // Returns (shouldDelete, reason)
 func (gc *Collector) shouldDeleteObservation(obs unstructured.Unstructured, defaultCutoffTime time.Time) (bool, string) {
 	createdTime := obs.GetCreationTimestamp().Time
 	now := time.Now()
 
-	// 1. Check spec.ttlSecondsAfterCreation first (highest priority - Kubernetes native style)
+	// 1. Check spec.ttlSecondsAfterCreation (Kubernetes native style - highest priority)
 	if ttlVal, found, _ := unstructured.NestedInt64(obs.Object, "spec", "ttlSecondsAfterCreation"); found && ttlVal > 0 {
 		cutoffTime := createdTime.Add(time.Duration(ttlVal) * time.Second)
 		if now.After(cutoffTime) {
@@ -345,19 +343,7 @@ func (gc *Collector) shouldDeleteObservation(obs unstructured.Unstructured, defa
 		return false, ""
 	}
 
-	// 2. Check for TTL annotation (per-Observation TTL override)
-	if ttlStr, found := obs.GetAnnotations()[TTLAnnotationKey]; found {
-		ttlSeconds, err := strconv.ParseInt(ttlStr, 10, 64)
-		if err == nil && ttlSeconds > 0 {
-			cutoffTime := createdTime.Add(time.Duration(ttlSeconds) * time.Second)
-			if now.After(cutoffTime) {
-				return true, "ttl_annotation"
-			}
-			return false, ""
-		}
-	}
-
-	// 3. Use default TTL based on creation timestamp (lowest priority)
+	// 2. Use default TTL based on creation timestamp (fallback)
 	if createdTime.Before(defaultCutoffTime) {
 		return true, "ttl_default"
 	}

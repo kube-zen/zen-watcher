@@ -140,16 +140,11 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 		namespace = "default"
 	}
 
-	// Ensure metadata.annotations exists for TTL annotation support
+	// Ensure metadata exists (for labels, annotations, etc. - not TTL specific)
 	metadata, _, _ := unstructured.NestedMap(observation.Object, "metadata")
 	if metadata == nil {
 		metadata = make(map[string]interface{})
 		unstructured.SetNestedMap(observation.Object, metadata, "metadata")
-	}
-	annotations, _, _ := unstructured.NestedStringMap(observation.Object, "metadata", "annotations")
-	if annotations == nil {
-		annotations = make(map[string]string)
-		unstructured.SetNestedStringMap(observation.Object, annotations, "metadata", "annotations")
 	}
 
 	// Extract category and severity from spec for metrics BEFORE creation

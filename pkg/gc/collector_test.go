@@ -63,32 +63,32 @@ func TestCollector_shouldDeleteObservation(t *testing.T) {
 			wantReason:    "",
 		},
 		{
-			name: "Observation with TTL annotation (expired)",
+			name: "Observation with spec.ttlSecondsAfterCreation (expired)",
 			obs: unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"name":              "ttl-obs",
 						"creationTimestamp": recentTime.Format(time.RFC3339),
-						"annotations": map[string]interface{}{
-							TTLAnnotationKey: "3600", // 1 hour TTL
-						},
+					},
+					"spec": map[string]interface{}{
+						"ttlSecondsAfterCreation": int64(3600), // 1 hour TTL
 					},
 				},
 			},
 			defaultCutoff: now.AddDate(0, 0, -7),
 			wantDelete:    true, // Created 1 day ago, TTL is 1 hour, so expired
-			wantReason:    "ttl_annotation",
+			wantReason:    "ttl_spec",
 		},
 		{
-			name: "Observation with TTL annotation (not expired)",
+			name: "Observation with spec.ttlSecondsAfterCreation (not expired)",
 			obs: unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"metadata": map[string]interface{}{
 						"name":              "ttl-obs-recent",
 						"creationTimestamp": now.Add(-30 * time.Minute).Format(time.RFC3339),
-						"annotations": map[string]interface{}{
-							TTLAnnotationKey: "3600", // 1 hour TTL
-						},
+					},
+					"spec": map[string]interface{}{
+						"ttlSecondsAfterCreation": int64(3600), // 1 hour TTL
 					},
 				},
 			},
