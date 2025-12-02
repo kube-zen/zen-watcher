@@ -8,6 +8,7 @@
 5. [Data Flow](#data-flow)
 6. [Security Model](#security-model)
 7. [Performance Characteristics](#performance-characteristics)
+8. [Future Architecture Considerations](#future-architecture-considerations)
 
 ---
 
@@ -837,64 +838,6 @@ type SinkController struct {
 - **Enterprise users can build their own sinks** without waiting
 
 This follows the proven pattern of Prometheus Alertmanager, Flux, and Crossplane: **core is minimal; ecosystem extends it**.
-
-## Cluster/Tenant Metadata Strategy
-
-### Design Principle: Cluster-Blind CRD Core
-
-The Observation CRD is intentionally **cluster-blind and tenant-blind** at its core. The CRD spec contains no cluster or tenant identifiers, keeping it generic and reusable across any Kubernetes cluster.
-
-### Optional Enrichment via Labels/Annotations
-
-For multi-cluster or multi-tenant deployments, zen-watcher supports **optional metadata enrichment** via environment variables. This enrichment is implemented **centrally in ObservationCreator** to ensure consistency across all adapters.
-
-**Implementation:**
-- Cluster/tenant metadata is added as **labels** (for filtering) and **annotations** (for metadata)
-- Metadata is **NOT** added to the CRD spec, maintaining the cluster-blind design
-- Enrichment only occurs if environment variables are set:
-  - `CLUSTER_ID` - Optional cluster identifier
-  - `TENANT_ID` - Optional tenant identifier
-
-**Labels Added (if env vars set):**
-```yaml
-metadata:
-  labels:
-    cluster-id: "cluster-001"  # For kubectl filtering
-    tenant-id: "tenant-xyz"    # For kubectl filtering
-```
-
-**Annotations Added (if env vars set):**
-```yaml
-metadata:
-  annotations:
-    zen.kube-zen.io/cluster-id: "cluster-001"
-    zen.kube-zen.io/tenant-id: "tenant-xyz"
-```
-
-**Usage:**
-```bash
-# Filter observations by cluster
-kubectl get observations -l cluster-id=cluster-001
-
-# Filter observations by tenant
-kubectl get observations -l tenant-id=tenant-xyz
-
-# Combined filtering
-kubectl get observations -l cluster-id=cluster-001,tenant-id=tenant-xyz
-```
-
-### Why This Approach?
-
-1. **KEP Readiness**: Keeps the CRD core generic and cluster-blind, making it easier to argue for Kubernetes SIG acceptance
-2. **Flexibility**: Works for single-cluster deployments (no enrichment) and multi-cluster deployments (with enrichment)
-3. **Consistency**: All adapters automatically get cluster/tenant metadata without per-adapter code
-4. **Kubernetes Best Practices**: Uses standard labels/annotations, not custom spec fields
-
-### Important Notes
-
-- **Individual adapters should NOT add cluster/tenant metadata directly** - it's handled centrally in ObservationCreator
-- **This is optional enrichment** - the core CRD remains cluster-blind
-- **Legacy watchers** (e.g., `kube_bench_watcher.go`) that directly use `CLUSTER_ID` in event data are deprecated in favor of the adapter pattern with centralized enrichment
 
 ## Future Architecture Considerations
 

@@ -85,7 +85,6 @@ type KubeBenchFinding struct {
 	Scored      bool      `json:"scored"`
 	NodeName    string    `json:"node_name"`
 	Timestamp   time.Time `json:"timestamp"`
-	ClusterID   string    `json:"cluster_id"`
 }
 
 // NewKubeBenchWatcher creates a new kube-bench watcher
@@ -439,7 +438,6 @@ func (kbw *KubeBenchWatcher) getJobResults(ctx context.Context, jobName, nodeNam
 						Scored:      test.Scored,
 						NodeName:    nodeName,
 						Timestamp:   time.Now(),
-						ClusterID:   os.Getenv("CLUSTER_ID"),
 					}
 					findings = append(findings, finding)
 				}
@@ -501,7 +499,6 @@ func (kbw *KubeBenchWatcher) RunKubeBenchLocally(ctx context.Context) ([]KubeBen
 						Scored:      test.Scored,
 						NodeName:    "local",
 						Timestamp:   time.Now(),
-						ClusterID:   os.Getenv("CLUSTER_ID"),
 					}
 					findings = append(findings, finding)
 				}
