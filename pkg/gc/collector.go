@@ -35,6 +35,10 @@ const (
 	DefaultTTLDays = 7
 	// DefaultGCInterval is the default interval between GC runs
 	DefaultGCInterval = 1 * time.Hour
+	// DefaultGCTimeout is the default timeout for a single GC run
+	DefaultGCTimeout = 5 * time.Minute
+	// GCListChunkSize is the chunk size for listing Observations (prevents memory issues with large lists)
+	GCListChunkSize = 500
 )
 
 // Collector handles garbage collection of old Observations
@@ -142,6 +146,16 @@ func (gc *Collector) runGC(ctx context.Context) {
 			},
 		})
 
+	// Add timeout for GC operations to prevent hangs
+	gcTimeout := DefaultGCTimeout
+	if timeoutStr := os.Getenv("GC_TIMEOUT"); timeoutStr != "" {
+		if parsed, err := time.ParseDuration(timeoutStr); err == nil && parsed > 0 {
+			gcTimeout = parsed
+		}
+	}
+	gcCtx, cancel := context.WithTimeout(ctx, gcTimeout)
+	defer cancel()
+
 	// List all namespaces (or use watch namespace if set)
 	namespaces := gc.getNamespacesToScan()
 
@@ -151,18 +165,35 @@ func (gc *Collector) runGC(ctx context.Context) {
 		var err error
 		if ns == "" {
 			// List all namespaces and collect from each
-			deleted, err = gc.collectAllNamespaces(ctx)
+			deleted, err = gc.collectAllNamespaces(gcCtx)
 		} else {
-			deleted, err = gc.collectNamespace(ctx, ns)
+			deleted, err = gc.collectNamespace(gcCtx, ns)
 		}
 		if err != nil {
-			logger.Warn("Failed to collect Observations in namespace",
-				logger.Fields{
-					Component: "gc",
-					Operation: "gc_run",
-					Namespace: ns,
-					Error:     err,
-				})
+			// Check if timeout occurred
+			if gcCtx.Err() == context.DeadlineExceeded {
+				logger.Warn("GC run timed out",
+					logger.Fields{
+						Component: "gc",
+						Operation: "gc_run",
+						Namespace: ns,
+						Error:     err,
+						Additional: map[string]interface{}{
+							"timeout": gcTimeout.String(),
+						},
+					})
+				if gc.gcErrors != nil {
+					gc.gcErrors.WithLabelValues("timeout", "gc_timeout").Inc()
+				}
+			} else {
+				logger.Warn("Failed to collect Observations in namespace",
+					logger.Fields{
+						Component: "gc",
+						Operation: "gc_run",
+						Namespace: ns,
+						Error:     err,
+					})
+			}
 			continue
 		}
 		totalDeleted += deleted
@@ -187,49 +218,82 @@ func (gc *Collector) runGC(ctx context.Context) {
 	}
 }
 
-// collectNamespace collects old Observations in a specific namespace
+// collectNamespace collects old Observations in a specific namespace with chunking support
 func (gc *Collector) collectNamespace(ctx context.Context, namespace string) (int, error) {
-	// List all Observations in the namespace
-	observations, err := gc.dynClient.Resource(gc.eventGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		// Track GC errors
-		if gc.gcErrors != nil {
-			gc.gcErrors.WithLabelValues("list", "list_failed").Inc()
-		}
-		return 0, fmt.Errorf("failed to list Observations: %w", err)
-	}
-
 	cutoffTime := time.Now().AddDate(0, 0, -gc.ttlDays)
 	deletedCount := 0
 
-	for _, obs := range observations.Items {
-		shouldDelete, reason := gc.shouldDeleteObservation(obs, cutoffTime)
-		if !shouldDelete {
-			continue
+	// Use chunking for large lists (prevents memory issues with 20k+ objects)
+	listOptions := metav1.ListOptions{Limit: GCListChunkSize}
+	continueToken := ""
+
+	for {
+		// Check if context is done
+		select {
+		case <-ctx.Done():
+			return deletedCount, ctx.Err()
+		default:
 		}
 
-		// Extract source for metrics
-		source := "unknown"
-		if sourceVal, _, _ := unstructured.NestedFieldCopy(obs.Object, "spec", "source"); sourceVal != nil {
-			source = fmt.Sprintf("%v", sourceVal)
+		if continueToken != "" {
+			listOptions.Continue = continueToken
 		}
 
-		// Delete the Observation
-		name := obs.GetName()
-		err := gc.dynClient.Resource(gc.eventGVR).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+		observations, err := gc.dynClient.Resource(gc.eventGVR).Namespace(namespace).List(ctx, listOptions)
 		if err != nil {
 			// Track GC errors
 			if gc.gcErrors != nil {
-				errorType := "delete_failed"
-				errMsg := strings.ToLower(err.Error())
-				if strings.Contains(errMsg, "not found") {
-					errorType = "not_found"
-				} else if strings.Contains(errMsg, "forbidden") {
-					errorType = "forbidden"
-				}
-				gc.gcErrors.WithLabelValues("delete", errorType).Inc()
+				gc.gcErrors.WithLabelValues("list", "list_failed").Inc()
 			}
-			logger.Warn("Failed to delete Observation",
+			return deletedCount, fmt.Errorf("failed to list Observations: %w", err)
+		}
+
+		// Process chunk
+		for _, obs := range observations.Items {
+			shouldDelete, reason := gc.shouldDeleteObservation(obs, cutoffTime)
+			if !shouldDelete {
+				continue
+			}
+
+			// Extract source for metrics
+			source := "unknown"
+			if sourceVal, _, _ := unstructured.NestedFieldCopy(obs.Object, "spec", "source"); sourceVal != nil {
+				source = fmt.Sprintf("%v", sourceVal)
+			}
+
+			// Delete the Observation
+			name := obs.GetName()
+			err := gc.dynClient.Resource(gc.eventGVR).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+			if err != nil {
+				// Track GC errors
+				if gc.gcErrors != nil {
+					errorType := "delete_failed"
+					errMsg := strings.ToLower(err.Error())
+					if strings.Contains(errMsg, "not found") {
+						errorType = "not_found"
+					} else if strings.Contains(errMsg, "forbidden") {
+						errorType = "forbidden"
+					}
+					gc.gcErrors.WithLabelValues("delete", errorType).Inc()
+				}
+				logger.Warn("Failed to delete Observation",
+					logger.Fields{
+						Component:    "gc",
+						Operation:    "gc_delete",
+						Namespace:    namespace,
+						ResourceName: name,
+						Source:       source,
+						Reason:       reason,
+						Error:        err,
+					})
+				continue
+			}
+
+			deletedCount++
+			if gc.observationsDeleted != nil {
+				gc.observationsDeleted.WithLabelValues(source, reason).Inc()
+			}
+			logger.Debug("Deleted Observation",
 				logger.Fields{
 					Component:    "gc",
 					Operation:    "gc_delete",
@@ -237,66 +301,100 @@ func (gc *Collector) collectNamespace(ctx context.Context, namespace string) (in
 					ResourceName: name,
 					Source:       source,
 					Reason:       reason,
-					Error:        err,
 				})
-			continue
 		}
 
-		deletedCount++
-		if gc.observationsDeleted != nil {
-			gc.observationsDeleted.WithLabelValues(source, reason).Inc()
+		// Check for more results
+		continueToken = observations.GetContinue()
+		if continueToken == "" {
+			break
 		}
-		logger.Debug("Deleted Observation",
-			logger.Fields{
-				Component:    "gc",
-				Operation:    "gc_delete",
-				Namespace:    namespace,
-				ResourceName: name,
-				Source:       source,
-				Reason:       reason,
-			})
 	}
 
 	return deletedCount, nil
 }
 
-// collectAllNamespaces collects old Observations across all namespaces
+// collectAllNamespaces collects old Observations across all namespaces with chunking support
 func (gc *Collector) collectAllNamespaces(ctx context.Context) (int, error) {
-	// List Observations across all namespaces
-	observations, err := gc.dynClient.Resource(gc.eventGVR).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		// Track GC errors
-		if gc.gcErrors != nil {
-			gc.gcErrors.WithLabelValues("list", "list_failed").Inc()
-		}
-		return 0, fmt.Errorf("failed to list Observations: %w", err)
-	}
-
 	cutoffTime := time.Now().AddDate(0, 0, -gc.ttlDays)
 	deletedCount := 0
 
-	for _, obs := range observations.Items {
-		shouldDelete, reason := gc.shouldDeleteObservation(obs, cutoffTime)
-		if !shouldDelete {
-			continue
+	// Use chunking for large lists (prevents memory issues with 20k+ objects)
+	listOptions := metav1.ListOptions{Limit: GCListChunkSize}
+	continueToken := ""
+
+	for {
+		// Check if context is done
+		select {
+		case <-ctx.Done():
+			return deletedCount, ctx.Err()
+		default:
 		}
 
-		// Extract source for metrics
-		source := "unknown"
-		if sourceVal, _, _ := unstructured.NestedFieldCopy(obs.Object, "spec", "source"); sourceVal != nil {
-			source = fmt.Sprintf("%v", sourceVal)
+		if continueToken != "" {
+			listOptions.Continue = continueToken
 		}
 
-		// Delete the Observation
-		name := obs.GetName()
-		namespace := obs.GetNamespace()
-		if namespace == "" {
-			namespace = "default"
-		}
-
-		err := gc.dynClient.Resource(gc.eventGVR).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+		observations, err := gc.dynClient.Resource(gc.eventGVR).List(ctx, listOptions)
 		if err != nil {
-			logger.Warn("Failed to delete Observation",
+			// Track GC errors
+			if gc.gcErrors != nil {
+				gc.gcErrors.WithLabelValues("list", "list_failed").Inc()
+			}
+			return deletedCount, fmt.Errorf("failed to list Observations: %w", err)
+		}
+
+		// Process chunk
+		for _, obs := range observations.Items {
+			shouldDelete, reason := gc.shouldDeleteObservation(obs, cutoffTime)
+			if !shouldDelete {
+				continue
+			}
+
+			// Extract source for metrics
+			source := "unknown"
+			if sourceVal, _, _ := unstructured.NestedFieldCopy(obs.Object, "spec", "source"); sourceVal != nil {
+				source = fmt.Sprintf("%v", sourceVal)
+			}
+
+			// Delete the Observation
+			name := obs.GetName()
+			namespace := obs.GetNamespace()
+			if namespace == "" {
+				namespace = "default"
+			}
+
+			err := gc.dynClient.Resource(gc.eventGVR).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+			if err != nil {
+				// Track GC errors
+				if gc.gcErrors != nil {
+					errorType := "delete_failed"
+					errMsg := strings.ToLower(err.Error())
+					if strings.Contains(errMsg, "not found") {
+						errorType = "not_found"
+					} else if strings.Contains(errMsg, "forbidden") {
+						errorType = "forbidden"
+					}
+					gc.gcErrors.WithLabelValues("delete", errorType).Inc()
+				}
+				logger.Warn("Failed to delete Observation",
+					logger.Fields{
+						Component:    "gc",
+						Operation:    "gc_delete",
+						Namespace:    namespace,
+						ResourceName: name,
+						Source:       source,
+						Reason:       reason,
+						Error:        err,
+					})
+				continue
+			}
+
+			deletedCount++
+			if gc.observationsDeleted != nil {
+				gc.observationsDeleted.WithLabelValues(source, reason).Inc()
+			}
+			logger.Debug("Deleted Observation",
 				logger.Fields{
 					Component:    "gc",
 					Operation:    "gc_delete",
@@ -304,24 +402,14 @@ func (gc *Collector) collectAllNamespaces(ctx context.Context) (int, error) {
 					ResourceName: name,
 					Source:       source,
 					Reason:       reason,
-					Error:        err,
 				})
-			continue
 		}
 
-		deletedCount++
-		if gc.observationsDeleted != nil {
-			gc.observationsDeleted.WithLabelValues(source, reason).Inc()
+		// Check for more results
+		continueToken = observations.GetContinue()
+		if continueToken == "" {
+			break
 		}
-		logger.Debug("Deleted Observation",
-			logger.Fields{
-				Component:    "gc",
-				Operation:    "gc_delete",
-				Namespace:    namespace,
-				ResourceName: name,
-				Source:       source,
-				Reason:       reason,
-			})
 	}
 
 	return deletedCount, nil

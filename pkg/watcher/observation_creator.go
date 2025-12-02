@@ -391,6 +391,12 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 	// Convert from days (OBSERVATION_TTL_DAYS) or use OBSERVATION_TTL_SECONDS if set
 	var defaultTTLSeconds int64 = 7 * 24 * 60 * 60 // Default: 7 days in seconds
 
+	// TTL validation bounds
+	const (
+		MinTTLSeconds = 60                              // 1 minute minimum (prevents immediate deletion)
+		MaxTTLSeconds = 365 * 24 * 60 * 60             // 1 year maximum (prevents indefinite retention)
+	)
+
 	// Check for seconds first (more precise)
 	if ttlSecondsStr := os.Getenv("OBSERVATION_TTL_SECONDS"); ttlSecondsStr != "" {
 		if ttlSeconds, err := strconv.ParseInt(ttlSecondsStr, 10, 64); err == nil && ttlSeconds > 0 {
@@ -401,6 +407,33 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 		if ttlDays, err := strconv.Atoi(ttlDaysStr); err == nil && ttlDays > 0 {
 			defaultTTLSeconds = int64(ttlDays) * 24 * 60 * 60
 		}
+	}
+
+	// Validate TTL bounds
+	if defaultTTLSeconds < MinTTLSeconds {
+		logger.Warn("TTL value too small, using minimum",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "ttl_validation",
+				Additional: map[string]interface{}{
+					"requested_ttl": defaultTTLSeconds,
+					"minimum_ttl":   MinTTLSeconds,
+					"applied_ttl":   MinTTLSeconds,
+				},
+			})
+		defaultTTLSeconds = MinTTLSeconds
+	} else if defaultTTLSeconds > MaxTTLSeconds {
+		logger.Warn("TTL value too large, using maximum",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "ttl_validation",
+				Additional: map[string]interface{}{
+					"requested_ttl": defaultTTLSeconds,
+					"maximum_ttl":   MaxTTLSeconds,
+					"applied_ttl":   MaxTTLSeconds,
+				},
+			})
+		defaultTTLSeconds = MaxTTLSeconds
 	}
 
 	// Ensure spec exists

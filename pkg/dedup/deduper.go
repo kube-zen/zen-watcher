@@ -109,7 +109,7 @@ type Deduper struct {
 	enableAggregation bool                        // whether aggregation is enabled
 
 	// Cleanup control
-	stopCh chan struct{} // Stop channel for cleanup loop
+	stopCh chan struct{}  // Stop channel for cleanup loop
 	wg     sync.WaitGroup // Wait group for cleanup goroutine
 }
 
