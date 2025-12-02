@@ -194,7 +194,7 @@ func TestObservationFilterLoader_InvalidCRD_SkipsInvalid(t *testing.T) {
 		},
 	}
 
-	client := fake.NewSimpleDynamicClient(validFilter, invalidFilter)
+	client := dynamicfake.NewSimpleDynamicClient(validFilter, invalidFilter)
 
 	filterInstance := filter.NewFilter(nil)
 	configMapLoader := &ConfigMapLoader{}
@@ -223,7 +223,7 @@ func TestObservationFilterLoader_EmptyTargetSource_Skips(t *testing.T) {
 		"minSeverity": "HIGH",
 	})
 
-	client := fake.NewSimpleDynamicClient(filter1)
+	client := dynamicfake.NewSimpleDynamicClient(filter1)
 
 	filterInstance := filter.NewFilter(nil)
 	configMapLoader := &ConfigMapLoader{}

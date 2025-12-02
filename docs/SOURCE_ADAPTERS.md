@@ -2,18 +2,49 @@
 
 This guide explains how to add support for new event sources to Zen Watcher. The Source Adapter interface makes it easy to integrate any tool that emits security, compliance, or infrastructure events.
 
-## Current Status
+## Two-Tier Adapter Approach
 
-**Phase 1 Complete:** Adapter infrastructure is established with implementations for:
-- ✅ TrivyAdapter (informer-based)
-- ✅ KyvernoAdapter (informer-based)
+Zen Watcher uses a **two-tier adapter strategy** that balances reliability with extensibility:
 
-**In Progress:** Existing watchers are being refactored to use the adapter pattern:
-- ⏳ Webhook-based adapters (Falco, Audit)
-- ⏳ ConfigMap-based adapters (kube-bench, Checkov)
-- ⏳ Full integration into main.go
+### Tier 1: First-Class Adapters (The "Big Six")
 
-Once complete, all sources will use the unified SourceAdapter interface.
+**Official adapters** implemented in Go code for core security tools:
+- ✅ **TrivyAdapter** - Vulnerability scanning
+- ✅ **KyvernoAdapter** - Policy violations
+- ✅ **FalcoAdapter** - Runtime security threats
+- ✅ **AuditAdapter** - Kubernetes audit events
+- ✅ **KubeBenchAdapter** - CIS benchmark compliance
+- ✅ **CheckovAdapter** - Infrastructure-as-code security
+
+**Why first-class adapters?**
+- ✅ **Strong semantics** - Hand-tested mappings ensure Observations are well-formed
+- ✅ **Resilience** - Can handle version-specific differences in upstream tools
+- ✅ **Confidence** - Battle-tested adapters that "just work" out of the box
+- ✅ **Clean story** - Users know these integrations are production-ready
+
+### Tier 2: Generic CRD Adapter (ObservationMapping)
+
+**Generic adapter** for the "long tail" of tools:
+- ✅ **CRDSourceAdapter** - Configurable via `ObservationMapping` CRDs
+- ✅ Covers new tools, internal CRDs, prototyping
+- ✅ Allows users to create custom mappings without touching Go code
+
+**Why generic adapter?**
+- ✅ **Extensibility** - Add new tools via YAML configuration
+- ✅ **Low friction** - No code changes needed for new integrations
+- ✅ **Vendor-friendly** - Tools can provide their own mappings
+
+**When to use each:**
+
+| Scenario | Use First-Class | Use Generic |
+|----------|----------------|-------------|
+| Core security tool (Falco, Trivy, etc.) | ✅ | ❌ |
+| New tool integration | ❌ | ✅ |
+| Prototyping integration | ❌ | ✅ |
+| Internal/company-specific CRD | ❌ | ✅ |
+| Vendor-provided mapping | ❌ | ✅ |
+
+See [Generic CRD Adapter](#generic-crd-adapter-observationmapping) section below for details on using `ObservationMapping` CRDs.
 
 ---
 

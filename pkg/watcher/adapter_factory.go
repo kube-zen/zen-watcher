@@ -55,6 +55,7 @@ func NewAdapterFactory(
 func (af *AdapterFactory) CreateAdapters() []SourceAdapter {
 	var adapters []SourceAdapter
 	
+	// First-class adapters (explicit, battle-tested)
 	// Informer-based adapters
 	adapters = append(adapters, NewTrivyAdapter(af.factory, af.trivyReportGVR))
 	adapters = append(adapters, NewKyvernoAdapter(af.factory, af.policyReportGVR))
@@ -72,6 +73,9 @@ func (af *AdapterFactory) CreateAdapters() []SourceAdapter {
 		adapters = append(adapters, NewKubeBenchAdapter(af.clientSet))
 		adapters = append(adapters, NewCheckovAdapter(af.clientSet))
 	}
+	
+	// Generic CRD adapter (for ObservationMapping CRDs - covers long tail of tools)
+	adapters = append(adapters, NewCRDSourceAdapter(af.factory, ObservationMappingGVR))
 	
 	return adapters
 }
