@@ -330,23 +330,34 @@ func (gc *Collector) collectAllNamespaces(ctx context.Context) (int, error) {
 }
 
 // shouldDeleteObservation determines if an Observation should be deleted
+// Priority: 1) spec.ttlSecondsAfterCreation, 2) annotation ttl-seconds, 3) default TTL
 // Returns (shouldDelete, reason)
 func (gc *Collector) shouldDeleteObservation(obs unstructured.Unstructured, defaultCutoffTime time.Time) (bool, string) {
-	// Check for TTL annotation (per-Observation TTL override)
+	createdTime := obs.GetCreationTimestamp().Time
+	now := time.Now()
+
+	// 1. Check spec.ttlSecondsAfterCreation first (highest priority - Kubernetes native style)
+	if ttlVal, found, _ := unstructured.NestedInt64(obs.Object, "spec", "ttlSecondsAfterCreation"); found && ttlVal > 0 {
+		cutoffTime := createdTime.Add(time.Duration(ttlVal) * time.Second)
+		if now.After(cutoffTime) {
+			return true, "ttl_spec"
+		}
+		return false, ""
+	}
+
+	// 2. Check for TTL annotation (per-Observation TTL override)
 	if ttlStr, found := obs.GetAnnotations()[TTLAnnotationKey]; found {
 		ttlSeconds, err := strconv.ParseInt(ttlStr, 10, 64)
 		if err == nil && ttlSeconds > 0 {
-			createdTime := obs.GetCreationTimestamp().Time
 			cutoffTime := createdTime.Add(time.Duration(ttlSeconds) * time.Second)
-			if time.Now().After(cutoffTime) {
+			if now.After(cutoffTime) {
 				return true, "ttl_annotation"
 			}
 			return false, ""
 		}
 	}
 
-	// Use default TTL based on creation timestamp
-	createdTime := obs.GetCreationTimestamp().Time
+	// 3. Use default TTL based on creation timestamp (lowest priority)
 	if createdTime.Before(defaultCutoffTime) {
 		return true, "ttl_default"
 	}

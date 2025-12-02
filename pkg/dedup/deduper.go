@@ -70,9 +70,9 @@ type rateLimitTracker struct {
 
 // aggregatedEvent represents an aggregated event within a rolling window
 type aggregatedEvent struct {
-	firstSeen time.Time
-	lastSeen  time.Time
-	count     int
+	firstSeen   time.Time
+	lastSeen    time.Time
+	count       int
 	fingerprint string
 }
 
@@ -93,20 +93,20 @@ type Deduper struct {
 
 	// Enhanced features
 	// Time-based buckets
-	buckets          map[int64]*timeBucket // bucket key (unix timestamp) -> bucket
-	bucketSizeSeconds int                  // size of each bucket in seconds
+	buckets           map[int64]*timeBucket // bucket key (unix timestamp) -> bucket
+	bucketSizeSeconds int                   // size of each bucket in seconds
 
 	// Fingerprint-based dedup
 	fingerprints map[string]*fingerprint // fingerprint hash -> fingerprint metadata
 
 	// Rate limiting per source
-	rateLimits      map[string]*rateLimitTracker // source -> rate limit tracker
-	maxRatePerSource int                        // maximum events per source per second
-	maxRateBurst     int                        // burst capacity
+	rateLimits       map[string]*rateLimitTracker // source -> rate limit tracker
+	maxRatePerSource int                          // maximum events per source per second
+	maxRateBurst     int                          // burst capacity
 
 	// Event aggregation
-	aggregatedEvents map[string]*aggregatedEvent // fingerprint -> aggregated event
-	enableAggregation bool                       // whether aggregation is enabled
+	aggregatedEvents  map[string]*aggregatedEvent // fingerprint -> aggregated event
+	enableAggregation bool                        // whether aggregation is enabled
 }
 
 // NewDeduper creates a new deduper with specified configuration and enhanced features
@@ -154,19 +154,19 @@ func NewDeduper(windowSeconds, maxSize int) *Deduper {
 	}
 
 	deduper := &Deduper{
-		cache:              make(map[string]*entry),
-		lruList:            make([]string, 0, maxSize),
-		maxSize:            maxSize,
-		windowSeconds:      windowSeconds,
-		ttl:                time.Duration(windowSeconds) * time.Second,
-		buckets:            make(map[int64]*timeBucket),
-		bucketSizeSeconds:  bucketSizeSeconds,
-		fingerprints:       make(map[string]*fingerprint),
-		rateLimits:         make(map[string]*rateLimitTracker),
-		maxRatePerSource:   maxRatePerSource,
-		maxRateBurst:       maxRateBurst,
-		aggregatedEvents:   make(map[string]*aggregatedEvent),
-		enableAggregation:  enableAggregation,
+		cache:             make(map[string]*entry),
+		lruList:           make([]string, 0, maxSize),
+		maxSize:           maxSize,
+		windowSeconds:     windowSeconds,
+		ttl:               time.Duration(windowSeconds) * time.Second,
+		buckets:           make(map[int64]*timeBucket),
+		bucketSizeSeconds: bucketSizeSeconds,
+		fingerprints:      make(map[string]*fingerprint),
+		rateLimits:        make(map[string]*rateLimitTracker),
+		maxRatePerSource:  maxRatePerSource,
+		maxRateBurst:      maxRateBurst,
+		aggregatedEvents:  make(map[string]*aggregatedEvent),
+		enableAggregation: enableAggregation,
 	}
 
 	// Start background cleanup goroutine for enhanced features
@@ -497,7 +497,7 @@ func (d *Deduper) ShouldCreateWithContent(key DedupKey, content map[string]inter
 	fingerprintHash := ""
 	if content != nil {
 		fingerprintHash = GenerateFingerprint(content)
-		
+
 		// Check fingerprint-based dedup first (more accurate)
 		if d.isDuplicateFingerprint(fingerprintHash, now) {
 			// Update aggregation

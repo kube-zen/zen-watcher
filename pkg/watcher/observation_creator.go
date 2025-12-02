@@ -184,6 +184,9 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 		severity = normalizeSeverity(severity)
 	}
 
+	// Set TTL in spec if not already set (Kubernetes native style)
+	oc.setTTLIfNotSet(observation)
+
 	// STEP 1: CREATE OBSERVATION CRD FIRST (before metrics)
 	// Create the Observation (first event always creates)
 	createdObservation, err := oc.dynClient.Resource(oc.eventGVR).Namespace(namespace).Create(ctx, observation, metav1.CreateOptions{})
@@ -378,4 +381,41 @@ func normalizeSeverity(severity string) string {
 	default:
 		return "UNKNOWN"
 	}
+}
+
+// setTTLIfNotSet sets spec.ttlSecondsAfterCreation if not already set
+// Priority: 1) Already set in spec, 2) Environment variable, 3) Default (7 days)
+func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructured) {
+	// Check if TTL is already set in spec
+	if ttlVal, found, _ := unstructured.NestedInt64(observation.Object, "spec", "ttlSecondsAfterCreation"); found && ttlVal > 0 {
+		// Already set, don't override
+		return
+	}
+
+	// Get default TTL from environment variable (in seconds)
+	// Convert from days (OBSERVATION_TTL_DAYS) or use OBSERVATION_TTL_SECONDS if set
+	var defaultTTLSeconds int64 = 7 * 24 * 60 * 60 // Default: 7 days in seconds
+
+	// Check for seconds first (more precise)
+	if ttlSecondsStr := os.Getenv("OBSERVATION_TTL_SECONDS"); ttlSecondsStr != "" {
+		if ttlSeconds, err := strconv.ParseInt(ttlSecondsStr, 10, 64); err == nil && ttlSeconds > 0 {
+			defaultTTLSeconds = ttlSeconds
+		}
+	} else if ttlDaysStr := os.Getenv("OBSERVATION_TTL_DAYS"); ttlDaysStr != "" {
+		// Fallback to days (for backward compatibility)
+		if ttlDays, err := strconv.Atoi(ttlDaysStr); err == nil && ttlDays > 0 {
+			defaultTTLSeconds = int64(ttlDays) * 24 * 60 * 60
+		}
+	}
+
+	// Ensure spec exists
+	spec, _, _ := unstructured.NestedMap(observation.Object, "spec")
+	if spec == nil {
+		spec = make(map[string]interface{})
+		unstructured.SetNestedMap(observation.Object, spec, "spec")
+	}
+
+	// Set TTL in spec (only if not already set)
+	spec["ttlSecondsAfterCreation"] = defaultTTLSeconds
+	unstructured.SetNestedMap(observation.Object, spec, "spec")
 }
