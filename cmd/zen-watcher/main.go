@@ -56,7 +56,7 @@ func main() {
 		})
 
 	// Setup signal handling and context
-	ctx, stopCh := lifecycle.SetupSignalHandler()
+	ctx, _ := lifecycle.SetupSignalHandler()
 
 	// Initialize metrics
 	m := metrics.NewMetrics()
@@ -94,9 +94,9 @@ func main() {
 	// Create ConfigMap loader for dynamic reloading
 	configMapLoader := config.NewConfigMapLoader(clients.Standard, filterInstance)
 
-	// Create processors with centralized observation creator and filter
-	// Flow: filter() → normalize() → dedup() → create Observation CRD + update metrics + log
-	eventProcessor, webhookProcessor, observationCreator := watcher.NewProcessors(
+	// Create centralized observation creator with filter
+	// This is used by AdapterLauncher to process all events
+	observationCreator := watcher.NewObservationCreator(
 		clients.Dynamic,
 		gvrs.Observations,
 		m.EventsTotal,
@@ -104,41 +104,31 @@ func main() {
 		m.ObservationsFiltered,
 		m.ObservationsDeduped,
 		m.ObservationsCreateErrors,
-		m.EventProcessingDuration,
 		filterInstance,
 	)
 
-	// Setup informers
-	if err := kubernetes.SetupInformers(ctx, informerFactory, gvrs, eventProcessor, stopCh); err != nil {
-		log.Fatal("Failed to setup informers",
-			logger.Fields{
-				Component: "main",
-				Operation: "setup_informers",
-				Error:     err,
-			})
-	}
-
-	// Update informer cache sync metrics
-	m.InformerCacheSync.WithLabelValues("policyreports").Set(1)
-	m.InformerCacheSync.WithLabelValues("vulnerabilityreports").Set(1)
-
-	// Create webhook channels
+	// Create webhook channels for Falco and Audit adapters
 	falcoAlertsChan := make(chan map[string]interface{}, 100)
 	auditEventsChan := make(chan map[string]interface{}, 200)
 
-	// Create HTTP server
+	// Create HTTP server (adapters will read from channels)
 	httpServer := server.NewServer(falcoAlertsChan, auditEventsChan, m.WebhookRequests, m.WebhookDropped)
 
-	// Create ConfigMap poller with centralized observation creator
-	configMapPoller := watcher.NewConfigMapPoller(
+	// Create adapter factory to build all source adapters
+	adapterFactory := watcher.NewAdapterFactory(
+		informerFactory,
+		gvrs.PolicyReport,
+		gvrs.TrivyReport,
 		clients.Standard,
-		clients.Dynamic,
-		gvrs.Observations,
-		eventProcessor,
-		webhookProcessor,
-		m.EventsTotal,
-		observationCreator,
+		falcoAlertsChan,
+		auditEventsChan,
 	)
+
+	// Create all adapters
+	adapters := adapterFactory.CreateAdapters()
+
+	// Create adapter launcher to run all adapters and process events
+	adapterLauncher := watcher.NewAdapterLauncher(adapters, observationCreator)
 
 	// WaitGroup for goroutines
 	var wg sync.WaitGroup
@@ -146,129 +136,22 @@ func main() {
 	// Start HTTP server
 	httpServer.Start(ctx, &wg)
 
-	// Process webhook channels in background
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		for {
-			select {
-			case <-ctx.Done():
-				// Drain channel non-blockingly
-				for {
-					select {
-					case <-falcoAlertsChan:
-					default:
-						return
-					}
-				}
-			case alert := <-falcoAlertsChan:
-				rule, _ := alert["rule"].(string)
-				priority := fmt.Sprintf("%v", alert["priority"])
-				log.Info("Processing Falco alert from channel",
-					logger.Fields{
-						Component: "main",
-						Operation: "process_falco_channel",
-						Source:    "falco",
-						EventType: "channel_consumed",
-						Additional: map[string]interface{}{
-							"rule":     rule,
-							"priority": priority,
-						},
-					})
-				if err := webhookProcessor.ProcessFalcoAlert(ctx, alert); err != nil {
-					log.Error("Failed to process Falco alert",
-						logger.Fields{
-							Component: "main",
-							Operation: "process_falco_channel",
-							Source:    "falco",
-							Error:     err,
-							Additional: map[string]interface{}{
-								"rule":     rule,
-								"priority": priority,
-							},
-						})
-				} else {
-					log.Debug("Falco alert processed successfully",
-						logger.Fields{
-							Component: "main",
-							Operation: "process_falco_channel",
-							Source:    "falco",
-							Additional: map[string]interface{}{
-								"rule":     rule,
-								"priority": priority,
-							},
-						})
-				}
-			}
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		for {
-			select {
-			case <-ctx.Done():
-				// Drain channel non-blockingly
-				for {
-					select {
-					case <-auditEventsChan:
-					default:
-						return
-					}
-				}
-			case auditEvent := <-auditEventsChan:
-				auditID := fmt.Sprintf("%v", auditEvent["auditID"])
-				verb := fmt.Sprintf("%v", auditEvent["verb"])
-				objectRef, _ := auditEvent["objectRef"].(map[string]interface{})
-				resource := fmt.Sprintf("%v", objectRef["resource"])
-				log.Info("Processing audit event from channel",
-					logger.Fields{
-						Component: "main",
-						Operation: "process_audit_channel",
-						Source:    "audit",
-						EventType: "channel_consumed",
-						Additional: map[string]interface{}{
-							"audit_id": auditID,
-							"verb":     verb,
-							"resource": resource,
-							"stage":    fmt.Sprintf("%v", auditEvent["stage"]),
-						},
-					})
-				if err := webhookProcessor.ProcessAuditEvent(ctx, auditEvent); err != nil {
-					log.Error("Failed to process audit event",
-						logger.Fields{
-							Component: "main",
-							Operation: "process_audit_channel",
-							Source:    "audit",
-							Error:     err,
-							Additional: map[string]interface{}{
-								"audit_id": auditID,
-								"verb":     verb,
-								"resource": resource,
-							},
-						})
-				} else {
-					log.Debug("Audit event processed successfully",
-						logger.Fields{
-							Component: "main",
-							Operation: "process_audit_channel",
-							Source:    "audit",
-							Additional: map[string]interface{}{
-								"audit_id": auditID,
-								"verb":     verb,
-								"resource": resource,
-							},
-						})
-				}
-			}
-		}
-	}()
-
 	// Mark server as ready
 	httpServer.SetReady(true)
 
-	// Start ConfigMap poller
-	go configMapPoller.Start(ctx)
+	// Start adapter launcher (runs all adapters and processes events)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := adapterLauncher.Start(ctx); err != nil {
+			log.Error("Adapter launcher stopped",
+				logger.Fields{
+					Component: "main",
+					Operation: "adapter_launcher",
+					Error:     err,
+				})
+		}
+	}()
 
 	// Start ConfigMap loader for dynamic filter config reloading
 	wg.Add(1)
@@ -336,14 +219,12 @@ func main() {
 
 	// Wait for shutdown
 	lifecycle.WaitForShutdown(ctx, &wg, func() {
-		totalCount := eventProcessor.GetTotalCount() + webhookProcessor.GetTotalCount()
+		// Stop adapter launcher gracefully
+		adapterLauncher.Stop()
 		log.Info("zen-watcher stopped",
 			logger.Fields{
 				Component: "main",
 				Operation: "shutdown",
-				Additional: map[string]interface{}{
-					"events_created": totalCount,
-				},
 			})
 	})
 }
