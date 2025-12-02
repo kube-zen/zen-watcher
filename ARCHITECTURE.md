@@ -4,9 +4,10 @@
 1. [Overview](#overview)
 2. [Design Principles](#design-principles)
 3. [Component Architecture](#component-architecture)
-4. [Data Flow](#data-flow)
-5. [Security Model](#security-model)
-6. [Performance Characteristics](#performance-characteristics)
+4. [Why CRDs Over WebSockets?](#why-crds-over-websockets)
+5. [Data Flow](#data-flow)
+6. [Security Model](#security-model)
+7. [Performance Characteristics](#performance-characteristics)
 
 ---
 
@@ -166,6 +167,193 @@ All event sources (informer, webhook, configmap) use the **same centralized flow
 - **Max Size**: 10,000 entries (configurable via `DEDUP_MAX_SIZE`)
 - **Algorithm**: Sliding window with LRU eviction and TTL cleanup
 - **Thread-safe**: All processors share the same deduper instance
+
+---
+
+## Why CRDs Over WebSockets?
+
+**KEP Reviewer Question**: "How do external systems consume the Observations efficiently?"
+
+Zen Watcher **intentionally chooses CRDs over WebSockets** as the consumption mechanism. This is a deliberate architectural decision that aligns with Kubernetes best practices and provides superior capabilities for enterprise use cases.
+
+### Design Decision: CRD-Based Consumption
+
+**Chosen Approach**: External systems consume Observations via:
+- **Kubernetes Informers** (recommended) - Real-time watch API
+- **kubectl/API queries** - Ad-hoc queries and exports
+- **kubewatcher** - Event routing to webhooks/CloudEvents
+
+**Rejected Approach**: WebSocket-based event streaming
+
+### Why CRDs Provide Superior Value
+
+#### 1. **RBAC (Role-Based Access Control)**
+
+**CRDs**: Native Kubernetes RBAC enables fine-grained access control
+```yaml
+# Example: Only security team can read Observations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: security-team-observations
+subjects:
+  - kind: Group
+    name: security-team
+roleRef:
+  kind: ClusterRole
+  name: observation-reader
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: observation-reader
+rules:
+  - apiGroups: ["zen.kube-zen.io"]
+    resources: ["observations"]
+    verbs: ["get", "list", "watch"]
+```
+
+**WebSockets**: Requires custom authentication/authorization implementation
+- No native Kubernetes RBAC integration
+- Must implement custom auth middleware
+- Difficult to audit and manage permissions
+
+#### 2. **Audit Logging**
+
+**CRDs**: All access automatically logged in Kubernetes audit logs
+```bash
+# All Observation access is automatically audited
+kubectl get observations  # ← Logged in audit logs
+```
+
+**WebSockets**: Requires custom audit logging implementation
+- Must instrument WebSocket connections manually
+- No standard audit format
+- Difficult to correlate with Kubernetes operations
+
+#### 3. **GitOps Integration**
+
+**CRDs**: Native GitOps support via standard Kubernetes tools
+```yaml
+# Observations can be version-controlled
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  name: critical-vuln-001
+spec:
+  # ... full event data
+```
+
+**Benefits**:
+- Version control of events (via Git)
+- Declarative event management
+- Rollback capabilities
+- Compliance and audit trails
+
+**WebSockets**: Events are ephemeral streams
+- No version control
+- No declarative management
+- Cannot rollback or review history
+
+#### 4. **Durability**
+
+**CRDs**: Events persist in etcd until TTL expires
+- Survive pod restarts
+- Available after network interruptions
+- Queryable at any time (no "missed events" problem)
+
+**WebSockets**: Events lost if connection drops
+- Require reconnection logic
+- Must handle missed events (backfill logic needed)
+- No historical query capability
+
+#### 5. **Multi-Reader Pattern**
+
+**CRDs**: Multiple consumers can watch the same Observations independently
+```go
+// Controller A watches Observations
+informerA := factoryA.ForResource(observationGVR).Informer()
+
+// Controller B watches the same Observations (independent)
+informerB := factoryB.ForResource(observationGVR).Informer()
+
+// Controller C queries Observations ad-hoc
+obs, _ := client.Get(ctx, name, metav1.GetOptions{})
+```
+
+**Benefits**:
+- Zero coordination needed between consumers
+- Each consumer maintains its own cache
+- No single point of failure
+- Horizontal scaling of consumers
+
+**WebSockets**: Require broadcast infrastructure
+- Must implement message broadcasting
+- Coordination needed between consumers
+- Connection management complexity
+- Single point of failure (WebSocket server)
+
+#### 6. **No Custom Transport**
+
+**CRDs**: Use standard Kubernetes APIs
+- Standard `kubectl` commands work out of the box
+- Standard Kubernetes client libraries
+- Standard Kubernetes tooling (Lens, k9s, etc.)
+- No custom protocols or clients needed
+
+**WebSockets**: Require custom client implementation
+- Custom WebSocket client library
+- Custom protocol design
+- Custom reconnection logic
+- Custom error handling
+
+### Real-Time Consumption via Informers
+
+**Concern**: "But WebSockets are more real-time than CRDs!"
+
+**Response**: Kubernetes Informers provide real-time updates via the Watch API:
+
+```go
+// Real-time consumption (latency: <100ms)
+informer := factory.ForResource(observationGVR).Informer()
+informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+    AddFunc: func(obj interface{}) {
+        obs := obj.(*unstructured.Unstructured)
+        // Process immediately - updates arrive in real-time
+    },
+})
+```
+
+**Performance**: Informers deliver updates with <100ms latency, comparable to WebSockets, while providing all the benefits above.
+
+### Comparison Summary
+
+| Feature | CRDs (via Informers) | WebSockets |
+|---------|---------------------|------------|
+| **RBAC** | ✅ Native Kubernetes RBAC | ❌ Custom implementation |
+| **Audit Logging** | ✅ Automatic (K8s audit logs) | ❌ Custom instrumentation |
+| **GitOps** | ✅ Native support | ❌ Not applicable (ephemeral) |
+| **Durability** | ✅ Persisted in etcd | ❌ Ephemeral (lost on disconnect) |
+| **Multi-Reader** | ✅ Zero coordination | ❌ Requires broadcasting |
+| **Standard APIs** | ✅ kubectl, K8s clients | ❌ Custom clients |
+| **Real-Time** | ✅ <100ms latency | ✅ <50ms latency |
+| **Scalability** | ✅ Horizontal scaling | ⚠️ Connection limits |
+| **Observability** | ✅ Native K8s metrics | ⚠️ Custom metrics |
+
+### Conclusion
+
+**For enterprise Kubernetes environments**, CRDs provide:
+- **Better security** (native RBAC, audit logging)
+- **Better operations** (GitOps, durability, multi-reader)
+- **Better integration** (standard APIs, no custom transport)
+- **Comparable performance** (<100ms latency via Informers)
+
+**WebSockets are appropriate for**:
+- Simple point-to-point event streams
+- External systems that cannot use Kubernetes APIs
+- Real-time dashboards that don't need persistence
+
+**For zen-watcher's use case** (security/compliance event aggregation in Kubernetes), CRDs are the superior choice. External systems can consume Observations efficiently via Kubernetes Informers, kubewatcher, or standard API queries—all while benefiting from native Kubernetes capabilities.
 
 ---
 
