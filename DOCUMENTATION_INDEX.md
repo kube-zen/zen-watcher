@@ -27,7 +27,7 @@ Complete guide to Zen Watcher documentation.
    - Technology stack
    - Use cases
 
-### Operations (4 files)
+### Operations (5 files)
 
 4. **[docs/OPERATIONAL_EXCELLENCE.md](docs/OPERATIONAL_EXCELLENCE.md)** - Ops best practices
    - Health checks
@@ -37,20 +37,26 @@ Complete guide to Zen Watcher documentation.
    - Backup & recovery
    - Troubleshooting runbooks
 
-5. **[docs/FILTERING.md](docs/FILTERING.md)** - Source-level filtering guide
+5. **[docs/SCALING.md](docs/SCALING.md)** - Scaling strategy and recommendations
+   - Single-replica deployment (recommended)
+   - Namespace sharding for scale-out
+   - Leader election roadmap
+   - Performance tuning
+
+6. **[docs/FILTERING.md](docs/FILTERING.md)** - Source-level filtering guide
    - Filter configuration
    - Dynamic ConfigMap reloading (no restart required)
    - Per-source filter rules
    - Examples and best practices
    - Troubleshooting
 
-6. **[monitoring/README.md](monitoring/README.md)** - Monitoring guide
+7. **[monitoring/README.md](monitoring/README.md)** - Monitoring guide
    - Prometheus metrics
    - Alert rules
    - VictoriaMetrics setup
    - Query examples
 
-7. **[dashboards/README.md](dashboards/README.md)** - Dashboard documentation
+8. **[dashboards/README.md](dashboards/README.md)** - Dashboard documentation
    - Grafana setup
    - Dashboard features
    - Metrics reference
@@ -58,20 +64,20 @@ Complete guide to Zen Watcher documentation.
 
 ### Security (3 files)
 
-7. **[docs/SECURITY.md](docs/SECURITY.md)** - Security policy
+9. **[docs/SECURITY.md](docs/SECURITY.md)** - Security policy
    - Vulnerability reporting
    - Security features
    - Best practices
    - Compliance
    - Incident response
 
-8. **[docs/SBOM.md](docs/SBOM.md)** - Software Bill of Materials
+10. **[docs/SBOM.md](docs/SBOM.md)** - Software Bill of Materials
    - SBOM generation
    - Vulnerability scanning
    - Supply chain security
    - Compliance
 
-9. **[docs/COSIGN.md](docs/COSIGN.md)** - Image signing
+11. **[docs/COSIGN.md](docs/COSIGN.md)** - Image signing
    - Cosign setup
    - Image verification
    - Key management
@@ -79,39 +85,39 @@ Complete guide to Zen Watcher documentation.
 
 ### Deployment (2 files)
 
-10. **[charts/zen-watcher/README.md](charts/zen-watcher/README.md)** - Helm chart guide
+12. **[charts/zen-watcher/README.md](charts/zen-watcher/README.md)** - Helm chart guide
     - Installation
     - Configuration
     - Security settings
     - Troubleshooting
 
-11. **[charts/HELM_SUMMARY.md](charts/HELM_SUMMARY.md)** - Helm features
+13. **[charts/HELM_SUMMARY.md](charts/HELM_SUMMARY.md)** - Helm features
     - Security features
     - Configuration options
     - Compliance info
 
 ### Development (2 files)
 
-12. **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guide
+14. **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guide
     - How to contribute
     - Development setup
     - Code standards
     - Review process
 
-13. **[CHANGELOG.md](CHANGELOG.md)** - Version history
+15. **[CHANGELOG.md](CHANGELOG.md)** - Version history
     - Release notes
     - Features added
     - Bug fixes
 
 ### Examples (2 files)
 
-14. **[examples/README.md](examples/README.md)** - Integration examples
+16. **[examples/README.md](examples/README.md)** - Integration examples
     - Query examples
     - Grafana setup
     - Prometheus config
     - Loki integration
 
-15. **[dashboards/DASHBOARD_GUIDE.md](dashboards/DASHBOARD_GUIDE.md)** - Dashboard details
+17. **[dashboards/DASHBOARD_GUIDE.md](dashboards/DASHBOARD_GUIDE.md)** - Dashboard details
     - Panel descriptions
     - How to read metrics
     - Customization
@@ -171,6 +177,11 @@ Complete guide to Zen Watcher documentation.
 - [helm/zen-watcher/values.yaml](helm/zen-watcher/values.yaml)
 - [docs/OPERATIONAL_EXCELLENCE.md](docs/OPERATIONAL_EXCELLENCE.md)
 
+### Scaling
+- [docs/SCALING.md](docs/SCALING.md) - Complete scaling strategy
+- [README.md#scaling](README.md#scaling) - Quick reference
+- [docs/OPERATIONAL_EXCELLENCE.md](docs/OPERATIONAL_EXCELLENCE.md) - Resource management
+
 ### Security
 - [docs/SECURITY.md](docs/SECURITY.md)
 - [docs/SBOM.md](docs/SBOM.md)
@@ -225,6 +236,7 @@ Complete guide to Zen Watcher documentation.
 | 5-min Setup | [QUICK_START.md](QUICK_START.md) |
 | Helm Install | [charts/zen-watcher/README.md](charts/zen-watcher/README.md) |
 | Filtering | [docs/FILTERING.md](docs/FILTERING.md) |
+| Scaling | [docs/SCALING.md](docs/SCALING.md) |
 | Security | [docs/SECURITY.md](docs/SECURITY.md) |
 | Operations | [docs/OPERATIONAL_EXCELLENCE.md](docs/OPERATIONAL_EXCELLENCE.md) |
 | Monitoring | [monitoring/README.md](monitoring/README.md) |
@@ -236,10 +248,10 @@ Complete guide to Zen Watcher documentation.
 
 ## 📝 Document Statistics
 
-- **Total Documentation Files**: 16
+- **Total Documentation Files**: 17
 - **Total Lines**: 5,500+
 - **Getting Started**: 3 guides
-- **Operations**: 4 guides (including filtering)
+- **Operations**: 5 guides (including filtering and scaling)
 - **Security**: 3 guides
 - **Deployment**: 2 guides
 - **Development**: 2 guides

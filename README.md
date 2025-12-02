@@ -286,6 +286,22 @@ kubectl create configmap zen-watcher-filter -n zen-system --from-file=filter.jso
 
 ---
 
+## 📈 Scaling
+
+Zen Watcher uses a **single-replica deployment model** by default for predictable semantics.
+
+**Recommended:** Deploy with `replicas: 1` and scale vertically if needed.
+
+**For high-volume deployments:**
+- **Namespace sharding** - Deploy multiple instances, each scoped to different namespaces
+- **Vertical scaling** - Increase CPU/memory limits
+
+**⚠️ Do NOT use HPA without leader election** - it will create duplicate Observations.
+
+See [docs/SCALING.md](docs/SCALING.md) for complete scaling strategy, performance envelope, and future roadmap (leader election planned for v1.1.x+).
+
+---
+
 ## 📊 Observability
 
 ### Prometheus Metrics (:9090/metrics)

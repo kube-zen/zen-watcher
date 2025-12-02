@@ -225,29 +225,48 @@ resources:
     cpu: "100m"
 ```
 
-### Autoscaling
+### Scaling Strategy
 
-**Horizontal Pod Autoscaler**:
+**⚠️ Important:** Zen Watcher uses a **single-replica deployment model** by default.
+
+**Why?**
+- Deduplication and filtering are in-memory per pod
+- Multiple replicas would create duplicate Observations
+- GC would run multiple times unnecessarily
+
+**Recommended Deployment:**
 ```yaml
-autoscaling:
-  enabled: true
-  minReplicas: 2
-  maxReplicas: 10
-  targetCPUUtilizationPercentage: 70
-  targetMemoryUtilizationPercentage: 80
+replicas: 1
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+  limits:
+    memory: "512Mi"
+    cpu: "500m"
 ```
 
-**Metrics-based Autoscaling**:
-```yaml
-# Scale based on event rate
-- type: Pods
-  pods:
-    metric:
-      name: zen_watcher_events_total
-    target:
-      type: AverageValue
-      averageValue: "1000"
-```
+**Scaling Options:**
+
+1. **Vertical Scaling** (First choice):
+   ```yaml
+   resources:
+     limits:
+       memory: "1Gi"
+       cpu: "1000m"
+   ```
+
+2. **Namespace Sharding** (For high volume):
+   - Deploy multiple instances, each scoped to different namespaces
+   - See [SCALING.md](SCALING.md) for details
+
+3. **Leader Election** (Future):
+   - Planned for v1.1.x+
+   - Will enable HPA for webhook traffic
+
+**⚠️ Do NOT use HPA without leader election** - it will create duplicate Observations.
+
+See [docs/SCALING.md](SCALING.md) for complete scaling strategy.
 
 ---
 
@@ -258,19 +277,21 @@ autoscaling:
 ```yaml
 podDisruptionBudget:
   enabled: true
-  minAvailable: 1
+  minAvailable: 1  # Maintains single replica during disruptions
 ```
 
-### Multiple Replicas
+### Single Replica + Restart Policy
 
-```bash
-# For high availability
-helm install zen-watcher ./charts/zen-watcher \
-  --set autoscaling.enabled=true \
-  --set autoscaling.minReplicas=3 \
-  --set podDisruptionBudget.enabled=true \
-  --set podDisruptionBudget.minAvailable=2
+```yaml
+replicas: 1
+spec:
+  restartPolicy: Always  # Kubernetes automatically restarts on failure
 ```
+
+**Availability Strategy:**
+- Kubernetes restart policies handle pod failures automatically
+- PodDisruptionBudget prevents voluntary disruptions during upgrades
+- No need for multiple replicas (which would create duplicates)
 
 ### Anti-Affinity
 

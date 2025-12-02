@@ -56,9 +56,26 @@ Add support for forwarding Observation events to external systems via optional, 
 
 ### Performance & Scale
 
-- **Horizontal Scaling** - Support for multiple replicas with leader election
-- **Event Batching** - Batch Observation creation for high-volume sources
+**Current Status (v1.0.x):**
+- ✅ **Single-replica deployment** - Recommended default (see [SCALING.md](docs/SCALING.md))
+- ✅ **Namespace sharding** - Official scale-out pattern for high-volume deployments
+- ✅ **Vertical scaling** - Increase resources for higher throughput
+
+**Medium-Term (v1.1.x+):**
+- 🔄 **Leader Election** - Optional leader election for singleton responsibilities:
+  - Leader handles: Informer-based watchers (Kyverno, Trivy) + Garbage collection
+  - All pods handle: Webhook endpoints (Falco, audit) - enables HPA for webhook traffic
+  - Keeps CRD semantics intact while allowing horizontal scaling
+- 🔄 **Event Batching** - Batch Observation creation for high-volume sources
 - ~~**Caching**~~ ✅ **Partially Complete** - Deduplication cache with LRU eviction implemented; general-purpose caching for frequently accessed data still planned
+
+**Design Philosophy:**
+- Keep it simple and predictable
+- Single-replica default with clear scaling envelope
+- Sharding by namespace for scale-out (no leader election needed)
+- Leader election only when real-world scale pressure demands it
+
+See [docs/SCALING.md](docs/SCALING.md) for complete scaling strategy and recommendations.
 
 ### Developer Experience
 
