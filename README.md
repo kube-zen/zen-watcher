@@ -340,69 +340,43 @@ curl http://localhost:9090/metrics   # Prometheus metrics
 
 ## 🔌 Integration Examples
 
-### Watch Events in Your Code
+### Quick Start
 
-```go
-// Watch Observation CRDs and process them
-package main
+**Want to consume Observations in your code?** See [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) for:
+- ✅ Using Kubernetes informers for real-time event streaming
+- ✅ kubewatcher integration for routing to webhooks
+- ✅ OpenAPI schema reference and sync guidance
+- ✅ Complete controller examples with work queues
 
-import (
-    metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-    "k8s.io/client-go/dynamic"
-)
+### Basic Examples
 
-func watchEvents(ctx context.Context, client dynamic.Interface) {
-    gvr := schema.GroupVersionResource{
-        Group:    "zen.kube-zen.io",
-        Version:  "v1",
-        Resource: "observations",
-    }
-    
-    watch, err := client.Resource(gvr).
-        Namespace("zen-system").
-        Watch(ctx, metav1.ListOptions{})
-    
-    for event := range watch.ResultChan() {
-        // Process each event
-        fmt.Printf("Event: %v\n", event.Object)
-    }
-}
-```
-
-### Query with kubectl
-
+**Watch Events with kubectl:**
 ```bash
 # All events
 kubectl get observations -n zen-system
 
 # High severity only
 kubectl get observations -n zen-system -o json | \
-  jq '.items[] | select(.spec.severity == "high")'
+  jq '.items[] | select(.spec.severity == "HIGH")'
 
 # From specific source
 kubectl get observations -n zen-system -o json | \
   jq '.items[] | select(.spec.source == "trivy")'
-
-# Last 24 hours
-kubectl get observations -n zen-system -o json | \
-  jq '.items[] | select(.spec.detectedAt > "2025-11-07T00:00:00Z")'
 ```
 
-### Export to External System
-
-```bash
-# Export all events
-kubectl get observations -n zen-system -o json > events.json
-
-# Stream to external API
-kubectl get observations -n zen-system -o json | \
-  jq -c '.items[]' | \
-  while read event; do
-    curl -X POST https://your-api.com/events \
-      -H "Content-Type: application/json" \
-      -d "$event"
-  done
+**Watch with Informer (Go):**
+```go
+// See docs/INTEGRATIONS.md for complete example
+informer := factory.ForResource(observationGVR).Informer()
+informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+    AddFunc: func(obj interface{}) {
+        obs := obj.(*unstructured.Unstructured)
+        // Process Observation
+    },
+})
 ```
+
+**For complete integration guide**, see [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
 ---
 
@@ -483,10 +457,13 @@ The `Observation` CRD is defined in this repository and synced to the Helm chart
 
 - **Canonical location**: `deployments/crds/observation_crd.yaml` (this repository)
 - **Helm charts location**: Synced to `helm-charts/charts/zen-watcher/templates/observation_crd.yaml`
+- **OpenAPI Schema**: Defined in CRD (`spec.versions[].schema.openAPIV3Schema`)
 
 **To sync CRD changes**: Run `make sync-crd-to-chart` from this repository.
 
-See [docs/CRD.md](docs/CRD.md) for detailed CRD documentation and sync process.
+See:
+- [docs/CRD.md](docs/CRD.md) - Detailed CRD documentation and sync process
+- [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md) - How to consume Observations (informers, kubewatcher, OpenAPI schema)
 
 ---
 

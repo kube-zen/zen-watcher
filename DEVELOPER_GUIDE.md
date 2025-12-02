@@ -15,6 +15,7 @@
 5. [Testing](#testing)
 6. [Building & Deployment](#building--deployment)
 7. [Best Practices](#best-practices)
+8. [Integrations](#integrations)
 
 ---
 
@@ -1033,12 +1034,65 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
 
 ---
 
+## Integrations
+
+### Consuming Observations
+
+If you want to **consume Observation CRDs** in your own controllers or services, see:
+
+📖 **[docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)** - Complete integration guide covering:
+
+- ✅ **OpenAPI Schema** - Schema structure, required/optional fields, programmatic access
+- ✅ **Schema Sync Guidance** - How CRD schema is synced across repositories
+- ✅ **Kubernetes Informers** - Real-time event streaming with complete examples
+- ✅ **kubewatcher Integration** - Route Observations to external webhooks/services
+- ✅ **Controller Examples** - Full working examples with work queues and event handlers
+- ✅ **Best Practices** - Filtering, rate limiting, monitoring
+
+### Key Integration Points
+
+1. **Watch Observations via Informers** (Recommended)
+   - Real-time updates with automatic reconnection
+   - See: [docs/INTEGRATIONS.md#consuming-observations-via-informers](docs/INTEGRATIONS.md#consuming-observations-via-informers)
+
+2. **kubewatcher for Event Routing**
+   - Route Observations to webhooks or CloudEvents endpoints
+   - See: [docs/INTEGRATIONS.md#kubewatcher-integration](docs/INTEGRATIONS.md#kubewatcher-integration)
+
+3. **OpenAPI Schema Reference**
+   - Type-safe schema definition and validation
+   - See: [docs/INTEGRATIONS.md#openapi-schema](docs/INTEGRATIONS.md#openapi-schema)
+
+### Quick Example
+
+```go
+// Watch Observations with informer
+observationGVR := schema.GroupVersionResource{
+    Group:    "zen.kube-zen.io",
+    Version:  "v1",
+    Resource: "observations",
+}
+
+informer := factory.ForResource(observationGVR).Informer()
+informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+    AddFunc: func(obj interface{}) {
+        obs := obj.(*unstructured.Unstructured)
+        // Process Observation
+    },
+})
+```
+
+For complete examples, see [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
+
+---
+
 ## Resources
 
 - **Main README**: [README.md](README.md)
 - **Architecture Details**: [ARCHITECTURE.md](ARCHITECTURE.md)
 - **Security Docs**: [docs/SECURITY.md](docs/SECURITY.md)
 - **Deployment Guide**: [docs/DEPLOYMENT_SCENARIOS.md](docs/DEPLOYMENT_SCENARIOS.md)
+- **Integrations Guide**: [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)
 - **Helm Charts**: [helm-charts repository](https://github.com/kube-zen/helm-charts)
 
 ---
