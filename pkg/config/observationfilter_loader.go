@@ -42,13 +42,13 @@ var (
 
 // ObservationFilterLoader watches ObservationFilter CRDs and reloads filter configuration dynamically
 type ObservationFilterLoader struct {
-	dynClient          dynamic.Interface
-	filter             *filter.Filter
-	configMapLoader    *ConfigMapLoader // Reference to ConfigMap loader for merging
-	factory            dynamicinformer.DynamicSharedInformerFactory
-	lastGoodConfig     *filter.FilterConfig
-	mu                 sync.RWMutex
-	watchNamespace     string
+	dynClient       dynamic.Interface
+	filter          *filter.Filter
+	configMapLoader *ConfigMapLoader // Reference to ConfigMap loader for merging
+	factory         dynamicinformer.DynamicSharedInformerFactory
+	lastGoodConfig  *filter.FilterConfig
+	mu              sync.RWMutex
+	watchNamespace  string
 }
 
 // NewObservationFilterLoader creates a new ObservationFilter loader that watches for changes
@@ -359,7 +359,6 @@ func (ofl *ObservationFilterLoader) convertObservationFilterToSourceFilter(of *u
 	return result
 }
 
-
 // updateFilter updates the merged filter (ConfigMap + ObservationFilters)
 func (ofl *ObservationFilterLoader) updateFilter(observationFilterConfig *filter.FilterConfig) {
 	if ofl.configMapLoader == nil || ofl.filter == nil {
@@ -405,4 +404,3 @@ func (ofl *ObservationFilterLoader) GetLastGoodConfig() *filter.FilterConfig {
 	defer ofl.mu.RUnlock()
 	return ofl.lastGoodConfig
 }
-

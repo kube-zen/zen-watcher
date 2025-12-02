@@ -249,7 +249,7 @@ func (cml *ConfigMapLoader) handleConfigMapChange(cm *corev1.ConfigMap) {
 
 	// Store config
 	cml.setLastGoodConfig(&config)
-	
+
 	// Update filter with new config
 	// Note: If ObservationFilterLoader is active, it will merge ConfigMap + CRD configs
 	// For backward compatibility without ObservationFilterLoader, we still update directly

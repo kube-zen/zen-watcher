@@ -227,4 +227,3 @@ func intersectStringLists(list1, list2 []string) []string {
 
 	return result
 }
-
