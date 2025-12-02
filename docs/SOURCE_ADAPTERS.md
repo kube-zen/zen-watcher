@@ -2,6 +2,19 @@
 
 This guide explains how to add support for new event sources to Zen Watcher. The Source Adapter interface makes it easy to integrate any tool that emits security, compliance, or infrastructure events.
 
+## Current Status
+
+**Phase 1 Complete:** Adapter infrastructure is established with implementations for:
+- ✅ TrivyAdapter (informer-based)
+- ✅ KyvernoAdapter (informer-based)
+
+**In Progress:** Existing watchers are being refactored to use the adapter pattern:
+- ⏳ Webhook-based adapters (Falco, Audit)
+- ⏳ ConfigMap-based adapters (kube-bench, Checkov)
+- ⏳ Full integration into main.go
+
+Once complete, all sources will use the unified SourceAdapter interface.
+
 ---
 
 ## Overview
