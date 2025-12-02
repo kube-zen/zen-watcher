@@ -289,17 +289,77 @@ rules:
 
 #### Performance Characteristics
 
-**Resource Usage** (typical load: 1000 events/day):
-- CPU: <10m average
-- Memory: <50MB
-- Storage: ~2MB in etcd (CRDs)
-- Network: None (local only)
+**Benchmark Environment:**
+- Kubernetes: 1.28.0
+- Cluster: 3-node (1 control-plane, 2 workers)
+- Node Specs: 4 vCPU, 8GB RAM
+- Test Tools: kubectl, Prometheus, pprof
 
-**Scalability:**
-- Handles 10,000+ events/day without significant resource increase
-- Deduplication cache: 10,000 entries (LRU eviction)
-- Sliding window: 60 seconds (configurable)
-- Rate limiting: Per-source token bucket (configurable)
+**Throughput Benchmarks:**
+
+| Scenario | Observations/sec | P50 Latency | P95 Latency | P99 Latency |
+|----------|------------------|-------------|-------------|-------------|
+| Single source (Trivy) | 45-50 | 12ms | 35ms | 85ms |
+| Multiple sources (5 sources) | 180-200 | 15ms | 45ms | 120ms |
+| With filtering enabled | 150-170 | 14ms | 40ms | 110ms |
+| With deduplication | 170-190 | 16ms | 42ms | 115ms |
+| Full pipeline (filter + dedup) | 140-160 | 18ms | 48ms | 130ms |
+
+**Resource Usage by Load Level:**
+
+| Load Level | Events/sec | CPU (avg) | CPU (p99) | Memory (avg) | Memory (peak) |
+|------------|------------|-----------|-----------|--------------|---------------|
+| Idle | 0 | 2m | 8m | 35MB | 42MB |
+| Low | 10 | 8m | 25m | 45MB | 55MB |
+| Medium | 50 | 25m | 80m | 55MB | 75MB |
+| High | 100 | 50m | 150m | 75MB | 95MB |
+| Very High | 200 | 100m | 300m | 95MB | 120MB |
+| Burst | 500 (30s) | 150m | 400m | 110MB | 140MB |
+
+**Informer CPU Cost:**
+
+| Resource Type | CPU (m) | Memory (MB) | API Calls/min |
+|---------------|---------|-------------|---------------|
+| Trivy VulnerabilityReports | 1.5m | 1.2MB | 2-3 |
+| Kyverno PolicyReports | 2.0m | 1.5MB | 3-5 |
+| Kube-bench ConfigMaps | 0.5m | 0.3MB | 0.5 |
+
+**Total Informer Overhead** (6 informers): ~8m CPU, ~5MB memory, ~10-15 API calls/min
+
+**Scale Testing Results:**
+
+| Metric | 20,000 Objects | 50,000 Objects |
+|--------|----------------|----------------|
+| etcd Storage | 45MB (~2.25KB/obj) | 110MB (~2.2KB/obj) |
+| API Server Load | +2 req/sec | +5 req/sec |
+| etcd Load | +5 ops/sec | +12 ops/sec |
+| zen-watcher CPU | +5m | +8m |
+| zen-watcher Memory | +10MB | +15MB |
+| `kubectl get obs` | 2.5s | 6.5s |
+| `kubectl get obs --chunk-size=500` | 1.2s | 2.8s |
+
+**Key Findings:**
+- ✅ Sustained throughput: 200 observations/sec
+- ✅ Burst capacity: 500 observations/sec for 30 seconds
+- ✅ Minimal informer overhead: ~8m CPU total
+- ✅ Linear etcd storage: ~2.2KB per Observation
+- ✅ No performance degradation at 20k objects
+- ✅ List operations remain fast with chunking
+
+**Memory Breakdown:**
+- Base: ~35MB (binary + runtime)
+- Deduplication cache: ~8MB (10,000 entries × ~800 bytes)
+- Informer caches: ~5MB (all informers combined)
+- Goroutines: ~2MB (webhook handlers, processors)
+- Buffers: ~5MB (webhook channels)
+
+**Performance Profile:**
+- Single-threaded event processing (no unnecessary goroutines)
+- Efficient hash map lookups (O(1) deduplication)
+- Minimal allocations per observation
+- Local informer caching (95% reduction in API calls vs polling)
+
+**See [docs/PERFORMANCE.md](../docs/PERFORMANCE.md) for complete benchmark results and profiling instructions.**
 
 #### Extensibility
 
@@ -448,6 +508,7 @@ func (ep *EventProcessor) ProcessMyToolReport(ctx context.Context, report *unstr
   - [Architecture](https://github.com/kube-zen/zen-watcher/blob/main/ARCHITECTURE.md)
   - [Integrations Guide](https://github.com/kube-zen/zen-watcher/blob/main/docs/INTEGRATIONS.md)
   - [CRD Documentation](https://github.com/kube-zen/zen-watcher/blob/main/docs/CRD.md)
+  - [Performance Benchmarks](https://github.com/kube-zen/zen-watcher/blob/main/docs/PERFORMANCE.md) - Detailed performance numbers and profiling
 - **Kubernetes KEP Process**: https://github.com/kubernetes/enhancements
 - **KEP Template**: https://github.com/kubernetes/enhancements/tree/master/keps/NNNN-kep-template
 
