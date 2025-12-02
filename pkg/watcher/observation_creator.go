@@ -114,8 +114,9 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 	// (Normalization happens inline during extraction below)
 
 	// STEP 3: DEDUP - Check if we should create (first event always creates, duplicates within window are skipped)
+	// Uses enhanced dedup with time buckets, fingerprinting, rate limiting, and aggregation
 	dedupKey := oc.extractDedupKey(observation)
-	if !oc.deduper.ShouldCreate(dedupKey) {
+	if !oc.deduper.ShouldCreateWithContent(dedupKey, observation.Object) {
 		logger.Debug("Skipping duplicate observation within window",
 			logger.Fields{
 				Component: "watcher",
