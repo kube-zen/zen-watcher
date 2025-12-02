@@ -61,6 +61,18 @@ type SourceFilter struct {
 	// IncludeCategories is a list of categories to include (if set, only these are allowed)
 	IncludeCategories []string `json:"includeCategories,omitempty"`
 
+	// IncludeSeverity is a list of severity levels to include (if set, only these are allowed)
+	// Example: ["CRITICAL", "HIGH"] - only allow CRITICAL and HIGH severity
+	IncludeSeverity []string `json:"includeSeverity,omitempty"`
+
+	// ExcludeRules is a list of rule names to exclude (e.g., ["disallow-latest-tag"])
+	// Used for sources like Kyverno where observations have a rule in details.rule
+	ExcludeRules []string `json:"excludeRules,omitempty"`
+
+	// IgnoreKinds is an alias for ExcludeKinds (convenience for kubernetesEvents source)
+	// If both IgnoreKinds and ExcludeKinds are set, they are merged
+	IgnoreKinds []string `json:"ignoreKinds,omitempty"`
+
 	// Enabled controls whether this source is enabled (default: true)
 	Enabled *bool `json:"enabled,omitempty"`
 }
@@ -157,6 +169,30 @@ func (fc *FilterConfig) GetSourceFilter(source string) *SourceFilter {
 	filter, exists := fc.Sources[strings.ToLower(source)]
 	if !exists {
 		return nil
+	}
+	// Normalize IgnoreKinds into ExcludeKinds
+	if len(filter.IgnoreKinds) > 0 {
+		// Merge IgnoreKinds into ExcludeKinds (deduplicate, preserve case)
+		excludeMap := make(map[string]string) // lowercase -> original case
+		// First, add existing ExcludeKinds
+		for _, k := range filter.ExcludeKinds {
+			lower := strings.ToLower(k)
+			if _, exists := excludeMap[lower]; !exists {
+				excludeMap[lower] = k
+			}
+		}
+		// Then, add IgnoreKinds (only if not already present)
+		for _, k := range filter.IgnoreKinds {
+			lower := strings.ToLower(k)
+			if _, exists := excludeMap[lower]; !exists {
+				excludeMap[lower] = k
+			}
+		}
+		// Rebuild ExcludeKinds list
+		filter.ExcludeKinds = make([]string, 0, len(excludeMap))
+		for _, v := range excludeMap {
+			filter.ExcludeKinds = append(filter.ExcludeKinds, v)
+		}
 	}
 	return &filter
 }

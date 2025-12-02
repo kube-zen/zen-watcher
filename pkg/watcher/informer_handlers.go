@@ -274,20 +274,14 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 	}
 
 	count := 0
-	highCriticalCount := 0
-	skippedLow := 0
 	for _, v := range vulnerabilities {
 		vuln, ok := v.(map[string]interface{})
 		if !ok {
 			continue
 		}
 		severity := vuln["severity"]
-		severityStr := fmt.Sprintf("%v", severity)
-		if severityStr != "HIGH" && severityStr != "CRITICAL" {
-			skippedLow++
-			continue
-		}
-		highCriticalCount++
+		// Note: Severity filtering is now handled by the filter framework
+		// configured via ConfigMap. Remove hardcoded HIGH/CRITICAL only filter.
 
 		vulnID := fmt.Sprintf("%v", vuln["vulnerabilityID"])
 
@@ -356,19 +350,17 @@ func (ep *EventProcessor) ProcessTrivyVulnerabilityReport(ctx context.Context, r
 			Count:     count,
 			Additional: map[string]interface{}{
 				"total_vulnerabilities": len(vulnerabilities),
-				"high_critical_count":   highCriticalCount,
-				"skipped_low":           skippedLow,
 				"observations_created":  count,
 			},
 		})
-	if count == 0 && highCriticalCount > 0 {
-		logger.Warn("Found HIGH/CRITICAL vulnerabilities but created 0 observations (all duplicates?)",
+	if count == 0 && len(vulnerabilities) > 0 {
+		logger.Debug("Found vulnerabilities but created 0 observations (may be filtered or duplicates)",
 			logger.Fields{
 				Component: "watcher",
 				Operation: "process_trivy_report",
 				Source:    "trivy",
-				Reason:    "all_duplicates",
-				Count:     highCriticalCount,
+				Reason:    "all_filtered_or_duplicates",
+				Count:     len(vulnerabilities),
 			})
 	}
 }

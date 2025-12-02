@@ -146,10 +146,42 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 		}
 	}
 
+	// Extract rule from details (for sources like Kyverno)
+	rule := ""
+	detailsVal, _, _ := unstructured.NestedMap(observation.Object, "spec", "details")
+	if detailsVal != nil {
+		if r, ok := detailsVal["rule"].(string); ok && r != "" {
+			rule = r
+		}
+	}
+
 	// Apply filters
 
-	// 1. MinSeverity filter
-	if sourceFilter.MinSeverity != "" {
+	// 1. IncludeSeverity filter (takes precedence over MinSeverity if set)
+	if len(sourceFilter.IncludeSeverity) > 0 {
+		allowed := false
+		for _, included := range sourceFilter.IncludeSeverity {
+			if strings.EqualFold(severity, included) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			logger.Debug("Severity not in include list, filtering out observation",
+				logger.Fields{
+					Component: "filter",
+					Operation: "filter_check",
+					Source:    source,
+					Severity:  severity,
+					Reason:    "include_severity",
+					Additional: map[string]interface{}{
+						"include_severity": sourceFilter.IncludeSeverity,
+					},
+				})
+			return false, "include_severity"
+		}
+	} else if sourceFilter.MinSeverity != "" {
+		// MinSeverity filter (only if IncludeSeverity is not set)
 		if !f.meetsMinSeverity(severity, sourceFilter.MinSeverity) {
 			logger.Debug("Severity below minimum, filtering out observation",
 				logger.Fields{
@@ -315,6 +347,25 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 					Reason: "include_category",
 				})
 			return false, "include_category"
+		}
+	}
+
+	// 6. Rule filters (for sources like Kyverno)
+	if len(sourceFilter.ExcludeRules) > 0 && rule != "" {
+		for _, excluded := range sourceFilter.ExcludeRules {
+			if strings.EqualFold(rule, excluded) {
+				logger.Debug("Rule excluded, filtering out observation",
+					logger.Fields{
+						Component: "filter",
+						Operation: "filter_check",
+						Source:    source,
+						Additional: map[string]interface{}{
+							"rule": rule,
+						},
+						Reason: "exclude_rule",
+					})
+				return false, "exclude_rule"
+			}
 		}
 	}
 

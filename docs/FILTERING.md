@@ -69,11 +69,15 @@ The ConfigMap should contain a JSON file with per-source filter rules:
 {
   "sources": {
     "trivy": {
-      "minSeverity": "MEDIUM"
+      "includeSeverity": ["CRITICAL", "HIGH"]
     },
     "kyverno": {
+      "excludeRules": ["disallow-latest-tag"],
       "excludeEventTypes": ["audit", "info"],
       "excludeKinds": ["ConfigMap", "Secret"]
+    },
+    "kubernetesEvents": {
+      "ignoreKinds": ["Pod", "ConfigMap"]
     },
     "audit": {
       "includeEventTypes": ["resource-deletion", "secret-access", "rbac-change"]
@@ -110,6 +114,24 @@ Minimum severity level to allow. Severity levels: `CRITICAL` > `HIGH` > `MEDIUM`
 ```
 - Allows: CRITICAL, HIGH, MEDIUM
 - Filters out: LOW, UNKNOWN
+
+**Note:** If `includeSeverity` is set, it takes precedence over `minSeverity`.
+
+#### `includeSeverity` (array of strings)
+Explicit list of severity levels to include. Only observations with these severity levels are allowed.
+
+**Example:**
+```json
+{
+  "trivy": {
+    "includeSeverity": ["CRITICAL", "HIGH"]
+  }
+}
+```
+- Allows: Only CRITICAL and HIGH
+- Filters out: MEDIUM, LOW, UNKNOWN
+
+**Note:** If `includeSeverity` is set, `minSeverity` is ignored for that source.
 
 #### `excludeEventTypes` / `includeEventTypes` (array of strings)
 Filter by event type.
@@ -153,6 +175,31 @@ Filter by resource kind.
 }
 ```
 
+#### `ignoreKinds` (array of strings)
+Alias for `excludeKinds`. Convenience option for kubernetesEvents source. If both `ignoreKinds` and `excludeKinds` are set, they are merged.
+
+**Example:**
+```json
+{
+  "kubernetesEvents": {
+    "ignoreKinds": ["Pod", "ConfigMap"]
+  }
+}
+```
+
+#### `excludeRules` (array of strings)
+Filter by rule name. Used for sources like Kyverno where observations have a rule name in `details.rule`.
+
+**Example:**
+```json
+{
+  "kyverno": {
+    "excludeRules": ["disallow-latest-tag"]
+  }
+}
+```
+- Filters out observations where `details.rule` matches any rule in the list
+
 #### `excludeCategories` / `includeCategories` (array of strings)
 Filter by category (security, compliance, etc.).
 
@@ -179,7 +226,21 @@ Enable or disable a source entirely.
 
 ## Examples
 
-### Example 1: Filter Trivy LOW Severity
+### Example 1: Filter Trivy - Include Only CRITICAL and HIGH
+
+```json
+{
+  "sources": {
+    "trivy": {
+      "includeSeverity": ["CRITICAL", "HIGH"]
+    }
+  }
+}
+```
+
+**Result:** Only CRITICAL and HIGH vulnerabilities create Observations.
+
+### Example 1b: Filter Trivy LOW Severity (using minSeverity)
 
 ```json
 {
@@ -193,7 +254,21 @@ Enable or disable a source entirely.
 
 **Result:** Only MEDIUM, HIGH, and CRITICAL vulnerabilities create Observations.
 
-### Example 2: Kyverno - Exclude Audit Policies
+### Example 2: Kyverno - Exclude Specific Rules
+
+```json
+{
+  "sources": {
+    "kyverno": {
+      "excludeRules": ["disallow-latest-tag"]
+    }
+  }
+}
+```
+
+**Result:** All Kyverno policy violations are allowed except for the "disallow-latest-tag" rule.
+
+### Example 2b: Kyverno - Exclude Audit Policies
 
 ```json
 {
@@ -236,7 +311,21 @@ Enable or disable a source entirely.
 
 **Result:** Only Falco alerts from production and staging namespaces create Observations.
 
-### Example 5: Disable Checkov
+### Example 5: Kubernetes Events - Ignore Specific Kinds
+
+```json
+{
+  "sources": {
+    "kubernetesEvents": {
+      "ignoreKinds": ["Pod", "ConfigMap"]
+    }
+  }
+}
+```
+
+**Result:** Kubernetes events for Pods and ConfigMaps are filtered out.
+
+### Example 6: Disable Checkov
 
 ```json
 {
@@ -249,6 +338,29 @@ Enable or disable a source entirely.
 ```
 
 **Result:** No Checkov observations are created.
+
+### Example 7: Complete Filter Configuration (v0.1.0 Requirements)
+
+```json
+{
+  "sources": {
+    "trivy": {
+      "includeSeverity": ["CRITICAL", "HIGH"]
+    },
+    "kyverno": {
+      "excludeRules": ["disallow-latest-tag"]
+    },
+    "kubernetesEvents": {
+      "ignoreKinds": ["Pod", "ConfigMap"]
+    }
+  }
+}
+```
+
+**Result:** 
+- Trivy: Only CRITICAL and HIGH vulnerabilities
+- Kyverno: All rules except "disallow-latest-tag"
+- Kubernetes Events: All kinds except Pod and ConfigMap
 
 ## Behavior
 
@@ -263,11 +375,13 @@ If the ConfigMap is not found, zen-watcher defaults to **"allow all"** (no filte
 
 Filters are applied in this order:
 1. **Source enabled check** - If disabled, filter out immediately
-2. **MinSeverity** - Check severity level
-3. **EventType filters** - Exclude/include by event type
-4. **Namespace filters** - Exclude/include by namespace
-5. **Kind filters** - Exclude/include by resource kind
-6. **Category filters** - Exclude/include by category
+2. **IncludeSeverity** - Check if severity is in include list (takes precedence over MinSeverity)
+3. **MinSeverity** - Check severity level (only if IncludeSeverity is not set)
+4. **EventType filters** - Exclude/include by event type
+5. **Namespace filters** - Exclude/include by namespace
+6. **Kind filters** - Exclude/include by resource kind (includes IgnoreKinds)
+7. **Category filters** - Exclude/include by category
+8. **Rule filters** - Exclude by rule name (for sources like Kyverno)
 
 If any filter rejects the observation, it is filtered out (no CRD creation, no metrics, no logs).
 

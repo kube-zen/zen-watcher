@@ -227,12 +227,13 @@ kubectl create configmap zen-watcher-filter -n zen-system --from-file=filter.jso
 {
   "sources": {
     "trivy": {
-      "minSeverity": "MEDIUM",
-      "excludeNamespaces": ["kube-system", "kube-public"]
+      "includeSeverity": ["CRITICAL", "HIGH"]
     },
     "kyverno": {
-      "excludeEventTypes": ["audit", "info"],
-      "excludeKinds": ["ConfigMap", "Secret"]
+      "excludeRules": ["disallow-latest-tag"]
+    },
+    "kubernetesEvents": {
+      "ignoreKinds": ["Pod", "ConfigMap"]
     },
     "audit": {
       "includeEventTypes": ["resource-deletion", "secret-access", "rbac-change"]
@@ -251,10 +252,13 @@ kubectl create configmap zen-watcher-filter -n zen-system --from-file=filter.jso
 ```
 
 **Filter Options (per source):**
+- `includeSeverity`: Explicit list of severity levels to include (e.g., `["CRITICAL", "HIGH"]`)
 - `minSeverity`: Minimum severity level (CRITICAL, HIGH, MEDIUM, LOW)
+- `excludeRules`: List of rule names to exclude (e.g., `["disallow-latest-tag"]` for Kyverno)
 - `excludeEventTypes` / `includeEventTypes`: Filter by event type
 - `excludeNamespaces` / `includeNamespaces`: Filter by namespace
 - `excludeKinds` / `includeKinds`: Filter by resource kind
+- `ignoreKinds`: Alias for `excludeKinds` (convenience for kubernetesEvents)
 - `excludeCategories` / `includeCategories`: Filter by category
 - `enabled`: Enable/disable source (default: true)
 
