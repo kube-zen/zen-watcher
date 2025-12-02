@@ -362,21 +362,6 @@ func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstruct
 	}
 }
 
-// normalizeSeverity normalizes severity values to uppercase standard format
-func normalizeSeverity(severity string) string {
-	switch severity {
-	case "critical", "Critical", "CRITICAL":
-		return "CRITICAL"
-	case "high", "High", "HIGH":
-		return "HIGH"
-	case "medium", "Medium", "MEDIUM":
-		return "MEDIUM"
-	case "low", "Low", "LOW":
-		return "LOW"
-	default:
-		return "UNKNOWN"
-	}
-}
 
 // setTTLIfNotSet sets spec.ttlSecondsAfterCreation if not already set
 // Priority: 1) Already set in spec, 2) Environment variable, 3) Default (7 days)

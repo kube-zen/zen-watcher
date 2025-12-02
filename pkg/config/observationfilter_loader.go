@@ -223,13 +223,13 @@ func (ofl *ObservationFilterLoader) loadAllObservationFilters(ctx context.Contex
 	if err != nil {
 		// CRD might not exist yet or might not have any resources
 		return &filter.FilterConfig{
-			Sources: make(map[string]SourceFilter),
+			Sources: make(map[string]filter.SourceFilter),
 		}, nil // Return empty config, not error
 	}
 
 	// Convert ObservationFilter CRDs to FilterConfig
 	config := &filter.FilterConfig{
-		Sources: make(map[string]SourceFilter),
+		Sources: make(map[string]filter.SourceFilter),
 	}
 
 	for _, of := range observationFilters.Items {
