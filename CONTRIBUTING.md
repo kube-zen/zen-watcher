@@ -112,6 +112,38 @@ func (s *SlackSink) Send(ctx context.Context, obs *Observation) error {
 
 ## Adding a New Watcher
 
+**New:** Zen Watcher now uses a formal **Source Adapter** interface for adding new event sources. This makes it much easier to integrate new tools.
+
+**📖 See [docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md) for the complete guide.**
+
+The SourceAdapter interface provides:
+- ✅ Standard Event model for normalization
+- ✅ Consistent integration pattern
+- ✅ Automatic filtering and deduplication
+- ✅ Built-in metrics and observability
+
+### Quick Start
+
+1. Implement the `SourceAdapter` interface:
+   ```go
+   type MyToolAdapter struct { ... }
+   
+   func (a *MyToolAdapter) Name() string { return "mytool" }
+   func (a *MyToolAdapter) Run(ctx context.Context, out chan<- *Event) error { ... }
+   func (a *MyToolAdapter) Stop() { ... }
+   ```
+
+2. Normalize events to the standard `Event` format
+3. Register in factory and wire in main
+
+See examples in `examples/adapters/` directory.
+
+---
+
+## Legacy: Adding a New Watcher (Direct Implementation)
+
+For reference, the legacy approach (still supported):
+
 ### Step 1: Choose the Right Processor Type
 
 **If your tool emits CRDs → Use Informers**

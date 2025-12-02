@@ -40,11 +40,16 @@ Zen Watcher is a Kubernetes-native security event aggregator that consolidates e
 - kubectl-compatible
 
 ### 3. **Extensible & Modular**
+- **Formal SourceAdapter interface** for standardizing new source integrations
 - **Informer-based processors** for CRD sources (real-time)
 - **Webhook processors** for push-based tools (real-time)
 - **ConfigMap processors** for batch tools (periodic)
-- Easy to add new watchers by implementing processor interfaces
+- Easy to add new watchers by implementing the SourceAdapter interface
+- Normalized Event model for consistent processing
+- Tool-specific data kept in `details.*` namespace (generic Observation spec)
 - Follows Kubernetes controller best practices
+
+See [docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md) for the complete extensibility guide.
 
 ### 4. **Observable**
 - Prometheus metrics for monitoring

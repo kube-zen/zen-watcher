@@ -50,13 +50,20 @@ Complete guide to Zen Watcher documentation.
    - Examples and best practices
    - Troubleshooting
 
-7. **[monitoring/README.md](monitoring/README.md)** - Monitoring guide
+7. **[docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md)** - Writing new source adapters
+   - SourceAdapter interface
+   - Event normalization model
+   - Implementation patterns (informer, webhook, polling)
+   - Best practices and examples
+   - Testing guide
+
+8. **[monitoring/README.md](monitoring/README.md)** - Monitoring guide
    - Prometheus metrics
    - Alert rules
    - VictoriaMetrics setup
    - Query examples
 
-8. **[dashboards/README.md](dashboards/README.md)** - Dashboard documentation
+9. **[dashboards/README.md](dashboards/README.md)** - Dashboard documentation
    - Grafana setup
    - Dashboard features
    - Metrics reference
@@ -64,20 +71,20 @@ Complete guide to Zen Watcher documentation.
 
 ### Security (3 files)
 
-9. **[docs/SECURITY.md](docs/SECURITY.md)** - Security policy
+10. **[docs/SECURITY.md](docs/SECURITY.md)** - Security policy
    - Vulnerability reporting
    - Security features
    - Best practices
    - Compliance
    - Incident response
 
-10. **[docs/SBOM.md](docs/SBOM.md)** - Software Bill of Materials
+11. **[docs/SBOM.md](docs/SBOM.md)** - Software Bill of Materials
    - SBOM generation
    - Vulnerability scanning
    - Supply chain security
    - Compliance
 
-11. **[docs/COSIGN.md](docs/COSIGN.md)** - Image signing
+12. **[docs/COSIGN.md](docs/COSIGN.md)** - Image signing
    - Cosign setup
    - Image verification
    - Key management
@@ -85,39 +92,39 @@ Complete guide to Zen Watcher documentation.
 
 ### Deployment (2 files)
 
-12. **[charts/zen-watcher/README.md](charts/zen-watcher/README.md)** - Helm chart guide
+13. **[charts/zen-watcher/README.md](charts/zen-watcher/README.md)** - Helm chart guide
     - Installation
     - Configuration
     - Security settings
     - Troubleshooting
 
-13. **[charts/HELM_SUMMARY.md](charts/HELM_SUMMARY.md)** - Helm features
+14. **[charts/HELM_SUMMARY.md](charts/HELM_SUMMARY.md)** - Helm features
     - Security features
     - Configuration options
     - Compliance info
 
 ### Development (2 files)
 
-14. **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guide
+15. **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guide
     - How to contribute
     - Development setup
     - Code standards
     - Review process
 
-15. **[CHANGELOG.md](CHANGELOG.md)** - Version history
+16. **[CHANGELOG.md](CHANGELOG.md)** - Version history
     - Release notes
     - Features added
     - Bug fixes
 
 ### Examples (2 files)
 
-16. **[examples/README.md](examples/README.md)** - Integration examples
+17. **[examples/README.md](examples/README.md)** - Integration examples
     - Query examples
     - Grafana setup
     - Prometheus config
     - Loki integration
 
-17. **[dashboards/DASHBOARD_GUIDE.md](dashboards/DASHBOARD_GUIDE.md)** - Dashboard details
+18. **[dashboards/DASHBOARD_GUIDE.md](dashboards/DASHBOARD_GUIDE.md)** - Dashboard details
     - Panel descriptions
     - How to read metrics
     - Customization
@@ -237,6 +244,7 @@ Complete guide to Zen Watcher documentation.
 | Helm Install | [charts/zen-watcher/README.md](charts/zen-watcher/README.md) |
 | Filtering | [docs/FILTERING.md](docs/FILTERING.md) |
 | Scaling | [docs/SCALING.md](docs/SCALING.md) |
+| Source Adapters | [docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md) |
 | Security | [docs/SECURITY.md](docs/SECURITY.md) |
 | Operations | [docs/OPERATIONAL_EXCELLENCE.md](docs/OPERATIONAL_EXCELLENCE.md) |
 | Monitoring | [monitoring/README.md](monitoring/README.md) |
@@ -248,10 +256,10 @@ Complete guide to Zen Watcher documentation.
 
 ## 📝 Document Statistics
 
-- **Total Documentation Files**: 17
-- **Total Lines**: 5,500+
+- **Total Documentation Files**: 18
+- **Total Lines**: 6,000+
 - **Getting Started**: 3 guides
-- **Operations**: 5 guides (including filtering and scaling)
+- **Operations**: 6 guides (including filtering, scaling, and source adapters)
 - **Security**: 3 guides
 - **Deployment**: 2 guides
 - **Development**: 2 guides

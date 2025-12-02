@@ -47,6 +47,9 @@ Add support for forwarding Observation events to external systems via optional, 
 - **Kubescape** - Security scanning
 - **Nexus IQ** - Dependency scanning
 - **Snyk** - Container and dependency scanning
+- **Kubecost** - Cost optimization and anomalies
+
+**Note:** New sources can be added easily using the formal [SourceAdapter interface](docs/SOURCE_ADAPTERS.md). The interface provides a standardized way to integrate any tool that emits events, making community contributions straightforward.
 
 ### Observability Enhancements
 
