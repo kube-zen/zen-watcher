@@ -107,6 +107,10 @@ type Deduper struct {
 	// Event aggregation
 	aggregatedEvents  map[string]*aggregatedEvent // fingerprint -> aggregated event
 	enableAggregation bool                        // whether aggregation is enabled
+
+	// Cleanup control
+	stopCh chan struct{} // Stop channel for cleanup loop
+	wg     sync.WaitGroup // Wait group for cleanup goroutine
 }
 
 // NewDeduper creates a new deduper with specified configuration and enhanced features
@@ -167,9 +171,11 @@ func NewDeduper(windowSeconds, maxSize int) *Deduper {
 		maxRateBurst:      maxRateBurst,
 		aggregatedEvents:  make(map[string]*aggregatedEvent),
 		enableAggregation: enableAggregation,
+		stopCh:            make(chan struct{}),
 	}
 
 	// Start background cleanup goroutine for enhanced features
+	deduper.wg.Add(1)
 	go deduper.cleanupLoop()
 
 	return deduper
@@ -457,17 +463,29 @@ func (d *Deduper) cleanupOldAggregations(now time.Time) {
 
 // cleanupLoop runs periodic cleanup in background
 func (d *Deduper) cleanupLoop() {
+	defer d.wg.Done()
 	ticker := time.NewTicker(time.Duration(d.bucketSizeSeconds) * time.Second)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		d.mu.Lock()
-		now := time.Now()
-		d.cleanupOldBuckets(now)
-		d.cleanupOldFingerprints(now)
-		d.cleanupOldAggregations(now)
-		d.mu.Unlock()
+	for {
+		select {
+		case <-d.stopCh:
+			return
+		case <-ticker.C:
+			d.mu.Lock()
+			now := time.Now()
+			d.cleanupOldBuckets(now)
+			d.cleanupOldFingerprints(now)
+			d.cleanupOldAggregations(now)
+			d.mu.Unlock()
+		}
 	}
+}
+
+// Stop stops the deduper cleanup goroutine and waits for it to finish
+func (d *Deduper) Stop() {
+	close(d.stopCh)
+	d.wg.Wait()
 }
 
 // ShouldCreate checks if an observation should be created (backward compatible)
