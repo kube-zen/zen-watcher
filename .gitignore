@@ -42,3 +42,6 @@ dist/
 .env
 .env.local
 
+# GitHub CI/CD (disabled - using .github.disabled instead)
+.github/
+
