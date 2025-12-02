@@ -284,6 +284,22 @@ func main() {
 		}
 	}()
 
+	// Create ObservationFilter loader for CRD-based filter configuration
+	// This merges with ConfigMap config automatically
+	observationFilterLoader := config.NewObservationFilterLoader(clients.Dynamic, filterInstance, configMapLoader)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := observationFilterLoader.Start(ctx); err != nil {
+			log.Error("ObservationFilter loader stopped",
+				logger.Fields{
+					Component: "main",
+					Operation: "observationfilter_loader",
+					Error:     err,
+				})
+		}
+	}()
+
 	// Create and start garbage collector
 	gcCollector := gc.NewCollector(
 		clients.Dynamic,

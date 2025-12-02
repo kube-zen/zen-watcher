@@ -53,6 +53,45 @@ kubectl create configmap zen-watcher-filter -n zen-system \
 - Missing key → Last known good config is preserved
 - ConfigMap deleted → Last known good config is preserved (no reset to default)
 
+### ObservationFilter CRD (Kubernetes-Native)
+
+**✨ New in v1.0+:** You can also use Kubernetes-native `ObservationFilter` CRDs instead of (or in addition to) ConfigMap-based filters.
+
+**Advantages:**
+- ✅ **RBAC-granular** - Per-namespace or cluster-scoped permissions
+- ✅ **Versioned** - GitOps-friendly, diffable
+- ✅ **Kubernetes-native** - Standard CRD pattern
+- ✅ **Multi-tenant** - Namespace-scoped filters for different teams
+
+**Usage:**
+```yaml
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationFilter
+metadata:
+  name: trivy-high-severity
+  namespace: zen-system
+spec:
+  targetSource: trivy
+  includeSeverity:
+    - CRITICAL
+    - HIGH
+  excludeEventTypes:
+    - info
+```
+
+**Merging Behavior:**
+- ConfigMap filters are applied first
+- ObservationFilter CRDs are merged on top
+- Multiple ObservationFilters targeting the same source are merged together
+- Lists are unioned (exclude) or intersected (include)
+- Most restrictive settings win (e.g., higher minSeverity)
+
+**Watching Namespaces:**
+- Default: Watches all namespaces (cluster-wide)
+- Set `OBSERVATION_FILTER_NAMESPACE` env var to watch specific namespace only
+
+See [ObservationFilter CRD Reference](#observationfilter-crd-reference) for complete CRD specification.
+
 ### Environment Variables
 
 | Variable | Description | Default |
@@ -60,8 +99,11 @@ kubectl create configmap zen-watcher-filter -n zen-system \
 | `FILTER_CONFIGMAP_NAME` | Filter ConfigMap name | `zen-watcher-filter` |
 | `FILTER_CONFIGMAP_NAMESPACE` | Filter ConfigMap namespace | `zen-system` (or `WATCH_NAMESPACE`) |
 | `FILTER_CONFIGMAP_KEY` | Filter ConfigMap data key | `filter.json` |
+| `OBSERVATION_FILTER_NAMESPACE` | Namespace to watch for ObservationFilter CRDs (empty = all namespaces) | `""` (all namespaces) |
 
 ### Filter Configuration Format
+
+**ConfigMap Format:**
 
 The ConfigMap should contain a JSON file with per-source filter rules:
 
