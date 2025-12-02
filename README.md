@@ -200,6 +200,14 @@ kubectl get observations -n zen-system
 | `METRICS_PORT` | Prometheus metrics port | `9090` |
 | `DEDUP_WINDOW_SECONDS` | Deduplication window in seconds | `60` |
 | `DEDUP_MAX_SIZE` | Maximum deduplication cache size | `10000` |
+| `DEDUP_BUCKET_SIZE_SECONDS` | Time bucket size for deduplication cleanup | `10` (or 10% of window) |
+| `DEDUP_MAX_RATE_PER_SOURCE` | Maximum events per second per source (rate limiting) | `100` |
+| `DEDUP_RATE_BURST` | Burst capacity for rate limiting | `200` (2x rate limit) |
+| `DEDUP_ENABLE_AGGREGATION` | Enable event aggregation in rolling window | `true` |
+| `OBSERVATION_TTL_SECONDS` | Default TTL for observations in seconds | `604800` (7 days) |
+| `OBSERVATION_TTL_DAYS` | Default TTL for observations in days (fallback) | `7` |
+| `GC_INTERVAL` | Garbage collection interval | `1h` |
+| `GC_TIMEOUT` | Timeout for garbage collection operations | `5m` |
 | `FILTER_CONFIGMAP_NAME` | Filter ConfigMap name | `zen-watcher-filter` |
 | `FILTER_CONFIGMAP_NAMESPACE` | Filter ConfigMap namespace | `zen-system` |
 | `FILTER_CONFIGMAP_KEY` | Filter ConfigMap data key | `filter.json` |

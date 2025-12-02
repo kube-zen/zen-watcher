@@ -161,12 +161,25 @@ All event sources (informer, webhook, configmap) use the **same centralized flow
 - **Metrics**: Prometheus metrics increment
 - **Log**: Structured logging
 
-**Deduplication Strategy** (Centralized):
+**Deduplication Strategy** (Centralized - Enhanced):
+
+*Basic Features:*
 - **DedupKey**: `source/namespace/kind/name/reason/messageHash`
 - **Window**: 60 seconds (configurable via `DEDUP_WINDOW_SECONDS`)
 - **Max Size**: 10,000 entries (configurable via `DEDUP_MAX_SIZE`)
 - **Algorithm**: Sliding window with LRU eviction and TTL cleanup
-- **Thread-safe**: All processors share the same deduper instance
+
+*Enhanced Features:*
+- **Time-based Buckets**: Events organized into time buckets for efficient cleanup (configurable via `DEDUP_BUCKET_SIZE_SECONDS`)
+- **Content-based Fingerprinting**: SHA256 fingerprint of normalized observation content (source, category, severity, eventType, resource, critical details) - more accurate than message-only hashing
+- **Per-source Rate Limiting**: Token bucket algorithm prevents observation floods per source (configurable via `DEDUP_MAX_RATE_PER_SOURCE` and `DEDUP_RATE_BURST`)
+- **Event Aggregation**: Rolling window aggregation tracks count and timing of similar events (configurable via `DEDUP_ENABLE_AGGREGATION`)
+
+*Implementation:*
+- All deduplication logic centralized in `pkg/dedup/deduper.go`
+- Thread-safe: All processors share the same deduper instance
+- Background cleanup goroutine for efficient memory management
+- Multiple deduplication strategies work together: fingerprint → bucket → cache
 
 ---
 

@@ -85,6 +85,11 @@ Observations support TTL (Time To Live) to prevent CRD bloat and etcd pressure:
 
 The garbage collector checks `spec.ttlSecondsAfterCreation` first, then falls back to the default TTL. Observations are deleted after their TTL expires.
 
+**TTL Validation Bounds:**
+- **Minimum TTL**: 60 seconds (1 minute) - Prevents immediate deletion due to misconfiguration
+- **Maximum TTL**: 365 days (1 year) - Prevents indefinite retention
+- Values outside these bounds are automatically adjusted with a warning logged
+
 ### Versioning
 
 When making changes to the CRD:
