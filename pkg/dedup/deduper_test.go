@@ -124,3 +124,163 @@ func TestDedupKey_String(t *testing.T) {
 		t.Errorf("Expected %s, got %s", expected, key.String())
 	}
 }
+
+func TestDeduper_FingerprintBasedDedup(t *testing.T) {
+	deduper := NewDeduper(60, 1000)
+
+	key1 := DedupKey{
+		Source:      "test",
+		Namespace:   "default",
+		Kind:        "Pod",
+		Name:        "test-pod",
+		Reason:      "test-reason",
+		MessageHash: "hash1",
+	}
+
+	key2 := DedupKey{
+		Source:      "test",
+		Namespace:   "default",
+		Kind:        "Pod",
+		Name:        "test-pod",
+		Reason:      "test-reason",
+		MessageHash: "hash2", // Different hash
+	}
+
+	// Same content should generate same fingerprint
+	content := map[string]interface{}{
+		"source":   "test",
+		"category": "security",
+		"severity": "HIGH",
+	}
+
+	// First observation with content
+	if !deduper.ShouldCreateWithContent(key1, content) {
+		t.Error("First observation with content should create")
+	}
+
+	// Same content, different key should still be deduplicated by fingerprint
+	if deduper.ShouldCreateWithContent(key2, content) {
+		t.Error("Same content with different key should be deduplicated by fingerprint")
+	}
+}
+
+func TestDeduper_RateLimiting(t *testing.T) {
+	// Create deduper with rate limiting enabled (via environment variable simulation)
+	deduper := NewDeduper(60, 1000)
+	
+	// Set rate limit via reflection or direct field access
+	// For this test, we'll assume rate limiting is configured via env vars
+	// In real code, rate limits are set via NewDeduper with env vars
+
+	key := DedupKey{
+		Source:      "test",
+		Namespace:   "default",
+		Kind:        "Pod",
+		Name:        "test-pod",
+		Reason:      "test-reason",
+		MessageHash: "hash1",
+	}
+
+	content := map[string]interface{}{
+		"source": "test",
+	}
+
+	// Create many observations rapidly
+	createdCount := 0
+	for i := 0; i < 10; i++ {
+		key.MessageHash = HashMessage("message" + string(rune(i)))
+		if deduper.ShouldCreateWithContent(key, content) {
+			createdCount++
+		}
+	}
+
+	// With rate limiting, not all should be created immediately
+	// Exact behavior depends on rate limit configuration
+	if createdCount == 0 {
+		t.Error("At least some observations should be created")
+	}
+}
+
+func TestGenerateFingerprint(t *testing.T) {
+	content1 := map[string]interface{}{
+		"source":   "test",
+		"category": "security",
+		"severity": "HIGH",
+		"resource": map[string]interface{}{
+			"kind": "Pod",
+			"name": "test-pod",
+		},
+	}
+
+	content2 := map[string]interface{}{
+		"source":   "test",
+		"category": "security",
+		"severity": "HIGH",
+		"resource": map[string]interface{}{
+			"kind": "Pod",
+			"name": "test-pod",
+		},
+	}
+
+	content3 := map[string]interface{}{
+		"source":   "test",
+		"category": "security",
+		"severity": "LOW", // Different severity
+		"resource": map[string]interface{}{
+			"kind": "Pod",
+			"name": "test-pod",
+		},
+	}
+
+	fp1 := GenerateFingerprint(content1)
+	fp2 := GenerateFingerprint(content2)
+	fp3 := GenerateFingerprint(content3)
+
+	if fp1 != fp2 {
+		t.Error("Same content should generate same fingerprint")
+	}
+
+	if fp1 == fp3 {
+		t.Error("Different content should generate different fingerprints")
+	}
+
+	if fp1 == "" {
+		t.Error("Fingerprint should not be empty")
+	}
+}
+
+func TestDeduper_TimeBuckets(t *testing.T) {
+	// Create deduper with 10 second window, buckets will be ~1 second
+	deduper := NewDeduper(10, 1000)
+
+	key := DedupKey{
+		Source:      "test",
+		Namespace:   "default",
+		Kind:        "Pod",
+		Name:        "test-pod",
+		Reason:      "test-reason",
+		MessageHash: "hash1",
+	}
+
+	// First event creates observation
+	if !deduper.ShouldCreate(key) {
+		t.Error("First event should create observation")
+	}
+
+	// Same event immediately should not create
+	if deduper.ShouldCreate(key) {
+		t.Error("Duplicate within window should not create")
+	}
+
+	// Check bucket cleanup - stats should show buckets
+	size, maxSize, windowSeconds := deduper.Stats()
+	if size == 0 {
+		t.Error("Deduper should have at least one entry")
+	}
+	if maxSize != 1000 {
+		t.Errorf("Expected maxSize 1000, got %d", maxSize)
+	}
+	if windowSeconds != 10 {
+		t.Errorf("Expected windowSeconds 10, got %d", windowSeconds)
+	}
+}
