@@ -20,6 +20,7 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
+	"k8s.io/client-go/kubernetes"
 )
 
 // AdapterFactory creates SourceAdapter instances for all configured sources
@@ -27,17 +28,25 @@ type AdapterFactory struct {
 	factory         dynamicinformer.DynamicSharedInformerFactory
 	policyReportGVR schema.GroupVersionResource
 	trivyReportGVR  schema.GroupVersionResource
+	clientSet       kubernetes.Interface
+	falcoChan       chan map[string]interface{}
+	auditChan       chan map[string]interface{}
 }
 
 // NewAdapterFactory creates a new adapter factory
 func NewAdapterFactory(
 	factory dynamicinformer.DynamicSharedInformerFactory,
 	policyReportGVR, trivyReportGVR schema.GroupVersionResource,
+	clientSet kubernetes.Interface,
+	falcoChan, auditChan chan map[string]interface{},
 ) *AdapterFactory {
 	return &AdapterFactory{
 		factory:         factory,
 		policyReportGVR: policyReportGVR,
 		trivyReportGVR:  trivyReportGVR,
+		clientSet:       clientSet,
+		falcoChan:       falcoChan,
+		auditChan:       auditChan,
 	}
 }
 
@@ -50,8 +59,19 @@ func (af *AdapterFactory) CreateAdapters() []SourceAdapter {
 	adapters = append(adapters, NewTrivyAdapter(af.factory, af.trivyReportGVR))
 	adapters = append(adapters, NewKyvernoAdapter(af.factory, af.policyReportGVR))
 	
-	// TODO: Add webhook-based adapters (Falco, Audit)
-	// TODO: Add ConfigMap-based adapters (kube-bench, Checkov)
+	// Webhook-based adapters
+	if af.falcoChan != nil {
+		adapters = append(adapters, NewFalcoAdapter(af.falcoChan))
+	}
+	if af.auditChan != nil {
+		adapters = append(adapters, NewAuditAdapter(af.auditChan))
+	}
+	
+	// ConfigMap-based adapters
+	if af.clientSet != nil {
+		adapters = append(adapters, NewKubeBenchAdapter(af.clientSet))
+		adapters = append(adapters, NewCheckovAdapter(af.clientSet))
+	}
 	
 	return adapters
 }
