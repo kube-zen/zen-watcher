@@ -111,7 +111,7 @@ kubectl apply -f config/monitoring/prometheus-alerts.yaml
 
 - [ ] Pod is running: `kubectl get pods -n zen-system`
 - [ ] Health check passes: `curl http://localhost:8080/health`
-- [ ] CRD installed: `kubectl get crd zenevents.zen.kube-zen.com`
+- [ ] CRD installed: `kubectl get crd zenevents.zen.kube-zen.io`
 - [ ] Metrics available: `curl http://localhost:8080/metrics`
 - [ ] Dashboard showing data (if monitoring enabled)
 - [ ] No errors in logs: `kubectl logs -n zen-system -l app=zen-watcher`

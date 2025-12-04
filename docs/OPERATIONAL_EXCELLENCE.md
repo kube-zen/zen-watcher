@@ -332,7 +332,7 @@ kubectl apply -f backup-zenevents-20241104.yaml
 
 # Or selective restore
 kubectl apply -f - <<EOF
-$(grep -A 100 "kind: ZenEvent" backup-zenevents-20241104.yaml | head -102)
+$(grep -A 100 "kind: Observation" backup-zenevents-20241104.yaml | head -102)
 EOF
 ```
 
@@ -340,7 +340,7 @@ EOF
 
 ```bash
 # 1. Backup CRDs
-kubectl get crd zenevents.zen.kube-zen.com -o yaml > backup-crd.yaml
+kubectl get crd zenevents.zen.kube-zen.io -o yaml > backup-crd.yaml
 
 # 2. Backup events
 kubectl get zenevents --all-namespaces -o yaml > backup-events.yaml
@@ -480,7 +480,7 @@ curl http://localhost:8080/metrics | grep memory
 curl http://localhost:8080/tools/status | jq
 
 # Check CRD exists
-kubectl get crd zenevents.zen.kube-zen.com
+kubectl get crd zenevents.zen.kube-zen.io
 
 # Check RBAC permissions
 kubectl auth can-i create zenevents --as=system:serviceaccount:zen-system:zen-watcher -n zen-system
@@ -658,7 +658,7 @@ BACKUP_DIR="/backups/zen-watcher/$(date +%Y%m%d)"
 mkdir -p $BACKUP_DIR
 
 # Backup CRDs
-kubectl get crd zenevents.zen.kube-zen.com -o yaml > $BACKUP_DIR/crd.yaml
+kubectl get crd zenevents.zen.kube-zen.io -o yaml > $BACKUP_DIR/crd.yaml
 
 # Backup events
 kubectl get zenevents --all-namespaces -o yaml > $BACKUP_DIR/events.yaml

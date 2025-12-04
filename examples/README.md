@@ -163,12 +163,12 @@ When setting up Grafana dashboard panels:
 
 **Query**:
 ```
-/apis/zen.kube-zen.com/v1/namespaces/zen-system/zenrecommendations
+/apis/zen.kube-zen.io/v1/namespaces/zen-system/zenrecommendations
 ```
 
 **With label selector**:
 ```
-/apis/zen.kube-zen.com/v1/namespaces/zen-system/zenrecommendations?labelSelector=category=security
+/apis/zen.kube-zen.io/v1/namespaces/zen-system/zenrecommendations?labelSelector=category=security
 ```
 
 ### Prometheus Queries

@@ -27,49 +27,56 @@ Complete guide to Zen Watcher documentation.
    - Technology stack
    - Use cases
 
-### Operations (5 files)
+### Operations (7 files)
 
-4. **[docs/OPERATIONAL_EXCELLENCE.md](docs/OPERATIONAL_EXCELLENCE.md)** - Ops best practices
+4. **[docs/OPERATIONS.md](docs/OPERATIONS.md)** - Day-to-day operations guide
    - Health checks
+   - Common operations
+   - Troubleshooting runbooks
+   - Monitoring & alerting
+   - Backup & recovery
+
+5. **[docs/STABILITY.md](docs/STABILITY.md)** - Production readiness guide
+   - HA configuration
+   - Capacity planning
+   - Failure modes
+   - Recovery procedures
+
+6. **[docs/OPERATIONAL_EXCELLENCE.md](docs/OPERATIONAL_EXCELLENCE.md)** - Ops best practices
    - Monitoring setup
    - Logging
-   - High availability
-   - Backup & recovery
-   - Troubleshooting runbooks
+   - Performance tuning
+   - Security hardening
 
-5. **[docs/SCALING.md](docs/SCALING.md)** - Scaling strategy and recommendations
+7. **[docs/SCALING.md](docs/SCALING.md)** - Scaling strategy and recommendations
    - Single-replica deployment (recommended)
    - Namespace sharding for scale-out
    - Leader election roadmap
    - Performance tuning
 
-6. **[docs/FILTERING.md](docs/FILTERING.md)** - Source-level filtering guide
+8. **[docs/FILTERING.md](docs/FILTERING.md)** - Source-level filtering guide
    - Filter configuration
    - Dynamic ConfigMap reloading (no restart required)
+   - ObservationFilter CRD usage
    - Per-source filter rules
    - Examples and best practices
    - Troubleshooting
 
-7. **[docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md)** - Writing new source adapters
+9. **[docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md)** - Writing new source adapters
    - SourceAdapter interface
    - Event normalization model
    - Implementation patterns (informer, webhook, polling)
+   - ObservationMapping CRD for generic adapters
    - Best practices and examples
    - Testing guide
 
-8. **[monitoring/README.md](monitoring/README.md)** - Monitoring guide
+10. **[config/monitoring/README.md](config/monitoring/README.md)** - Monitoring guide
    - Prometheus metrics
    - Alert rules
    - VictoriaMetrics setup
    - Query examples
 
-9. **[dashboards/README.md](dashboards/README.md)** - Dashboard documentation
-   - Grafana setup
-   - Dashboard features
-   - Metrics reference
-   - Query examples
-
-### Security (3 files)
+### Security (5 files)
 
 10. **[docs/SECURITY.md](docs/SECURITY.md)** - Security policy
    - Vulnerability reporting
@@ -78,13 +85,24 @@ Complete guide to Zen Watcher documentation.
    - Compliance
    - Incident response
 
-11. **[docs/SBOM.md](docs/SBOM.md)** - Software Bill of Materials
+11. **[docs/SECURITY_MODEL.md](docs/SECURITY_MODEL.md)** - Security model & threat analysis
+   - Trust boundaries
+   - Threat model
+   - Security layers
+   - Mitigations
+
+12. **[docs/SECURITY_RBAC.md](docs/SECURITY_RBAC.md)** - RBAC permissions
+   - Permission rationale
+   - ClusterRole details
+   - Security audit guide
+
+13. **[docs/SBOM.md](docs/SBOM.md)** - Software Bill of Materials
    - SBOM generation
    - Vulnerability scanning
    - Supply chain security
    - Compliance
 
-12. **[docs/COSIGN.md](docs/COSIGN.md)** - Image signing
+14. **[docs/COSIGN.md](docs/COSIGN.md)** - Image signing
    - Cosign setup
    - Image verification
    - Key management
@@ -103,18 +121,30 @@ Complete guide to Zen Watcher documentation.
     - Configuration options
     - Compliance info
 
-### Development (2 files)
+### Development (4 files)
 
 15. **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guide
     - How to contribute
     - Development setup
     - Code standards
+    - PR workflow
     - Review process
 
 16. **[CHANGELOG.md](CHANGELOG.md)** - Version history
     - Release notes
     - Features added
     - Bug fixes
+
+17. **[VERSIONING.md](VERSIONING.md)** - Versioning strategy
+    - Semantic versioning
+    - Image and chart sync
+    - Release process
+
+18. **[OSS_LAUNCH_CHECKLIST.md](OSS_LAUNCH_CHECKLIST.md)** - Launch readiness
+    - Pre-launch checklist
+    - Documentation status
+    - CI/CD setup
+    - Publication steps
 
 ### Examples (2 files)
 
@@ -124,11 +154,11 @@ Complete guide to Zen Watcher documentation.
     - Prometheus config
     - Loki integration
 
-18. **[dashboards/DASHBOARD_GUIDE.md](dashboards/DASHBOARD_GUIDE.md)** - Dashboard details
-    - Panel descriptions
-    - How to read metrics
-    - Customization
-    - Troubleshooting
+18. **[config/dashboards/DASHBOARD_GUIDE.md](config/dashboards/DASHBOARD_GUIDE.md)** - Dashboard details
+   - Panel descriptions
+   - How to read metrics
+   - Customization
+   - Troubleshooting
 
 ---
 
@@ -143,8 +173,8 @@ Complete guide to Zen Watcher documentation.
 
 **Daily operations?**
 1. [docs/OPERATIONAL_EXCELLENCE.md](docs/OPERATIONAL_EXCELLENCE.md)
-2. [monitoring/README.md](monitoring/README.md)
-3. [dashboards/README.md](dashboards/README.md)
+2. [config/monitoring/README.md](config/monitoring/README.md)
+3. [config/dashboards/README.md](config/dashboards/README.md)
 
 ### For Operators
 
@@ -165,9 +195,9 @@ Complete guide to Zen Watcher documentation.
 3. [README.md](README.md#development)
 
 **Monitoring?**
-1. [monitoring/README.md](monitoring/README.md)
-2. [dashboards/README.md](dashboards/README.md)
-3. Source code: `src/metrics/metrics.go`
+1. [config/monitoring/README.md](config/monitoring/README.md)
+2. [config/dashboards/README.md](config/dashboards/README.md)
+3. Source code: `pkg/metrics/definitions.go`
 
 ---
 
@@ -196,9 +226,9 @@ Complete guide to Zen Watcher documentation.
 - [charts/zen-watcher/README.md#security](charts/zen-watcher/README.md#security)
 
 ### Monitoring
-- [monitoring/README.md](monitoring/README.md)
-- [dashboards/README.md](dashboards/README.md)
-- [dashboards/DASHBOARD_GUIDE.md](dashboards/DASHBOARD_GUIDE.md)
+- [config/monitoring/README.md](config/monitoring/README.md)
+- [config/dashboards/README.md](config/dashboards/README.md)
+- [config/dashboards/DASHBOARD_GUIDE.md](config/dashboards/DASHBOARD_GUIDE.md)
 - [README.md#monitoring-dashboards](README.md#monitoring-dashboards)
 
 ### Troubleshooting
@@ -256,14 +286,14 @@ Complete guide to Zen Watcher documentation.
 
 ## 📝 Document Statistics
 
-- **Total Documentation Files**: 18
-- **Total Lines**: 6,000+
+- **Total Documentation Files**: 50+ (including all markdown files)
+- **Total Lines**: 10,000+
 - **Getting Started**: 3 guides
-- **Operations**: 6 guides (including filtering, scaling, and source adapters)
-- **Security**: 3 guides
+- **Operations**: 7 guides (including filtering, scaling, stability, and source adapters)
+- **Security**: 5 guides (including RBAC and threat model)
 - **Deployment**: 2 guides
-- **Development**: 2 guides
-- **Examples**: 2 guides
+- **Development**: 5 guides (including versioning, changelog, launch checklist)
+- **Examples**: 3 use cases + integration examples
 
 ---
 

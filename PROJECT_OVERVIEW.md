@@ -4,10 +4,11 @@
 
 Zen Watcher is an open-source Kubernetes operator that aggregates security, compliance, and observability events from multiple sources into a unified, extensible CRD-based system. Core features are production-ready and battle-tested.
 
-**Version**: 1.0.0  
+**Version**: 1.1.0  
 **License**: Apache 2.0  
 **Language**: Go 1.23+ (tested on 1.23 and 1.24)  
-**Platform**: Kubernetes 1.26-1.29 (client libs: k8s.io/* v0.28.15)
+**Platform**: Kubernetes 1.26-1.30 (client libs: k8s.io/* v0.28.15)  
+**Architecture**: Modular adapter-based with 6 first-class sources + generic CRD adapter
 
 ---
 
@@ -32,10 +33,12 @@ Provide a **central event aggregation hub** for Kubernetes clusters that:
 - Production-ready from day one
 
 **Components**:
-1. **Watchers** - Monitor security tools (Trivy, Falco, Kyverno, Audit, Kube-bench)
-2. **CRD Writer** - Converts events to Observation CRDs
-3. **Metrics Exporter** - Exposes Prometheus metrics
-4. **API Server** - Health checks and status endpoints
+1. **Source Adapters** - Modular adapters for 6 sources (Trivy, Kyverno, Falco, Audit, Checkov, KubeBench)
+2. **Generic CRD Adapter** - ObservationMapping-driven integration for custom CRDs
+3. **Centralized ObservationCreator** - Filtering, dedup, normalization, CRD creation
+4. **Filter System** - Dynamic filtering via ConfigMap + ObservationFilter CRDs
+5. **Metrics Exporter** - 20+ Prometheus metrics
+6. **HTTP Server** - Webhook endpoints + health/ready probes
 
 ---
 
@@ -46,36 +49,55 @@ Provide a **central event aggregation hub** for Kubernetes clusters that:
 The core data model - stores all events as Kubernetes resources:
 
 ```yaml
-apiVersion: zen.kube-zen.com/v1
-kind: ZenEvent
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  name: trivy-vuln-abc123
+  namespace: production
+  labels:
+    source: trivy
+    category: security
+    severity: HIGH
 spec:
-  category: security          # Extensible
-  source: trivy               # Extensible
-  eventType: vulnerability    # Extensible
-  message: "Event description"
-  severity: CRITICAL
-  priority: 1
-  tags: []
-  metadata: {}
-  timestamp: "2024-11-04T10:00:00Z"
+  source: trivy
+  category: security
+  severity: HIGH
+  eventType: vulnerability
+  resource:
+    kind: Deployment
+    name: myapp
+    namespace: production
+  detectedAt: "2024-12-04T10:00:00Z"
+  details:
+    cve: "CVE-2024-1234"
+    package: "openssl"
+    fixVersion: "1.1.1w"
+  ttlSecondsAfterCreation: 604800  # 7 days
 ```
 
-### Watchers
+### Source Adapters (Modular Architecture)
 
-- **Trivy Watcher**: Container vulnerability scanning
-- **Falco Watcher**: Runtime security threats
-- **Kyverno Watcher**: Policy violations
-- **Audit Watcher**: Kubernetes audit logs
-- **Kube-bench Watcher**: CIS benchmark compliance
+**First-Class Adapters** (6 sources):
+- **TrivyAdapter**: VulnerabilityReport CRD informer
+- **KyvernoAdapter**: PolicyReport CRD informer
+- **FalcoAdapter**: Webhook-based (HTTP POST /falco/webhook)
+- **AuditAdapter**: Webhook-based (HTTP POST /audit/webhook)
+- **CheckovAdapter**: ConfigMap polling (5-minute interval)
+- **KubeBenchAdapter**: ConfigMap polling (5-minute interval)
+
+**Generic Adapter**:
+- **CRDSourceAdapter**: ObservationMapping CRD-driven for custom integrations
 
 ### Metrics System
 
 20+ Prometheus metrics covering:
-- Event collection and processing
-- Watcher performance
-- CRD operations
-- API latency
-- Resource usage
+- Event collection and processing (by source, category, severity)
+- Adapter lifecycle and performance
+- Filter decisions and reload status
+- Deduplication effectiveness
+- Webhook health and backpressure
+- GC performance and observation backlog
+- ObservationMapping usage (for generic CRD adapter)
 
 ---
 

@@ -389,7 +389,7 @@ Want to see what will be installed without making changes?
 kubectl get pods -n zen-system
 
 # Check CRDs are installed
-kubectl get crd zenevents.zen.kube-zen.com
+kubectl get crd zenevents.zen.kube-zen.io
 
 # View Zen Events
 kubectl get zenevents -A
@@ -499,7 +499,7 @@ helm upgrade --install promtail grafana/promtail \
 Zen Watcher uses least-privilege RBAC:
 ```yaml
 rules:
-- apiGroups: ["zen.kube-zen.com"]
+- apiGroups: ["zen.kube-zen.io"]
   resources: ["zenevents"]
   verbs: ["get", "list", "watch", "create", "update"]
 - apiGroups: [""]

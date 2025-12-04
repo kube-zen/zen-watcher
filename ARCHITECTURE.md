@@ -21,10 +21,11 @@ Zen Watcher is a Kubernetes-native security event aggregator that consolidates e
 - **Standalone**: Works completely independently, no external services required
 - **Pure & Secure**: Zero egress traffic, zero secrets, zero external dependencies
 - **Kubernetes-native**: Stores data as CRDs in etcd, no external database
-- **Modular**: Each tool watcher is independent and can be enabled/disabled
-- **Efficient**: <10m CPU, <50MB RAM under normal load
-- **Observable**: Prometheus metrics, structured logging, health endpoints
-- **Extensible**: Observation CRD enables ecosystem of sink controllers (Slack, PagerDuty, SIEMs, etc.)
+- **Modular**: 6 first-class source adapters + 1 generic CRD adapter for extensibility
+- **Efficient**: <100m CPU, <50MB RAM under normal load (tested with 6 sources)
+- **Observable**: 20+ Prometheus metrics, structured logging, health endpoints
+- **Cluster-Blind**: No cluster/tenant metadata - pure event aggregation
+- **Extensible**: ObservationMapping CRD enables custom CRD integration without code
 
 ---
 
@@ -524,14 +525,25 @@ spec:
     vulnID: CVE-2024-1234
     package: nginx
     version: 1.21.0
+  ttlSecondsAfterCreation: 604800  # 7 days
 ```
+
+**Complete Field Reference:**
+- `source`: Event source (trivy, kyverno, falco, audit, checkov, kubebench, or custom)
+- `category`: Event category (security, compliance, infrastructure, or custom)
+- `severity`: Event severity (CRITICAL, HIGH, MEDIUM, LOW, INFO, or custom)
+- `eventType`: Type of event (vulnerability-report, policy-violation, runtime-threat, etc.)
+- `detectedAt`: ISO8601 timestamp of when event was detected
+- `resource`: Affected Kubernetes resource (kind, name, namespace, optional uid)
+- `details`: Source-specific data (arbitrary JSON, not queryable via kubectl)
+- `ttlSecondsAfterCreation`: Automatic deletion after N seconds (default 7 days)
 
 **Storage Characteristics:**
 - Stored in etcd (Kubernetes' built-in database)
 - No external database required
-- Standard kubectl access
-- GitOps compatible
-- Automatic garbage collection via Kubernetes TTL
+- Standard kubectl access (`kubectl get observations -A`)
+- GitOps compatible (can be version-controlled and applied declaratively)
+- Automatic garbage collection via Kubernetes TTL controller
 
 ---
 

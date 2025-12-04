@@ -22,11 +22,11 @@ import (
 
 func TestFalcoAdapter(t *testing.T) {
 	tests := []struct {
-		name          string
-		alert         map[string]interface{}
-		expectEvent   bool
-		expectedSev   string
-		expectedType  string
+		name         string
+		alert        map[string]interface{}
+		expectEvent  bool
+		expectedSev  string
+		expectedType string
 	}{
 		{
 			name: "critical alert creates event",
@@ -232,7 +232,7 @@ func TestAuditAdapter(t *testing.T) {
 func TestKubeBenchAdapterName(t *testing.T) {
 	clientSet := &fakeClientSet{}
 	adapter := NewKubeBenchAdapter(clientSet)
-	
+
 	if adapter.Name() != "kubebench" {
 		t.Errorf("Name() = %v, want kubebench", adapter.Name())
 	}
@@ -241,7 +241,7 @@ func TestKubeBenchAdapterName(t *testing.T) {
 func TestCheckovAdapterName(t *testing.T) {
 	clientSet := &fakeClientSet{}
 	adapter := NewCheckovAdapter(clientSet)
-	
+
 	if adapter.Name() != "checkov" {
 		t.Errorf("Name() = %v, want checkov", adapter.Name())
 	}
@@ -251,4 +251,3 @@ func TestCheckovAdapterName(t *testing.T) {
 type fakeClientSet struct{}
 
 func (f *fakeClientSet) CoreV1() interface{} { return nil }
-
