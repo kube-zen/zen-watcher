@@ -167,7 +167,7 @@ func TestDeduper_FingerprintBasedDedup(t *testing.T) {
 func TestDeduper_RateLimiting(t *testing.T) {
 	// Create deduper with rate limiting enabled (via environment variable simulation)
 	deduper := NewDeduper(60, 1000)
-	
+
 	// Set rate limit via reflection or direct field access
 	// For this test, we'll assume rate limiting is configured via env vars
 	// In real code, rate limits are set via NewDeduper with env vars

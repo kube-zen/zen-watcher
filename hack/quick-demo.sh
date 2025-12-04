@@ -1426,26 +1426,299 @@ if [ "$DEPLOY_MOCK_DATA" = true ] || ([ "$SKIP_MOCK_DATA" != true ] && [ "$NON_I
     
     if [ "$DEPLOY_MOCK_DATA" = true ] && [ "$SKIP_MOCK_DATA" != true ]; then
         echo ""
-        echo -e "${YELLOW}→${NC} Deploying mock data..."
-        if [ -f "./hack/send-mock-webhooks.sh" ]; then
-            # Wait for zen-watcher to be ready before sending webhooks
-            echo -e "${CYAN}   Waiting for zen-watcher to be ready...${NC}"
-            for i in {1..60}; do
-                if kubectl get pod -n ${NAMESPACE} -l app.kubernetes.io/name=zen-watcher --field-selector=status.phase=Running 2>/dev/null | grep -q "zen-watcher"; then
-                    if kubectl exec -n ${NAMESPACE} $(kubectl get pod -n ${NAMESPACE} -l app.kubernetes.io/name=zen-watcher -o jsonpath='{.items[0].metadata.name}') -- wget -qO- http://localhost:8080/health 2>/dev/null | grep -q "ok"; then
-                        echo -e "${GREEN}   ✓${NC} zen-watcher ready"
-                        break
-                    fi
-                fi
-                sleep 2
-            done
-            
-            # Run mock data script
-            timeout 120 ./hack/send-mock-webhooks.sh ${NAMESPACE} 2>&1 || echo -e "${YELLOW}   ⚠${NC}  Mock data deployment had issues (this is OK if observations already exist)"
-            echo -e "${GREEN}✓${NC} Mock data deployment completed"
+        echo -e "${YELLOW}→${NC} Deploying mock data via Helm..."
+        
+        # Ensure required namespaces exist before deploying mock data
+        echo -e "${CYAN}   Ensuring required namespaces exist...${NC}"
+        for ns in checkov kube-bench; do
+            kubectl get namespace $ns >/dev/null 2>&1 || kubectl create namespace $ns 2>&1 | grep -v "already exists" > /dev/null || true
+        done
+        
+        # Upgrade zen-watcher with mock data enabled
+        echo -e "${CYAN}   Enabling mock data in zen-watcher Helm chart...${NC}"
+        if [ -d "../helm-charts/charts/zen-watcher" ]; then
+            helm upgrade zen-watcher ../helm-charts/charts/zen-watcher -n ${NAMESPACE} \
+                --set mockData.enabled=true \
+                --wait --timeout=2m 2>&1 | grep -v "WARNING" || true
+            echo -e "${GREEN}   ✓${NC} Mock data ConfigMaps and Job deployed"
+        elif [ -d "./helm-charts/charts/zen-watcher" ]; then
+            helm upgrade zen-watcher ./helm-charts/charts/zen-watcher -n ${NAMESPACE} \
+                --set mockData.enabled=true \
+                --wait --timeout=2m 2>&1 | grep -v "WARNING" || true
+            echo -e "${GREEN}   ✓${NC} Mock data ConfigMaps and Job deployed"
         else
-            echo -e "${YELLOW}   ⚠${NC}  send-mock-webhooks.sh not found, skipping mock data"
+            echo -e "${YELLOW}   ⚠${NC}  Helm chart not found, skipping Helm-based mock data"
         fi
+        
+        # Restart zen-watcher to trigger immediate ConfigMap polling
+        echo -e "${CYAN}   Restarting zen-watcher to pick up ConfigMaps...${NC}"
+        kubectl delete pod -n ${NAMESPACE} -l app.kubernetes.io/name=zen-watcher 2>&1 | grep -v "not found" > /dev/null || true
+        
+        # Wait for zen-watcher to be ready
+        echo -e "${CYAN}   Waiting for zen-watcher to restart...${NC}"
+        kubectl wait --for=condition=ready pod -n ${NAMESPACE} -l app.kubernetes.io/name=zen-watcher --timeout=60s 2>&1 | grep -v "no matching resources" > /dev/null || sleep 10
+        
+        # Send Falco and Audit webhooks via port-forward
+        echo -e "${CYAN}   Sending Falco and Audit webhooks...${NC}"
+        ZEN_PORT=18080
+        
+        # Start port-forward and wait for it to be ready
+        kubectl port-forward -n ${NAMESPACE} svc/zen-watcher ${ZEN_PORT}:8080 >/tmp/pf-webhook.log 2>&1 &
+        PF_PID=$!
+        
+        # Wait for port-forward with better verification
+        WEBHOOK_READY=false
+        for i in {1..20}; do
+            if curl -sf -m 2 http://localhost:${ZEN_PORT}/health 2>/dev/null | grep -q "healthy"; then
+                WEBHOOK_READY=true
+                echo -e "${GREEN}   ✓${NC} Port-forward ready"
+                break
+            fi
+            sleep 1
+        done
+        
+        if [ "$WEBHOOK_READY" = true ]; then
+            # Use unique timestamps to avoid deduplication
+            TIMESTAMP=$(date +%s)
+            WEBHOOK_COUNT=0
+            
+            # Send Falco webhooks with visible output for debugging
+            echo -e "${CYAN}     Sending Falco webhooks...${NC}"
+            RESP=$(curl -s -X POST -H 'Content-Type: application/json' -d "{
+              \"output\": \"Privileged container started (demo-${TIMESTAMP})\",
+              \"priority\": \"Critical\",
+              \"rule\": \"Privileged container started\",
+              \"time\": \"$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")\",
+              \"output_fields\": {
+                \"k8s.pod.name\": \"demo-pod-${TIMESTAMP}\",
+                \"k8s.ns.name\": \"default\",
+                \"container.id\": \"mock${TIMESTAMP}\"
+              },
+              \"source\": \"syscall\",
+              \"tags\": [\"container\"]
+            }" "http://localhost:${ZEN_PORT}/falco/webhook" 2>&1)
+            if echo "$RESP" | grep -q "ok"; then
+                WEBHOOK_COUNT=$((WEBHOOK_COUNT + 1))
+            fi
+            
+            sleep 1
+            TIMESTAMP=$((TIMESTAMP + 1))
+            
+            RESP=$(curl -s -X POST -H 'Content-Type: application/json' -d "{
+              \"output\": \"Shell spawned (demo-${TIMESTAMP})\",
+              \"priority\": \"Warning\",
+              \"rule\": \"Shell spawned in container\",
+              \"time\": \"$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")\",
+              \"output_fields\": {
+                \"k8s.pod.name\": \"demo-shell-${TIMESTAMP}\",
+                \"k8s.ns.name\": \"default\",
+                \"container.id\": \"shell${TIMESTAMP}\"
+              },
+              \"source\": \"syscall\",
+              \"tags\": [\"shell\"]
+            }" "http://localhost:${ZEN_PORT}/falco/webhook" 2>&1)
+            if echo "$RESP" | grep -q "ok"; then
+                WEBHOOK_COUNT=$((WEBHOOK_COUNT + 1))
+            fi
+            
+            sleep 1
+            TIMESTAMP=$((TIMESTAMP + 1))
+            
+            # Send Audit webhooks
+            echo -e "${CYAN}     Sending Audit webhooks...${NC}"
+            RESP=$(curl -s -X POST -H 'Content-Type: application/json' -d "{
+              \"auditID\": \"audit-${TIMESTAMP}\",
+              \"stage\": \"ResponseComplete\",
+              \"verb\": \"delete\",
+              \"user\": {\"username\": \"system:admin\"},
+              \"objectRef\": {
+                \"resource\": \"secrets\",
+                \"namespace\": \"default\",
+                \"name\": \"secret-${TIMESTAMP}\"
+              },
+              \"responseStatus\": {\"code\": 200},
+              \"requestReceivedTimestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")\"
+            }" "http://localhost:${ZEN_PORT}/audit/webhook" 2>&1)
+            if echo "$RESP" | grep -q "ok"; then
+                WEBHOOK_COUNT=$((WEBHOOK_COUNT + 1))
+            fi
+            
+            sleep 1
+            TIMESTAMP=$((TIMESTAMP + 1))
+            
+            RESP=$(curl -s -X POST -H 'Content-Type: application/json' -d "{
+              \"auditID\": \"audit-${TIMESTAMP}\",
+              \"stage\": \"ResponseComplete\",
+              \"verb\": \"create\",
+              \"user\": {\"username\": \"system:admin\"},
+              \"objectRef\": {
+                \"resource\": \"rolebindings\",
+                \"namespace\": \"default\",
+                \"name\": \"binding-${TIMESTAMP}\"
+              },
+              \"responseStatus\": {\"code\": 201},
+              \"requestReceivedTimestamp\": \"$(date -u +"%Y-%m-%dT%H:%M:%S.000Z")\"
+            }" "http://localhost:${ZEN_PORT}/audit/webhook" 2>&1)
+            if echo "$RESP" | grep -q "ok"; then
+                WEBHOOK_COUNT=$((WEBHOOK_COUNT + 1))
+            fi
+            
+            # Wait for zen-watcher to process webhooks and create observations
+            sleep 5
+            
+            echo -e "${GREEN}   ✓${NC} Sent ${WEBHOOK_COUNT}/4 webhooks"
+            
+            # Verify observations were created
+            OBS_COUNT=$(kubectl get observations -A -o json 2>/dev/null | jq -r '.items[] | .spec.source' | grep -E "falco|audit" | wc -l || echo "0")
+            if [ "$OBS_COUNT" -gt 0 ]; then
+                echo -e "${GREEN}   ✓${NC} Webhook observations created (${OBS_COUNT} falco/audit events)"
+            else
+                echo -e "${YELLOW}   ⚠${NC}  Webhook observations not created via webhook, creating directly..."
+                # Fallback: Create Falco and Audit observations directly as CRDs
+                TIMESTAMP=$(date +%s)
+                cat <<EOF | kubectl apply -f - >/dev/null 2>&1 || true
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  name: falco-mock-${TIMESTAMP}
+  namespace: ${NAMESPACE}
+spec:
+  source: falco
+  category: security
+  severity: HIGH
+  eventType: runtime-security
+  details:
+    message: "Privileged container started (mock demo)"
+    rule: "Privileged container started"
+    priority: "Critical"
+  resource:
+    kind: Pod
+    name: demo-pod
+    namespace: default
+  detectedAt: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  ttlSecondsAfterCreation: 604800
+---
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  name: falco-mock-shell-${TIMESTAMP}
+  namespace: ${NAMESPACE}
+spec:
+  source: falco
+  category: security
+  severity: MEDIUM
+  eventType: runtime-security
+  details:
+    message: "Shell spawned in container (mock demo)"
+    rule: "Shell spawned in container"
+    priority: "Warning"
+  resource:
+    kind: Pod
+    name: demo-pod-2
+    namespace: default
+  detectedAt: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  ttlSecondsAfterCreation: 604800
+---
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  name: audit-mock-${TIMESTAMP}
+  namespace: ${NAMESPACE}
+spec:
+  source: audit
+  category: compliance
+  severity: MEDIUM
+  eventType: resource-deletion
+  details:
+    message: "Secret deleted by admin (mock demo)"
+    verb: "delete"
+    user: "system:admin"
+  resource:
+    kind: Secret
+    name: demo-secret
+    namespace: default
+  detectedAt: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  ttlSecondsAfterCreation: 604800
+---
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  name: audit-mock-rolebinding-${TIMESTAMP}
+  namespace: ${NAMESPACE}
+spec:
+  source: audit
+  category: compliance
+  severity: HIGH
+  eventType: rbac-change
+  details:
+    message: "RoleBinding created (mock demo)"
+    verb: "create"
+    user: "system:admin"
+  resource:
+    kind: RoleBinding
+    name: demo-binding
+    namespace: default
+  detectedAt: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  ttlSecondsAfterCreation: 604800
+EOF
+                echo -e "${GREEN}   ✓${NC} Created mock Falco and Audit observations directly"
+            fi
+        else
+            echo -e "${YELLOW}   ⚠${NC}  Port-forward not ready, creating mock observations directly..."
+            # Create Falco and Audit observations directly as CRDs
+            TIMESTAMP=$(date +%s)
+            cat <<EOF | kubectl apply -f - >/dev/null 2>&1 || true
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  name: falco-mock-${TIMESTAMP}
+  namespace: ${NAMESPACE}
+spec:
+  source: falco
+  category: security
+  severity: HIGH
+  eventType: runtime-security
+  details:
+    message: "Privileged container started (mock demo)"
+    rule: "Privileged container started"
+    priority: "Critical"
+  resource:
+    kind: Pod
+    name: demo-pod
+    namespace: default
+  detectedAt: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  ttlSecondsAfterCreation: 604800
+---
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  name: audit-mock-${TIMESTAMP}
+  namespace: ${NAMESPACE}
+spec:
+  source: audit
+  category: compliance
+  severity: MEDIUM
+  eventType: resource-deletion
+  details:
+    message: "Secret deleted (mock demo)"
+    verb: "delete"
+    user: "system:admin"
+  resource:
+    kind: Secret
+    name: demo-secret
+    namespace: default
+  detectedAt: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  ttlSecondsAfterCreation: 604800
+EOF
+            echo -e "${GREEN}   ✓${NC} Created mock Falco and Audit observations"
+        fi
+        
+        # Clean up port-forward
+        kill $PF_PID 2>/dev/null || true
+        wait $PF_PID 2>/dev/null || true
+        
+        echo -e "${GREEN}✓${NC} Mock data deployment completed"
+        echo -e "${CYAN}   Note: All 6 sources should now have observations${NC}"
     fi
 fi
 
@@ -1562,8 +1835,9 @@ EOF
     fi
 fi
 
-# Create Kyverno test policy (if Kyverno is installed)
-if [ "$INSTALL_KYVERNO" = true ]; then
+# Create Kyverno test policy (if Kyverno is installed and mock data is not enabled)
+# Note: The require-labels policy blocks mock data pods, so we skip it when mock data is enabled
+if [ "$INSTALL_KYVERNO" = true ] && [ "$DEPLOY_MOCK_DATA" != true ]; then
     echo -e "${YELLOW}→${NC} Creating Kyverno test policy..."
     cat <<EOF | kubectl apply -f - 2>&1 | grep -v "already exists" > /dev/null || true
 apiVersion: kyverno.io/v1
@@ -1585,6 +1859,10 @@ spec:
           labels:
             app: "?*"
 EOF
+elif [ "$INSTALL_KYVERNO" = true ] && [ "$DEPLOY_MOCK_DATA" = true ]; then
+    echo -e "${CYAN}   Skipping Kyverno test policy (conflicts with mock data)${NC}"
+    # Delete the policy if it exists
+    kubectl delete clusterpolicy require-labels 2>&1 | grep -v "not found" > /dev/null || true
 fi
 
 # Helmfile handles all installations synchronously, no need to wait for background processes

@@ -54,12 +54,12 @@ func NewAdapterFactory(
 // This returns a slice of adapters that implement the SourceAdapter interface
 func (af *AdapterFactory) CreateAdapters() []SourceAdapter {
 	var adapters []SourceAdapter
-	
+
 	// First-class adapters (explicit, battle-tested)
 	// Informer-based adapters
 	adapters = append(adapters, NewTrivyAdapter(af.factory, af.trivyReportGVR))
 	adapters = append(adapters, NewKyvernoAdapter(af.factory, af.policyReportGVR))
-	
+
 	// Webhook-based adapters
 	if af.falcoChan != nil {
 		adapters = append(adapters, NewFalcoAdapter(af.falcoChan))
@@ -67,24 +67,24 @@ func (af *AdapterFactory) CreateAdapters() []SourceAdapter {
 	if af.auditChan != nil {
 		adapters = append(adapters, NewAuditAdapter(af.auditChan))
 	}
-	
+
 	// ConfigMap-based adapters
 	if af.clientSet != nil {
 		adapters = append(adapters, NewKubeBenchAdapter(af.clientSet))
 		adapters = append(adapters, NewCheckovAdapter(af.clientSet))
 	}
-	
+
 	// Generic CRD adapter (for ObservationMapping CRDs - covers long tail of tools)
 	adapters = append(adapters, NewCRDSourceAdapter(af.factory, ObservationMappingGVR))
-	
+
 	return adapters
 }
 
 // AdapterLauncher manages running all source adapters
 type AdapterLauncher struct {
-	adapters          []SourceAdapter
+	adapters           []SourceAdapter
 	observationCreator *ObservationCreator
-	eventCh           chan *Event
+	eventCh            chan *Event
 }
 
 // NewAdapterLauncher creates a new adapter launcher
@@ -94,7 +94,7 @@ func NewAdapterLauncher(
 ) *AdapterLauncher {
 	// Create buffered channel for events
 	eventCh := make(chan *Event, 1000)
-	
+
 	return &AdapterLauncher{
 		adapters:           adapters,
 		observationCreator: observationCreator,
@@ -119,7 +119,7 @@ func (al *AdapterLauncher) Start(ctx context.Context) error {
 			}
 		}()
 	}
-	
+
 	// Process events from all adapters
 	for {
 		select {
@@ -151,4 +151,3 @@ func (al *AdapterLauncher) Stop() {
 		adapter.Stop()
 	}
 }
-

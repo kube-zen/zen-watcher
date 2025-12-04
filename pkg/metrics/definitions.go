@@ -20,20 +20,47 @@ import (
 
 // Metrics holds all Prometheus metrics for zen-watcher
 type Metrics struct {
+	// Core event metrics
 	EventsTotal              *prometheus.CounterVec
 	ObservationsCreated      *prometheus.CounterVec
 	ObservationsFiltered     *prometheus.CounterVec
 	ObservationsDeduped      prometheus.Counter
 	ObservationsDeleted      *prometheus.CounterVec
 	ObservationsCreateErrors *prometheus.CounterVec
-	GCRunsTotal              prometheus.Counter
-	GCDuration               *prometheus.HistogramVec
-	GCErrors                 *prometheus.CounterVec
-	ToolsActive              *prometheus.GaugeVec
-	InformerCacheSync        *prometheus.GaugeVec
-	EventProcessingDuration  *prometheus.HistogramVec
-	WebhookRequests          *prometheus.CounterVec
-	WebhookDropped           *prometheus.CounterVec
+
+	// Filter metrics (NEW)
+	FilterDecisions      *prometheus.CounterVec
+	FilterReloadTotal    *prometheus.CounterVec
+	FilterLastReload     *prometheus.GaugeVec
+	FilterPoliciesActive *prometheus.GaugeVec
+
+	// ObservationMapping / CRD adapter metrics (NEW)
+	ObservationMappingsActive *prometheus.GaugeVec
+	ObservationMappingsEvents *prometheus.CounterVec
+	CRDAdapterErrors          *prometheus.CounterVec
+
+	// Adapter lifecycle metrics (NEW)
+	AdapterRunsTotal *prometheus.CounterVec
+
+	// Webhook metrics (enhanced)
+	WebhookRequests   *prometheus.CounterVec
+	WebhookDropped    *prometheus.CounterVec
+	WebhookQueueUsage *prometheus.GaugeVec // NEW
+
+	// Dedup metrics (enhanced - NEW)
+	DedupCacheUsage *prometheus.GaugeVec
+	DedupEvictions  *prometheus.CounterVec
+
+	// GC metrics
+	GCRunsTotal      prometheus.Counter
+	GCDuration       *prometheus.HistogramVec
+	GCErrors         *prometheus.CounterVec
+	ObservationsLive *prometheus.GaugeVec // NEW
+
+	// Performance & health metrics
+	ToolsActive             *prometheus.GaugeVec
+	InformerCacheSync       *prometheus.GaugeVec
+	EventProcessingDuration *prometheus.HistogramVec
 }
 
 // NewMetrics creates and registers all Prometheus metrics
@@ -150,6 +177,108 @@ func NewMetrics() *Metrics {
 		[]string{"operation", "error_type"},
 	)
 
+	// NEW: Filter metrics
+	filterDecisions := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_filter_decisions_total",
+			Help: "Total filter decisions by action and reason",
+		},
+		[]string{"source", "action", "reason"},
+	)
+
+	filterReloadTotal := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_filter_reload_total",
+			Help: "Total filter config reloads",
+		},
+		[]string{"source", "result"},
+	)
+
+	filterLastReload := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_filter_last_reload_timestamp_seconds",
+			Help: "Timestamp of last successful filter reload",
+		},
+		[]string{"source"},
+	)
+
+	filterPoliciesActive := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_filter_policies_active",
+			Help: "Number of active filter policies",
+		},
+		[]string{"type"},
+	)
+
+	// NEW: ObservationMapping metrics
+	observationMappingsActive := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_observation_mappings_active",
+			Help: "Active ObservationMapping CRDs",
+		},
+		[]string{"mapping", "group", "version", "kind", "namespace_scope"},
+	)
+
+	observationMappingsEvents := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_observation_mappings_events_total",
+			Help: "Events processed by ObservationMapping",
+		},
+		[]string{"mapping", "result"},
+	)
+
+	crdAdapterErrors := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_crd_adapter_errors_total",
+			Help: "CRD adapter errors",
+		},
+		[]string{"mapping", "stage", "error_type"},
+	)
+
+	// NEW: Adapter lifecycle metrics
+	adapterRunsTotal := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_adapter_runs_total",
+			Help: "Adapter run iterations",
+		},
+		[]string{"adapter", "outcome"},
+	)
+
+	// NEW: Enhanced webhook metrics
+	webhookQueueUsage := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_webhook_queue_usage_ratio",
+			Help: "Webhook queue utilization ratio",
+		},
+		[]string{"endpoint"},
+	)
+
+	// NEW: Dedup cache metrics
+	dedupCacheUsage := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_dedup_cache_usage_ratio",
+			Help: "Dedup cache utilization ratio",
+		},
+		[]string{"source"},
+	)
+
+	dedupEvictions := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_dedup_evictions_total",
+			Help: "Dedup cache evictions",
+		},
+		[]string{"source"},
+	)
+
+	// NEW: GC footprint metric
+	observationsLive := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_observations_live",
+			Help: "Current live Observation CRs in etcd",
+		},
+		[]string{"source"},
+	)
+
 	// Register all metrics
 	prometheus.MustRegister(eventsTotal)
 	prometheus.MustRegister(observationsCreated)
@@ -166,20 +295,61 @@ func NewMetrics() *Metrics {
 	prometheus.MustRegister(webhookRequests)
 	prometheus.MustRegister(webhookDropped)
 
+	// Register NEW metrics
+	prometheus.MustRegister(filterDecisions)
+	prometheus.MustRegister(filterReloadTotal)
+	prometheus.MustRegister(filterLastReload)
+	prometheus.MustRegister(filterPoliciesActive)
+	prometheus.MustRegister(observationMappingsActive)
+	prometheus.MustRegister(observationMappingsEvents)
+	prometheus.MustRegister(crdAdapterErrors)
+	prometheus.MustRegister(adapterRunsTotal)
+	prometheus.MustRegister(webhookQueueUsage)
+	prometheus.MustRegister(dedupCacheUsage)
+	prometheus.MustRegister(dedupEvictions)
+	prometheus.MustRegister(observationsLive)
+
 	return &Metrics{
+		// Core event metrics
 		EventsTotal:              eventsTotal,
 		ObservationsCreated:      observationsCreated,
 		ObservationsFiltered:     observationsFiltered,
 		ObservationsDeduped:      observationsDeduped,
 		ObservationsDeleted:      observationsDeleted,
 		ObservationsCreateErrors: observationsCreateErrors,
-		GCRunsTotal:              gcRunsTotal,
-		GCDuration:               gcDuration,
-		GCErrors:                 gcErrors,
-		ToolsActive:              toolsActive,
-		InformerCacheSync:        informerCacheSync,
-		EventProcessingDuration:  eventProcessingDuration,
-		WebhookRequests:          webhookRequests,
-		WebhookDropped:           webhookDropped,
+
+		// Filter metrics (NEW)
+		FilterDecisions:      filterDecisions,
+		FilterReloadTotal:    filterReloadTotal,
+		FilterLastReload:     filterLastReload,
+		FilterPoliciesActive: filterPoliciesActive,
+
+		// ObservationMapping / CRD adapter metrics (NEW)
+		ObservationMappingsActive: observationMappingsActive,
+		ObservationMappingsEvents: observationMappingsEvents,
+		CRDAdapterErrors:          crdAdapterErrors,
+
+		// Adapter lifecycle metrics (NEW)
+		AdapterRunsTotal: adapterRunsTotal,
+
+		// Webhook metrics
+		WebhookRequests:   webhookRequests,
+		WebhookDropped:    webhookDropped,
+		WebhookQueueUsage: webhookQueueUsage, // NEW
+
+		// Dedup metrics (NEW)
+		DedupCacheUsage: dedupCacheUsage,
+		DedupEvictions:  dedupEvictions,
+
+		// GC metrics
+		GCRunsTotal:      gcRunsTotal,
+		GCDuration:       gcDuration,
+		GCErrors:         gcErrors,
+		ObservationsLive: observationsLive, // NEW
+
+		// Performance & health metrics
+		ToolsActive:             toolsActive,
+		InformerCacheSync:       informerCacheSync,
+		EventProcessingDuration: eventProcessingDuration,
 	}
 }

@@ -461,7 +461,7 @@ func TestMergeFilterConfigs_ComplexMerge(t *testing.T) {
 	crdConfig := &FilterConfig{
 		Sources: map[string]SourceFilter{
 			"trivy": {
-				MinSeverity:       "HIGH", // More restrictive
+				MinSeverity:       "HIGH",                  // More restrictive
 				ExcludeNamespaces: []string{"kube-public"}, // Union with kube-system
 				ExcludeKinds:      []string{"Secret"},      // Union with Pod
 				Enabled:           boolPtr(true),
@@ -529,4 +529,3 @@ func containsAll(slice []string, items []string) bool {
 	}
 	return true
 }
-

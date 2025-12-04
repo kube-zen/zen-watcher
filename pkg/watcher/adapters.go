@@ -51,12 +51,12 @@ func normalizeSeverity(severity string) string {
 
 // TrivyAdapter implements SourceAdapter for Trivy VulnerabilityReports
 type TrivyAdapter struct {
-	factory            dynamicinformer.DynamicSharedInformerFactory
-	trivyGVR           schema.GroupVersionResource
-	informer           cache.SharedIndexInformer
-	stopCh             chan struct{}
-	ctx                context.Context
-	cancel             context.CancelFunc
+	factory  dynamicinformer.DynamicSharedInformerFactory
+	trivyGVR schema.GroupVersionResource
+	informer cache.SharedIndexInformer
+	stopCh   chan struct{}
+	ctx      context.Context
+	cancel   context.CancelFunc
 }
 
 // NewTrivyAdapter creates a new Trivy adapter
@@ -77,10 +77,10 @@ func (a *TrivyAdapter) Name() string {
 
 func (a *TrivyAdapter) Run(ctx context.Context, out chan<- *Event) error {
 	a.ctx, a.cancel = context.WithCancel(ctx)
-	
+
 	// Get informer for Trivy VulnerabilityReports
 	a.informer = a.factory.ForResource(a.trivyGVR).Informer()
-	
+
 	// Add event handlers
 	a.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -112,14 +112,14 @@ func (a *TrivyAdapter) Run(ctx context.Context, out chan<- *Event) error {
 			}
 		},
 	})
-	
+
 	// Start informer
 	a.factory.Start(a.stopCh)
-	
+
 	// Wait for cache sync
 	ctx, cancel := context.WithTimeout(a.ctx, 30*time.Second)
 	defer cancel()
-	
+
 	if !cache.WaitForCacheSync(ctx.Done(), a.informer.HasSynced) {
 		logger.Debug("Trivy informer cache did not sync within timeout (CRD may not be installed)",
 			logger.Fields{
@@ -128,7 +128,7 @@ func (a *TrivyAdapter) Run(ctx context.Context, out chan<- *Event) error {
 				Source:    "trivy",
 			})
 	}
-	
+
 	// Block until context cancelled
 	<-a.ctx.Done()
 	return a.ctx.Err()
@@ -139,22 +139,22 @@ func (a *TrivyAdapter) processReport(report *unstructured.Unstructured) []*Event
 	if !found || len(vulnerabilities) == 0 {
 		return nil
 	}
-	
+
 	resourceKind := report.GetLabels()["trivy-operator.resource.kind"]
 	resourceName := report.GetLabels()["trivy-operator.resource.name"]
 	if resourceKind == "" || resourceName == "" {
 		return nil
 	}
-	
+
 	var events []*Event
 	for _, v := range vulnerabilities {
 		vuln, ok := v.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		
+
 		severity := normalizeSeverity(fmt.Sprintf("%v", vuln["severity"]))
-		
+
 		event := &Event{
 			Source:    "trivy",
 			Category:  "security",
@@ -176,10 +176,10 @@ func (a *TrivyAdapter) processReport(report *unstructured.Unstructured) []*Event
 				"installedVersion": vuln["installedVersion"],
 			},
 		}
-		
+
 		events = append(events, event)
 	}
-	
+
 	return events
 }
 
@@ -192,12 +192,12 @@ func (a *TrivyAdapter) Stop() {
 
 // KyvernoAdapter implements SourceAdapter for Kyverno PolicyReports
 type KyvernoAdapter struct {
-	factory            dynamicinformer.DynamicSharedInformerFactory
-	policyReportGVR    schema.GroupVersionResource
-	informer           cache.SharedIndexInformer
-	stopCh             chan struct{}
-	ctx                context.Context
-	cancel             context.CancelFunc
+	factory         dynamicinformer.DynamicSharedInformerFactory
+	policyReportGVR schema.GroupVersionResource
+	informer        cache.SharedIndexInformer
+	stopCh          chan struct{}
+	ctx             context.Context
+	cancel          context.CancelFunc
 }
 
 // NewKyvernoAdapter creates a new Kyverno adapter
@@ -218,10 +218,10 @@ func (a *KyvernoAdapter) Name() string {
 
 func (a *KyvernoAdapter) Run(ctx context.Context, out chan<- *Event) error {
 	a.ctx, a.cancel = context.WithCancel(ctx)
-	
+
 	// Get informer for Kyverno PolicyReports
 	a.informer = a.factory.ForResource(a.policyReportGVR).Informer()
-	
+
 	// Add event handlers
 	a.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
@@ -253,14 +253,14 @@ func (a *KyvernoAdapter) Run(ctx context.Context, out chan<- *Event) error {
 			}
 		},
 	})
-	
+
 	// Start informer
 	a.factory.Start(a.stopCh)
-	
+
 	// Wait for cache sync
 	ctx, cancel := context.WithTimeout(a.ctx, 30*time.Second)
 	defer cancel()
-	
+
 	if !cache.WaitForCacheSync(ctx.Done(), a.informer.HasSynced) {
 		logger.Debug("Kyverno informer cache did not sync within timeout (CRD may not be installed)",
 			logger.Fields{
@@ -269,7 +269,7 @@ func (a *KyvernoAdapter) Run(ctx context.Context, out chan<- *Event) error {
 				Source:    "kyverno",
 			})
 	}
-	
+
 	// Block until context cancelled
 	<-a.ctx.Done()
 	return a.ctx.Err()
@@ -280,14 +280,14 @@ func (a *KyvernoAdapter) processReport(report *unstructured.Unstructured) []*Eve
 	if !found || len(results) == 0 {
 		return nil
 	}
-	
+
 	// Try to get scope
 	scope, scopeFound, _ := unstructured.NestedMap(report.Object, "scope")
-	
+
 	resourceNs := report.GetNamespace()
 	resourceKind := ""
 	resourceName := ""
-	
+
 	if scopeFound && scope != nil {
 		resourceKind = fmt.Sprintf("%v", scope["kind"])
 		resourceName = fmt.Sprintf("%v", scope["name"])
@@ -295,24 +295,24 @@ func (a *KyvernoAdapter) processReport(report *unstructured.Unstructured) []*Eve
 			resourceNs = ns
 		}
 	}
-	
+
 	var events []*Event
 	for _, r := range results {
 		result, ok := r.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		
+
 		resultStatus := fmt.Sprintf("%v", result["result"])
 		if resultStatus != "fail" {
 			continue
 		}
-		
+
 		policy := fmt.Sprintf("%v", result["policy"])
 		rule := fmt.Sprintf("%v", result["rule"])
 		severity := normalizeSeverity(fmt.Sprintf("%v", result["severity"]))
 		message := fmt.Sprintf("%v", result["message"])
-		
+
 		// Try to get resource info from result.resources if scope not available
 		if resourceKind == "" || resourceName == "" {
 			if resources, found, _ := unstructured.NestedSlice(result, "resources"); found && len(resources) > 0 {
@@ -329,11 +329,11 @@ func (a *KyvernoAdapter) processReport(report *unstructured.Unstructured) []*Eve
 				}
 			}
 		}
-		
+
 		if resourceKind == "" || resourceName == "" {
 			continue
 		}
-		
+
 		event := &Event{
 			Source:    "kyverno",
 			Category:  "security",
@@ -353,10 +353,10 @@ func (a *KyvernoAdapter) processReport(report *unstructured.Unstructured) []*Eve
 				"result":  resultStatus,
 			},
 		}
-		
+
 		events = append(events, event)
 	}
-	
+
 	return events
 }
 
@@ -389,7 +389,7 @@ func (a *FalcoAdapter) Name() string {
 
 func (a *FalcoAdapter) Run(ctx context.Context, out chan<- *Event) error {
 	a.ctx, a.cancel = context.WithCancel(ctx)
-	
+
 	for {
 		select {
 		case <-a.ctx.Done():
@@ -411,12 +411,12 @@ func (a *FalcoAdapter) processAlert(alert map[string]interface{}) *Event {
 	priority := fmt.Sprintf("%v", alert["priority"])
 	rule := fmt.Sprintf("%v", alert["rule"])
 	output := fmt.Sprintf("%v", alert["output"])
-	
+
 	// Only process Warning, Error, Critical, Alert, Emergency
 	if priority != "Warning" && priority != "Error" && priority != "Critical" && priority != "Alert" && priority != "Emergency" {
 		return nil
 	}
-	
+
 	// Get K8s context if present
 	var k8sPodName, k8sNs string
 	if outputFields, ok := alert["output_fields"].(map[string]interface{}); ok {
@@ -432,13 +432,13 @@ func (a *FalcoAdapter) processAlert(alert map[string]interface{}) *Event {
 	if k8sNs == "<nil>" || k8sNs == "" {
 		k8sNs = "default"
 	}
-	
+
 	// Map priority to severity
 	severity := "MEDIUM"
 	if priority == "Critical" || priority == "Alert" || priority == "Emergency" {
 		severity = "HIGH"
 	}
-	
+
 	return &Event{
 		Source:    "falco",
 		Category:  "security",
@@ -489,7 +489,7 @@ func (a *AuditAdapter) Name() string {
 
 func (a *AuditAdapter) Run(ctx context.Context, out chan<- *Event) error {
 	a.ctx, a.cancel = context.WithCancel(ctx)
-	
+
 	for {
 		select {
 		case <-a.ctx.Done():
@@ -509,12 +509,12 @@ func (a *AuditAdapter) Run(ctx context.Context, out chan<- *Event) error {
 
 func (a *AuditAdapter) processEvent(auditEvent map[string]interface{}) *Event {
 	stage := fmt.Sprintf("%v", auditEvent["stage"])
-	
+
 	// Only process ResponseComplete stage
 	if stage != "ResponseComplete" {
 		return nil
 	}
-	
+
 	objectRef, ok := auditEvent["objectRef"].(map[string]interface{})
 	if !ok {
 		objectRef = make(map[string]interface{})
@@ -524,19 +524,19 @@ func (a *AuditAdapter) processEvent(auditEvent map[string]interface{}) *Event {
 	name := fmt.Sprintf("%v", objectRef["name"])
 	apiGroup := fmt.Sprintf("%v", objectRef["apiGroup"])
 	verb := fmt.Sprintf("%v", auditEvent["verb"])
-	
+
 	// Filter for important actions
 	important := false
 	category := "compliance"
 	severity := "MEDIUM"
 	eventType := "audit-event"
-	
+
 	if verb == "delete" {
 		important = true
 		severity = "HIGH"
 		eventType = "resource-deletion"
 	}
-	
+
 	if resource == "secrets" || resource == "configmaps" {
 		if verb == "create" || verb == "update" || verb == "patch" || verb == "delete" {
 			important = true
@@ -544,7 +544,7 @@ func (a *AuditAdapter) processEvent(auditEvent map[string]interface{}) *Event {
 			eventType = "secret-access"
 		}
 	}
-	
+
 	if apiGroup == "rbac.authorization.k8s.io" {
 		if verb == "create" || verb == "update" || verb == "patch" || verb == "delete" {
 			important = true
@@ -552,7 +552,7 @@ func (a *AuditAdapter) processEvent(auditEvent map[string]interface{}) *Event {
 			eventType = "rbac-change"
 		}
 	}
-	
+
 	if resource == "pods" && verb == "create" {
 		requestObject, ok := auditEvent["requestObject"].(map[string]interface{})
 		if ok && requestObject != nil {
@@ -580,27 +580,27 @@ func (a *AuditAdapter) processEvent(auditEvent map[string]interface{}) *Event {
 			}
 		}
 	}
-	
+
 	if !important {
 		return nil
 	}
-	
+
 	if namespace == "<nil>" || namespace == "" {
 		namespace = "default"
 	}
-	
+
 	user, ok := auditEvent["user"].(map[string]interface{})
 	if !ok {
 		user = make(map[string]interface{})
 	}
 	username := fmt.Sprintf("%v", user["username"])
-	
+
 	responseStatus, ok := auditEvent["responseStatus"].(map[string]interface{})
 	if !ok {
 		responseStatus = make(map[string]interface{})
 	}
 	statusCode := fmt.Sprintf("%v", responseStatus["code"])
-	
+
 	return &Event{
 		Source:    "audit",
 		Category:  category,
@@ -631,12 +631,12 @@ func (a *AuditAdapter) Stop() {
 
 // KubeBenchAdapter implements SourceAdapter for kube-bench ConfigMap polling
 type KubeBenchAdapter struct {
-	clientSet    kubernetes.Interface
-	namespace    string
-	interval     time.Duration
-	ctx          context.Context
-	cancel       context.CancelFunc
-	ticker       *time.Ticker
+	clientSet kubernetes.Interface
+	namespace string
+	interval  time.Duration
+	ctx       context.Context
+	cancel    context.CancelFunc
+	ticker    *time.Ticker
 }
 
 // NewKubeBenchAdapter creates a new kube-bench adapter
@@ -645,7 +645,7 @@ func NewKubeBenchAdapter(clientSet kubernetes.Interface) *KubeBenchAdapter {
 	if namespace == "" {
 		namespace = "kube-bench"
 	}
-	
+
 	return &KubeBenchAdapter{
 		clientSet: clientSet,
 		namespace: namespace,
@@ -661,7 +661,7 @@ func (a *KubeBenchAdapter) Run(ctx context.Context, out chan<- *Event) error {
 	a.ctx, a.cancel = context.WithCancel(ctx)
 	a.ticker = time.NewTicker(a.interval)
 	defer a.ticker.Stop()
-	
+
 	// Initial poll
 	events := a.poll()
 	for _, event := range events {
@@ -671,7 +671,7 @@ func (a *KubeBenchAdapter) Run(ctx context.Context, out chan<- *Event) error {
 			return a.ctx.Err()
 		}
 	}
-	
+
 	for {
 		select {
 		case <-a.ctx.Done():
@@ -696,24 +696,24 @@ func (a *KubeBenchAdapter) poll() []*Event {
 	if err != nil || len(configMaps.Items) == 0 {
 		return nil
 	}
-	
+
 	var events []*Event
 	for _, cm := range configMaps.Items {
 		resultsJSON, found := cm.Data["results.json"]
 		if !found {
 			continue
 		}
-		
+
 		var benchResults map[string]interface{}
 		if err := json.Unmarshal([]byte(resultsJSON), &benchResults); err != nil {
 			continue
 		}
-		
+
 		controls, ok := benchResults["Controls"].([]interface{})
 		if !ok {
 			continue
 		}
-		
+
 		for _, c := range controls {
 			control, ok := c.(map[string]interface{})
 			if !ok {
@@ -723,7 +723,7 @@ func (a *KubeBenchAdapter) poll() []*Event {
 			if !ok {
 				continue
 			}
-			
+
 			for _, t := range tests {
 				test, ok := t.(map[string]interface{})
 				if !ok {
@@ -734,28 +734,28 @@ func (a *KubeBenchAdapter) poll() []*Event {
 					continue
 				}
 				section := fmt.Sprintf("%v", test["section"])
-				
+
 				for _, r := range results {
 					result, ok := r.(map[string]interface{})
 					if !ok {
 						continue
 					}
 					status := fmt.Sprintf("%v", result["status"])
-					
+
 					if status != "FAIL" {
 						continue
 					}
-					
+
 					testNumber := fmt.Sprintf("%v", result["test_number"])
 					testDesc := fmt.Sprintf("%v", result["test_desc"])
 					remediation := fmt.Sprintf("%v", result["remediation"])
 					scored := result["scored"] == true
-					
+
 					severity := "MEDIUM"
 					if scored {
 						severity = "HIGH"
 					}
-					
+
 					event := &Event{
 						Source:    "kubebench",
 						Category:  "compliance",
@@ -775,13 +775,13 @@ func (a *KubeBenchAdapter) poll() []*Event {
 							"scored":      scored,
 						},
 					}
-					
+
 					events = append(events, event)
 				}
 			}
 		}
 	}
-	
+
 	return events
 }
 
@@ -796,12 +796,12 @@ func (a *KubeBenchAdapter) Stop() {
 
 // CheckovAdapter implements SourceAdapter for Checkov ConfigMap polling
 type CheckovAdapter struct {
-	clientSet    kubernetes.Interface
-	namespace    string
-	interval     time.Duration
-	ctx          context.Context
-	cancel       context.CancelFunc
-	ticker       *time.Ticker
+	clientSet kubernetes.Interface
+	namespace string
+	interval  time.Duration
+	ctx       context.Context
+	cancel    context.CancelFunc
+	ticker    *time.Ticker
 }
 
 // NewCheckovAdapter creates a new Checkov adapter
@@ -810,7 +810,7 @@ func NewCheckovAdapter(clientSet kubernetes.Interface) *CheckovAdapter {
 	if namespace == "" {
 		namespace = "checkov"
 	}
-	
+
 	return &CheckovAdapter{
 		clientSet: clientSet,
 		namespace: namespace,
@@ -826,7 +826,7 @@ func (a *CheckovAdapter) Run(ctx context.Context, out chan<- *Event) error {
 	a.ctx, a.cancel = context.WithCancel(ctx)
 	a.ticker = time.NewTicker(a.interval)
 	defer a.ticker.Stop()
-	
+
 	// Initial poll
 	events := a.poll()
 	for _, event := range events {
@@ -836,7 +836,7 @@ func (a *CheckovAdapter) Run(ctx context.Context, out chan<- *Event) error {
 			return a.ctx.Err()
 		}
 	}
-	
+
 	for {
 		select {
 		case <-a.ctx.Done():
@@ -861,40 +861,40 @@ func (a *CheckovAdapter) poll() []*Event {
 	if err != nil || len(checkovCMs.Items) == 0 {
 		return nil
 	}
-	
+
 	var events []*Event
 	for _, cm := range checkovCMs.Items {
 		resultsJSON, found := cm.Data["results.json"]
 		if !found {
 			continue
 		}
-		
+
 		var checkovResults map[string]interface{}
 		if err := json.Unmarshal([]byte(resultsJSON), &checkovResults); err != nil {
 			continue
 		}
-		
+
 		results, ok := checkovResults["results"].(map[string]interface{})
 		if !ok {
 			continue
 		}
-		
+
 		failedChecks, ok := results["failed_checks"].([]interface{})
 		if !ok {
 			continue
 		}
-		
+
 		for _, fc := range failedChecks {
 			failedCheck, ok := fc.(map[string]interface{})
 			if !ok {
 				continue
 			}
-			
+
 			checkID := fmt.Sprintf("%v", failedCheck["check_id"])
 			checkName := fmt.Sprintf("%v", failedCheck["check_name"])
 			resource := fmt.Sprintf("%v", failedCheck["resource"])
 			guideline := fmt.Sprintf("%v", failedCheck["guideline"])
-			
+
 			// Parse resource (format: "Kind.namespace.name")
 			resourceParts := strings.SplitN(resource, ".", 3)
 			resourceKind := "Unknown"
@@ -910,7 +910,7 @@ func (a *CheckovAdapter) poll() []*Event {
 			} else if len(resourceParts) == 1 {
 				resourceName = resourceParts[0]
 			}
-			
+
 			category := "security"
 			severity := "MEDIUM"
 			if strings.HasPrefix(checkID, "CKV_K8S") {
@@ -919,7 +919,7 @@ func (a *CheckovAdapter) poll() []*Event {
 					severity = "HIGH"
 				}
 			}
-			
+
 			event := &Event{
 				Source:    "checkov",
 				Category:  category,
@@ -939,11 +939,11 @@ func (a *CheckovAdapter) poll() []*Event {
 					"guideline": guideline,
 				},
 			}
-			
+
 			events = append(events, event)
 		}
 	}
-	
+
 	return events
 }
 
@@ -955,4 +955,3 @@ func (a *CheckovAdapter) Stop() {
 		a.ticker.Stop()
 	}
 }
-

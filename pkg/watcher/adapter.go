@@ -25,15 +25,15 @@ import (
 // This is the standard interface that all source adapters must produce.
 type Event struct {
 	// Core required fields (map to Observation spec)
-	Source    string            `json:"source"`     // Tool name (e.g., "falco", "trivy", "opagatekeeper")
-	Category  string            `json:"category"`   // Event category (security, compliance, performance)
-	Severity  string            `json:"severity"`   // Severity level (CRITICAL, HIGH, MEDIUM, LOW)
-	EventType string            `json:"eventType"`  // Type of event (vulnerability, runtime-threat, policy-violation)
-	Resource  *ResourceRef      `json:"resource"`   // Affected Kubernetes resource
-	Details   map[string]interface{} `json:"details"` // Tool-specific details (preserved in spec.details)
-	
+	Source    string                 `json:"source"`    // Tool name (e.g., "falco", "trivy", "opagatekeeper")
+	Category  string                 `json:"category"`  // Event category (security, compliance, performance)
+	Severity  string                 `json:"severity"`  // Severity level (CRITICAL, HIGH, MEDIUM, LOW)
+	EventType string                 `json:"eventType"` // Type of event (vulnerability, runtime-threat, policy-violation)
+	Resource  *ResourceRef           `json:"resource"`  // Affected Kubernetes resource
+	Details   map[string]interface{} `json:"details"`   // Tool-specific details (preserved in spec.details)
+
 	// Optional metadata
-	Namespace string `json:"namespace,omitempty"` // Target namespace for Observation CRD
+	Namespace  string `json:"namespace,omitempty"`  // Target namespace for Observation CRD
 	DetectedAt string `json:"detectedAt,omitempty"` // RFC3339 timestamp
 }
 
@@ -60,13 +60,13 @@ type SourceAdapter interface {
 	// Name returns the unique source name (e.g., "falco", "trivy", "opagatekeeper")
 	// This must match the source name used in filter configuration and metrics.
 	Name() string
-	
+
 	// Run starts the adapter and sends normalized Events to the output channel.
 	// The adapter should run until ctx is cancelled.
 	// Errors should be logged but should not stop the adapter unless fatal.
 	// The adapter is responsible for its own error handling and retries.
 	Run(ctx context.Context, out chan<- *Event) error
-	
+
 	// Stop gracefully stops the adapter and cleans up resources.
 	// This is called during shutdown.
 	Stop()
@@ -78,17 +78,17 @@ func EventToObservation(event *Event) *unstructured.Unstructured {
 	if event == nil {
 		return nil
 	}
-	
+
 	namespace := event.Namespace
 	if namespace == "" {
 		namespace = "default"
 	}
-	
+
 	detectedAt := event.DetectedAt
 	if detectedAt == "" {
 		detectedAt = time.Now().Format(time.RFC3339)
 	}
-	
+
 	obs := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "zen.kube-zen.io/v1",
@@ -111,7 +111,7 @@ func EventToObservation(event *Event) *unstructured.Unstructured {
 			},
 		},
 	}
-	
+
 	// Add resource if provided
 	if event.Resource != nil {
 		resource := map[string]interface{}{
@@ -126,12 +126,11 @@ func EventToObservation(event *Event) *unstructured.Unstructured {
 		}
 		unstructured.SetNestedMap(obs.Object, resource, "spec", "resource")
 	}
-	
+
 	// Add details if provided
 	if len(event.Details) > 0 {
 		unstructured.SetNestedMap(obs.Object, event.Details, "spec", "details")
 	}
-	
+
 	return obs
 }
-

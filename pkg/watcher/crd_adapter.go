@@ -21,8 +21,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -52,12 +50,12 @@ type ObservationMapping struct {
 
 // FieldMappings defines how to extract fields from source CRD to Event
 type FieldMappings struct {
-	Severity   string            // JSONPath or static value
-	Category   string            // JSONPath or static value (default: "security")
-	EventType  string            // JSONPath or static value (default: "custom-event")
-	Message    string            // JSONPath (optional)
-	Resource   ResourceMappings  // Resource reference mappings
-	Details    map[string]string // Additional details mappings (JSONPath)
+	Severity  string            // JSONPath or static value
+	Category  string            // JSONPath or static value (default: "security")
+	EventType string            // JSONPath or static value (default: "custom-event")
+	Message   string            // JSONPath (optional)
+	Resource  ResourceMappings  // Resource reference mappings
+	Details   map[string]string // Additional details mappings (JSONPath)
 }
 
 // ResourceMappings defines how to extract resource reference fields
@@ -108,7 +106,7 @@ func (a *CRDSourceAdapter) Run(ctx context.Context, out chan<- *Event) error {
 
 	// Watch ObservationMapping CRDs
 	a.informer = a.factory.ForResource(a.mappingGVR).Informer()
-	
+
 	a.informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc:    a.handleMappingAdd,
 		UpdateFunc: a.handleMappingUpdate,
@@ -132,7 +130,7 @@ func (a *CRDSourceAdapter) Stop() {
 	if a.cancel != nil {
 		a.cancel()
 	}
-	
+
 	// Close stopCh to stop all informers
 	close(a.stopCh)
 }
@@ -235,7 +233,7 @@ func (a *CRDSourceAdapter) convertToMapping(obj interface{}) *ObservationMapping
 	// Extract mappings
 	mappingsObj, _, _ := unstructured.NestedMap(spec, "mappings")
 	fieldMappings := FieldMappings{
-		Category:  "security", // default
+		Category:  "security",     // default
 		EventType: "custom-event", // default
 		Details:   make(map[string]string),
 	}
@@ -323,7 +321,7 @@ func (a *CRDSourceAdapter) startInformerForMapping(mapping *ObservationMapping) 
 
 	// Create informer for source CRD
 	informer := a.factory.ForResource(mapping.GVR).Informer()
-	
+
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			a.processSourceCRD(mapping, obj)
@@ -404,7 +402,7 @@ func (a *CRDSourceAdapter) mapCRDToEvent(mapping *ObservationMapping, crd *unstr
 		}
 		resourceRef.Kind = a.extractFieldString(mapping.Mappings.Resource.Kind, crd.Object, "")
 		resourceRef.Name = a.extractFieldString(mapping.Mappings.Resource.Name, crd.Object, "")
-		
+
 		// Extract namespace - try from mapping, fallback to metadata.namespace
 		if mapping.Mappings.Resource.Namespace != "" {
 			resourceRef.Namespace = a.extractFieldString(mapping.Mappings.Resource.Namespace, crd.Object, "")
@@ -507,4 +505,3 @@ func (a *CRDSourceAdapter) extractField(path string, obj map[string]interface{},
 
 	return current
 }
-

@@ -201,4 +201,3 @@ func TestObservationCreator_CreateObservation_WithDedup(t *testing.T) {
 		t.Logf("Second CreateObservation was deduplicated (expected)")
 	}
 }
-

@@ -109,7 +109,6 @@ spec:
                 enabled:
                   type: boolean
                   description: "Controls whether this source is enabled (default: true)"
-              additionalProperties: false
       subresources:
         status: {}
       additionalPrinterColumns:

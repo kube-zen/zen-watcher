@@ -147,7 +147,6 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 		unstructured.SetNestedMap(observation.Object, metadata, "metadata")
 	}
 
-
 	// Extract category and severity from spec for metrics BEFORE creation
 	// Use NestedFieldCopy to handle interface{} types, then convert to string
 	categoryVal, categoryFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "category")
@@ -363,7 +362,6 @@ func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstruct
 	}
 }
 
-
 // setTTLIfNotSet sets spec.ttlSecondsAfterCreation if not already set
 // Priority: 1) Already set in spec, 2) Environment variable, 3) Default (7 days)
 func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructured) {
@@ -379,8 +377,8 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 
 	// TTL validation bounds
 	const (
-		MinTTLSeconds = 60                              // 1 minute minimum (prevents immediate deletion)
-		MaxTTLSeconds = 365 * 24 * 60 * 60             // 1 year maximum (prevents indefinite retention)
+		MinTTLSeconds = 60                 // 1 minute minimum (prevents immediate deletion)
+		MaxTTLSeconds = 365 * 24 * 60 * 60 // 1 year maximum (prevents indefinite retention)
 	)
 
 	// Check for seconds first (more precise)

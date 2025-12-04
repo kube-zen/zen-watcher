@@ -109,9 +109,9 @@ func TestObservationCRDSchemaFileExists(t *testing.T) {
 // TestObservationSchema_RequiredFields validates required fields structure
 func TestObservationSchema_RequiredFields(t *testing.T) {
 	tests := []struct {
-		name        string
-		observation map[string]interface{}
-		wantValid   bool
+		name         string
+		observation  map[string]interface{}
+		wantValid    bool
 		missingField string
 	}{
 		{
@@ -141,7 +141,7 @@ func TestObservationSchema_RequiredFields(t *testing.T) {
 					"eventType": "vulnerability",
 				},
 			},
-			wantValid: false,
+			wantValid:    false,
 			missingField: "source",
 		},
 		{
@@ -153,7 +153,7 @@ func TestObservationSchema_RequiredFields(t *testing.T) {
 					"eventType": "vulnerability",
 				},
 			},
-			wantValid: false,
+			wantValid:    false,
 			missingField: "category",
 		},
 		{
@@ -165,7 +165,7 @@ func TestObservationSchema_RequiredFields(t *testing.T) {
 					"eventType": "vulnerability",
 				},
 			},
-			wantValid: false,
+			wantValid:    false,
 			missingField: "severity",
 		},
 		{
@@ -177,7 +177,7 @@ func TestObservationSchema_RequiredFields(t *testing.T) {
 					"severity": "HIGH",
 				},
 			},
-			wantValid: false,
+			wantValid:    false,
 			missingField: "eventType",
 		},
 	}
@@ -249,10 +249,10 @@ func TestObservationSchema_TTLValidation(t *testing.T) {
 			obs := &unstructured.Unstructured{
 				Object: map[string]interface{}{
 					"spec": map[string]interface{}{
-						"source":                "test",
-						"category":              "security",
-						"severity":              "HIGH",
-						"eventType":             "vulnerability",
+						"source":                  "test",
+						"category":                "security",
+						"severity":                "HIGH",
+						"eventType":               "vulnerability",
 						"ttlSecondsAfterCreation": tt.ttlValue,
 					},
 				},

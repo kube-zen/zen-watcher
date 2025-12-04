@@ -30,7 +30,7 @@ import (
 func TestObservationFilterLoader_LoadSingleFilter(t *testing.T) {
 	// Create a fake dynamic client with a single ObservationFilter
 	observationFilter := createObservationFilter("filter-1", "default", "trivy", map[string]interface{}{
-		"minSeverity": "HIGH",
+		"minSeverity":       "HIGH",
 		"excludeNamespaces": []string{"kube-system"},
 	})
 
@@ -67,12 +67,12 @@ func TestObservationFilterLoader_LoadSingleFilter(t *testing.T) {
 func TestObservationFilterLoader_LoadMultipleFilters_SameSource(t *testing.T) {
 	// Create multiple ObservationFilters targeting the same source
 	filter1 := createObservationFilter("filter-1", "default", "trivy", map[string]interface{}{
-		"minSeverity":      "MEDIUM",
+		"minSeverity":       "MEDIUM",
 		"excludeNamespaces": []string{"kube-system"},
 	})
 
 	filter2 := createObservationFilter("filter-2", "default", "trivy", map[string]interface{}{
-		"minSeverity":      "HIGH", // More restrictive
+		"minSeverity":       "HIGH",                  // More restrictive
 		"excludeNamespaces": []string{"kube-public"}, // Should union with kube-system
 	})
 
@@ -244,7 +244,7 @@ func TestObservationFilterLoader_EmptyTargetSource_Skips(t *testing.T) {
 func TestObservationFilterLoader_MergeWithConfigMap(t *testing.T) {
 	// Create ConfigMapLoader with a real client and set initial config via ConfigMap
 	clientSet := kubernetesfake.NewSimpleClientset()
-	
+
 	// ConfigMap filter
 	configMapConfig := &filter.FilterConfig{
 		Sources: map[string]filter.SourceFilter{
@@ -254,7 +254,7 @@ func TestObservationFilterLoader_MergeWithConfigMap(t *testing.T) {
 			},
 		},
 	}
-	
+
 	// Create ConfigMap with initial config
 	filterJSON, _ := json.Marshal(configMapConfig)
 	cm := &corev1.ConfigMap{
@@ -278,7 +278,7 @@ func TestObservationFilterLoader_MergeWithConfigMap(t *testing.T) {
 
 	// ObservationFilter CRD
 	observationFilter := createObservationFilter("filter-1", "default", "trivy", map[string]interface{}{
-		"minSeverity":       "HIGH", // More restrictive
+		"minSeverity":       "HIGH",                  // More restrictive
 		"excludeNamespaces": []string{"kube-public"}, // Should union with kube-system
 	})
 
@@ -434,4 +434,3 @@ func containsAll(slice []string, items []string) bool {
 	}
 	return true
 }
-
