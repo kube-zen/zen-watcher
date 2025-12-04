@@ -17,14 +17,22 @@ Try Zen Watcher in minutes: `./hack/quick-demo.sh --non-interactive --deploy-moc
 
 ## 🎯 Features
 
-### Multi-Source Event Aggregation
+### Multi-Source Event Aggregation (6 Sources - All Working ✅)
 Collects events from popular security and compliance tools:
-- 🛡️ **Trivy** - Container vulnerabilities (HIGH/CRITICAL)
-- 🚨 **Falco** - Runtime threat detection (Warning+)
-- 📋 **Kyverno** - Policy violations (security policies)
-- 🔐 **Checkov** - Static analysis (IaC security)
-- 🔍 **Kubernetes Audit Logs** - API server audit events
-- ✅ **Kube-bench** - CIS benchmark compliance
+- 🛡️ **Trivy** - Container vulnerabilities (HIGH/CRITICAL) - CRD informer
+- 🚨 **Falco** - Runtime threat detection (Warning+) - Webhook
+- 📋 **Kyverno** - Policy violations (security policies) - CRD informer
+- 🔐 **Checkov** - Static analysis (IaC security) - ConfigMap polling
+- 🔍 **Kubernetes Audit Logs** - API server audit events - Webhook
+- ✅ **Kube-bench** - CIS benchmark compliance - ConfigMap polling
+
+**✨ NEW in v1.0.10:**
+- Modular adapter architecture (SourceAdapter interface)
+- ObservationFilter CRD for dynamic, Kubernetes-native filtering
+- ObservationMapping CRD for generic CRD integration (no code changes needed)
+- Cluster-blind design (no infrastructure metadata coupling)
+- Filter merge semantics (ConfigMap + CRD with comprehensive tests)
+- Complete end-to-end automation (quick-demo.sh validates all 6 sources in ~4 minutes)
 
 ### CRD-Based Storage
 - All events stored as **Observation** Custom Resources

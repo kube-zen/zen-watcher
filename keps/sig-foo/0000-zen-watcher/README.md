@@ -11,9 +11,9 @@ reviewers:
   - TBD
 approvers:
   - TBD
-status: draft
+status: implementable
 creation-date: 2024-11-27
-last-updated: 2024-11-27
+last-updated: 2024-12-04
 see-also:
   - https://github.com/kube-zen/zen-watcher
 replaces:
@@ -424,24 +424,38 @@ func (ep *EventProcessor) ProcessMyToolReport(ctx context.Context, report *unstr
 
 ## Implementation History
 
-### Phase 1: Core Functionality (v1.0.0) ✅
+### Phase 1: Core Functionality (v1.0.0) ✅ COMPLETE
 
 - [x] Observation CRD definition
 - [x] Informer-based processors (Trivy, Kyverno)
 - [x] Webhook processors (Falco, Audit)
 - [x] ConfigMap pollers (Kube-bench, Checkov)
 - [x] Filtering framework (ConfigMap-based)
-- [x] Deduplication (sliding window, fingerprinting)
-- [x] Prometheus metrics
-- [x] Garbage collection (TTL-based)
-- [x] Security hardening (non-root, read-only FS)
+- [x] Deduplication (sliding window, fingerprinting, LRU eviction)
+- [x] Prometheus metrics (events_total, created, filtered, deduped)
+- [x] Garbage collection (TTL-based, hourly runs)
+- [x] Security hardening (non-root, read-only FS, NetworkPolicy)
 
-### Phase 2: Enhancements (Future)
+### Phase 2: Advanced Features (v1.0.10) ✅ COMPLETE
 
+- [x] **Modular Adapter Architecture** - SourceAdapter interface for all 6 sources
+- [x] **ObservationFilter CRD** - Kubernetes-native dynamic filtering
+- [x] **ObservationMapping CRD** - Generic CRD adapter for "long tail" integrations
+- [x] **Filter Merge Semantics** - ConfigMap + ObservationFilter CRD merging with comprehensive tests
+- [x] **Cluster-Blind Design** - Removed all CLUSTER_ID/TENANT_ID metadata
+- [x] **Enhanced Metrics** - Filter, adapter, mapping, dedup, GC metrics defined
+- [x] **VictoriaMetrics Integration** - VMServiceScrape with automatic discovery
+- [x] **Automated Demo** - quick-demo.sh validates all 6 sources in ~4 minutes
+- [x] **Production Stability** - HA support, graceful degradation, comprehensive docs
+
+### Phase 3: Future Enhancements
+
+- [ ] Full instrumentation of new metrics (filter decisions, adapter runs, mapping events)
+- [ ] Multi-dashboard approach (Ops, Security, Critical Feed)
+- [ ] Kubernetes datasource for critical events table
 - [ ] Additional event sources (Polaris, OPA Gatekeeper, Kubescape)
-- [ ] Advanced correlation (event linking, dependency tracking)
-- [ ] Metrics aggregation (histograms, percentiles)
-- [ ] Multi-cluster support (via federation)
+- [ ] Community sink controllers (Slack, PagerDuty) - separate from core
+- [ ] Multi-cluster federation (via Observation CRD replication)
 
 ---
 

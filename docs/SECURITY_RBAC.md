@@ -78,6 +78,32 @@ verbs: ["get", "list", "watch"]
 - Read-only access prevents policy manipulation
 - Cluster-wide read necessary to access cluster-level policies
 
+### Trivy Security Reports (Read-Only)
+
+#### VulnerabilityReports and Related Resources
+```yaml
+apiGroups: ["aquasecurity.github.io"]
+resources: 
+  - vulnerabilityreports
+  - clustervulnerabilityreports
+  - configauditreports
+  - clusterconfigauditreports
+  - exposedsecretsreports
+  - clusterexposedsecretsreports
+  - rbachassessments
+  - clusterrbachassessments
+verbs: ["get", "list", "watch"]
+```
+**Rationale:**
+- Required to monitor Trivy Operator vulnerability scan results
+- Read-only access prevents tampering with security reports
+- Cluster-wide read necessary to detect vulnerabilities across all namespaces
+- Multiple resource types cover all Trivy Operator report kinds
+
+**Security Considerations:**
+- Vulnerability data is sensitive but zen-watcher only aggregates, doesn't expose externally
+- RBAC controls who can read the Observation CRDs containing vulnerability summaries
+
 ### Observation CRDs (Full Access)
 
 #### Observations
@@ -98,6 +124,41 @@ verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - Deduplication prevents duplicate CRD creation
 - Rate limiting prevents flooding (see threat model)
 - GC prevents unbounded growth
+
+#### ObservationFilters (Read-Only) ✨ NEW in v1.0.10
+```yaml
+apiGroups: ["zen.kube-zen.io"]
+resources: ["observationfilters"]
+verbs: ["get", "list", "watch"]
+```
+**Rationale:**
+- Required to dynamically load filter configuration from ObservationFilter CRDs
+- Read-only access prevents filter tampering
+- Watches for changes to reload filter config dynamically
+- Merges with ConfigMap-based filters
+
+**Security Considerations:**
+- Filters are validated before application
+- Invalid filters fall back to last-good-config
+- Filter changes are logged for audit trail
+
+#### ObservationMappings (Read-Only) ✨ NEW in v1.0.10
+```yaml
+apiGroups: ["zen.kube-zen.io"]
+resources: ["observationmappings"]
+verbs: ["get", "list", "watch"]
+```
+**Rationale:**
+- Required for generic CRD adapter to discover mapping configurations
+- Read-only access prevents mapping tampering
+- Watches for changes to dynamically create/destroy informers for source CRDs
+- Enables "long tail" tool integration without code changes
+
+**Security Considerations:**
+- Mappings validated before informer creation
+- JSONPath expressions sanitized to prevent code injection
+- Malformed mappings logged but don't crash the adapter
+- Per-mapping error metrics for observability
 
 ### Trivy Reports (Read-Only)
 
