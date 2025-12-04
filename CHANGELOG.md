@@ -1,75 +1,119 @@
 # Changelog
 
-All notable changes to Zen Watcher will be documented in this file.
+All notable changes to zen-watcher will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2024-11-04
+## [1.0.10] - 2024-12-04
 
-### 🎉 Initial Release
+### 🎉 Major Features
 
-First public release of Zen Watcher - Universal Kubernetes Event Aggregator.
+#### Modular Adapter Architecture
+- **Added** SourceAdapter interface for all 6 event sources
+- **Implemented** adapter factory pattern for lifecycle management
+- **Migrated** all sources to new adapter architecture (Trivy, Kyverno, Falco, Audit, Checkov, KubeBench)
 
-### ✨ Features
+#### Dynamic Filtering with CRDs
+- **Added** ObservationFilter CRD for Kubernetes-native filtering
+- **Implemented** filter merge semantics (ConfigMap + ObservationFilter CRD)
+- **Added** comprehensive filter merge tests with 20+ test cases
+- **Added** last-good-config fallback for filter errors
 
-**Core Functionality**:
-- CRD-based event storage (`ZenEvent`)
-- Multi-source event collection (Trivy, Falco, Kyverno, Audit, Kube-bench)
-- Extensible event categories (security, compliance, performance, observability, custom)
-- Flexible event sources and types
-- Zero external dependencies
+#### Generic CRD Integration
+- **Added** ObservationMapping CRD for custom CRD integration
+- **Implemented** CRDSourceAdapter for "long tail" tool support
+- **Added** JSONPath-based field mapping from source CRDs to Observations
+- **Enabled** zero-code integration of new security tools
 
-**Monitoring & Observability**:
-- 20+ Prometheus metrics
-- Pre-built Grafana dashboard with 16 panels
-- 20+ alerting rules
-- Health and readiness probes
-- SLO tracking
+#### Cluster-Blind Design
+- **Removed** all CLUSTER_ID and TENANT_ID metadata references
+- **Simplified** architecture to pure security event aggregation
+- **Decoupled** from infrastructure concerns
 
-**Security**:
-- Non-privileged containers
-- Read-only root filesystem
-- NetworkPolicy support
-- Pod Security Standards (restricted)
-- RBAC least-privilege
-- Image signing support (Cosign)
-- SBOM generation
+### ✅ Improvements
 
-**Deployment**:
-- Production-ready Helm chart
-- Kubernetes manifests
-- Comprehensive configuration options
-- ServiceMonitor support (Prometheus Operator)
-- High availability support
-- Autoscaling (HPA)
+#### Observability
+- **Enhanced** metrics definitions for filter, adapter, mapping, dedup, GC
+- **Enabled** VictoriaMetrics scraping by default (vmServiceScrape)
+- **Added** Prometheus annotations to service for automatic discovery
+- **Fixed** metrics exposure for all 6 sources (previously only informer-based)
 
-**Documentation**:
-- Complete user guide
-- Security best practices
-- Operations guide
-- Monitoring setup guide
-- API reference
-- Contributing guidelines
-- Examples and tutorials
+#### Testing
+- **Added** filter merger unit tests (pkg/filter/merger_test.go)
+- **Added** ObservationFilter loader tests (pkg/config/observationfilter_loader_test.go)
+- **Improved** test coverage for filter logic
 
-### 📦 Components
+#### Deployment & Demo
+- **Automated** quick-demo.sh for 6/6 source validation
+- **Added** mock data system via Helm chart templates
+- **Reduced** deployment time to ~4-5 minutes
+- **Added** non-interactive mode for CI/automation
 
-- **Watchers**: Trivy, Falco, Kyverno, Audit, Kube-bench
-- **CRD Writer**: Converts events to Kubernetes CRDs
-- **Metrics**: Prometheus-compatible metrics endpoint
-- **API**: Health, readiness, status, and metrics endpoints
+#### Documentation
+- **Created** docs/STABILITY.md - production readiness guide
+- **Updated** KEP to "implementable" status with implementation history
+- **Enhanced** docs/SECURITY_RBAC.md with new CRD permissions
+- **Updated** README.md with v1.0.10 features
+- **Added** DEPLOYMENT_SUCCESS.md
 
-### 🎯 Use Cases
+### 🐛 Bug Fixes
+- **Fixed** ObservationFilter CRD validation error (removed conflicting additionalProperties)
+- **Fixed** RBAC permissions for aquasecurity.github.io resources
+- **Fixed** ConfigMap adapter metrics not incrementing
+- **Fixed** Webhook adapter metrics not incrementing
+- **Removed** unused imports (kube_bench_watcher.go)
 
-- Security event aggregation
-- Compliance monitoring
-- Centralized observability
-- GitOps integration
-- Multi-tool correlation
+### 🔧 Technical Changes
+- **Centralized** event processing through AdapterLauncher
+- **Standardized** Event struct across all adapters
+- **Improved** deduplication with content-based fingerprinting
+- **Enhanced** error handling and logging throughout
+
+### 📦 Helm Chart (v1.0.10)
+- **Added** observationfilter_crd.yaml template
+- **Added** observationmapping_crd.yaml template
+- **Added** mock-data-job.yaml for automated demos
+- **Added** mock-kyverno-policy.yaml for non-blocking policy generation
+- **Updated** service.yaml with Prometheus scrape annotations
+- **Updated** RBAC with all required permissions
+- **Set** mockData.enabled=true by default for demos
+- **Set** vmServiceScrape.enabled=true by default
+- **Updated** image tag to 1.0.19
+
+### 🔒 Security
+- **Verified** all RBAC permissions follow least privilege
+- **Documented** security rationale for all permissions
+- **Maintained** non-root, read-only filesystem, dropped capabilities
+- **Added** webhook authentication documentation
+
+## [1.0.0] - 2024-11-27
+
+### Initial Release
+
+- **Observation CRD** - Unified event format for security/compliance
+- **6 Event Sources** - Trivy, Kyverno, Falco, Audit, Checkov, KubeBench
+- **Filtering** - ConfigMap-based per-source filtering
+- **Deduplication** - Sliding window with LRU eviction
+- **Metrics** - Prometheus metrics (events_total, created, filtered, deduped)
+- **Garbage Collection** - TTL-based cleanup (7-day default)
+- **Security Hardening** - Non-root, read-only FS, NetworkPolicy
+- **Grafana Dashboard** - Pre-built visualization
+- **VictoriaMetrics Integration** - Metrics storage
+- **Quick Demo** - Automated local deployment
 
 ---
 
-## Future Releases
+## Version Numbering
 
-See [Roadmap](README.md#roadmap) for planned features.
+- **Image versions** (e.g., 1.0.19): Application code releases
+- **Chart versions** (e.g., 1.0.10): Helm chart releases
+- Both follow semantic versioning independently
+- Major releases sync both versions
+
+## Links
+
+- [GitHub Repository](https://github.com/kube-zen/zen-watcher)
+- [Helm Charts](https://github.com/kube-zen/helm-charts)
+- [Docker Hub](https://hub.docker.com/r/kubezen/zen-watcher)
+- [Documentation](https://github.com/kube-zen/zen-watcher/tree/main/docs)
