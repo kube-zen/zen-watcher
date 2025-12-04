@@ -2,7 +2,7 @@
 set -e
 
 VERSION="${1:-$(git describe --tags --always --dirty)}"
-IMAGE="zubezen/zen-watcher"
+IMAGE="kubezen/zen-watcher"
 
 echo "🔨 Building zen-watcher:${VERSION}..."
 

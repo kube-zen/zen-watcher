@@ -1,0 +1,108 @@
+# Use Case: Custom CRD Integration with ObservationMapping
+#
+# Scenario: You have a custom security scanner that creates CRDs
+# Requirement: Integrate it with zen-watcher without writing Go code
+#
+# Solution: Use ObservationMapping CRD to define the mapping
+
+---
+# Example: Your custom scanner creates SecurityScan CRDs
+# apiVersion: security.example.com/v1
+# kind: SecurityScan
+# metadata:
+#   name: scan-12345
+#   namespace: production
+# spec:
+#   target:
+#     kind: Deployment
+#     name: myapp
+#   findings:
+#   - severity: high
+#     title: "SQL Injection vulnerability"
+#     cve: "CVE-2024-1234"
+#     remediation: "Upgrade to v2.0"
+
+---
+# ObservationMapping tells zen-watcher how to convert SecurityScan → Observation
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationMapping
+metadata:
+  name: custom-security-scanner
+  namespace: zen-system
+spec:
+  # Source CRD to watch
+  sourceName: custom-security-scanner
+  group: security.example.com
+  version: v1
+  kind: SecurityScan
+  
+  # How to map fields from SecurityScan to Observation
+  mappings:
+    # Extract severity from spec.findings[*].severity
+    severity:
+      jsonPath: "$.spec.findings[*].severity"
+      # Map custom values to standard severity
+      transform:
+        high: HIGH
+        medium: MEDIUM
+        low: LOW
+    
+    # Category is always security for this scanner
+    category:
+      static: "security"
+    
+    # Event type from finding type
+    eventType:
+      jsonPath: "$.spec.findings[*].type"
+      default: "security-scan"
+    
+    # Message from title
+    message:
+      jsonPath: "$.spec.findings[*].title"
+    
+    # Resource from spec.target
+    resource:
+      kind:
+        jsonPath: "$.spec.target.kind"
+      name:
+        jsonPath: "$.spec.target.name"
+      namespace:
+        jsonPath: "$.metadata.namespace"
+    
+    # Details include CVE and remediation
+    details:
+      cve:
+        jsonPath: "$.spec.findings[*].cve"
+      remediation:
+        jsonPath: "$.spec.findings[*].remediation"
+      scanId:
+        jsonPath: "$.metadata.name"
+  
+  # Map severity values
+  severityMap:
+    critical: CRITICAL
+    high: HIGH
+    medium: MEDIUM
+    low: LOW
+    info: LOW
+  
+  enabled: true
+
+---
+# Result:
+# When a SecurityScan CRD is created, zen-watcher automatically:
+# 1. Detects it via dynamic informer
+# 2. Applies the mapping rules
+# 3. Creates an Observation CRD
+# 4. Increments metrics (zen_watcher_observation_mappings_events_total)
+#
+# Benefits:
+# - No Go code required
+# - GitOps-friendly (mapping is a CRD)
+# - Versioned and reviewable
+# - Works with ANY custom CRD
+# - Perfect for "long tail" internal tools
+#
+# Example Query:
+# kubectl get observations -l source=custom-security-scanner
+

@@ -1,0 +1,98 @@
+# Use Case: Multi-Tenant Filtering
+#
+# Scenario: Multi-tenant platform where each tenant gets their own namespace
+# Requirement: Filter observations per tenant, different severity thresholds
+#
+# Solution: Use namespace-scoped ObservationFilter CRDs
+
+---
+# Tenant A: High-security namespace, only CRITICAL/HIGH
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationFilter
+metadata:
+  name: tenant-a-strict-filter
+  namespace: tenant-a
+spec:
+  # Apply to all sources
+  targetSource: "*"
+  
+  # Only CRITICAL and HIGH
+  includeSeverity:
+    - CRITICAL
+    - HIGH
+  
+  # Exclude info/debug event types
+  excludeEventTypes:
+    - info
+    - debug
+    - notice
+  
+  enabled: true
+
+---
+# Tenant B: Development namespace, more permissive
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationFilter
+metadata:
+  name: tenant-b-dev-filter
+  namespace: tenant-b
+spec:
+  targetSource: "*"
+  
+  # Allow MEDIUM and above
+  minSeverity: MEDIUM
+  
+  # But exclude certain noisy categories
+  excludeCategories:
+    - informational
+  
+  enabled: true
+
+---
+# Tenant C: Trivy-specific filtering
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationFilter
+metadata:
+  name: tenant-c-trivy-filter
+  namespace: tenant-c
+spec:
+  # Only apply to Trivy
+  targetSource: trivy
+  
+  # Only vulnerabilities with fixes available
+  includeRules:
+    - has-fix
+  
+  # Exclude LOW severity
+  excludeSeverity:
+    - LOW
+    - UNKNOWN
+  
+  enabled: true
+
+---
+# Cross-namespace: Platform team sees everything
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationFilter
+metadata:
+  name: platform-team-all-events
+  namespace: zen-system
+spec:
+  targetSource: "*"
+  
+  # No filtering - see all events across all tenants
+  enabled: true
+
+---
+# Result:
+# - Tenant A namespace: Only CRITICAL/HIGH observations created
+# - Tenant B namespace: MEDIUM+ observations
+# - Tenant C namespace: Trivy-only, filtered by rules
+# - zen-system namespace: All observations
+#
+# Benefits:
+# - Each tenant gets appropriate noise level
+# - Platform team has full visibility
+# - Filters update dynamically (no restart)
+# - RBAC controls who can modify filters
+

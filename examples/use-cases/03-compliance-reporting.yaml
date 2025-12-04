@@ -1,0 +1,123 @@
+# Use Case: Compliance Reporting & Export
+#
+# Scenario: Need to export security/compliance events for SOC2/ISO27001 audits
+# Requirement: Query all HIGH/CRITICAL events for the last 90 days
+#
+# Solution: Use kubectl + jq for ad-hoc queries, or build a custom controller
+
+---
+# Example 1: Export all CRITICAL events to JSON for audit
+# 
+# kubectl get observations -A \
+#   -o json | \
+#   jq '.items[] | select(.spec.severity == "CRITICAL") | {
+#     timestamp: .metadata.creationTimestamp,
+#     source: .spec.source,
+#     category: .spec.category,
+#     resource: .spec.resource.name,
+#     namespace: .spec.resource.namespace,
+#     details: .spec.details
+#   }' > critical-events-audit.json
+
+---
+# Example 2: Count events by source for compliance dashboard
+#
+# kubectl get observations -A \
+#   -o json | \
+#   jq -r '.items[] | .spec.source' | \
+#   sort | uniq -c
+
+---
+# Example 3: Build a custom compliance report controller
+#
+# This controller watches Observations and exports to your compliance system
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: compliance-reporter
+  namespace: compliance-system
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: observation-reader
+rules:
+- apiGroups: ["zen.kube-zen.io"]
+  resources: ["observations"]
+  verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: compliance-reporter
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: observation-reader
+subjects:
+- kind: ServiceAccount
+  name: compliance-reporter
+  namespace: compliance-system
+
+---
+# Sample controller (pseudocode)
+#
+# func main() {
+#     informer := watchObservations(clientset)
+#     informer.AddEventHandler(ResourceEventHandlerFuncs{
+#         AddFunc: func(obj interface{}) {
+#             obs := obj.(*Observation)
+#             if obs.Spec.Severity == "CRITICAL" || obs.Spec.Severity == "HIGH" {
+#                 // Export to compliance system
+#                 exportToComplianceDB(obs)
+#                 // Send to audit log
+#                 auditLogger.Log(obs)
+#             }
+#         },
+#     })
+# }
+
+---
+# Example 4: Filter for CIS benchmark failures (compliance)
+#
+# kubectl get observations -A \
+#   -l source=kubebench \
+#   -o json | \
+#   jq '.items[] | {
+#     test: .spec.details.testNumber,
+#     description: .spec.details.testDesc,
+#     remediation: .spec.details.remediation,
+#     node: .spec.resource.name
+#   }'
+
+---
+# Example 5: Export to CSV for compliance report
+#
+# kubectl get observations -A \
+#   -o json | \
+#   jq -r '["Timestamp","Source","Severity","Resource","Namespace","EventType"],
+#          (.items[] | [
+#            .metadata.creationTimestamp,
+#            .spec.source,
+#            .spec.severity,
+#            .spec.resource.name,
+#            .spec.resource.namespace,
+#            .spec.eventType
+#          ]) | @csv' > compliance-report.csv
+
+---
+# Benefits:
+# - CRDs are queryable via standard kubectl
+# - Historical data available (up to TTL limit)
+# - Structured format perfect for automated reporting
+# - No external dependencies or credentials
+# - Audit trail in Kubernetes events
+#
+# For long-term retention beyond TTL:
+# - Build a sink controller that watches and exports
+# - Store in TimescaleDB, S3, or compliance system
+# - Zen-watcher stays pure (no egress)
+

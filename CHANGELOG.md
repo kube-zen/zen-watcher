@@ -5,6 +5,51 @@ All notable changes to zen-watcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2024-12-04
+
+### 🎉 OSS Launch Release
+
+**Polished Launch Release** with complete documentation, CI automation, and production-ready features.
+
+#### Added
+
+**CI/CD & Automation:**
+- CI scripts for test, build, and release (`scripts/ci-*.sh`)
+- Automated testing with coverage reporting
+- Build pipeline with Docker Hub publishing
+
+**Documentation:**
+- `docs/STABILITY.md` - Production readiness and HA patterns
+- `VERSIONING.md` - Version sync strategy
+- `OSS_LAUNCH_CHECKLIST.md` - Launch readiness guide
+- Comparison table in README (vs Falco Sidekick, Kubescape)
+- Polished Quick Start section with copy-paste commands
+- Use case examples (`examples/use-cases/`)
+  - Multi-tenant filtering
+  - Custom CRD integration
+  - Compliance reporting
+
+**Tests:**
+- Webhook adapter tests (Falco, Audit)
+- Enhanced filter merge tests
+
+**Helm Chart:**
+- ArtifactHub metadata for publishing
+- Enhanced Chart.yaml annotations
+- Synced version (1.1.0) with image
+
+#### Changed
+- **Version Sync:** Image and chart now use same version (1.1.0)
+- KEP status: draft → implementable
+- README: Clearer positioning and value proposition
+- SECURITY_RBAC.md: Added ObservationFilter and ObservationMapping permissions
+
+#### Fixed
+- Chart.yaml: Use `kubezen` (was `zubezen` in some places)
+- build-and-sign.sh: Correct image name
+
+---
+
 ## [1.0.10] - 2024-12-04
 
 ### 🎉 Major Features

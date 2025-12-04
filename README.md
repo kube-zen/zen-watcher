@@ -9,9 +9,46 @@ Zen Watcher is an open-source Kubernetes operator that aggregates structured sig
 
 ---
 
-## 🚀 Quick Demo
+## 🚀 Quick Start (4 Minutes to Working System)
 
-Try Zen Watcher in minutes: `./hack/quick-demo.sh --non-interactive --deploy-mock-data` creates a local cluster, deploys security tools, generates demo observations, and opens Grafana at `http://localhost:3100` (user: `zen`, password shown at end). Check observations with `kubectl get observations -n zen-system`. Cleanup: `./hack/cleanup-demo.sh`.
+**One command gives you a complete demo with all 6 observation sources:**
+
+```bash
+# Clone the repo
+git clone https://github.com/kube-zen/zen-watcher
+cd zen-watcher
+
+# Run automated demo (creates k3d cluster, deploys everything, validates 6/6 sources)
+./hack/quick-demo.sh --non-interactive --deploy-mock-data
+
+# Demo will show credentials at the end, example:
+# Grafana:  http://localhost:8080/grafana/d/zen-watcher
+# Username: zen
+# Password: <shown in output>
+```
+
+**What you get:**
+- ✅ k3d cluster with all 6 security tools (Trivy, Falco, Kyverno, Checkov, KubeBench, Audit)
+- ✅ VictoriaMetrics + Grafana with pre-built dashboard
+- ✅ Mock observations from all 6 sources
+- ✅ ~4 minutes total time
+
+**View observations:**
+```bash
+export KUBECONFIG=~/.kube/zen-demo-kubeconfig
+kubectl get observations -A
+
+# By source
+kubectl get observations -A -o json | jq -r '.items[] | .spec.source' | sort | uniq -c
+
+# Watch live
+kubectl get observations -A --watch
+```
+
+**Cleanup:**
+```bash
+./hack/cleanup-demo.sh
+```
 
 ---
 
@@ -57,6 +94,45 @@ Collects events from popular security and compliance tools:
 - Structured logging with correlation IDs
 - Comprehensive metrics and health checks
 - **Note**: Core features are production-ready. Some alternative code paths may exist for compatibility or future enhancements.
+
+---
+
+## 🤔 Why Zen-Watcher?
+
+### Comparison with Alternatives
+
+| Feature | Zen-Watcher | Falco Sidekick | Kubescape | Native Tools | Custom Exporters |
+|---------|-------------|----------------|-----------|--------------|------------------|
+| **Unified Event Format** | ✅ Single Observation CRD | ❌ Forward-only | ⚠️ Kubescape format | ❌ Per-tool format | ⚠️ Custom |
+| **Multi-Source Aggregation** | ✅ 6+ sources | ❌ Falco only | ⚠️ Limited | ❌ Separate | ⚠️ Manual |
+| **Storage** | ✅ CRDs (etcd) | ❌ Requires DB/S3 | ✅ CRDs | ❌ Logs/files | ⚠️ Various |
+| **Zero Dependencies** | ✅ Kubernetes only | ❌ DB, Redis, etc. | ✅ | ✅ | ❌ Usually needs DB |
+| **Extensibility** | ✅ Adapter + Mapping CRDs | ❌ Hard-coded outputs | ⚠️ Limited | ❌ | ⚠️ Code changes |
+| **Dynamic Filtering** | ✅ CRD + ConfigMap | ❌ | ⚠️ Static | ❌ | ❌ |
+| **Deduplication** | ✅ Built-in | ❌ | ❌ | ❌ | ❌ |
+| **Kubernetes-Native** | ✅ Pure K8s patterns | ⚠️ Hybrid | ✅ | ✅ | ⚠️ Varies |
+| **No Egress Traffic** | ✅ Cluster-only | ❌ Sends to external | ✅ | ✅ | ❌ Usually |
+| **No Secrets Required** | ✅ RBAC only | ❌ Credentials needed | ✅ | ✅ | ❌ Usually |
+| **HA / Multiple Replicas** | ✅ Dedup handles it | ⚠️ Complex | ✅ | ✅ | ⚠️ Varies |
+| **Learning Curve** | ⚠️ K8s CRDs | ⚠️ Sidekick config | ⚠️ Medium | ✅ Low | ❌ High |
+
+### Key Differentiators
+
+1. **🎯 True Aggregation** - Zen-watcher is the only tool that aggregates multiple security tools into a single, queryable format
+2. **🔒 Zero Trust** - No external dependencies, credentials, or egress traffic required
+3. **🧩 Extensibility** - ObservationMapping CRDs let you integrate ANY CRD without code changes
+4. **📦 Kubernetes-Native** - First-class CRDs, not just a forwarder or exporter
+5. **🎨 Modular** - 6 adapters + 1 generic adapter for the "long tail"
+
+### When to Use What
+
+| Use Zen-Watcher If... | Use Alternatives If... |
+|----------------------|------------------------|
+| You want unified view of all security events | You only use Falco (use Sidekick) |
+| You need CRD storage for GitOps | You need external SIEM immediately |
+| You want zero external dependencies | You're okay with databases/Redis |
+| You need custom CRD integration | You only use standard tools |
+| You want Kubernetes-native patterns | You prefer SaaS solutions |
 
 ---
 
