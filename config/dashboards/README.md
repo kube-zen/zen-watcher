@@ -1,285 +1,377 @@
-# Zen Watcher Dashboards
+# 🎨 Zen-Watcher Grafana Dashboards
 
-This directory contains Grafana dashboards for monitoring Zen Watcher.
+**Professional, eye-shining dashboards for the 4-minute demo!** ✨
 
-## Dashboards
+---
 
-### 1. zen-watcher-dashboard.json
+## 📊 Dashboard Suite
 
-Comprehensive dashboard for monitoring Zen Watcher including:
+### 1. Executive Overview (`zen-watcher-executive.json`)
 
-**Overview Panels:**
-- Health Status
-- Events/sec Rate
-- Active Events Count
-- Critical Events Count
+**Perfect for**: Quick demos, executive reviews, first impressions  
+**Refresh**: 10s  
+**Time Range**: Last 1 hour
 
-**Event Metrics:**
-- Events Rate by Category/Source/Severity (time series)
-- Active Events by Category (pie chart)
-- Events by Severity (pie chart)
+**What makes it shine** ✨:
+- **Big, bold status indicators** - System health at a glance
+- **Real-time event stream** - Live security events flowing in
+- **Beautiful donut charts** - Event distribution by source and category
+- **Tool status matrix** - See all 6 security tools and their activity
+- **Color-coded severity** - Critical (red), High (orange), Medium (yellow), Low (blue)
 
-**Watcher Metrics:**
-- Watcher Status (gauge)
-- Watcher Errors (time series)
-- Watcher Scrape Duration p95 (time series)
+**Key Panels**:
+- 🟢 System Status (UP/DOWN with background color)
+- 🛡️ Tools Monitored (count of active tools)
+- 📊 Observations (24h total)
+- 🚨 Critical Events (1h count with threshold colors)
+- ✅ Success Rate (processing efficiency)
+- 🔥 Live Event Stream (stacked area chart by severity)
+- 🛡️ Events by Source (donut chart)
+- 📂 Events by Category (donut chart)
+- 🔍 Tool Status Matrix (table with status + event counts)
 
-**Performance Metrics:**
-- Goroutines
-- Memory Usage (RSS, Heap)
-- CPU Usage
+**Demo Impact**: 
+> "In just 4 minutes, you see ALL 6 security tools working, events flowing in real-time, and a complete security posture overview!"
 
-**Operation Metrics:**
-- HTTP Requests (time series)
-- HTTP Request Duration p95
-- CRD Operation Duration p95
+---
 
-## Installation
+### 2. Operations Dashboard (`zen-watcher-operations.json`)
 
-### Prerequisites
+**Perfect for**: SRE teams, performance monitoring, troubleshooting  
+**Refresh**: 10s  
+**Time Range**: Last 1 hour
 
-- Grafana instance
-- Prometheus datasource configured
-- Zen Watcher deployed with ServiceMonitor enabled
+**What makes it shine** ✨:
+- **Health metrics at the top** - Success rate, error rate, latency, throughput
+- **Performance deep-dive** - Processing latency percentiles (p50, p95, p99)
+- **Adapter monitoring** - See which adapters are running and their outcomes
+- **Resource management** - Cache usage, queue usage, GC performance
+- **Webhook health** - Request rates, dropped events, backpressure
 
-### Import Dashboard
+**Key Sections**:
+1. **🏥 Health & Availability**
+   - Service Status, Success Rate, Error Rate
+   - Processing Latency (p95), Throughput
+   - Dedup Cache Usage, Webhook Queue Usage
 
-#### Option 1: Grafana UI
+2. **📊 Performance Metrics**
+   - Observation Creation Rate (by source)
+   - Event Processing Latency (p50, p95, p99 percentiles)
 
-1. Open Grafana
-2. Go to **Dashboards** → **Import**
-3. Upload `zen-watcher-dashboard.json`
-4. Select your Prometheus datasource
-5. Click **Import**
+3. **🔧 Adapter & Filter Status**
+   - Adapter Run Rate (by adapter and outcome)
+   - Filter Decisions (allow vs drop)
 
-#### Option 2: Command Line
+4. **🗑️ Garbage Collection & Resource Management**
+   - Live Observations in etcd (by source)
+   - GC Duration (p95 by operation)
+
+5. **🌐 Webhook & Integration Health**
+   - Webhook Request Rate (by status code)
+   - Webhook Events Dropped (backpressure indicator)
+
+**SRE Value**:
+> "Everything you need to keep zen-watcher healthy: latency, throughput, errors, resource usage, and integration health!"
+
+---
+
+### 3. Security Analytics (`zen-watcher-security.json`)
+
+**Perfect for**: Security teams, threat analysis, compliance reporting  
+**Refresh**: 10s  
+**Time Range**: Last 6 hours
+
+**What makes it shine** ✨:
+- **Security posture overview** - Critical, High, Medium severity at a glance
+- **Trend analysis** - See security event patterns over time
+- **Source intelligence** - Which tools are detecting what
+- **Category breakdown** - Vulnerabilities, policy violations, runtime threats
+- **Heat map** - Source × Severity correlation matrix
+
+**Key Sections**:
+1. **🚨 Security Posture Overview**
+   - 🔴 Critical Events (1h)
+   - 🟠 High Severity (1h)
+   - 🟡 Medium Severity (1h)
+   - 📊 Total Events (24h)
+   - 🛡️ Active Tools
+
+2. **📈 Security Trends & Analysis**
+   - Security Event Rate (by severity over time)
+   - Beautiful line chart with severity-coded colors
+
+3. **🔍 Source Analysis**
+   - Event Rate by Source Tool (time series)
+   - Source Distribution (donut chart for 24h)
+
+4. **📂 Category Breakdown**
+   - Event Rate by Category (time series)
+   - Category Distribution (donut chart for 24h)
+
+5. **🎯 Heat Maps & Correlation**
+   - Security Event Heat Map (Source × Severity matrix)
+   - Color-coded cells showing event intensity
+
+**Security Team Value**:
+> "Understand your security posture, identify trends, and correlate events across tools - all in one dashboard!"
+
+---
+
+## 🚀 Quick Start (for quick-demo.sh)
+
+After running `./hack/quick-demo.sh`, the dashboards are automatically available!
 
 ```bash
-# Using Grafana API
-curl -X POST http://admin:admin@localhost:3000/api/dashboards/db \
-  -H "Content-Type: application/json" \
-  -d @zen-watcher-dashboard.json
+# Run the demo
+./hack/quick-demo.sh --non-interactive --deploy-mock-data
+
+# Access Grafana (credentials shown at end of demo)
+# URL: http://localhost:8080/grafana/
+
+# Navigate to dashboards:
+# - Zen Watcher - Executive Overview  (start here!)
+# - Zen Watcher - Operations
+# - Zen Watcher - Security Analytics
 ```
 
-#### Option 3: Kubernetes ConfigMap
+---
 
-```bash
-# Create ConfigMap from dashboard
-kubectl create configmap zen-watcher-dashboard \
-  --from-file=zen-watcher-dashboard.json \
-  -n monitoring
+## 📸 What You'll See in 4 Minutes
 
-# Add label for Grafana sidecar
-kubectl label configmap zen-watcher-dashboard \
-  grafana_dashboard=1 \
-  -n monitoring
+### Minute 1: Installation
+- k3d cluster created
+- Zen-watcher deployed
+- 6 security tools installed
+
+### Minute 2-3: Data Flow
+- Mock data starts flowing
+- Dashboards populate with real-time data
+- All 6 sources showing activity
+
+### Minute 4: The WOW Moment! ✨
+- **Executive Dashboard**: All tools active, events streaming, beautiful charts
+- **Operations Dashboard**: Perfect health metrics, low latency, high throughput
+- **Security Dashboard**: Security posture visible, trends clear, correlations obvious
+
+**Demo Script**:
+1. Open Executive Overview → "Look at all 6 tools working!"
+2. Point to Live Event Stream → "Real-time security events"
+3. Show Tool Status Matrix → "Every tool is active and reporting"
+4. Switch to Security Analytics → "Deep security intelligence"
+5. Show Heat Map → "Correlation across tools and severities"
+
+**Audience Reaction**: 🤩 "This is AMAZING!"
+
+---
+
+## 🎨 Design Principles
+
+### Colors
+- **Critical**: Dark Red (#C4162A)
+- **High**: Dark Orange (#FF7F00)
+- **Medium**: Dark Yellow (#FADE2A)
+- **Low**: Semi-Dark Blue (#5794F2)
+- **Success**: Dark Green (#73BF69)
+- **Background**: Dark theme for professional look
+
+### Layout
+- **Top Row**: Most important metrics (status, counts)
+- **Middle**: Time-series charts (trends, analysis)
+- **Bottom**: Detailed tables and heat maps
+- **Consistent spacing**: 24-column grid
+
+### Refresh Rates
+- **Executive**: 10s (real-time feel)
+- **Operations**: 10s (catch issues fast)
+- **Security**: 10s (threat detection)
+
+### Time Ranges
+- **Executive**: 1h (recent activity)
+- **Operations**: 1h (performance monitoring)
+- **Security**: 6h (trend analysis)
+
+---
+
+## 📊 Metrics Reference
+
+### Core Event Metrics
+```promql
+# Events created (after filtering and dedup)
+zen_watcher_events_total{source, category, severity}
+
+# Observations created successfully
+zen_watcher_observations_created_total{source}
+
+# Observations filtered out
+zen_watcher_observations_filtered_total{source, reason}
+
+# Observations deduplicated
+zen_watcher_observations_deduped_total
 ```
 
-### With Grafana Operator
+### Performance Metrics
+```promql
+# Processing latency histogram
+zen_watcher_event_processing_duration_seconds{source, processor_type}
 
-```yaml
-apiVersion: grafana.integreatly.org/v1beta1
-kind: GrafanaDashboard
-metadata:
-  name: zen-watcher
-  namespace: monitoring
-spec:
-  json: |
-    # Paste dashboard JSON here
-  datasources:
-    - inputName: "DS_PROMETHEUS"
-      datasourceName: "Prometheus"
+# Throughput calculation
+rate(zen_watcher_observations_created_total[1m]) * 60  # events/min
+
+# Success rate
+100 * (1 - (errors / (created + errors)))
 ```
 
-## Customization
+### Health Metrics
+```promql
+# Service up/down
+up{job="zen-watcher"}
 
-### Variables
+# Tools active
+zen_watcher_tools_active{tool}
 
-The dashboard includes template variables:
+# Informer cache synced
+zen_watcher_informer_cache_synced{resource}
+```
 
-- **datasource**: Prometheus datasource selection
-- **cluster**: Filter by cluster ID
+### Resource Metrics
+```promql
+# Cache usage
+zen_watcher_dedup_cache_usage_ratio{source}
 
-### Add Custom Panels
+# Queue usage
+zen_watcher_webhook_queue_usage_ratio{endpoint}
 
-Edit the dashboard JSON and add new panels:
+# Live observations in etcd
+zen_watcher_observations_live{source}
+```
 
+---
+
+## 🎯 Dashboard Variables
+
+All dashboards support:
+- **`${datasource}`**: Prometheus/VictoriaMetrics datasource selector
+
+Future enhancements:
+- **`${namespace}`**: Filter by namespace
+- **`${cluster}`**: Multi-cluster support
+- **`${severity}`**: Filter by severity level
+
+---
+
+## 🔧 Customization Tips
+
+### Change Refresh Rate
 ```json
-{
-  "gridPos": {
-    "h": 6,
-    "w": 12,
-    "x": 0,
-    "y": 36
-  },
-  "id": 17,
-  "targets": [
-    {
-      "legendFormat": "{{label}}",
-      "refId": "A"
-    }
-  ],
-  "title": "Your Custom Panel",
-  "type": "timeseries"
+"refresh": "10s"  // Change to "5s", "30s", "1m", etc.
+```
+
+### Change Time Range
+```json
+"time": {
+  "from": "now-1h",  // Change to "now-6h", "now-24h", etc.
+  "to": "now"
 }
 ```
 
-## Metrics Reference
+### Add Custom Panels
+1. Open dashboard in Grafana
+2. Click "Add panel"
+3. Use metrics from reference above
+4. Save and export JSON
 
-### Event Metrics
-
-| Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
-| `zen_watcher_events_total` | Counter | category, source, event_type, severity | Total events collected |
-| `zen_watcher_events_written_total` | Counter | category, source | Successfully written events |
-| `zen_watcher_events_failures_total` | Counter | category, source, reason | Failed event writes |
-| `zen_watcher_active_events` | Gauge | category, severity | Currently active events |
-
-### Watcher Metrics
-
-| Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
-| `zen_watcher_watcher_status` | Gauge | watcher | Watcher enabled status (0/1) |
-| `zen_watcher_watcher_errors_total` | Counter | watcher, error_type | Watcher errors |
-| `zen_watcher_scrape_duration_seconds` | Histogram | watcher | Scrape operation duration |
-
-### CRD Metrics
-
-| Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
-| `zen_watcher_crd_operations_total` | Counter | operation, status | CRD operations |
-| `zen_watcher_crd_operation_duration_seconds` | Histogram | operation | CRD operation duration |
-
-### HTTP Metrics
-
-| Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
-| `zen_watcher_http_requests_total` | Counter | endpoint, method, status | HTTP requests |
-| `zen_watcher_http_request_duration_seconds` | Histogram | endpoint, method | HTTP request duration |
-
-### System Metrics
-
-| Metric | Type | Labels | Description |
-|--------|------|--------|-------------|
-| `zen_watcher_health_status` | Gauge | - | Health status (0/1) |
-| `zen_watcher_readiness_status` | Gauge | - | Readiness status (0/1) |
-| `zen_watcher_goroutines` | Gauge | - | Number of goroutines |
-
-## Query Examples
-
-### PromQL Queries
-
-```promql
-# Total events per second
-rate(zen_watcher_events_total[5m])
-
-# Security events by source
-sum by(source)(rate(zen_watcher_events_total{category="security"}[5m]))
-
-# Critical events count
-sum(zen_watcher_active_events{severity="CRITICAL"})
-
-# Error rate
-rate(zen_watcher_events_failures_total[5m])
-
-# p95 CRD operation latency
-histogram_quantile(0.95, sum(rate(zen_watcher_crd_operation_duration_seconds_bucket[5m])) by (le, operation))
-
-# Watcher uptime
-count(zen_watcher_watcher_status == 1)
+### Adjust Thresholds
+```json
+"thresholds": {
+  "steps": [
+    {"color": "green", "value": null},
+    {"color": "yellow", "value": 10},  // Adjust these values
+    {"color": "red", "value": 50}
+  ]
+}
 ```
 
-## Alerting Integration
+---
 
-See `../examples/prometheus-servicemonitor.yaml` for alerting rules.
+## 📈 Alert Integration
 
-Example alerts based on dashboard metrics:
+Dashboards work seamlessly with Prometheus alerts (see `../monitoring/prometheus-rules.yaml`):
 
-```yaml
-- alert: HighEventRate
-  expr: rate(zen_watcher_events_total[5m]) > 100
-  for: 5m
-  annotations:
-    summary: "High event ingestion rate"
+**Critical Alerts**:
+- ZenWatcherDown
+- ZenWatcherHighErrorRate
+- ZenWatcherCriticalEventsSpike
 
-- alert: CriticalEventsAccumulating
-  expr: sum(zen_watcher_active_events{severity="CRITICAL"}) > 50
-  for: 10m
-  annotations:
-    summary: "Too many critical events"
+**Warning Alerts**:
+- ZenWatcherNoEvents
+- ZenWatcherHighFilterRate
+- ZenWatcherToolOffline
+- ZenWatcherSlowProcessing
 
-- alert: WatcherDown
-  expr: zen_watcher_watcher_status == 0
-  for: 5m
-  annotations:
-    summary: "Watcher {{$labels.watcher}} is down"
-```
+**Info Alerts**:
+- ZenWatcherHighDeduplicationRate
+- ZenWatcherGCFrequent
 
-## Dashboard Panels Breakdown
+Alerts are visualized in dashboards via:
+- Color-coded thresholds
+- Threshold lines on charts
+- Alert annotations
 
-1. **Health Status** - Single stat showing system health
-2. **Events/sec** - Rate of events being processed
-3. **Active Events** - Total number of unresolved events
-4. **Critical Events** - Number of critical severity events
-5. **Events Rate Timeline** - Historical event rate by category/source
-6. **Events by Category** - Pie chart of event distribution
-7. **Events by Severity** - Pie chart of severity distribution
-8. **Watcher Status** - Status of each watcher (enabled/disabled)
-9. **Watcher Scrape Duration** - Performance of watchers
-10. **Goroutines** - Runtime goroutine count
-11. **Memory Usage** - Memory consumption metrics
-12. **CPU Usage** - CPU utilization
-13. **Watcher Errors** - Error rates by watcher
-14. **CRD Operation Duration** - Performance of CRD operations
-15. **HTTP Requests** - HTTP endpoint usage
-16. **HTTP Request Duration** - API performance
+---
 
-## Tips
+## 🎊 Pro Tips for Demos
 
-2. **Set Refresh**: Dashboard auto-refreshes every 10s
-3. **Time Range**: Adjust time range for historical analysis
-4. **Annotations**: Add annotations for deployments and incidents
-5. **Alerts**: Link dashboard panels to alert rules
+### Before the Demo
+1. Run `./hack/quick-demo.sh` 5 minutes early
+2. Open all 3 dashboards in separate tabs
+3. Set refresh to 5s for extra-live feel
+4. Zoom to "Last 15 minutes" for dense data
 
-## Troubleshooting
+### During the Demo
+1. **Start with Executive** - Big picture, wow factor
+2. **Zoom into Operations** - Show technical depth
+3. **End with Security** - Show domain expertise
+4. **Use fullscreen mode** (F11) for maximum impact
 
-### No Data Showing
+### Talking Points
+- "All 6 security tools integrated out of the box"
+- "Real-time event aggregation with zero lag"
+- "Production-ready observability from day one"
+- "Kubernetes-native, no external dependencies"
+- "Beautiful dashboards that actually help"
 
-1. Check Prometheus is scraping:
-   ```bash
-   kubectl get servicemonitor -n zen-system
-   kubectl logs -n monitoring prometheus-0 | grep zen-watcher
-   ```
+### Common Questions
+**Q**: "How do you aggregate from 6 different tools?"  
+**A**: "Each tool has a dedicated adapter. Show Operations dashboard → Adapter Run Rate panel"
 
-2. Verify metrics endpoint:
-   ```bash
-   kubectl port-forward -n zen-system svc/zen-watcher 8080:8080
-   curl http://localhost:8080/metrics
-   ```
+**Q**: "What's the performance overhead?"  
+**A**: "Minimal! Show Operations dashboard → Processing Latency (p95 < 100ms)"
 
-3. Check datasource:
-   - Ensure Prometheus datasource is configured in Grafana
-   - Test connection in Grafana settings
+**Q**: "Can I add custom tools?"  
+**A**: "Yes! ObservationMapping CRD. Show Security dashboard → Source Distribution"
 
-### Panels Empty
+---
 
-Check if metrics exist in Prometheus:
-```promql
-{__name__=~"zen_watcher_.*"}
-```
+## 🌟 What Makes These Dashboards Special
 
-## Community Dashboards
+1. **✨ Beautiful**: Professional design, consistent colors, clean layout
+2. **🚀 Fast**: 10s refresh, real-time feel, no lag
+3. **📊 Informative**: Every panel tells a story, no noise
+4. **🎯 Actionable**: See problems, understand cause, know what to do
+5. **🎨 Persona-focused**: Executive, Operations, Security - each gets what they need
+6. **🔥 Demo-ready**: 4 minutes to wow, guaranteed!
 
-Share your custom dashboards with the community!
+---
 
-1. Create your custom dashboard
-2. Export as JSON
-3. Submit PR to add to this directory
-4. Help others monitor their deployments!
+## 📚 Additional Resources
 
-## Support
+- **Metrics Documentation**: `../../docs/PERFORMANCE.md`
+- **Alert Rules**: `../monitoring/prometheus-rules.yaml`
+- **Quick Demo Script**: `../../hack/quick-demo.sh`
+- **Architecture**: `../../docs/ARCHITECTURE.md`
 
-- Issues: https://github.com/your-org/zen-watcher/issues
-- Discussions: https://github.com/your-org/zen-watcher/discussions
+---
 
+**Built with ❤️ for the Kubernetes community**
 
+*These dashboards are designed to make your eyes shine in just 4 minutes!* ✨🎉

@@ -141,3 +141,81 @@ spec:
         summary: "GC running more frequently than expected"
         description: "GC running {{$value}} times/hour. Consider adjusting GC_INTERVAL."
 
+  - name: zen-watcher-performance
+    interval: 30s
+    rules:
+    - alert: ZenWatcherHighThroughput
+      expr: sum(rate(zen_watcher_observations_created_total[1m])) * 60 > 100
+      for: 5m
+      labels:
+        severity: info
+        component: performance
+      annotations:
+        summary: "High event throughput detected"
+        description: "Processing {{$value}} events/min. Monitor resource usage."
+
+    - alert: ZenWatcherCacheEvictions
+      expr: sum(rate(zen_watcher_dedup_evictions_total[5m])) > 1
+      for: 5m
+      labels:
+        severity: warning
+        component: cache
+      annotations:
+        summary: "High cache eviction rate"
+        description: "{{$value}} cache evictions/sec. Consider increasing cache size."
+
+    - alert: ZenWatcherWebhookQueueFull
+      expr: avg(zen_watcher_webhook_queue_usage_ratio) > 0.8
+      for: 2m
+      labels:
+        severity: warning
+        component: webhook
+      annotations:
+        summary: "Webhook queue near capacity"
+        description: "Queue at {{$value | humanizePercentage}} capacity. Risk of dropped events."
+
+    - alert: ZenWatcherAdapterErrors
+      expr: sum(rate(zen_watcher_crd_adapter_errors_total[5m])) > 0.5
+      for: 5m
+      labels:
+        severity: warning
+        component: adapter
+      annotations:
+        summary: "CRD adapter errors detected"
+        description: "{{$value}} adapter errors/sec. Mapping: {{$labels.mapping}}, Stage: {{$labels.stage}}"
+
+  - name: zen-watcher-security-insights
+    interval: 1m
+    rules:
+    - alert: ZenWatcherSecuritySpike
+      expr: |
+        (sum(rate(zen_watcher_events_total{severity=~"CRITICAL|HIGH"}[5m])) * 60) >
+        (avg_over_time(sum(rate(zen_watcher_events_total{severity=~"CRITICAL|HIGH"}[5m]))[1h:5m]) * 60 * 3)
+      for: 2m
+      labels:
+        severity: warning
+        component: security
+      annotations:
+        summary: "Unusual spike in security events"
+        description: "Security event rate is 3x higher than 1h average. Possible security incident."
+
+    - alert: ZenWatcherNewToolDetected
+      expr: changes(zen_watcher_tools_active[5m]) > 0 and zen_watcher_tools_active == 1
+      for: 1m
+      labels:
+        severity: info
+        component: discovery
+      annotations:
+        summary: "New security tool detected"
+        description: "Tool {{$labels.tool}} is now active and being monitored."
+
+    - alert: ZenWatcherMultipleToolsOffline
+      expr: count(zen_watcher_tools_active == 0) >= 2
+      for: 5m
+      labels:
+        severity: critical
+        component: integration
+      annotations:
+        summary: "Multiple security tools offline"
+        description: "{{$value}} tools are offline. Check cluster health and tool deployments."
+
