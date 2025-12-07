@@ -52,8 +52,6 @@ spec:
   detectedAt: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   details:
 ${details_json}
-status:
-  synced: false
 EOF
 }
 
@@ -123,6 +121,33 @@ create_observation "demo-audit-info-2" "audit" "compliance" "info" "audit-event"
     user: "admin"
     verb: "create"'
 
+# Create demo observations from cert-manager (certificate issues)
+create_observation "demo-cert-manager-high-1" "cert-manager" "operations" "high" "certificate_status" "Certificate" "demo-tls-cert" "demo-manifests" '    status: "Failed"
+    certificate_name: "demo-tls-cert"
+    reason: "Failed to obtain certificate from ACME provider"
+    domain: "example.com"'
+create_observation "demo-cert-manager-medium-1" "cert-manager" "operations" "medium" "certificate_status" "Certificate" "demo-expiring-cert" "demo-manifests" '    status: "ExpiringSoon"
+    certificate_name: "demo-expiring-cert"
+    expires_in_days: 15
+    domain: "demo.example.com"'
+create_observation "demo-cert-manager-medium-2" "cert-manager" "operations" "medium" "certificate_status" "Certificate" "demo-renewal-failed" "demo-manifests" '    status: "RenewalFailed"
+    certificate_name: "demo-renewal-failed"
+    reason: "DNS-01 challenge failed"
+    domain: "test.example.com"'
+
+# Create demo observations from sealed-secrets (decryption failures)
+create_observation "demo-sealed-secrets-high-1" "sealed-secrets" "security" "high" "secret_decryption_failure" "Secret" "demo-secret" "demo-manifests" '    reason: "decryption failed"
+    namespace: "demo-manifests"
+    secret_name: "demo-secret"
+    error: "unable to decrypt sealed secret"'
+create_observation "demo-sealed-secrets-high-2" "sealed-secrets" "security" "high" "secret_decryption_failure" "Secret" "demo-encrypted-secret" "demo-manifests" '    reason: "decryption failed"
+    namespace: "demo-manifests"
+    secret_name: "demo-encrypted-secret"
+    error: "no key could decrypt secret"'
+create_observation "demo-sealed-secrets-medium-1" "sealed-secrets" "security" "medium" "sealed_secret_error" "SealedSecret" "demo-sealed-secret" "demo-manifests" '    message: "error processing sealed secret"
+    namespace: "demo-manifests"
+    secret_name: "demo-sealed-secret"'
+
 echo "✓ Demo observations created"
 
 # Deploy demo manifests for Checkov to scan
@@ -174,6 +199,10 @@ zen_watcher_events_total{{cluster_id="demo",category="security",source="checkov"
 zen_watcher_events_total{{cluster_id="demo",category="compliance",source="kube-bench",event_type="cis-benchmark",severity="medium"}} 1
 zen_watcher_events_total{{cluster_id="demo",category="compliance",source="kube-bench",event_type="cis-benchmark",severity="low"}} 1
 zen_watcher_events_total{{cluster_id="demo",category="compliance",source="audit",event_type="audit-event",severity="info"}} 2
+zen_watcher_events_total{{cluster_id="demo",category="operations",source="cert-manager",event_type="certificate_status",severity="high"}} 1
+zen_watcher_events_total{{cluster_id="demo",category="operations",source="cert-manager",event_type="certificate_status",severity="medium"}} 2
+zen_watcher_events_total{{cluster_id="demo",category="security",source="sealed-secrets",event_type="secret_decryption_failure",severity="high"}} 2
+zen_watcher_events_total{{cluster_id="demo",category="security",source="sealed-secrets",event_type="sealed_secret_error",severity="medium"}} 1
 
 # HELP zen_watcher_active_events Currently active events
 # TYPE zen_watcher_active_events gauge
@@ -193,6 +222,8 @@ zen_watcher_watcher_status{{cluster_id="demo",watcher="kyverno"}} 1
 zen_watcher_watcher_status{{cluster_id="demo",watcher="checkov"}} 1
 zen_watcher_watcher_status{{cluster_id="demo",watcher="kube-bench"}} 1
 zen_watcher_watcher_status{{cluster_id="demo",watcher="audit"}} 1
+zen_watcher_watcher_status{{cluster_id="demo",watcher="cert-manager"}} 1
+zen_watcher_watcher_status{{cluster_id="demo",watcher="sealed-secrets"}} 1
 """
         
         class Handler(BaseHTTPRequestHandler):

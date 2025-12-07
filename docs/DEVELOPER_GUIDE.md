@@ -1,6 +1,6 @@
 # Zen Watcher Developer Guide
 
-**Version:** 1.0.19+  
+**Version:** 1.0.0-alpha  
 **Go Version:** 1.23+ (tested on 1.23 and 1.24)  
 **License:** Apache 2.0
 
@@ -115,9 +115,9 @@ zen-watcher/
 │   └── OPERATIONAL_EXCELLENCE.md  # Production operations
 │
 ├── README.md                      # Main documentation
-├── ARCHITECTURE.md                # Architecture deep dive
-├── CONTRIBUTING.md                # Contribution guidelines
-├── DEVELOPER_GUIDE.md             # This file
+├── docs/ARCHITECTURE.md            # Architecture deep dive
+├── CONTRIBUTING.md                 # Contribution guidelines
+├── docs/DEVELOPER_GUIDE.md         # This file
 ├── LICENSE                        # Apache 2.0
 └── go.mod                         # Go dependencies
 ```
@@ -622,7 +622,7 @@ Update `deployments/rbac/clusterrole.yaml`:
 
 ### Step 5: Add to Documentation
 
-Update `README.md` and `ARCHITECTURE.md` to include the new tool.
+Update `README.md` and `docs/ARCHITECTURE.md` to include the new tool.
 
 ---
 
@@ -710,16 +710,16 @@ go build \
 docker build \
     --no-cache \
     --pull \
-    -t kubezen/zen-watcher:1.0.19 \
+    -t kubezen/zen-watcher:1.0.0-alpha \
     -f build/Dockerfile \
     .
 
 # Or with Podman (drop-in replacement):
-# podman build --no-cache --pull -t kubezen/zen-watcher:1.0.19 -f build/Dockerfile .
+# podman build --no-cache --pull -t kubezen/zen-watcher:1.0.0-alpha -f build/Dockerfile .
 
 # Push to registry
-docker push kubezen/zen-watcher:1.0.19
-# Or: podman push kubezen/zen-watcher:1.0.19
+docker push kubezen/zen-watcher:1.0.0-alpha
+# Or: podman push kubezen/zen-watcher:1.0.0-alpha
 ```
 
 **Dockerfile optimization:**
@@ -827,7 +827,7 @@ kubectl logs -n zen-system deployment/zen-watcher -f
 
 1. **Every new feature needs:**
    - README.md update
-   - ARCHITECTURE.md update if design changes
+   - docs/ARCHITECTURE.md update if design changes
    - CHANGELOG.md entry
    - Inline code comments
 
@@ -852,7 +852,7 @@ kubectl logs -n zen-system deployment/zen-watcher -f
 ### Enable Verbose Logging
 
 ```go
-// Temporarily add debug logs
+// Add debug logs for troubleshooting
 log.Printf("DEBUG: Report spec: %+v", spec)
 log.Printf("DEBUG: Dedup key: %s", dedupKey)
 log.Printf("DEBUG: Existing keys: %d", len(existingKeys))
@@ -977,45 +977,45 @@ _, err := dynClient.Resource(eventGVR).Namespace(namespace).Create(ctx, event, m
 
 ### Version Bumping
 
-1. Update version in `main.go`:
-   ```go
-   log.Println("🚀 zen-watcher v1.0.22 (Go 1.23+, Apache 2.0)")
+1. Update version in `Makefile`:
+   ```makefile
+   VERSION ?= 1.0.0-alpha
    ```
 
 2. Update `CHANGELOG.md` with changes
 
 3. Tag release:
    ```bash
-   git tag v1.0.20
-   git push origin v1.0.20
+   git tag v1.0.0-alpha
+   git push origin v1.0.0-alpha
    ```
 
 ### Build and Push
 
 ```bash
 # Build (using Docker or Podman)
-docker build --no-cache --pull -t kubezen/zen-watcher:1.0.20 -f build/Dockerfile .
-# Or with Podman: podman build --no-cache --pull -t kubezen/zen-watcher:1.0.20 -f build/Dockerfile .
+docker build --no-cache --pull -t kubezen/zen-watcher:1.0.0-alpha -f build/Dockerfile .
+# Or with Podman: podman build --no-cache --pull -t kubezen/zen-watcher:1.0.0-alpha -f build/Dockerfile .
 
 # Push
-docker push kubezen/zen-watcher:1.0.20
-# Or: podman push kubezen/zen-watcher:1.0.20
+docker push kubezen/zen-watcher:1.0.0-alpha
+# Or: podman push kubezen/zen-watcher:1.0.0-alpha
 
 # Tag as latest (optional)
-docker tag kubezen/zen-watcher:1.0.20 kubezen/zen-watcher:latest
+docker tag kubezen/zen-watcher:1.0.0-alpha kubezen/zen-watcher:latest
 docker push kubezen/zen-watcher:latest
-# Or with Podman: podman tag kubezen/zen-watcher:1.0.20 kubezen/zen-watcher:latest && podman push kubezen/zen-watcher:latest
+# Or with Podman: podman tag kubezen/zen-watcher:1.0.0-alpha kubezen/zen-watcher:latest && podman push kubezen/zen-watcher:latest
 ```
 
 ### Update Helm Charts
 
 ```bash
 # Update helm chart values.yaml
-sed -i 's/tag: "1.0.19"/tag: "1.0.20"/' helm-charts/charts/zen-watcher/values.yaml
+sed -i 's/tag: ".*"/tag: "1.0.0-alpha"/' helm-charts/charts/zen-watcher/values.yaml
 
 # Commit
 git add helm-charts/charts/zen-watcher/values.yaml
-git commit -m "zen-watcher v1.0.20: <summary>"
+git commit -m "zen-watcher v1.0.0-alpha: <summary>"
 git push
 ```
 
@@ -1045,7 +1045,7 @@ If you want to **consume Observation CRDs** in your own controllers or services,
 - ✅ **OpenAPI Schema** - Schema structure, required/optional fields, programmatic access
 - ✅ **Schema Sync Guidance** - How CRD schema is synced across repositories
 - ✅ **Kubernetes Informers** - Real-time event streaming with complete examples
-- ✅ **kubewatcher Integration** - Route Observations to external webhooks/services
+- ✅ **kubewatch / Robusta Integration** - Route Observations to external webhooks/services
 - ✅ **Controller Examples** - Full working examples with work queues and event handlers
 - ✅ **Best Practices** - Filtering, rate limiting, monitoring
 
@@ -1055,9 +1055,9 @@ If you want to **consume Observation CRDs** in your own controllers or services,
    - Real-time updates with automatic reconnection
    - See: [docs/INTEGRATIONS.md#consuming-observations-via-informers](docs/INTEGRATIONS.md#consuming-observations-via-informers)
 
-2. **kubewatcher for Event Routing**
+2. **kubewatch / Robusta for Event Routing**
    - Route Observations to webhooks or CloudEvents endpoints
-   - See: [docs/INTEGRATIONS.md#kubewatcher-integration](docs/INTEGRATIONS.md#kubewatcher-integration)
+   - See: [docs/INTEGRATIONS.md#quick-start-use-kubewatch-recommended](docs/INTEGRATIONS.md#quick-start-use-kubewatch-recommended)
 
 3. **OpenAPI Schema Reference**
    - Type-safe schema definition and validation
@@ -1089,7 +1089,7 @@ For complete examples, see [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 ## Resources
 
 - **Main README**: [README.md](README.md)
-- **Architecture Details**: [ARCHITECTURE.md](ARCHITECTURE.md)
+- **Architecture Details**: [ARCHITECTURE.md](ARCHITECTURE.md) (in docs/)
 - **Security Docs**: [docs/SECURITY.md](docs/SECURITY.md)
 - **Deployment Guide**: [docs/DEPLOYMENT_SCENARIOS.md](docs/DEPLOYMENT_SCENARIOS.md)
 - **Integrations Guide**: [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)
@@ -1097,5 +1097,5 @@ For complete examples, see [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
 ---
 
-**Questions?** Open an issue on GitHub or check the [documentation index](DOCUMENTATION_INDEX.md).
+**Questions?** Open an issue on GitHub or check the [documentation index](DOCUMENTATION_INDEX.md) (in docs/).
 

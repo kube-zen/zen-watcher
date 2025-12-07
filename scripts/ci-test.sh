@@ -78,7 +78,7 @@ echo ""
 echo "🐚 Step 5: Shell Script Linting"
 echo "────────────────────────────────────────────────────"
 if command -v shellcheck >/dev/null 2>&1; then
-    if shellcheck hack/*.sh scripts/*.sh 2>/dev/null; then
+    if shellcheck scripts/**/*.sh 2>/dev/null; then
         echo "  ✅ Shell scripts OK"
     else
         echo "  ⚠️  Shellcheck found issues (non-blocking)"

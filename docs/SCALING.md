@@ -1,12 +1,14 @@
 # Scaling Strategy
 
+## 🛡️ Official Scaling Strategy for v1.x: Namespace Sharding
+
 ## Overview
 
 Zen Watcher is designed to be **simple, decoupled, and easy to extend**. Our scaling strategy prioritizes predictability and operational simplicity over complex distributed coordination.
 
 ---
 
-## Current Behavior (v1.0.x)
+## Current Behavior (v1.0.0-alpha)
 
 ### Single-Replica Deployment (Recommended)
 
@@ -91,7 +93,7 @@ resources:
 - ⚠️ No easy horizontal scale-out
 - ⚠️ Single point of failure (mitigated by Kubernetes restart policies)
 
-**This is the recommended approach for v1.0.x.**
+**This is the recommended approach for v1.0.0-alpha.**
 
 ---
 
@@ -234,12 +236,12 @@ env:
 
 ## Migration Path
 
-### Short-Term (v1.0.x)
+### Short-Term (v1.0.0-alpha)
 - ✅ Default to single-replica deployment
 - ✅ Document scaling constraints transparently
 - ✅ Offer sharding via namespace scoping as official scale-out pattern
 
-### Medium-Term (v1.1.x+)
+### Medium-Term (Future releases)
 - 🔄 Add optional leader election for informers + GC
 - 🔄 Enable HPA for webhook traffic (stateless)
 - 🔄 Document clear separation: leader-bound vs. stateless components
@@ -286,7 +288,7 @@ env:
 
 ### Q: Can I run multiple replicas for high availability?
 
-**A:** Not recommended in v1.0.x. You'll get duplicate Observations. Use Kubernetes restart policies and PodDisruptionBudgets for availability instead.
+**A:** Not recommended in v1.0.0-alpha. You'll get duplicate Observations. Use Kubernetes restart policies and PodDisruptionBudgets for availability instead.
 
 ### Q: What happens if my single replica dies?
 
@@ -307,12 +309,12 @@ env:
 
 ## Summary
 
-**Recommended Approach (v1.0.x):**
+**Recommended Approach (v1.0.0-alpha):**
 - ✅ Single-replica deployment (default)
 - ✅ Vertical scaling if needed
 - ✅ Sharding by namespace for scale-out
 
-**Future (v1.1.x+):**
+**Future (Next releases):**
 - 🔄 Optional leader election
 - 🔄 HPA support for webhooks
 - 🔄 Clear leader-bound vs. stateless separation

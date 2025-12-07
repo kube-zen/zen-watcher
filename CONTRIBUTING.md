@@ -6,6 +6,8 @@ Thank you for your interest in contributing to Zen Watcher! This document outlin
 
 Zen Watcher follows **Kubernetes controller best practices** and uses a **modular, scalable architecture**. This design makes contributions easy:
 
+> ⚠️ **Remember**: Zen Watcher core stays pure. All egress lives in separate controllers. See [Pure Core, Extensible Ecosystem](docs/ARCHITECTURE.md#7-pure-core-extensible-ecosystem).
+
 **🎯 Adding a New Watcher is Trivial**
 - Want to add Wiz support? Add a `wiz_processor.go` and register it in `factory.go`.
 - No need to understand the entire codebase—just implement one processor interface.
@@ -106,7 +108,7 @@ func (s *SlackSink) Send(ctx context.Context, obs *Observation) error {
 - Store credentials in SealedSecrets or external secret manager
 - Can be deployed per-namespace or cluster-wide
 
-**See [ARCHITECTURE.md](ARCHITECTURE.md) for more details on the extensibility pattern.**
+**See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for more details on the extensibility pattern.**
 
 ---
 

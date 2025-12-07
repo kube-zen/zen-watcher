@@ -546,6 +546,9 @@ validate_ports() {
     if [ "$ports_changed" = true ]; then
         echo -e "${YELLOW}⚠${NC}  Some ports were adjusted due to conflicts"
         echo -e "${CYAN}   Export these to reuse:${NC}"
+        if [ "$PLATFORM" = "k3d" ]; then
+            echo -e "   ${CYAN}export INGRESS_HTTP_PORT=${INGRESS_HTTP_PORT}${NC}"
+        fi
         echo -e "   ${CYAN}export GRAFANA_PORT=${GRAFANA_PORT}${NC}"
         echo -e "   ${CYAN}export VICTORIA_METRICS_PORT=${VICTORIA_METRICS_PORT}${NC}"
         echo -e "   ${CYAN}export ZEN_WATCHER_PORT=${ZEN_WATCHER_PORT}${NC}"
@@ -822,6 +825,10 @@ echo ""
 
 # Validate everything upfront before making any changes (quiet unless issues found)
 validate_ports
+
+# Export INGRESS_HTTP_PORT immediately after validation so it's available for cluster creation
+export INGRESS_HTTP_PORT=${INGRESS_HTTP_PORT}
+
 validate_cluster
 
 # Create cluster
@@ -1394,20 +1401,28 @@ kubectl delete validatingwebhookconfiguration ingress-nginx-admission 2>&1 | gre
 kubectl delete mutatingwebhookconfiguration ingress-nginx-admission 2>&1 | grep -v "not found" > /dev/null || true
 
 # Deploy mock data if requested (after components are installed but before validation)
-if [ "$DEPLOY_MOCK_DATA" = true ] || ([ "$SKIP_MOCK_DATA" != true ] && [ "$NON_INTERACTIVE" != true ]); then
+# Default: deploy mock data in non-interactive mode, prompt in interactive mode
+if [ "$SKIP_MOCK_DATA" != true ]; then
+    # In non-interactive mode, deploy by default unless explicitly skipped
+    if [ "$NON_INTERACTIVE" = true ] && [ "$DEPLOY_MOCK_DATA" != true ]; then
+        DEPLOY_MOCK_DATA=true
+    fi
+    
     # In interactive mode, prompt user
     if [ "$NON_INTERACTIVE" != true ] && [ "$DEPLOY_MOCK_DATA" != true ]; then
         echo ""
         echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo -e "${CYAN}  Deploy Mock Data?${NC}"
         echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo -e "${CYAN}  This will create mock observations from all 6 sources:${NC}"
+        echo -e "${CYAN}  This will create mock observations from all 8 sources:${NC}"
         echo -e "${CYAN}    - Kyverno (policy violations)${NC}"
         echo -e "${CYAN}    - Trivy (vulnerability reports)${NC}"
         echo -e "${CYAN}    - Falco (runtime security events)${NC}"
         echo -e "${CYAN}    - Audit (K8s audit logs)${NC}"
         echo -e "${CYAN}    - Checkov (IaC scanning)${NC}"
         echo -e "${CYAN}    - kube-bench (CIS benchmarks)${NC}"
+        echo -e "${CYAN}    - cert-manager (certificate issues)${NC}"
+        echo -e "${CYAN}    - sealed-secrets (decryption failures)${NC}"
         echo ""
         if [ -t 0 ]; then
             read -p "$(echo -e ${YELLOW}Deploy mock data? [Y/n]${NC}) " -n 1 -r
@@ -1717,8 +1732,122 @@ EOF
         kill $PF_PID 2>/dev/null || true
         wait $PF_PID 2>/dev/null || true
         
+        # Create cert-manager and sealed-secrets mock observations
+        echo -e "${CYAN}   Creating cert-manager and sealed-secrets mock observations...${NC}"
+        TIMESTAMP=$(date +%s)
+        cat <<EOF | kubectl apply -f - >/dev/null 2>&1 || true
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  name: demo-cert-manager-high-${TIMESTAMP}
+  namespace: ${NAMESPACE}
+  labels:
+    demo.zen.kube-zen.io/observation: "true"
+    source: cert-manager
+    category: operations
+    severity: high
+spec:
+  source: cert-manager
+  category: operations
+  severity: high
+  eventType: certificate_status
+  resource:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    name: demo-tls-cert
+    namespace: demo-manifests
+  detectedAt: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  details:
+    status: "Failed"
+    certificate_name: "demo-tls-cert"
+    reason: "Failed to obtain certificate from ACME provider"
+    domain: "example.com"
+---
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  name: demo-cert-manager-medium-${TIMESTAMP}
+  namespace: ${NAMESPACE}
+  labels:
+    demo.zen.kube-zen.io/observation: "true"
+    source: cert-manager
+    category: operations
+    severity: medium
+spec:
+  source: cert-manager
+  category: operations
+  severity: medium
+  eventType: certificate_status
+  resource:
+    apiVersion: cert-manager.io/v1
+    kind: Certificate
+    name: demo-expiring-cert
+    namespace: demo-manifests
+  detectedAt: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  details:
+    status: "ExpiringSoon"
+    certificate_name: "demo-expiring-cert"
+    expires_in_days: 15
+    domain: "demo.example.com"
+---
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  name: demo-sealed-secrets-high-${TIMESTAMP}
+  namespace: ${NAMESPACE}
+  labels:
+    demo.zen.kube-zen.io/observation: "true"
+    source: sealed-secrets
+    category: security
+    severity: high
+spec:
+  source: sealed-secrets
+  category: security
+  severity: high
+  eventType: secret_decryption_failure
+  resource:
+    apiVersion: v1
+    kind: Secret
+    name: demo-secret
+    namespace: demo-manifests
+  detectedAt: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  details:
+    reason: "decryption failed"
+    namespace: "demo-manifests"
+    secret_name: "demo-secret"
+---
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  name: demo-sealed-secrets-medium-${TIMESTAMP}
+  namespace: ${NAMESPACE}
+  labels:
+    demo.zen.kube-zen.io/observation: "true"
+    source: sealed-secrets
+    category: security
+    severity: medium
+spec:
+  source: sealed-secrets
+  category: security
+  severity: medium
+  eventType: sealed_secret_error
+  resource:
+    apiVersion: bitnami.com/v1alpha1
+    kind: SealedSecret
+    name: demo-sealed-secret
+    namespace: demo-manifests
+  detectedAt: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  details:
+    message: "error processing sealed secret"
+    namespace: "demo-manifests"
+    secret_name: "demo-sealed-secret"
+status:
+  synced: false
+EOF
+        echo -e "${GREEN}   ✓${NC} Created cert-manager and sealed-secrets mock observations"
+        
         echo -e "${GREEN}✓${NC} Mock data deployment completed"
-        echo -e "${CYAN}   Note: All 6 sources should now have observations${NC}"
+        echo -e "${CYAN}   Note: All 8 sources should now have observations${NC}"
     fi
 fi
 
@@ -1727,6 +1856,8 @@ if [ "$SKIP_MONITORING" != true ]; then
     echo -e "${YELLOW}→${NC} Creating ingress resources..."
     
     # Create ingress with host-based routing and path rewriting
+    # Note: Grafana uses GF_SERVER_SERVE_FROM_SUB_PATH=true, so we pass the full path
+    # The rewrite preserves the /grafana prefix and adds the captured path
     cat <<EOF | timeout 30 kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" > /dev/null || true
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -1735,14 +1866,16 @@ metadata:
   namespace: grafana
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/rewrite-target: /grafana/\$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
 spec:
   ingressClassName: nginx
   rules:
   - host: localhost
     http:
       paths:
-      - path: /grafana
-        pathType: Prefix
+      - path: /grafana(/|$)(.*)
+        pathType: ImplementationSpecific
         backend:
           service:
             name: grafana
@@ -1771,10 +1904,34 @@ spec:
             name: victoriametrics-single-vms-server
             port:
               number: 8428
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: zen-demo-zen-watcher
+  namespace: ${NAMESPACE}
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/rewrite-target: /\$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: localhost
+    http:
+      paths:
+      - path: /zen-watcher(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: zen-watcher
+            port:
+              number: 8080
 EOF
     # Verify ingress resources were created
     if kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && \
-       kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1; then
+       kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1 && \
+       kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1; then
         echo -e "${GREEN}✓${NC} Ingress resources created"
     else
         echo -e "${YELLOW}⚠${NC}  Ingress resources may not have been created correctly"
@@ -1898,6 +2055,7 @@ for comp in "${COMPONENTS[@]}"; do
 done
 [ "$SKIP_MONITORING" != true ] && echo -e "${CYAN}     - Grafana ingress${NC}"
 [ "$SKIP_MONITORING" != true ] && echo -e "${CYAN}     - VictoriaMetrics ingress${NC}"
+[ "$SKIP_MONITORING" != true ] && echo -e "${CYAN}     - Zen Watcher ingress${NC}"
 echo ""
 
 # Track ingress resources separately (only if monitoring is enabled)
@@ -1907,12 +2065,14 @@ if [ "$SKIP_MONITORING" != true ]; then
     COMPONENT_SHOWN["Grafana ingress"]=false
     COMPONENT_READY["VictoriaMetrics ingress"]=false
     COMPONENT_SHOWN["VictoriaMetrics ingress"]=false
+    COMPONENT_READY["Zen Watcher ingress"]=false
+    COMPONENT_SHOWN["Zen Watcher ingress"]=false
 fi
 
 MAX_WAIT=60  # 1 minute max
 EXPECTED_READY=${#COMPONENTS[@]}  # Number of components in the list
 # Add ingress resources (Grafana, VictoriaMetrics, and Zen Watcher)
-[ "$SKIP_MONITORING" != true ] && EXPECTED_READY=$((EXPECTED_READY + 3))  # Add 3 ingress resources
+[ "$SKIP_MONITORING" != true ] && EXPECTED_READY=$((EXPECTED_READY + 3))  # Add 3 ingress resources (Grafana, VictoriaMetrics, Zen Watcher)
 
 WAIT_START_TIME=$(date +%s)
 for i in {1..60}; do
@@ -1962,9 +2122,21 @@ done
             fi
         fi
         
+        # Check Zen Watcher ingress
+        if [ "${COMPONENT_READY[Zen Watcher ingress]}" != "true" ]; then
+            if kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1; then
+                COMPONENT_READY["Zen Watcher ingress"]=true
+                if [ "${COMPONENT_SHOWN[Zen Watcher ingress]}" != "true" ]; then
+                    echo -e "${GREEN}     ✓${NC} Zen Watcher ingress"
+                    COMPONENT_SHOWN["Zen Watcher ingress"]=true
+                fi
+            fi
+        fi
+        
         # Count ready ingress resources
         [ "${COMPONENT_READY[Grafana ingress]}" = "true" ] && READY_COUNT=$((READY_COUNT + 1))
         [ "${COMPONENT_READY[VictoriaMetrics ingress]}" = "true" ] && READY_COUNT=$((READY_COUNT + 1))
+        [ "${COMPONENT_READY[Zen Watcher ingress]}" = "true" ] && READY_COUNT=$((READY_COUNT + 1))
     fi
     
     if [ $((i % 10)) -eq 0 ]; then
@@ -1982,6 +2154,7 @@ done
         if [ "$SKIP_MONITORING" != true ]; then
             [ "${COMPONENT_READY[Grafana ingress]}" != "true" ] && OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1)) && OUTSTANDING_LIST+=("Grafana ingress")
             [ "${COMPONENT_READY[VictoriaMetrics ingress]}" != "true" ] && OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1)) && OUTSTANDING_LIST+=("VictoriaMetrics ingress")
+            [ "${COMPONENT_READY[Zen Watcher ingress]}" != "true" ] && OUTSTANDING_COUNT=$((OUTSTANDING_COUNT + 1)) && OUTSTANDING_LIST+=("Zen Watcher ingress")
         fi
         
         if [ "$OUTSTANDING_COUNT" -gt 0 ]; then
@@ -2015,10 +2188,13 @@ done
 if [ "$SKIP_MONITORING" != true ]; then
     INGRESS_GRAFANA_READY=false
     INGRESS_VM_READY=false
+    INGRESS_ZEN_WATCHER_READY=false
     kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && INGRESS_GRAFANA_READY=true
     kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1 && INGRESS_VM_READY=true
+    kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1 && INGRESS_ZEN_WATCHER_READY=true
     [ "$INGRESS_GRAFANA_READY" = false ] && HAS_FAILURES=true || true
     [ "$INGRESS_VM_READY" = false ] && HAS_FAILURES=true || true
+    [ "$INGRESS_ZEN_WATCHER_READY" = false ] && HAS_FAILURES=true || true
 fi
 
 if [ "$HAS_FAILURES" = true ]; then
@@ -2044,11 +2220,13 @@ done
         INGRESS_VM_READY=false
         kubectl get ingress zen-demo-grafana -n grafana >/dev/null 2>&1 && INGRESS_GRAFANA_READY=true
         kubectl get ingress zen-demo-victoriametrics -n victoriametrics >/dev/null 2>&1 && INGRESS_VM_READY=true
+        kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} >/dev/null 2>&1 && INGRESS_ZEN_WATCHER_READY=true
         
-        if [ "$INGRESS_GRAFANA_READY" = false ] || [ "$INGRESS_VM_READY" = false ]; then
+        if [ "$INGRESS_GRAFANA_READY" = false ] || [ "$INGRESS_VM_READY" = false ] || [ "$INGRESS_ZEN_WATCHER_READY" = false ]; then
             echo -e "${YELLOW}  Ingress resources:${NC}"
             [ "$INGRESS_GRAFANA_READY" = false ] && echo -e "${CYAN}    Checking Grafana ingress...${NC}" && kubectl get ingress zen-demo-grafana -n grafana 2>&1 || echo "    Ingress not found"
             [ "$INGRESS_VM_READY" = false ] && echo -e "${CYAN}    Checking VictoriaMetrics ingress...${NC}" && kubectl get ingress zen-demo-victoriametrics -n victoriametrics 2>&1 || echo "    Ingress not found"
+            [ "$INGRESS_ZEN_WATCHER_READY" = false ] && echo -e "${CYAN}    Checking Zen Watcher ingress...${NC}" && kubectl get ingress zen-demo-zen-watcher -n ${NAMESPACE} 2>&1 || echo "    Ingress not found"
 echo ""
         fi
     fi
@@ -2062,12 +2240,19 @@ declare -A ENDPOINT_SHOWN
 
 # Define all endpoints to test
 # Note: Ingress uses regex rewriting, so paths need trailing slash or specific paths
+# Grafana: Uses GF_SERVER_SERVE_FROM_SUB_PATH, so full path is passed through
+# VictoriaMetrics: Path prefix is preserved in rewrite
+# Zen Watcher: Path prefix is stripped
+# Note: Any 2xx status code is automatically accepted as success
 ENDPOINTS=(
-    "Grafana:/grafana/api/health:200,401,403"
-    "Grafana Dashboard:/grafana/d/zen-watcher:200,302,401,403"
-    "VictoriaMetrics:/victoriametrics/:200,204,301,302"
-    "VictoriaMetrics API:/victoriametrics/api/v1/query?query=up:200,400,405"
-    "VictoriaMetrics VMUI:/victoriametrics/vmui/:200,301,302,400"
+    "Grafana:/grafana/:200,201,202,204,301,302"
+    "Grafana API:/grafana/api/health:200,201,202,204,302,401,403"
+    "Grafana Dashboard:/grafana/d/zen-watcher:200,201,202,204,302,401,403"
+    "VictoriaMetrics:/victoriametrics/:200,201,202,204,301,302"
+    "VictoriaMetrics API:/victoriametrics/api/v1/query?query=up:200,201,202,204,400,405"
+    "VictoriaMetrics VMUI:/victoriametrics/vmui/:200,201,202,204,301,302,400"
+    "Zen Watcher Metrics:/zen-watcher/metrics:200,201,202,204"
+    "Zen Watcher Health:/zen-watcher/health:200,201,202,204"
 )
 
 # Initialize status for all endpoints
@@ -2090,8 +2275,14 @@ for i in {1..120}; do
             # Use longer timeout and follow redirects for endpoints that may redirect
             HTTP_CODE=$(timeout 5 curl -s -L -o /dev/null -w "%{http_code}" -H "Host: localhost" http://localhost:${INGRESS_HTTP_PORT}${path} 2>/dev/null || echo "000")
             
-            # Check if HTTP code matches expected codes
-            if echo ",${expected_codes}," | grep -q ",${HTTP_CODE},"; then
+            # Check if HTTP code matches expected codes or is any 2xx success code
+            HTTP_CODE_NUM=$((HTTP_CODE))
+            IS_2XX=false
+            if [ "$HTTP_CODE_NUM" -ge 200 ] && [ "$HTTP_CODE_NUM" -lt 300 ]; then
+                IS_2XX=true
+            fi
+            
+            if echo ",${expected_codes}," | grep -q ",${HTTP_CODE}," || [ "$IS_2XX" = true ]; then
                 ENDPOINT_STATUS["$name"]="working"
                 if [ "${ENDPOINT_SHOWN[$name]}" = false ]; then
                     echo -e "${GREEN}     ✓${NC} $name (HTTP ${HTTP_CODE})"
@@ -2141,12 +2332,24 @@ done
 # Configure Grafana datasource and dashboard after endpoints are ready
 # Wait for Grafana to be accessible before configuring
 if [ "$SKIP_MONITORING" != true ]; then
-    # Check if Grafana is accessible
+    # Check if Grafana is accessible (wait longer and check multiple endpoints)
     GRAFANA_READY=false
-    for i in {1..30}; do
-        if curl -s -f -H "Host: localhost" "http://localhost:${INGRESS_HTTP_PORT}/grafana/api/health" >/dev/null 2>&1; then
-            GRAFANA_READY=true
-            break
+    echo ""
+    echo -e "${YELLOW}→${NC} Waiting for Grafana to be ready for configuration..."
+    for i in {1..60}; do
+        # Check if Grafana root is accessible (should return 200 or 302, not 503)
+        HTTP_CODE=$(timeout 5 curl -s -L -o /dev/null -w "%{http_code}" -H "Host: localhost" "http://localhost:${INGRESS_HTTP_PORT}/grafana/" 2>/dev/null || echo "000")
+        if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "301" ]; then
+            # Also check if API is responding (may redirect to login, which is OK)
+            API_CODE=$(timeout 5 curl -s -L -o /dev/null -w "%{http_code}" -H "Host: localhost" "http://localhost:${INGRESS_HTTP_PORT}/grafana/api/health" 2>/dev/null || echo "000")
+            if [ "$API_CODE" = "200" ] || [ "$API_CODE" = "302" ] || [ "$API_CODE" = "401" ] || [ "$API_CODE" = "403" ]; then
+                GRAFANA_READY=true
+                echo -e "${GREEN}    ✓${NC} Grafana is ready (HTTP ${HTTP_CODE})"
+                break
+            fi
+        fi
+        if [ $((i % 10)) -eq 0 ]; then
+            echo -e "${CYAN}   Still waiting for Grafana... (${i}/60 attempts, HTTP ${HTTP_CODE})${NC}"
         fi
         sleep 2
     done
@@ -2156,7 +2359,7 @@ if [ "$SKIP_MONITORING" != true ]; then
     echo -e "${YELLOW}→${NC} Configuring Grafana (datasource and dashboard)..."
     
     # Wait a bit more for Grafana to be fully ready
-    sleep 5
+    sleep 3
     
     # Configure VictoriaMetrics datasource
     echo -e "${CYAN}  Configuring VictoriaMetrics datasource...${NC}"
@@ -2207,25 +2410,49 @@ if [ "$SKIP_MONITORING" != true ]; then
         fi
     fi
     
-    # Import dashboard
-    echo -e "${CYAN}  Importing Zen Watcher dashboard...${NC}"
-if [ -f "config/dashboards/zen-watcher-dashboard.json" ]; then
-        DASHBOARD_RESULT=$(timeout 15 cat config/dashboards/zen-watcher-dashboard.json | \
-    jq '{dashboard: ., overwrite: true, message: "Demo Import"}' | \
-    curl -s -X POST \
-        -H "Content-Type: application/json" \
-            -H "Host: localhost" \
-        -u zen:${GRAFANA_PASSWORD} \
-        -d @- \
-        http://localhost:${INGRESS_HTTP_PORT}/grafana/api/dashboards/db 2>&1 || echo "timeout or error")
+    # Import all dashboards
+    echo -e "${CYAN}  Importing Zen Watcher dashboards...${NC}"
+    DASHBOARD_FILES=(
+        "config/dashboards/zen-watcher-executive.json"
+        "config/dashboards/zen-watcher-operations.json"
+        "config/dashboards/zen-watcher-security.json"
+        "config/dashboards/zen-watcher-explorer.json"
+        "config/dashboards/zen-watcher-namespace-health.json"
+    )
     
-        if echo "$DASHBOARD_RESULT" | grep -qE "success|Dashboard.*imported|message.*success"; then
-            echo -e "${GREEN}    ✓${NC} Dashboard imported successfully"
-    else
-            echo -e "${YELLOW}    ⚠${NC}  Dashboard import failed: $(echo "$DASHBOARD_RESULT" | jq -r '.message // .' 2>/dev/null | head -1)"
+    DASHBOARD_IMPORTED=0
+    DASHBOARD_FAILED=0
+    
+    for dashboard_file in "${DASHBOARD_FILES[@]}"; do
+        if [ -f "$dashboard_file" ]; then
+            dashboard_name=$(basename "$dashboard_file" .json)
+            DASHBOARD_RESULT=$(timeout 15 cat "$dashboard_file" | \
+                jq '{dashboard: ., overwrite: true, message: "Demo Import"}' | \
+                curl -s -X POST \
+                    -H "Content-Type: application/json" \
+                    -H "Host: localhost" \
+                    -u zen:${GRAFANA_PASSWORD} \
+                    -d @- \
+                    http://localhost:${INGRESS_HTTP_PORT}/grafana/api/dashboards/db 2>&1 || echo "timeout or error")
+            
+            if echo "$DASHBOARD_RESULT" | grep -qE "success|Dashboard.*imported|message.*success"; then
+                echo -e "${GREEN}    ✓${NC} $dashboard_name imported successfully"
+                DASHBOARD_IMPORTED=$((DASHBOARD_IMPORTED + 1))
+            else
+                echo -e "${YELLOW}    ⚠${NC}  $dashboard_name import failed: $(echo "$DASHBOARD_RESULT" | jq -r '.message // .' 2>/dev/null | head -1)"
+                DASHBOARD_FAILED=$((DASHBOARD_FAILED + 1))
+            fi
+        else
+            echo -e "${YELLOW}    ⚠${NC}  Dashboard file not found: $dashboard_file"
+            DASHBOARD_FAILED=$((DASHBOARD_FAILED + 1))
+        fi
+    done
+    
+    if [ "$DASHBOARD_IMPORTED" -gt 0 ]; then
+        echo -e "${GREEN}    ✓${NC} Successfully imported ${DASHBOARD_IMPORTED} dashboard(s)"
     fi
-else
-        echo -e "${YELLOW}    ⚠${NC}  Dashboard file not found at config/dashboards/zen-watcher-dashboard.json"
+    if [ "$DASHBOARD_FAILED" -gt 0 ]; then
+        echo -e "${YELLOW}    ⚠${NC}  Failed to import ${DASHBOARD_FAILED} dashboard(s)"
     fi
     else
         echo ""
@@ -2271,6 +2498,10 @@ echo ""
             ns="victoriametrics"
             ingress_name="zen-demo-victoriametrics"
             svc_filter="victoriametrics"
+        elif echo "$path" | grep -q "^/zen-watcher"; then
+            ns="${NAMESPACE}"
+            ingress_name="zen-demo-zen-watcher"
+            svc_filter="zen-watcher"
         fi
         
         # Skip if no namespace was determined
@@ -2302,7 +2533,7 @@ if [ "$OBSERVATION_COUNT" -gt 0 ]; then
     fi
 fi
 
-# Validate all 6 sources appear in VictoriaMetrics (for Grafana dashboard)
+# Validate all 8 sources appear in VictoriaMetrics (for Grafana dashboard)
 if [ "$SKIP_MONITORING" != true ]; then
     echo ""
     echo -e "${YELLOW}→${NC} Validating dashboard sources..."
@@ -2318,9 +2549,9 @@ if [ "$SKIP_MONITORING" != true ]; then
             SOURCES_FOUND=$(echo "$SOURCES_QUERY" | jq -r '.data.result[] | .metric.source' 2>/dev/null | sort -u || echo "")
             SOURCES_COUNT=$(echo "$SOURCES_FOUND" | grep -v '^$' | wc -l | tr -d '[:space:]' || echo "0")
             
-            if [ "$SOURCES_COUNT" -ge 6 ]; then
+            if [ "$SOURCES_COUNT" -ge 8 ]; then
                 VALIDATION_SUCCESS=true
-                echo -e "${GREEN}✓${NC} All 6 sources visible in VictoriaMetrics:"
+                echo -e "${GREEN}✓${NC} All 8 sources visible in VictoriaMetrics:"
                 echo "$SOURCES_FOUND" | while read -r source; do
                     [ -n "$source" ] && echo -e "${GREEN}     ✓${NC} $source"
                 done
@@ -2328,7 +2559,7 @@ if [ "$SKIP_MONITORING" != true ]; then
             elif [ "$SOURCES_COUNT" -gt 0 ]; then
                 ELAPSED=$(($(date +%s) - VALIDATION_START))
                 if [ $((i % 10)) -eq 0 ]; then
-                    echo -e "${CYAN}   Found ${SOURCES_COUNT}/6 sources (${ELAPSED}s elapsed):${NC}"
+                    echo -e "${CYAN}   Found ${SOURCES_COUNT}/8 sources (${ELAPSED}s elapsed):${NC}"
                     echo "$SOURCES_FOUND" | while read -r source; do
                         [ -n "$source" ] && echo -e "${CYAN}     - ${source}${NC}"
                     done
@@ -2341,7 +2572,7 @@ if [ "$SKIP_MONITORING" != true ]; then
         if [ "$ELAPSED" -ge "$MAX_VALIDATION_WAIT" ]; then
             echo -e "${YELLOW}⚠${NC}  Validation timeout after ${MAX_VALIDATION_WAIT}s"
             if [ "$SOURCES_COUNT" -gt 0 ]; then
-                echo -e "${YELLOW}   Found ${SOURCES_COUNT}/6 sources:${NC}"
+                echo -e "${YELLOW}   Found ${SOURCES_COUNT}/8 sources:${NC}"
                 echo "$SOURCES_FOUND" | while read -r source; do
                     [ -n "$source" ] && echo -e "${YELLOW}     - ${source}${NC}"
                 done
@@ -2355,9 +2586,9 @@ if [ "$SKIP_MONITORING" != true ]; then
     # Ensure SOURCES_COUNT is set even if loop didn't execute
     SOURCES_COUNT=${SOURCES_COUNT:-0}
     
-    if [ "$VALIDATION_SUCCESS" = false ] && [ "$SOURCES_COUNT" -lt 6 ]; then
-        echo -e "${YELLOW}⚠${NC}  Only ${SOURCES_COUNT}/6 sources visible in dashboard"
-        echo -e "${CYAN}   Expected sources: kyverno, trivy, falco, audit, checkov, kube-bench${NC}"
+    if [ "$VALIDATION_SUCCESS" = false ] && [ "$SOURCES_COUNT" -lt 8 ]; then
+        echo -e "${YELLOW}⚠${NC}  Only ${SOURCES_COUNT}/8 sources visible in dashboard"
+        echo -e "${CYAN}   Expected sources: kyverno, trivy, falco, audit, checkov, kube-bench, cert-manager, sealed-secrets${NC}"
         echo -e "${CYAN}   Run './hack/send-mock-webhooks.sh ${NAMESPACE}' to generate mock data${NC}"
     fi
 fi

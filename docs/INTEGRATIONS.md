@@ -1,27 +1,32 @@
 # Integrations Guide
 
-This guide explains how to integrate with Zen Watcher's `Observation` CRDs, including consuming events via Kubernetes informers, OpenAPI schema details, and integration with tools like kubewatcher.
+This guide explains how to integrate with Zen Watcher's `Observation` CRDs. **You don't need to write code to use them.** Instead, connect them to existing tools that already handle alerting and routing.
+
+> 💡 **Recommendation**: For 95% of users, **use kubewatch or Robusta** instead of building custom sinks. They're maintained, secure, and support 20+ destinations out of the box.
+
+> ⚠️ **Remember**: Zen Watcher core stays pure. All egress lives in separate controllers. See [Pure Core, Extensible Ecosystem](../docs/ARCHITECTURE.md#7-pure-core-extensible-ecosystem).
 
 ---
 
 ## Table of Contents
 
 1. [Overview](#overview)
-2. [OpenAPI Schema](#openapi-schema)
-3. [Schema Sync Guidance](#schema-sync-guidance)
-4. [Consuming Observations via Informers](#consuming-observations-via-informers)
-5. [kubewatcher Integration](#kubewatcher-integration)
-6. [Other Integration Examples](#other-integration-examples)
+2. [Quick Start: Use kubewatch (Recommended)](#quick-start-use-kubewatch-recommended)
+3. [Other Supported Tools](#other-supported-tools)
+4. [OpenAPI Schema](#openapi-schema)
+5. [Schema Sync Guidance](#schema-sync-guidance)
+6. [Advanced: Build Your Own Controller (Only If Needed)](#advanced-build-your-own-controller-only-if-needed)
+7. [Other Integration Examples](#other-integration-examples)
+8. [Best Practices](#best-practices)
 
 ---
 
 ## Overview
 
 Zen Watcher creates `Observation` CRDs that can be consumed by:
-- **Controllers/Watchers**: Use Kubernetes informers to watch Observations in real-time
-- **Sink Controllers**: Forward Observations to external systems (Slack, PagerDuty, SIEMs)
-- **Custom Operators**: React to Observations and create Remediations, Policies, etc.
-- **kubewatcher**: Route Observations to external webhooks or services
+- **kubewatch / Robusta**: Route Observations to Slack, PagerDuty, SIEMs, and 30+ destinations (recommended)
+- **Argo Events**: Trigger workflows on Observation creation
+- **Custom Controllers**: Watch Observations and create custom resources, policies, etc. (advanced)
 
 **Key Benefits:**
 - Real-time event streaming via Kubernetes watch API
@@ -31,7 +36,101 @@ Zen Watcher creates `Observation` CRDs that can be consumed by:
 
 ---
 
+## 🚀 Quick Start: Use kubewatch (Recommended)
+
+[kubewatch](https://github.com/robusta-dev/kubewatch) watches Kubernetes resources and sends alerts to Slack, Teams, webhooks, and more.
+
+### Step 1: Install kubewatch
+
+```bash
+helm repo add robusta https://robusta-dev.github.io/helm-charts
+helm repo update
+
+helm install kubewatch robusta/kubewatch \
+  --namespace kubewatch \
+  --create-namespace
+```
+
+### Step 2: Configure kubewatch to watch Observations
+
+Create a ConfigMap with your configuration:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kubewatch-config
+  namespace: kubewatch
+data:
+  config.yaml: |
+    resources:
+      - name: Observation
+        namespace: zen-system
+        group: zen.kube-zen.io
+        version: v1
+    handler:
+      slack:
+        webhookurl: "https://hooks.slack.com/services/YOUR/WEBHOOK"
+```
+
+Observations will appear as Slack messages automatically.
+
+✅ **No code needed. No custom controllers. Just works.**
+
+> 📝 **Note**: kubewatch uses simple config files (not EventSource CRDs). See [kubewatch documentation](https://github.com/robusta-dev/kubewatch#configuration) for all supported handlers (Slack, Teams, PagerDuty, webhooks, etc.).
+
+---
+
+## 🔌 Other Supported Tools
+
+### Robusta
+
+Robusta natively supports watching custom resources like Observations:
+
+```yaml
+# robusta.yaml
+sinks:
+  slack:
+    url: YOUR_SLACK_WEBHOOK
+
+customResourceTriggers:
+  - apiVersion: zen.kube-zen.io/v1
+    kind: Observation
+    action: send_to_slack  # or your custom action
+```
+
+See [Robusta documentation](https://home.robusta.dev/) for more details.
+
+### Argo Events
+
+Use Argo Events' Resource Sensor to trigger workflows on Observation creation:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: observation-sensor
+spec:
+  dependencies:
+    - name: observation-trigger
+      eventSourceName: k8s
+      eventName: observation-created
+  triggers:
+    - template:
+        k8s:
+          group: zen.kube-zen.io
+          version: v1
+          resource: observations
+          operation: get
+```
+
+See [Argo Events documentation](https://argoproj.github.io/argo-events/) for more details.
+
+---
+
 ## OpenAPI Schema
+
+> 📝 **Note**: For detailed schema reference, see [CRD.md](CRD.md). This section covers only what's needed for integrations.
 
 ### Schema Location
 
@@ -39,47 +138,6 @@ The Observation CRD includes a complete OpenAPI v3 schema definition:
 
 - **Canonical CRD**: `deployments/crds/observation_crd.yaml`
 - **Schema Section**: `spec.versions[].schema.openAPIV3Schema`
-
-### Schema Structure
-
-```yaml
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
-  name: observations.zen.kube-zen.io
-spec:
-  group: zen.kube-zen.io
-  versions:
-    - name: v1
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          type: object
-          properties:
-            spec:
-              type: object
-              required: ["source", "category", "severity", "eventType"]
-              properties:
-                source:
-                  type: string
-                  description: "Tool that detected this event (trivy, falco, kyverno, etc)"
-                category:
-                  type: string
-                  description: "Event category (security, compliance, performance)"
-                severity:
-                  type: string
-                  description: "Severity level (critical, high, medium, low, info)"
-                # ... more fields
-            status:
-              type: object
-              properties:
-                processed:
-                  type: boolean
-                lastProcessedAt:
-                  type: string
-                  format: date-time
-```
 
 ### Required Fields
 
@@ -107,26 +165,6 @@ kubectl get crd observations.zen.kube-zen.io -o yaml
 
 # Extract just the OpenAPI schema
 kubectl get crd observations.zen.kube-zen.io -o jsonpath='{.spec.versions[0].schema.openAPIV3Schema}' | jq
-```
-
-Or programmatically in Go:
-
-```go
-import (
-    "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-    apiextensionsclient "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
-)
-
-func getObservationSchema(ctx context.Context, client apiextensionsclient.Interface) (*v1.JSONSchemaProps, error) {
-    crd, err := client.ApiextensionsV1().CustomResourceDefinitions().Get(
-        ctx, "observations.zen.kube-zen.io", metav1.GetOptions{})
-    if err != nil {
-        return nil, err
-    }
-    
-    schema := crd.Spec.Versions[0].Schema.OpenAPIV3Schema
-    return schema, nil
-}
 ```
 
 ---
@@ -170,19 +208,13 @@ When making schema changes:
    - Document migration path
    - Update helm chart version
 
-### Importing Schema in Your Project
-
-If you're building a controller that consumes Observations:
-
-1. **Use the CRD directly**: Deploy the CRD and let Kubernetes validate against it
-2. **Generate Go types** (optional): Use tools like `controller-gen` to generate typed clients
-3. **Use dynamic client**: Works with `unstructured.Unstructured` (no code generation needed)
-
 ---
 
-## Consuming Observations via Informers
+## 🛠 Advanced: Build Your Own Controller (Only If Needed)
 
-### Why Use Informers?
+⚠️ **Only for specialized use cases** (e.g., custom processing logic). Most users should use kubewatch or Robusta instead.
+
+### Consuming Observations via Informers
 
 **Informers** are the recommended way to consume Observations because they:
 - Provide real-time updates (watch-based, no polling)
@@ -314,7 +346,7 @@ informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 
 ### Complete Controller Example
 
-A full controller that processes Observations and creates Remediations:
+A full controller that processes Observations and creates custom resources:
 
 ```go
 package controller
@@ -335,7 +367,7 @@ import (
 type ObservationController struct {
     dynamicClient    dynamic.Interface
     observationGVR   schema.GroupVersionResource
-    remediationGVR   schema.GroupVersionResource
+    customResourceGVR schema.GroupVersionResource
     informer         cache.SharedIndexInformer
     workqueue        workqueue.RateLimitingInterface
 }
@@ -417,7 +449,7 @@ func (c *ObservationController) processNextWorkItem(ctx context.Context) bool {
     
     observation := obs.(*unstructured.Unstructured)
     
-    // Process Observation (e.g., create Remediation)
+    // Process Observation (e.g., create custom resource)
     if err := c.syncObservation(ctx, namespace, name, observation); err != nil {
         c.workqueue.AddRateLimited(key)
         return true
@@ -436,225 +468,12 @@ func (c *ObservationController) syncObservation(
     source, _, _ := unstructured.NestedString(observation.Object, "spec", "source")
     severity, _, _ := unstructured.NestedString(observation.Object, "spec", "severity")
     
-    // Example: Create Remediation for CRITICAL events
+    // Example: Create custom resource for CRITICAL events
     if severity == "CRITICAL" {
-        return c.createRemediation(ctx, namespace, observation)
+        return c.createCustomResource(ctx, namespace, observation)
     }
     
     return nil
-}
-```
-
----
-
-## kubewatcher Integration
-
-[kubewatcher](https://github.com/cloudevents/spec/tree/main/kubewatcher) is a Kubernetes event router that can watch CRDs and route events to external webhooks or services.
-
-### kubewatcher Overview
-
-kubewatcher watches Kubernetes resources and forwards events to:
-- HTTP webhooks
-- CloudEvents-compliant endpoints
-- Custom services
-
-### Setting Up kubewatcher to Watch Observations
-
-#### 1. Install kubewatcher
-
-```bash
-# Install kubewatcher via Helm or kubectl
-helm repo add cloudevents https://cloudevents.github.io/helm-charts
-helm install kubewatcher cloudevents/kubewatcher
-```
-
-#### 2. Create EventSource for Observations
-
-Create an EventSource CRD that watches Observations:
-
-```yaml
-apiVersion: events.k8s.io/v1alpha1
-kind: EventSource
-metadata:
-  name: observation-eventsource
-  namespace: zen-system
-spec:
-  service:
-    ports:
-      - port: 80
-        targetPort: 8080
-  resource:
-    apiVersion: zen.kube-zen.io/v1
-    kind: Observation
-    metadata:
-      namespace:
-        matchExpressions:
-          - key: kubernetes.io/metadata.name
-            operator: In
-            values: ["zen-system"]
-    eventTypes:
-      - ADDED
-      - MODIFIED
-  sink:
-    ref:
-      apiVersion: v1
-      kind: Service
-      name: observation-sink
-      namespace: zen-system
-```
-
-#### 3. Create Sink Service
-
-Create a service that receives Observation events:
-
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: observation-sink
-  namespace: zen-system
-spec:
-  selector:
-    app: observation-processor
-  ports:
-    - port: 8080
-      targetPort: 8080
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: observation-processor
-  namespace: zen-system
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: observation-processor
-  template:
-    metadata:
-      labels:
-        app: observation-processor
-    spec:
-      containers:
-      - name: processor
-        image: your-registry/observation-processor:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: WEBHOOK_PORT
-          value: "8080"
-```
-
-#### 4. Filter by Severity or Source
-
-kubewatcher supports filtering. Example: only route CRITICAL events:
-
-```yaml
-apiVersion: events.k8s.io/v1alpha1
-kind: EventSource
-metadata:
-  name: critical-observations
-spec:
-  resource:
-    apiVersion: zen.kube-zen.io/v1
-    kind: Observation
-    filters:
-      - key: spec.severity
-        operator: Equal
-        value: CRITICAL
-  sink:
-    ref:
-      apiVersion: v1
-      kind: Service
-      name: critical-alerts
-```
-
-#### 5. Transform to CloudEvents
-
-kubewatcher can transform Observations into CloudEvents format:
-
-```yaml
-apiVersion: events.k8s.io/v1alpha1
-kind: EventSource
-metadata:
-  name: observation-cloudevents
-spec:
-  resource:
-    apiVersion: zen.kube-zen.io/v1
-    kind: Observation
-  sink:
-    uri: https://your-service.com/webhook
-    cloudEvents:
-      contentType: application/json
-      data:
-        source: "zen.kube-zen.io/observations"
-        type: "io.zen.observation.created"
-```
-
-### kubewatcher with Custom Sink Controller
-
-Alternatively, create a custom sink controller that uses kubewatcher's event routing:
-
-```go
-package main
-
-import (
-    "context"
-    "encoding/json"
-    "net/http"
-    
-    cloudevents "github.com/cloudevents/sdk-go/v2"
-    "github.com/cloudevents/sdk-go/v2/protocol/http"
-)
-
-func main() {
-    ctx := context.Background()
-    
-    // Create HTTP protocol
-    p, err := http.New()
-    if err != nil {
-        panic(err)
-    }
-    
-    c, err := cloudevents.NewClient(p)
-    if err != nil {
-        panic(err)
-    }
-    
-    // Start receiver
-    if err := c.StartReceiver(ctx, receive); err != nil {
-        panic(err)
-    }
-}
-
-func receive(ctx context.Context, event cloudevents.Event) {
-    // Parse Observation from CloudEvent data
-    var observation map[string]interface{}
-    if err := event.DataAs(&observation); err != nil {
-        return
-    }
-    
-    // Extract fields
-    spec := observation["spec"].(map[string]interface{})
-    source := spec["source"].(string)
-    severity := spec["severity"].(string)
-    
-    // Process Observation
-    if severity == "CRITICAL" {
-        sendToSlack(source, severity, observation)
-    }
-}
-
-func sendToSlack(source, severity string, observation map[string]interface{}) {
-    // Send to Slack webhook
-    payload := map[string]interface{}{
-        "text": fmt.Sprintf("CRITICAL Observation from %s", source),
-        "observation": observation,
-    }
-    
-    jsonData, _ := json.Marshal(payload)
-    http.Post("https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
-        "application/json", bytes.NewBuffer(jsonData))
 }
 ```
 
@@ -791,9 +610,10 @@ func watchObservations(ctx context.Context, c client.Client) {
 ## See Also
 
 - [CRD Documentation](CRD.md) - Complete CRD schema reference
-- [Developer Guide](../DEVELOPER_GUIDE.md) - Building custom watchers
-- [Architecture](../ARCHITECTURE.md) - System architecture overview
-- [kubewatcher Documentation](https://github.com/cloudevents/spec/tree/main/kubewatcher) - Official kubewatcher docs
+- [Developer Guide](DEVELOPER_GUIDE.md) - Building custom watchers
+- [Architecture](ARCHITECTURE.md) - System architecture overview
+- [kubewatch Documentation](https://github.com/robusta-dev/kubewatch) - Official kubewatch docs
+- [Robusta Documentation](https://home.robusta.dev/) - Robusta platform docs
 
 ---
 
@@ -802,4 +622,3 @@ func watchObservations(ctx context.Context, c client.Client) {
 For questions or issues:
 - **GitHub Issues**: [kube-zen/zen-watcher](https://github.com/kube-zen/zen-watcher/issues)
 - **Documentation**: [docs/](https://github.com/kube-zen/zen-watcher/tree/main/docs)
-

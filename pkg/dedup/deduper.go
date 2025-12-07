@@ -81,6 +81,7 @@ type aggregatedEvent struct {
 // - Content-based fingerprinting
 // - Rate limiting per source
 // - Event aggregation in rolling window
+// - Per-source deduplication windows
 type Deduper struct {
 	mu sync.RWMutex
 
@@ -88,8 +89,10 @@ type Deduper struct {
 	cache         map[string]*entry // key -> entry
 	lruList       []string          // LRU list (most recent at end)
 	maxSize       int               // Maximum cache size (LRU eviction)
-	windowSeconds int               // Sliding window in seconds
-	ttl           time.Duration     // TTL for entries
+	windowSeconds int               // Default sliding window in seconds (for backward compatibility)
+	defaultWindowSeconds int        // Default window for sources not in sourceWindows map
+	sourceWindows map[string]int    // Per-source deduplication windows (source -> seconds)
+	ttl           time.Duration     // TTL for entries (default)
 
 	// Enhanced features
 	// Time-based buckets
@@ -122,8 +125,31 @@ func NewDeduper(windowSeconds, maxSize int) *Deduper {
 		maxSize = 10000 // Default 10k entries
 	}
 
-	// Read bucket size from env, default to 10% of window or minimum 10 seconds
-	bucketSizeSeconds := windowSeconds / 10
+	// Parse per-source windows from environment variable
+	// Format: JSON object like {"cert-manager": 86400, "falco": 60, "default": 60}
+	sourceWindows := make(map[string]int)
+	defaultWindowSeconds := windowSeconds
+	
+	if sourceWindowsStr := os.Getenv("DEDUP_WINDOW_BY_SOURCE"); sourceWindowsStr != "" {
+		var config map[string]interface{}
+		if err := json.Unmarshal([]byte(sourceWindowsStr), &config); err == nil {
+			for source, windowVal := range config {
+				if windowInt, ok := windowVal.(float64); ok {
+					windowSecondsInt := int(windowInt)
+					if windowSecondsInt > 0 {
+						if source == "default" {
+							defaultWindowSeconds = windowSecondsInt
+						} else {
+							sourceWindows[source] = windowSecondsInt
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Read bucket size from env, default to 10% of default window or minimum 10 seconds
+	bucketSizeSeconds := defaultWindowSeconds / 10
 	if bucketSizeSeconds < 10 {
 		bucketSizeSeconds = 10
 	}
@@ -158,20 +184,22 @@ func NewDeduper(windowSeconds, maxSize int) *Deduper {
 	}
 
 	deduper := &Deduper{
-		cache:             make(map[string]*entry),
-		lruList:           make([]string, 0, maxSize),
-		maxSize:           maxSize,
-		windowSeconds:     windowSeconds,
-		ttl:               time.Duration(windowSeconds) * time.Second,
-		buckets:           make(map[int64]*timeBucket),
-		bucketSizeSeconds: bucketSizeSeconds,
-		fingerprints:      make(map[string]*fingerprint),
-		rateLimits:        make(map[string]*rateLimitTracker),
-		maxRatePerSource:  maxRatePerSource,
-		maxRateBurst:      maxRateBurst,
-		aggregatedEvents:  make(map[string]*aggregatedEvent),
-		enableAggregation: enableAggregation,
-		stopCh:            make(chan struct{}),
+		cache:                make(map[string]*entry),
+		lruList:              make([]string, 0, maxSize),
+		maxSize:              maxSize,
+		windowSeconds:        windowSeconds, // Keep for backward compatibility
+		defaultWindowSeconds: defaultWindowSeconds,
+		sourceWindows:        sourceWindows,
+		ttl:                  time.Duration(defaultWindowSeconds) * time.Second,
+		buckets:              make(map[int64]*timeBucket),
+		bucketSizeSeconds:    bucketSizeSeconds,
+		fingerprints:         make(map[string]*fingerprint),
+		rateLimits:           make(map[string]*rateLimitTracker),
+		maxRatePerSource:     maxRatePerSource,
+		maxRateBurst:         maxRateBurst,
+		aggregatedEvents:     make(map[string]*aggregatedEvent),
+		enableAggregation:    enableAggregation,
+		stopCh:               make(chan struct{}),
 	}
 
 	// Start background cleanup goroutine for enhanced features
@@ -249,6 +277,18 @@ func GenerateFingerprint(content map[string]interface{}) string {
 
 	hash := sha256.Sum256(jsonBytes)
 	return fmt.Sprintf("%x", hash[:16]) // Use first 16 bytes for fingerprint
+}
+
+// getWindowForSource returns the deduplication window in seconds for a given source
+// Returns source-specific window if configured, otherwise default window
+func (d *Deduper) getWindowForSource(source string) int {
+	if source == "" {
+		return d.defaultWindowSeconds
+	}
+	if window, exists := d.sourceWindows[source]; exists {
+		return window
+	}
+	return d.defaultWindowSeconds
 }
 
 // getBucketKey returns the bucket key for a given time
@@ -339,15 +379,25 @@ func (d *Deduper) addToBucket(keyStr, fingerprintHash string, now time.Time) {
 }
 
 // isDuplicateFingerprint checks if this fingerprint was seen recently (called with lock held)
+// Note: This uses default window since fingerprint doesn't have source context
+// For source-specific dedup, use isDuplicateFingerprintForSource
 func (d *Deduper) isDuplicateFingerprint(fingerprintHash string, now time.Time) bool {
+	return d.isDuplicateFingerprintForSource(fingerprintHash, "", now)
+}
+
+// isDuplicateFingerprintForSource checks if this fingerprint was seen recently for a specific source
+func (d *Deduper) isDuplicateFingerprintForSource(fingerprintHash, source string, now time.Time) bool {
 	fp, exists := d.fingerprints[fingerprintHash]
 	if !exists {
 		return false
 	}
 
+	// Get source-specific window
+	windowSeconds := d.getWindowForSource(source)
+
 	// Check if fingerprint is still within window
 	age := now.Sub(fp.timestamp)
-	if age >= time.Duration(d.windowSeconds)*time.Second {
+	if age >= time.Duration(windowSeconds)*time.Second {
 		return false // Expired, not a duplicate
 	}
 
@@ -404,8 +454,17 @@ func (d *Deduper) updateAggregation(fingerprintHash string, now time.Time) {
 }
 
 // cleanupOldBuckets removes buckets that are outside the window (called with lock held)
+// Uses the maximum window across all sources to ensure we don't delete buckets too early
 func (d *Deduper) cleanupOldBuckets(now time.Time) {
-	cutoffTime := now.Add(-time.Duration(d.windowSeconds) * time.Second)
+	// Find the maximum window to ensure we keep buckets for all sources
+	maxWindowSeconds := d.defaultWindowSeconds
+	for _, window := range d.sourceWindows {
+		if window > maxWindowSeconds {
+			maxWindowSeconds = window
+		}
+	}
+	
+	cutoffTime := now.Add(-time.Duration(maxWindowSeconds) * time.Second)
 	cutoffBucket := d.getBucketKey(cutoffTime)
 
 	for bucketKey := range d.buckets {
@@ -414,8 +473,8 @@ func (d *Deduper) cleanupOldBuckets(now time.Time) {
 		}
 	}
 
-	// Limit number of buckets (window/bucket size + 2 for safety)
-	maxBuckets := (d.windowSeconds / d.bucketSizeSeconds) + 2
+	// Limit number of buckets (max window/bucket size + 2 for safety)
+	maxBuckets := (maxWindowSeconds / d.bucketSizeSeconds) + 2
 	if len(d.buckets) > maxBuckets {
 		// Remove oldest buckets
 		keys := make([]int64, 0, len(d.buckets))
@@ -438,8 +497,17 @@ func (d *Deduper) cleanupOldBuckets(now time.Time) {
 }
 
 // cleanupOldFingerprints removes fingerprints outside the window (called with lock held)
+// Uses the maximum window across all sources to ensure we don't delete fingerprints too early
 func (d *Deduper) cleanupOldFingerprints(now time.Time) {
-	cutoff := now.Add(-time.Duration(d.windowSeconds) * time.Second)
+	// Find the maximum window to ensure we keep fingerprints for all sources
+	maxWindowSeconds := d.defaultWindowSeconds
+	for _, window := range d.sourceWindows {
+		if window > maxWindowSeconds {
+			maxWindowSeconds = window
+		}
+	}
+	
+	cutoff := now.Add(-time.Duration(maxWindowSeconds) * time.Second)
 	for hash, fp := range d.fingerprints {
 		if fp.timestamp.Before(cutoff) {
 			delete(d.fingerprints, hash)
@@ -448,12 +516,21 @@ func (d *Deduper) cleanupOldFingerprints(now time.Time) {
 }
 
 // cleanupOldAggregations removes aggregated events outside the window (called with lock held)
+// Uses the maximum window across all sources to ensure we don't delete aggregations too early
 func (d *Deduper) cleanupOldAggregations(now time.Time) {
 	if !d.enableAggregation {
 		return
 	}
 
-	cutoff := now.Add(-time.Duration(d.windowSeconds) * time.Second)
+	// Find the maximum window to ensure we keep aggregations for all sources
+	maxWindowSeconds := d.defaultWindowSeconds
+	for _, window := range d.sourceWindows {
+		if window > maxWindowSeconds {
+			maxWindowSeconds = window
+		}
+	}
+
+	cutoff := now.Add(-time.Duration(maxWindowSeconds) * time.Second)
 	for hash, agg := range d.aggregatedEvents {
 		if agg.lastSeen.Before(cutoff) {
 			delete(d.aggregatedEvents, hash)
@@ -497,16 +574,22 @@ func (d *Deduper) ShouldCreate(key DedupKey) bool {
 // ShouldCreateWithContent checks if an observation should be created with enhanced features
 // If content is provided, uses fingerprint-based dedup and all enhanced features
 // Returns true if this is the first event (should create), false if duplicate within window
+// Uses source-specific deduplication windows if configured
 func (d *Deduper) ShouldCreateWithContent(key DedupKey, content map[string]interface{}) bool {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
 	keyStr := key.String()
 	now := time.Now()
+	source := key.Source
+
+	// Get source-specific window
+	windowSeconds := d.getWindowForSource(source)
+	ttl := time.Duration(windowSeconds) * time.Second
 
 	// 1. Rate limiting check (only if we have a source)
-	if key.Source != "" {
-		if !d.checkRateLimit(key.Source, now) {
+	if source != "" {
+		if !d.checkRateLimit(source, now) {
 			return false // Rate limit exceeded
 		}
 	}
@@ -516,8 +599,8 @@ func (d *Deduper) ShouldCreateWithContent(key DedupKey, content map[string]inter
 	if content != nil {
 		fingerprintHash = GenerateFingerprint(content)
 
-		// Check fingerprint-based dedup first (more accurate)
-		if d.isDuplicateFingerprint(fingerprintHash, now) {
+		// Check fingerprint-based dedup first (more accurate) with source-specific window
+		if d.isDuplicateFingerprintForSource(fingerprintHash, source, now) {
 			// Update aggregation
 			d.updateAggregation(fingerprintHash, now)
 			return false // Duplicate fingerprint
@@ -537,10 +620,11 @@ func (d *Deduper) ShouldCreateWithContent(key DedupKey, content map[string]inter
 	d.cleanupOldFingerprints(now)
 	d.cleanupOldAggregations(now)
 
-	// 5. Original cache-based dedup (for backward compatibility)
-	d.cleanupExpired(now)
+	// 5. Original cache-based dedup (for backward compatibility) with source-specific TTL
+	d.cleanupExpiredForSource(source, now)
 	if ent, exists := d.cache[keyStr]; exists {
-		if now.Sub(ent.timestamp) < d.ttl {
+		// Use source-specific window for TTL check
+		if now.Sub(ent.timestamp) < ttl {
 			d.updateLRU(keyStr)
 			ent.timestamp = now
 			return false // Duplicate in original cache
@@ -561,6 +645,7 @@ func (d *Deduper) ShouldCreateWithContent(key DedupKey, content map[string]inter
 }
 
 // cleanupExpired removes expired entries (called with lock held)
+// Uses default window for cleanup (backward compatibility)
 func (d *Deduper) cleanupExpired(now time.Time) {
 	expired := make([]string, 0)
 	for keyStr, ent := range d.cache {
@@ -568,6 +653,40 @@ func (d *Deduper) cleanupExpired(now time.Time) {
 			expired = append(expired, keyStr)
 		}
 	}
+	for _, keyStr := range expired {
+		delete(d.cache, keyStr)
+		d.removeFromLRU(keyStr)
+	}
+}
+
+// cleanupExpiredForSource removes expired entries for a specific source (called with lock held)
+// Uses source-specific window if configured
+func (d *Deduper) cleanupExpiredForSource(source string, now time.Time) {
+	windowSeconds := d.getWindowForSource(source)
+	ttl := time.Duration(windowSeconds) * time.Second
+	expired := make([]string, 0)
+	
+	// Parse source from cache keys to check expiration with source-specific window
+	// Cache keys format: "source/namespace/kind/name/reason/messageHash"
+	for keyStr, ent := range d.cache {
+		// Extract source from key (first part before /)
+		keySource := ""
+		if idx := 0; idx < len(keyStr); idx++ {
+			if keyStr[idx] == '/' {
+				keySource = keyStr[:idx]
+				break
+			}
+		}
+		
+		// Use source-specific window if this entry matches the source
+		entryWindowSeconds := d.getWindowForSource(keySource)
+		entryTTL := time.Duration(entryWindowSeconds) * time.Second
+		
+		if now.Sub(ent.timestamp) >= entryTTL {
+			expired = append(expired, keyStr)
+		}
+	}
+	
 	for _, keyStr := range expired {
 		delete(d.cache, keyStr)
 		d.removeFromLRU(keyStr)
@@ -620,7 +739,55 @@ func (d *Deduper) removeFromLRU(keyStr string) {
 func (d *Deduper) Stats() (size int, maxSize int, windowSeconds int) {
 	d.mu.RLock()
 	defer d.mu.RUnlock()
-	return len(d.cache), d.maxSize, d.windowSeconds
+	return len(d.cache), d.maxSize, d.defaultWindowSeconds
+}
+
+// GetSourceWindows returns the per-source window configuration
+func (d *Deduper) GetSourceWindows() map[string]int {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	result := make(map[string]int)
+	for k, v := range d.sourceWindows {
+		result[k] = v
+	}
+	return result
+}
+
+// GetDefaultWindow returns the default deduplication window
+func (d *Deduper) GetDefaultWindow() int {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.defaultWindowSeconds
+}
+
+// UpdateSourceWindows updates the per-source window configuration dynamically
+// This is thread-safe and can be called at runtime to update configuration
+func (d *Deduper) UpdateSourceWindows(sourceWindows map[string]int, defaultWindow int) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	
+	// Update default window if provided
+	if defaultWindow > 0 {
+		d.defaultWindowSeconds = defaultWindow
+		// Update TTL based on new default (used for backward compatibility)
+		d.ttl = time.Duration(d.defaultWindowSeconds) * time.Second
+	}
+	
+	// Update source windows
+	d.sourceWindows = make(map[string]int)
+	for source, window := range sourceWindows {
+		if window > 0 {
+			d.sourceWindows[source] = window
+		}
+	}
+	
+	// Update windowSeconds for backward compatibility (use default or max)
+	d.windowSeconds = d.defaultWindowSeconds
+	for _, window := range d.sourceWindows {
+		if window > d.windowSeconds {
+			d.windowSeconds = window
+		}
+	}
 }
 
 // EnhancedStats returns enhanced statistics including buckets, fingerprints, and aggregations

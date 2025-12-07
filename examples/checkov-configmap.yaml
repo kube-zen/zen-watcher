@@ -1,0 +1,35 @@
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: checkov-config
+spec:
+  source: checkov
+  adapterType: configmap
+  configmap:
+    namespace: ""
+    labelSelector: app=checkov
+    pollInterval: "30m"
+    jsonPath: ""
+  normalization:
+    domain: security
+    type: iac_vulnerability
+    priority:
+      CRITICAL: 0.9
+      HIGH: 0.7
+      MEDIUM: 0.5
+      LOW: 0.3
+    fieldMapping:
+      - from: extracted.check_id
+        to: check_id
+      - from: extracted.severity
+        to: severity
+  filter:
+    minPriority: 0.3
+  dedup:
+    window: "2h"
+    strategy: fingerprint
+  thresholds:
+    observationsPerMinute:
+      warning: 30
+      critical: 100
+

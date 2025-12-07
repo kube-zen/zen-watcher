@@ -519,7 +519,7 @@ func (ep *EventProcessor) ProcessMyToolReport(ctx context.Context, report *unstr
 
 - **Repository**: https://github.com/kube-zen/zen-watcher
 - **Documentation**: 
-  - [Architecture](https://github.com/kube-zen/zen-watcher/blob/main/ARCHITECTURE.md)
+  - [Architecture](https://github.com/kube-zen/zen-watcher/blob/main/docs/ARCHITECTURE.md)
   - [Integrations Guide](https://github.com/kube-zen/zen-watcher/blob/main/docs/INTEGRATIONS.md)
   - [CRD Documentation](https://github.com/kube-zen/zen-watcher/blob/main/docs/CRD.md)
   - [Performance Benchmarks](https://github.com/kube-zen/zen-watcher/blob/main/docs/PERFORMANCE.md) - Detailed performance numbers and profiling

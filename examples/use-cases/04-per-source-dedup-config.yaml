@@ -1,0 +1,54 @@
+# Example: Per-Source Deduplication Configuration
+# 
+# This example shows how to configure different deduplication windows per source
+# using the ObservationDedupConfig CRD. This is useful for scenarios like:
+# - Certificate expiration monitoring (cert-manager) - longer window to avoid flooding
+# - Runtime security events (falco) - shorter window for faster detection
+#
+# Apply these configurations:
+#   kubectl apply -f examples/use-cases/04-per-source-dedup-config.yaml
+
+---
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationDedupConfig
+metadata:
+  name: cert-manager-dedup
+  namespace: zen-system
+spec:
+  targetSource: cert-manager
+  windowSeconds: 86400  # 24 hours - prevents flooding etcd with certificate expiration events
+  enabled: true
+
+---
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationDedupConfig
+metadata:
+  name: falco-dedup
+  namespace: zen-system
+spec:
+  targetSource: falco
+  windowSeconds: 60  # 1 minute - shorter window for runtime security events
+  enabled: true
+
+---
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationDedupConfig
+metadata:
+  name: trivy-dedup
+  namespace: zen-system
+spec:
+  targetSource: trivy
+  windowSeconds: 3600  # 1 hour - vulnerability scans don't change frequently
+  enabled: true
+
+---
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationDedupConfig
+metadata:
+  name: kyverno-dedup
+  namespace: zen-system
+spec:
+  targetSource: kyverno
+  windowSeconds: 300  # 5 minutes - policy violations might repeat but should be caught quickly
+  enabled: true
+

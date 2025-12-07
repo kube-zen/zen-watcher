@@ -21,6 +21,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
@@ -43,6 +44,59 @@ type ObservationCreator struct {
 	observationsCreateErrors *prometheus.CounterVec
 	deduper                  *dedup.Deduper
 	filter                   *filter.Filter
+	// Optimization metrics (optional)
+	optimizationMetrics *OptimizationMetrics
+	// Source config loader (optional, for dynamic processing order)
+	sourceConfigLoader interface {
+		GetSourceConfig(source string) *config.SourceConfig
+	}
+	// Current processing order per source (for logging changes)
+	currentOrder map[string]ProcessingOrder
+	orderMu      sync.RWMutex
+}
+
+// OptimizationMetrics holds optimization-related metrics
+type OptimizationMetrics struct {
+	FilterPassRate        *prometheus.GaugeVec
+	DedupEffectiveness    *prometheus.GaugeVec
+	LowSeverityPercent    *prometheus.GaugeVec
+	ObservationsPerMinute *prometheus.GaugeVec
+	ObservationsPerHour   *prometheus.GaugeVec
+	SeverityDistribution  *prometheus.CounterVec
+	// Per-source counters for calculating rates
+	sourceCounters map[string]*sourceCounters
+	countersMu     sync.RWMutex
+}
+
+// sourceCounters tracks counters per source for rate calculations
+type sourceCounters struct {
+	attempted   int64     // Total events attempted
+	filtered    int64     // Events filtered out
+	deduped     int64     // Events deduplicated
+	created     int64     // Events created
+	lowSeverity int64     // LOW severity count
+	totalCount  int64     // Total count for severity distribution
+	lastUpdate  time.Time
+}
+
+// NewOptimizationMetrics creates optimization metrics from the main Metrics struct
+func NewOptimizationMetrics(filterPassRate, dedupEffectiveness, lowSeverityPercent,
+	observationsPerMinute, observationsPerHour *prometheus.GaugeVec,
+	severityDistribution *prometheus.CounterVec) *OptimizationMetrics {
+	return &OptimizationMetrics{
+		FilterPassRate:        filterPassRate,
+		DedupEffectiveness:    dedupEffectiveness,
+		LowSeverityPercent:    lowSeverityPercent,
+		ObservationsPerMinute: observationsPerMinute,
+		ObservationsPerHour:   observationsPerHour,
+		SeverityDistribution:  severityDistribution,
+		sourceCounters:        make(map[string]*sourceCounters),
+	}
+}
+
+// GetDeduper returns a reference to the deduper for dynamic configuration updates
+func (oc *ObservationCreator) GetDeduper() *dedup.Deduper {
+	return oc.deduper
 }
 
 // NewObservationCreator creates a new observation creator with optional filter and metrics
@@ -55,6 +109,25 @@ func NewObservationCreator(
 	observationsDeduped prometheus.Counter,
 	observationsCreateErrors *prometheus.CounterVec,
 	filter *filter.Filter,
+) *ObservationCreator {
+	return NewObservationCreatorWithOptimization(
+		dynClient, eventGVR, eventsTotal, observationsCreated,
+		observationsFiltered, observationsDeduped, observationsCreateErrors,
+		filter, nil,
+	)
+}
+
+// NewObservationCreatorWithOptimization creates a new observation creator with optimization metrics
+func NewObservationCreatorWithOptimization(
+	dynClient dynamic.Interface,
+	eventGVR schema.GroupVersionResource,
+	eventsTotal *prometheus.CounterVec,
+	observationsCreated *prometheus.CounterVec,
+	observationsFiltered *prometheus.CounterVec,
+	observationsDeduped prometheus.Counter,
+	observationsCreateErrors *prometheus.CounterVec,
+	filter *filter.Filter,
+	optimizationMetrics *OptimizationMetrics,
 ) *ObservationCreator {
 	// Get dedup window from env, default 60 seconds
 	windowSeconds := 60
@@ -80,7 +153,21 @@ func NewObservationCreator(
 		observationsCreateErrors: observationsCreateErrors,
 		deduper:                  dedup.NewDeduper(windowSeconds, maxSize),
 		filter:                   filter,
+		optimizationMetrics:      optimizationMetrics,
+		currentOrder:             make(map[string]ProcessingOrder),
 	}
+}
+
+// SetOptimizationMetrics sets optimization metrics for recording
+func (oc *ObservationCreator) SetOptimizationMetrics(metrics *OptimizationMetrics) {
+	oc.optimizationMetrics = metrics
+}
+
+// SetSourceConfigLoader sets the source config loader for dynamic processing order
+func (oc *ObservationCreator) SetSourceConfigLoader(loader interface {
+	GetSourceConfig(source string) *config.SourceConfig
+}) {
+	oc.sourceConfigLoader = loader
 }
 
 // CreateObservation creates an Observation CRD and increments metrics
@@ -98,23 +185,45 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 		source = "unknown"
 	}
 
-	// STEP 1: FILTER - Apply source-level filtering BEFORE normalization and deduplication
+	// Record attempted event for optimization metrics
+	if oc.optimizationMetrics != nil {
+		oc.recordEventAttempted(source)
+	}
+
+	// Determine processing order (dynamic or static)
+	processingOrder := oc.determineProcessingOrder(source)
+	
+	// Execute processing steps based on determined order
+	switch processingOrder {
+	case ProcessingOrderFilterFirst:
+		// Filter → Dedup → Create
+		return oc.processFilterFirst(ctx, observation, source)
+	case ProcessingOrderDedupFirst:
+		// Dedup → Filter → Create
+		return oc.processDedupFirst(ctx, observation, source)
+	default:
+		// Default: Filter → Dedup → Create (backward compatible)
+		return oc.processFilterFirst(ctx, observation, source)
+	}
+}
+
+// processFilterFirst processes with filter-first order: Filter → Dedup → Create
+func (oc *ObservationCreator) processFilterFirst(ctx context.Context, observation *unstructured.Unstructured, source string) error {
+	// STEP 1: FILTER
 	if oc.filter != nil {
 		allowed, reason := oc.filter.AllowWithReason(observation)
 		if !allowed {
-			// Filtered out - increment filtered metric and return early
 			if oc.observationsFiltered != nil {
 				oc.observationsFiltered.WithLabelValues(source, reason).Inc()
+			}
+			if oc.optimizationMetrics != nil {
+				oc.recordEventFiltered(source, reason)
 			}
 			return nil
 		}
 	}
 
-	// STEP 2: NORMALIZE - Normalize severity to uppercase for consistency
-	// (Normalization happens inline during extraction below)
-
-	// STEP 3: DEDUP - Check if we should create (first event always creates, duplicates within window are skipped)
-	// Uses enhanced dedup with time buckets, fingerprinting, rate limiting, and aggregation
+	// STEP 2: DEDUP
 	dedupKey := oc.extractDedupKey(observation)
 	if !oc.deduper.ShouldCreateWithContent(dedupKey, observation.Object) {
 		logger.Debug("Skipping duplicate observation within window",
@@ -123,16 +232,146 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 				Operation: "observation_dedup",
 				Source:    source,
 				Reason:    "duplicate_within_window",
-				Additional: map[string]interface{}{
-					"dedup_key": dedupKey.String(),
-				},
 			})
-		// Increment deduped metric
 		if oc.observationsDeduped != nil {
 			oc.observationsDeduped.Inc()
 		}
-		return nil // Skip duplicate, but don't error
+		if oc.optimizationMetrics != nil {
+			oc.recordEventDeduped(source)
+		}
+		return nil
 	}
+
+	// STEP 3: CREATE
+	return oc.createObservation(ctx, observation, source)
+}
+
+// processDedupFirst processes with dedup-first order: Dedup → Filter → Create
+func (oc *ObservationCreator) processDedupFirst(ctx context.Context, observation *unstructured.Unstructured, source string) error {
+	// STEP 1: DEDUP
+	dedupKey := oc.extractDedupKey(observation)
+	if !oc.deduper.ShouldCreateWithContent(dedupKey, observation.Object) {
+		logger.Debug("Skipping duplicate observation within window",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "observation_dedup",
+				Source:    source,
+				Reason:    "duplicate_within_window",
+			})
+		if oc.observationsDeduped != nil {
+			oc.observationsDeduped.Inc()
+		}
+		if oc.optimizationMetrics != nil {
+			oc.recordEventDeduped(source)
+		}
+		return nil
+	}
+
+	// STEP 2: FILTER
+	if oc.filter != nil {
+		allowed, reason := oc.filter.AllowWithReason(observation)
+		if !allowed {
+			if oc.observationsFiltered != nil {
+				oc.observationsFiltered.WithLabelValues(source, reason).Inc()
+			}
+			if oc.optimizationMetrics != nil {
+				oc.recordEventFiltered(source, reason)
+			}
+			return nil
+		}
+	}
+
+	// STEP 3: CREATE
+	return oc.createObservation(ctx, observation, source)
+}
+
+// determineProcessingOrder determines the processing order for a source
+func (oc *ObservationCreator) determineProcessingOrder(source string) ProcessingOrder {
+	var sourceConfig *config.SourceConfig
+	if oc.sourceConfigLoader != nil {
+		sourceConfig = oc.sourceConfigLoader.GetSourceConfig(source)
+	}
+
+	// Get current metrics for this source
+	var sourceMetrics *SourceMetrics
+	if oc.optimizationMetrics != nil {
+		sourceMetrics = oc.getSourceMetrics(source)
+	}
+
+	// Determine optimal order
+	optimalOrder := DetermineOptimalOrder(source, sourceConfig, sourceMetrics)
+
+	// Check if order changed and log it
+	oc.orderMu.Lock()
+	oldOrder, exists := oc.currentOrder[source]
+	if !exists || oldOrder != optimalOrder {
+		if exists {
+			logger.Info("Processing order changed",
+				logger.Fields{
+					Component: "watcher",
+					Operation: "order_change",
+					Source:    source,
+					Additional: map[string]interface{}{
+						"old_order": string(oldOrder),
+						"new_order": string(optimalOrder),
+						"reason":    "auto_optimization",
+					},
+				})
+		}
+		oc.currentOrder[source] = optimalOrder
+	}
+	oc.orderMu.Unlock()
+
+	return optimalOrder
+}
+
+// getSourceMetrics gets current metrics for a source from optimization metrics
+func (oc *ObservationCreator) getSourceMetrics(source string) *SourceMetrics {
+	if oc.optimizationMetrics == nil {
+		return nil
+	}
+
+	oc.optimizationMetrics.countersMu.RLock()
+	defer oc.optimizationMetrics.countersMu.RUnlock()
+
+	counters, exists := oc.optimizationMetrics.sourceCounters[source]
+	if !exists {
+		return nil
+	}
+
+	// Calculate metrics
+	lowSeverityPercent := 0.0
+	if counters.totalCount > 0 {
+		lowSeverityPercent = float64(counters.lowSeverity) / float64(counters.totalCount)
+	}
+
+	dedupEffectiveness := 0.0
+	totalProcessed := counters.created + counters.deduped
+	if totalProcessed > 0 {
+		dedupEffectiveness = float64(counters.deduped) / float64(totalProcessed)
+	}
+
+	obsPerMinute := 0.0
+	now := time.Now()
+	timeWindow := now.Sub(counters.lastUpdate)
+	if timeWindow > 0 && timeWindow < 5*time.Minute {
+		obsPerMinute = float64(counters.created) / timeWindow.Minutes()
+	}
+
+	return &SourceMetrics{
+		Source:                source,
+		ObservationsPerMinute: obsPerMinute,
+		LowSeverityPercent:    lowSeverityPercent,
+		DedupEffectiveness:    dedupEffectiveness,
+		TotalObservations:     counters.totalCount,
+		FilteredCount:         counters.filtered,
+		DedupedCount:          counters.deduped,
+		CreatedCount:          counters.created,
+	}
+}
+
+// createObservation creates the observation (extracted from original CreateObservation)
+func (oc *ObservationCreator) createObservation(ctx context.Context, observation *unstructured.Unstructured, source string) error {
 
 	// Extract namespace from observation
 	namespace, found, _ := unstructured.NestedString(observation.Object, "metadata", "namespace")
@@ -147,10 +386,11 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 		unstructured.SetNestedMap(observation.Object, metadata, "metadata")
 	}
 
-	// Extract category and severity from spec for metrics BEFORE creation
+	// Extract category, severity, and eventType from spec for metrics BEFORE creation
 	// Use NestedFieldCopy to handle interface{} types, then convert to string
 	categoryVal, categoryFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "category")
 	severityVal, severityFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "severity")
+	eventTypeVal, eventTypeFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "eventType")
 	category := ""
 	if categoryVal != nil {
 		category = fmt.Sprintf("%v", categoryVal)
@@ -167,6 +407,17 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 		severity = fmt.Sprintf("%v", severityVal)
 	} else if !severityFound {
 		logger.Debug("Severity not found in spec",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "observation_create",
+				Source:    source,
+			})
+	}
+	eventType := ""
+	if eventTypeVal != nil {
+		eventType = fmt.Sprintf("%v", eventTypeVal)
+	} else if !eventTypeFound {
+		logger.Debug("EventType not found in spec",
 			logger.Fields{
 				Component: "watcher",
 				Operation: "observation_create",
@@ -209,7 +460,13 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 		oc.observationsCreated.WithLabelValues(source).Inc()
 	}
 
-	// Increment eventsTotal metric - this tracks events by source/category/severity
+	// Record created event for optimization metrics
+	if oc.optimizationMetrics != nil {
+		oc.recordEventCreated(source, severity)
+		oc.updateOptimizationMetrics(source)
+	}
+
+	// Increment eventsTotal metric - this tracks events by source/category/severity/eventType/namespace/kind
 	// Only increment AFTER observation CRD is successfully created
 	if oc.eventsTotal != nil {
 		if category == "" {
@@ -218,7 +475,34 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 		if severity == "" {
 			severity = "UNKNOWN"
 		}
-		oc.eventsTotal.WithLabelValues(source, category, severity).Inc()
+		if eventType == "" {
+			eventType = "unknown"
+		}
+		
+		// Extract namespace and kind from resource
+		resourceNamespace := namespace // Use observation namespace as fallback
+		resourceKind := ""
+		resourceVal, _, _ := unstructured.NestedMap(observation.Object, "spec", "resource")
+		if resourceVal != nil {
+			if ns, ok := resourceVal["namespace"].(string); ok && ns != "" {
+				resourceNamespace = ns
+			} else if ns, ok := resourceVal["namespace"].(interface{}); ok {
+				resourceNamespace = fmt.Sprintf("%v", ns)
+			}
+			if k, ok := resourceVal["kind"].(string); ok && k != "" {
+				resourceKind = k
+			} else if k, ok := resourceVal["kind"].(interface{}); ok {
+				resourceKind = fmt.Sprintf("%v", k)
+			}
+		}
+		if resourceNamespace == "" {
+			resourceNamespace = "default"
+		}
+		if resourceKind == "" {
+			resourceKind = "Unknown"
+		}
+		
+		oc.eventsTotal.WithLabelValues(source, category, severity, eventType, resourceNamespace, resourceKind).Inc()
 		logger.Debug("Metric incremented after observation creation",
 			logger.Fields{
 				Component: "watcher",
@@ -227,8 +511,11 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 				Additional: map[string]interface{}{
 					"category":              category,
 					"severity":              severity,
+					"eventType":             eventType,
 					"observation_name":      createdObservation.GetName(),
 					"observation_namespace": namespace,
+					"resource_namespace":    resourceNamespace,
+					"resource_kind":         resourceKind,
 				},
 			})
 	} else {
@@ -430,4 +717,150 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 	// Set TTL in spec (only if not already set)
 	spec["ttlSecondsAfterCreation"] = defaultTTLSeconds
 	unstructured.SetNestedMap(observation.Object, spec, "spec")
+}
+
+// recordEventAttempted records that an event was attempted
+func (oc *ObservationCreator) recordEventAttempted(source string) {
+	if oc.optimizationMetrics == nil {
+		return
+	}
+	oc.optimizationMetrics.countersMu.Lock()
+	defer oc.optimizationMetrics.countersMu.Unlock()
+	
+	if oc.optimizationMetrics.sourceCounters == nil {
+		oc.optimizationMetrics.sourceCounters = make(map[string]*sourceCounters)
+	}
+	
+	if _, exists := oc.optimizationMetrics.sourceCounters[source]; !exists {
+		oc.optimizationMetrics.sourceCounters[source] = &sourceCounters{
+			lastUpdate: time.Now(),
+		}
+	}
+	oc.optimizationMetrics.sourceCounters[source].attempted++
+}
+
+// recordEventFiltered records that an event was filtered
+func (oc *ObservationCreator) recordEventFiltered(source, reason string) {
+	if oc.optimizationMetrics == nil {
+		return
+	}
+	oc.optimizationMetrics.countersMu.Lock()
+	defer oc.optimizationMetrics.countersMu.Unlock()
+	
+	if oc.optimizationMetrics.sourceCounters == nil {
+		oc.optimizationMetrics.sourceCounters = make(map[string]*sourceCounters)
+	}
+	
+	if _, exists := oc.optimizationMetrics.sourceCounters[source]; !exists {
+		oc.optimizationMetrics.sourceCounters[source] = &sourceCounters{
+			lastUpdate: time.Now(),
+		}
+	}
+	oc.optimizationMetrics.sourceCounters[source].filtered++
+}
+
+// recordEventDeduped records that an event was deduplicated
+func (oc *ObservationCreator) recordEventDeduped(source string) {
+	if oc.optimizationMetrics == nil {
+		return
+	}
+	oc.optimizationMetrics.countersMu.Lock()
+	defer oc.optimizationMetrics.countersMu.Unlock()
+	
+	if oc.optimizationMetrics.sourceCounters == nil {
+		oc.optimizationMetrics.sourceCounters = make(map[string]*sourceCounters)
+	}
+	
+	if _, exists := oc.optimizationMetrics.sourceCounters[source]; !exists {
+		oc.optimizationMetrics.sourceCounters[source] = &sourceCounters{
+			lastUpdate: time.Now(),
+		}
+	}
+	oc.optimizationMetrics.sourceCounters[source].deduped++
+}
+
+// recordEventCreated records that an event was created
+func (oc *ObservationCreator) recordEventCreated(source, severity string) {
+	if oc.optimizationMetrics == nil {
+		return
+	}
+	oc.optimizationMetrics.countersMu.Lock()
+	defer oc.optimizationMetrics.countersMu.Unlock()
+	
+	if oc.optimizationMetrics.sourceCounters == nil {
+		oc.optimizationMetrics.sourceCounters = make(map[string]*sourceCounters)
+	}
+	
+	if _, exists := oc.optimizationMetrics.sourceCounters[source]; !exists {
+		oc.optimizationMetrics.sourceCounters[source] = &sourceCounters{
+			lastUpdate: time.Now(),
+		}
+	}
+	oc.optimizationMetrics.sourceCounters[source].created++
+	oc.optimizationMetrics.sourceCounters[source].totalCount++
+	
+	// Track low severity
+	if strings.ToUpper(severity) == "LOW" || strings.ToUpper(severity) == "INFO" {
+		oc.optimizationMetrics.sourceCounters[source].lowSeverity++
+	}
+	
+	// Update severity distribution
+	if oc.optimizationMetrics.SeverityDistribution != nil {
+		oc.optimizationMetrics.SeverityDistribution.WithLabelValues(source, strings.ToUpper(severity)).Inc()
+	}
+}
+
+// updateOptimizationMetrics calculates and updates optimization metrics
+func (oc *ObservationCreator) updateOptimizationMetrics(source string) {
+	if oc.optimizationMetrics == nil {
+		return
+	}
+	
+	oc.optimizationMetrics.countersMu.RLock()
+	counters, exists := oc.optimizationMetrics.sourceCounters[source]
+	oc.optimizationMetrics.countersMu.RUnlock()
+	
+	if !exists || counters.attempted == 0 {
+		return
+	}
+	
+	// Calculate filter pass rate: (created + deduped) / attempted
+	filterPassRate := float64(counters.created+counters.deduped) / float64(counters.attempted)
+	if oc.optimizationMetrics.FilterPassRate != nil {
+		oc.optimizationMetrics.FilterPassRate.WithLabelValues(source).Set(filterPassRate)
+	}
+	
+	// Calculate dedup effectiveness: deduped / (created + deduped)
+	totalProcessed := counters.created + counters.deduped
+	dedupEffectiveness := 0.0
+	if totalProcessed > 0 {
+		dedupEffectiveness = float64(counters.deduped) / float64(totalProcessed)
+	}
+	if oc.optimizationMetrics.DedupEffectiveness != nil {
+		oc.optimizationMetrics.DedupEffectiveness.WithLabelValues(source).Set(dedupEffectiveness)
+	}
+	
+	// Calculate low severity percent
+	lowSeverityPercent := 0.0
+	if counters.totalCount > 0 {
+		lowSeverityPercent = float64(counters.lowSeverity) / float64(counters.totalCount)
+	}
+	if oc.optimizationMetrics.LowSeverityPercent != nil {
+		oc.optimizationMetrics.LowSeverityPercent.WithLabelValues(source).Set(lowSeverityPercent)
+	}
+	
+	// Calculate observations per minute (simplified - uses time window)
+	now := time.Now()
+	timeWindow := now.Sub(counters.lastUpdate)
+	if timeWindow > 0 && timeWindow < 5*time.Minute {
+		// Only update if within reasonable window
+		obsPerMinute := float64(counters.created) / timeWindow.Minutes()
+		if oc.optimizationMetrics.ObservationsPerMinute != nil {
+			oc.optimizationMetrics.ObservationsPerMinute.WithLabelValues(source).Set(obsPerMinute)
+		}
+		obsPerHour := obsPerMinute * 60
+		if oc.optimizationMetrics.ObservationsPerHour != nil {
+			oc.optimizationMetrics.ObservationsPerHour.WithLabelValues(source).Set(obsPerHour)
+		}
+	}
 }

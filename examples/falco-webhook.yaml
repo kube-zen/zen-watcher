@@ -1,0 +1,36 @@
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: falco-config
+spec:
+  source: falco
+  adapterType: webhook
+  webhook:
+    path: /falco
+    port: 8080
+    bufferSize: 200
+    auth:
+      type: bearer
+      secretName: falco-webhook-token
+  normalization:
+    domain: security
+    type: runtime_threat
+    priority:
+      Critical: 0.9
+      Warning: 0.6
+      Notice: 0.3
+    fieldMapping:
+      - from: rule
+        to: rule_name
+      - from: output
+        to: message
+  filter:
+    minPriority: 0.5
+  dedup:
+    window: "5m"
+    strategy: fingerprint
+  thresholds:
+    observationsPerMinute:
+      warning: 200
+      critical: 500
+

@@ -4,7 +4,7 @@
 1. [Overview](#overview)
 2. [Design Principles](#design-principles)
 3. [Component Architecture](#component-architecture)
-4. [Why CRDs Over WebSockets?](#why-crds-over-websockets)
+4. [Kubernetes-Native Event Consumption: Building Trust via CRDs](#kubernetes-native-event-consumption-building-trust-via-crds)
 5. [Data Flow](#data-flow)
 6. [Security Model](#security-model)
 7. [Performance Characteristics](#performance-characteristics)
@@ -21,10 +21,10 @@ Zen Watcher is a Kubernetes-native security event aggregator that consolidates e
 - **Standalone**: Works completely independently, no external services required
 - **Pure & Secure**: Zero egress traffic, zero secrets, zero external dependencies
 - **Kubernetes-native**: Stores data as CRDs in etcd, no external database
-- **Modular**: 6 first-class source adapters + 1 generic CRD adapter for extensibility
-- **Efficient**: <100m CPU, <50MB RAM under normal load (tested with 6 sources)
+- **Modular**: 8 first-class source adapters + 1 generic CRD adapter for extensibility
+- **Efficient**: <100m CPU, <50MB RAM under normal load (tested with 8 sources)
 - **Observable**: 20+ Prometheus metrics, structured logging, health endpoints
-- **Cluster-Blind**: No cluster/tenant metadata - pure event aggregation
+- **Infrastructure-Blind**: Avoids cluster-unique identifiers (AWS account ID, GKE project name) while preserving Kubernetes-native context (namespace, name, kind) for RBAC, auditing, and multi-tenancy
 - **Extensible**: ObservationMapping CRD enables custom CRD integration without code
 
 ---
@@ -63,6 +63,52 @@ See [docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md) for the complete extensib
 - Read-only filesystem
 - Minimal privileges (ClusterRole with read-only access)
 - NetworkPolicy support
+
+### 6. **Intelligent Event Integrity**
+
+Zen Watcher uses multi-layered noise reduction to prevent alert fatigue and etcd bloat:
+
+- **SHA-256 content fingerprinting**: Hash of normalized event payload (source, category, severity, eventType, resource, critical details) ensures accurate duplicate detection
+- **Per-source token bucket rate limiting**: Prevents one noisy tool from overwhelming the system (configurable via `DEDUP_MAX_RATE_PER_SOURCE` and `DEDUP_RATE_BURST`)
+- **Time-bucketed deduplication**: Collapses repeating events within configurable windows (default 60s, configurable via `DEDUP_WINDOW_SECONDS`)
+- **LRU eviction**: Efficient memory management with configurable cache size (default 10,000 entries)
+
+This ensures <100ms CPU spikes and minimal etcd churn—even under firehose conditions.
+
+See [docs/DEDUPLICATION.md](DEDUPLICATION.md) for complete deduplication documentation.
+
+### 7. **Pure Core, Extensible Ecosystem: Zero Blast Radius Security**
+
+Zen Watcher follows a proven cloud-native pattern: **core is minimal; ecosystem extends it**. This architectural choice delivers a critical security guarantee: **zero blast radius in the event of compromise**.
+
+> 🔑 **Zen Watcher core stays pure**:  
+> - Only watches sources → writes `Observation` CRDs  
+> - **Zero egress traffic**  
+> - **Zero secrets or credentials**  
+> - **Zero external dependencies**
+
+**The Security Promise:**
+
+Because the core component **never holds API keys** for Slack, Splunk, PagerDuty, or any external syncs, a compromise exposes **zero credentials**. This makes the core component **inherently zero trust compliant** and eliminates the need to run it in highly privileged lockdown network zones.
+
+**How It Works:**
+
+This mirrors the pattern used by major CNCF projects:
+- **Prometheus**: Collects metrics, but doesn't handle alert destination secrets—AlertManager does that
+- **Flux**: Reconciles git state, but offloads application operations to other controllers
+- **Zen Watcher**: Core only aggregates to etcd—all sensitive external operations live strictly outside that perimeter, managed by separate controllers and RBAC
+
+**Architecture:**
+```
+Zen Watcher Core (Pure)
+  ↓ (Observation CRDs)
+  ├─ kubewatch / Robusta (Slack, PagerDuty) ← Secrets live here
+  └─ Custom Controllers (SIEM, etc.) ← Secrets live here
+```
+
+This separation ensures that even if the core is compromised, **no credentials can be leaked** because they simply don't exist in the core component.
+
+> 💡 **For compliance-heavy or highly regulated environments**, this zero blast radius guarantee is the primary differentiator. You can deploy zen-watcher core with confidence, knowing that compromise cannot expose external system credentials.
 
 ---
 
@@ -190,24 +236,20 @@ All event sources (informer, webhook, configmap) use the **same centralized flow
 
 ---
 
-## Why CRDs Over WebSockets?
+## Kubernetes-Native Event Consumption: Building Trust via CRDs
 
-**KEP Reviewer Question**: "How do external systems consume the Observations efficiently?"
+Zen Watcher uses Kubernetes Custom Resource Definitions (CRDs) as its primary, intentional design choice for event consumption. This approach delivers native integration with Kubernetes security, operations, and GitOps practices—enabling zero-trust event aggregation without compromise.
 
-Zen Watcher **intentionally chooses CRDs over WebSockets** as the consumption mechanism. This is a deliberate architectural decision that aligns with Kubernetes best practices and provides superior capabilities for enterprise use cases.
+### Consumption Methods
 
-### Design Decision: CRD-Based Consumption
-
-**Chosen Approach**: External systems consume Observations via:
+External systems consume Observations via:
 - **Kubernetes Informers** (recommended) - Real-time watch API
 - **kubectl/API queries** - Ad-hoc queries and exports
-- **kubewatcher** - Event routing to webhooks/CloudEvents
-
-**Rejected Approach**: WebSocket-based event streaming
+- **kubewatch / Robusta** - Event routing to webhooks/CloudEvents
 
 ### Why CRDs Provide Superior Value
 
-#### 1. **RBAC (Role-Based Access Control)**
+#### 2. **RBAC (Role-Based Access Control)**
 
 **CRDs**: Native Kubernetes RBAC enables fine-grained access control
 ```yaml
@@ -238,7 +280,7 @@ rules:
 - Must implement custom auth middleware
 - Difficult to audit and manage permissions
 
-#### 2. **Audit Logging**
+#### 3. **Audit Logging**
 
 **CRDs**: All access automatically logged in Kubernetes audit logs
 ```bash
@@ -251,7 +293,7 @@ kubectl get observations  # ← Logged in audit logs
 - No standard audit format
 - Difficult to correlate with Kubernetes operations
 
-#### 3. **GitOps Integration**
+#### 4. **GitOps Integration**
 
 **CRDs**: Native GitOps support via standard Kubernetes tools
 ```yaml
@@ -275,7 +317,7 @@ spec:
 - No declarative management
 - Cannot rollback or review history
 
-#### 4. **Durability**
+#### 5. **Durability**
 
 **CRDs**: Events persist in etcd until TTL expires
 - Survive pod restarts
@@ -287,7 +329,7 @@ spec:
 - Must handle missed events (backfill logic needed)
 - No historical query capability
 
-#### 5. **Multi-Reader Pattern**
+#### 1. **Multi-Reader Pattern** (Zero Coordination Required)
 
 **CRDs**: Multiple consumers can watch the same Observations independently
 ```go
@@ -329,9 +371,7 @@ obs, _ := client.Get(ctx, name, metav1.GetOptions{})
 
 ### Real-Time Consumption via Informers
 
-**Concern**: "But WebSockets are more real-time than CRDs!"
-
-**Response**: Kubernetes Informers provide real-time updates via the Watch API:
+Kubernetes Informers provide real-time updates via the Watch API:
 
 ```go
 // Real-time consumption (latency: <100ms)
@@ -373,7 +413,7 @@ informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 - External systems that cannot use Kubernetes APIs
 - Real-time dashboards that don't need persistence
 
-**For zen-watcher's use case** (security/compliance event aggregation in Kubernetes), CRDs are the superior choice. External systems can consume Observations efficiently via Kubernetes Informers, kubewatcher, or standard API queries—all while benefiting from native Kubernetes capabilities.
+**For zen-watcher's use case** (security/compliance event aggregation in Kubernetes), CRDs are the superior choice. External systems can consume Observations efficiently via kubewatch, Robusta, Kubernetes Informers, or standard API queries—all while benefiting from native Kubernetes capabilities.
 
 ---
 
@@ -444,53 +484,64 @@ Create Observation with category=compliance
 
 ### 2. Event Processing Pipeline
 
-**Centralized Flow (All Sources):**
+All events from any source (informer, webhook, ConfigMap) flow through the same centralized processing pipeline:
+
+```mermaid
+graph LR
+    A[Event Source<br/>Informer/Webhook/ConfigMap] --> B[FILTER<br/>Source-level filtering]
+    B -->|if allowed| C[NORMALIZE<br/>Severity/Category/EventType]
+    C --> D[DEDUP<br/>SHA-256 fingerprinting<br/>Rate limiting]
+    D -->|if not duplicate| E[CREATE CRD<br/>Observation CRD]
+    E --> F[METRICS<br/>Update counters]
+    E --> G[LOG<br/>Structured logging]
+    
+    style B fill:#fff3e0
+    style C fill:#e8f5e9
+    style D fill:#e3f2fd
+    style E fill:#f3e5f5
+    style F fill:#fce4ec
+    style G fill:#fce4ec
 ```
-┌─────────────────┐
-│  Event Source   │
-│ (informer/cm/   │
-│  webhook)       │
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│   FILTER()      │ ← Source-level filtering (ConfigMap-based)
-│                 │   • MinSeverity per source
-│                 │   • Exclude/Include event types
-│                 │   • Exclude/Include namespaces
-│                 │   • Exclude/Include kinds
-│                 │   • Exclude/Include categories
-│                 │   • Enable/Disable sources
-└────────┬────────┘
-         │ (if allowed)
-         ▼
-┌─────────────────┐
-│  NORMALIZE()    │ ← Map to standard categories/severities
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│   DEDUP()       │ ← Sliding window deduplication (LRU + TTL)
-│                 │   • Window: 60s (configurable)
-│                 │   • Max cache: 10k entries (configurable)
-│                 │   • Key: source/namespace/kind/name/reason/messageHash
-└────────┬────────┘
-         │ (if not duplicate)
-         ▼
-┌─────────────────┐
-│ CRD Creation    │ ← Create Observation CRD
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│ Metrics Update  │ ← Increment counters (source/category/severity)
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│     LOG()       │ ← Structured logging
-└─────────────────┘
-```
+
+**Processing Steps:**
+
+1. **FILTER** - Source-level filtering (ConfigMap-based)
+   - MinSeverity per source
+   - Exclude/Include event types, namespaces, kinds, categories
+   - Enable/Disable sources
+   - Filtered events never proceed to next steps
+
+2. **NORMALIZE** - Map to standard format
+   - Severity: Normalize to uppercase (CRITICAL, HIGH, MEDIUM, LOW)
+   - Category: Assign standard category (security, compliance, performance)
+   - EventType: Map to standard event types
+   - Resource: Normalize Kubernetes resource references
+
+3. **DEDUP** - Deduplication and rate limiting
+   - SHA-256 content fingerprinting of normalized event
+   - Per-source token bucket rate limiting
+   - Time-bucketed deduplication window
+   - Duplicate events skip CRD creation
+
+4. **CREATE CRD** - Observation CRD creation
+   - Create Observation CRD in Kubernetes
+   - Store in etcd
+   - Set TTL if configured
+
+5. **METRICS** - Update Prometheus metrics
+   - Increment observation counters (by source, category, severity)
+   - Update processing latency histograms
+   - Track deduplication and filtering metrics
+
+6. **LOG** - Structured logging
+   - Log observation creation
+   - Include correlation IDs
+   - Log filtering and deduplication decisions
+
+**Key Principle:**
+- All steps are centralized in `ObservationCreator.CreateObservation()`
+- No duplicated code across different source processors
+- Single point of control for the entire pipeline
 
 **Key Architectural Principle:**
 - **Filtering MUST happen before CRD creation** - Filtered events never create CRDs, update metrics, or generate logs

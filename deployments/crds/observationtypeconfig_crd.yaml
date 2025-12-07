@@ -1,0 +1,131 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: observationtypeconfigs.zen.kube-zen.io
+spec:
+  group: zen.kube-zen.io
+  names:
+    kind: ObservationTypeConfig
+    listKind: ObservationTypeConfigList
+    plural: observationtypeconfigs
+    singular: observationtypeconfig
+    shortNames:
+      - obstypeconfig
+      - otc
+  scope: Namespaced
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required: ["type", "domain"]
+              properties:
+                type:
+                  type: string
+                  description: "Which event type this configures (vulnerability, certificate_expiring, policy_violation, etc.)"
+                  pattern: "^[a-z0-9_]+$"
+                domain:
+                  type: string
+                  description: "Domain classification: security, operations, cost, compliance, or custom"
+                  enum:
+                    - security
+                    - operations
+                    - cost
+                    - compliance
+                    - custom
+                priority:
+                  type: object
+                  description: "Priority mapping from source values to 0.0-1.0 priority scores"
+                  additionalProperties:
+                    type: number
+                    minimum: 0.0
+                    maximum: 1.0
+                  x-kubernetes-preserve-unknown-fields: true
+                fieldMapping:
+                  type: array
+                  description: "Field mappings from raw data path to observation labels"
+                  items:
+                    type: object
+                    required: ["from", "to"]
+                    properties:
+                      from:
+                        type: string
+                        description: "JSONPath to extract value from raw data (e.g., '$.certificate.name' or '$.severity')"
+                      to:
+                        type: string
+                        description: "Label name to set (e.g., 'certificate-name' or 'severity')"
+                      transform:
+                        type: string
+                        description: "Optional transform function: lower, upper, truncate:50, etc."
+                templates:
+                  type: object
+                  description: "Go template strings for title and description generation"
+                  properties:
+                    title:
+                      type: string
+                      description: "Go template for observation title (access fields via .raw, .type, etc.)"
+                    description:
+                      type: string
+                      description: "Go template for observation description"
+                resourceExtraction:
+                  type: object
+                  description: "How to extract Kubernetes resources from raw data"
+                  properties:
+                    strategy:
+                      type: string
+                      description: "Extraction strategy: jsonpath, k8s_owner, or manual"
+                      enum:
+                        - jsonpath
+                        - k8s_owner
+                        - manual
+                    jsonpath:
+                      type: string
+                      description: "JSONPath expression to find resources array (if strategy=jsonpath)"
+                    k8sOwner:
+                      type: object
+                      description: "Extract owner reference from Kubernetes resource (if strategy=k8s_owner)"
+                      properties:
+                        apiVersionField:
+                          type: string
+                          description: "Field path in raw data containing apiVersion"
+                        kindField:
+                          type: string
+                          description: "Field path in raw data containing kind"
+                        nameField:
+                          type: string
+                          description: "Field path in raw data containing name"
+                        namespaceField:
+                          type: string
+                          description: "Field path in raw data containing namespace (optional)"
+                    manual:
+                      type: array
+                      description: "Manually specified resources (if strategy=manual)"
+                      items:
+                        type: object
+                        properties:
+                          apiVersion:
+                            type: string
+                          kind:
+                            type: string
+                          name:
+                            type: string
+                          namespace:
+                            type: string
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Type
+          type: string
+          jsonPath: .spec.type
+        - name: Domain
+          type: string
+          jsonPath: .spec.domain
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+

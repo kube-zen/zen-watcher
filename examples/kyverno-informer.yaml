@@ -1,0 +1,35 @@
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: kyverno-config
+spec:
+  source: kyverno
+  adapterType: informer
+  informer:
+    gvr:
+      group: wgpolicyk8s.io
+      version: v1alpha2
+      resource: policyreports
+    resyncPeriod: "15m"
+  normalization:
+    domain: security
+    type: policy_violation
+    priority:
+      fail: 0.8
+      warn: 0.5
+      error: 0.9
+    fieldMapping:
+      - from: policy
+        to: policy_name
+      - from: rule
+        to: rule_name
+  filter:
+    minPriority: 0.4
+  dedup:
+    window: "30m"
+    strategy: fingerprint
+  thresholds:
+    observationsPerMinute:
+      warning: 50
+      critical: 100
+

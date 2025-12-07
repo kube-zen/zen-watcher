@@ -64,6 +64,7 @@ The Observation CRD defines:
 #### Optional Fields
 
 - `spec.resource` - Affected Kubernetes resource
+  - `spec.resource.namespace` - **Intentionally preserved** to support granular RBAC policies (e.g., 'security-team can only view Observations in prod-* namespaces') and compliance auditing. This enables multi-tenancy controls while maintaining infrastructure-blind design (no cluster-unique identifiers like AWS account ID).
 - `spec.details` - Event-specific details (flexible JSON)
 - `spec.detectedAt` - Timestamp when event was detected
 - `spec.ttlSecondsAfterCreation` - TTL in seconds after creation (Kubernetes native style, like Jobs). Observation will be deleted by GC after this duration. If not set, uses default TTL from GC configuration.

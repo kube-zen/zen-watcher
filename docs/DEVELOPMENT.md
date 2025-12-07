@@ -409,7 +409,9 @@ sleep 60
 kubectl get observations -A
 
 # 6. Cleanup (if using local cluster)
-#    k3d cluster delete zen-test
+#    Recommended: Use cleanup script (works with k3d, kind, minikube)
+#    ZEN_CLUSTER_NAME=zen-test ./scripts/cleanup-demo.sh k3d
+#    Or manually: k3d cluster delete zen-test
 ```
 
 ### Manual Smoke Test
@@ -598,8 +600,8 @@ git commit --no-verify -m "message"
 ## Resources
 
 - **Main README**: [../README.md](../README.md)
-- **Architecture**: [../ARCHITECTURE.md](../ARCHITECTURE.md)
-- **Developer Guide**: [../DEVELOPER_GUIDE.md](../DEVELOPER_GUIDE.md)
+- **Architecture**: [ARCHITECTURE.md](ARCHITECTURE.md)
+- **Developer Guide**: [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
 - **Contributing**: [../CONTRIBUTING.md](../CONTRIBUTING.md)
 - **Security**: [SECURITY.md](SECURITY.md)
 

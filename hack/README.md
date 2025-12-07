@@ -126,8 +126,9 @@ This directory contains helpful scripts for installing, testing, and managing Ze
 
 ### Test Quick Demo
 ```bash
-# Clean start
-k3d cluster delete zen-demo
+# Clean start (recommended: use cleanup script for all platforms)
+./hack/cleanup-demo.sh k3d
+# Or manually: k3d cluster delete zen-demo
 ./hack/quick-demo.sh
 ```
 
@@ -176,7 +177,7 @@ GRAFANA_PORT=3200 ./hack/quick-demo.sh
 ## 📚 More Information
 
 - **[Deployment Scenarios](../docs/DEPLOYMENT_SCENARIOS.md)** - Complete guide
-- **[Quick Start](../QUICK_START.md)** - Manual steps
+- **[Quick Start](../QUICK_START.md)** - Manual steps (in root)
 - **[Helm Chart](../charts/zen-watcher/README.md)** - Production deployment
 
 ---

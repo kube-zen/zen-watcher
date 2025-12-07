@@ -2,11 +2,46 @@
 
 This guide explains how to add support for new event sources to Zen Watcher. The Source Adapter interface makes it easy to integrate any tool that emits security, compliance, or infrastructure events.
 
+## 🎯 Adding a New Source: Just YAML!
+
+**You don't need to write any code to add a new source!** Zen Watcher supports **four input methods** that can all be configured via YAML using the `ObservationSourceConfig` CRD:
+
+1. **🔍 Logs** - Monitor pod logs with regex patterns
+2. **📡 Webhooks** - Receive HTTP webhooks from external tools
+3. **🗂️ ConfigMaps** - Poll ConfigMaps for batch results
+4. **📋 CRDs (Informers)** - Watch Kubernetes Custom Resource Definitions
+
+### Quick Example: Adding a Source from Logs
+
+```yaml
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: my-custom-source
+  namespace: zen-system
+spec:
+  source: my-tool
+  adapterType: logs
+  logs:
+    podSelector: app=my-tool
+    patterns:
+      - regex: "ERROR.*(?P<message>.*)"
+        type: error
+        priority: 0.8
+      - regex: "WARN.*(?P<message>.*)"
+        type: warning
+        priority: 0.5
+```
+
+That's it! No code changes, no recompilation—just apply the YAML and zen-watcher will start collecting observations.
+
+See [Generic Source Configuration](#generic-source-configuration-via-yaml) below for complete examples of all input methods.
+
 ## Two-Tier Adapter Approach
 
 Zen Watcher uses a **two-tier adapter strategy** that balances reliability with extensibility:
 
-### Tier 1: First-Class Adapters (The "Big Six")
+### Tier 1: First-Class Adapters (The "Big Eight")
 
 **Official adapters** implemented in Go code for core security tools:
 - ✅ **TrivyAdapter** - Vulnerability scanning
@@ -15,6 +50,8 @@ Zen Watcher uses a **two-tier adapter strategy** that balances reliability with 
 - ✅ **AuditAdapter** - Kubernetes audit events
 - ✅ **KubeBenchAdapter** - CIS benchmark compliance
 - ✅ **CheckovAdapter** - Infrastructure-as-code security
+- ✅ **CertManagerAdapter** - Certificate lifecycle monitoring
+- ✅ **SealedSecretsAdapter** - Sealed secret decryption failures
 
 **Why first-class adapters?**
 - ✅ **Strong semantics** - Hand-tested mappings ensure Observations are well-formed
@@ -44,7 +81,467 @@ Zen Watcher uses a **two-tier adapter strategy** that balances reliability with 
 | Internal/company-specific CRD | ❌ | ✅ |
 | Vendor-provided mapping | ❌ | ✅ |
 
-See [Generic CRD Adapter](#generic-crd-adapter-observationmapping) section below for details on using `ObservationMapping` CRDs.
+See [Generic Source Configuration](#generic-source-configuration-via-yaml) section below for complete examples of all input methods.
+
+---
+
+## Generic Source Configuration (Via YAML)
+
+**No code required!** Zen Watcher supports four input methods that can all be configured using the `ObservationSourceConfig` CRD:
+
+### Input Methods Overview
+
+| Method | Use Case | Configuration Type |
+|--------|----------|-------------------|
+| **Logs** | Monitor pod logs, parse log lines with regex | `adapterType: logs` |
+| **Webhooks** | Receive HTTP webhooks from external tools | `adapterType: webhook` |
+| **ConfigMaps** | Poll ConfigMaps for batch scan results | `adapterType: configmap` |
+| **CRDs (Informers)** | Watch Kubernetes Custom Resource Definitions | `adapterType: informer` |
+
+### Method 1: Logs Adapter
+
+Monitor pod logs and extract events using regex patterns:
+
+```yaml
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: sealed-secrets-source
+  namespace: zen-system
+spec:
+  source: sealed-secrets
+  adapterType: logs
+  logs:
+    podSelector: app=sealed-secrets-controller
+    container: sealed-secrets-controller
+    patterns:
+      - regex: 'Error decrypting secret (?P<namespace>\S+)/(?P<name>\S+): (?P<message>.*)'
+        type: decryption_failure
+        priority: 0.9  # HIGH severity
+      - regex: 'Unable to decrypt: (?P<message>.*)'
+        type: decryption_error
+        priority: 0.7  # MEDIUM severity
+    sinceSeconds: 300  # Only read last 5 minutes
+    pollInterval: "1s" # Check for new pods every second
+  normalization:
+    domain: security
+    type: sealed_secret_error
+```
+
+**How it works:**
+- Watches all pods matching the label selector
+- Streams logs from the specified container
+- Matches log lines against regex patterns
+- Creates Observations when patterns match
+- Named capture groups populate `details`
+
+### Method 2: Webhook Adapter
+
+Receive HTTP webhooks from external tools:
+
+```yaml
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: custom-webhook-source
+  namespace: zen-system
+spec:
+  source: my-external-tool
+  adapterType: webhook
+  webhook:
+    path: /webhook/my-tool
+    port: 8080
+    bufferSize: 200
+    auth:
+      type: bearer
+      secretName: webhook-auth-secret
+  normalization:
+    domain: security
+    type: custom_event
+```
+
+**How it works:**
+- Exposes HTTP endpoint at `:8080/webhook/my-tool`
+- Receives POST requests from external tools
+- Buffers events for processing
+- Supports bearer token or basic auth (optional)
+
+### Method 3: ConfigMap Adapter
+
+Poll ConfigMaps for batch scan results:
+
+```yaml
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: checkov-source
+  namespace: zen-system
+spec:
+  source: checkov
+  adapterType: configmap
+  configmap:
+    namespace: checkov
+    labelSelector: app=checkov
+    pollInterval: "5m"
+    jsonPath: "$.results[*]"  # Optional: extract nested data
+  normalization:
+    domain: security
+    type: iac_vulnerability
+```
+
+**How it works:**
+- Periodically polls ConfigMaps matching the label selector
+- Extracts data from ConfigMap keys
+- Parses JSON and creates Observations
+- Configurable poll interval (default: 5 minutes)
+
+### Method 4: CRD/Informer Adapter
+
+Watch Kubernetes Custom Resource Definitions:
+
+```yaml
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: cert-manager-source
+  namespace: zen-system
+spec:
+  source: cert-manager
+  adapterType: informer
+  informer:
+    gvr:
+      group: cert-manager.io
+      version: v1
+      resource: certificaterequests
+    namespace: ""  # Empty = watch all namespaces
+    labelSelector: ""  # Optional
+    resyncPeriod: "30m"  # Optional resync interval
+  normalization:
+    domain: operations
+    type: certificate_status
+```
+
+**How it works:**
+- Creates a Kubernetes informer for the specified CRD
+- Watches for Create/Update/Delete events
+- Real-time processing (no polling)
+- Automatically handles reconnection and resync
+
+### Complete Configuration Example
+
+Here's a full example with all optional features including auto-optimization, thresholds, and warnings:
+
+```yaml
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: comprehensive-example
+  namespace: zen-system
+spec:
+  source: my-tool
+  adapterType: logs
+  
+  # Adapter-specific configuration
+  logs:
+    podSelector: app=my-tool
+    container: main
+    patterns:
+      - regex: "ERROR: (?P<message>.*)"
+        type: error
+        priority: 0.8
+  
+  # Filtering (before processing)
+  filter:
+    minPriority: 0.5  # Ignore events below MEDIUM
+    excludeNamespaces:
+      - kube-system
+      - default
+    includeTypes:
+      - error
+      - warning
+  
+  # Deduplication
+  dedup:
+    window: "1h"
+    strategy: fingerprint  # or "key"
+  
+  # TTL configuration
+  ttl:
+    default: "7d"
+    min: "1h"
+    max: "30d"
+  
+  # Rate limiting
+  rateLimit:
+    maxPerMinute: 100
+    burst: 200
+  
+  # Normalization rules
+  normalization:
+    domain: security
+    type: custom_event
+    priority:
+      error: 0.8
+      warning: 0.5
+    fieldMapping:
+      - from: "$.message"
+        to: "message"
+      - from: "$.pod"
+        to: "pod_name"
+  
+  # Processing order and auto-optimization
+  processing:
+    order: auto  # auto, filter_first, or dedup_first
+    autoOptimize: true  # Enable automatic optimization
+  
+  # Thresholds for monitoring and alerts
+  thresholds:
+    observationsPerMinute:
+      warning: 100    # Warn if >100 observations/min
+      critical: 200   # Critical if >200 observations/min
+    lowSeverityPercent:
+      warning: 0.7    # Warn if >70% are LOW severity
+      critical: 0.9   # Critical if >90% are LOW severity
+    dedupEffectiveness:
+      warning: 0.3    # Warn if <30% effectiveness (more is better)
+      critical: 0.1   # Critical if <10% effectiveness
+    custom:
+      - name: "high_error_rate"
+        field: "$.error_count"
+        operator: ">"
+        value: 50
+        message: "Error count exceeded threshold"
+```
+
+---
+
+## Auto-Optimization
+
+Zen Watcher includes an intelligent auto-optimization system that learns from your cluster patterns and automatically adjusts processing order and filters.
+
+### How Auto-Optimization Works
+
+1. **Metrics Analysis**: Continuously analyzes metrics to understand event patterns
+2. **Pattern Detection**: Identifies optimization opportunities (high LOW severity, duplicates, etc.)
+3. **Automatic Adjustment**: Dynamically adjusts processing order and filter settings
+4. **Impact Tracking**: Measures and reports optimization effectiveness
+
+### Processing Order Modes
+
+Zen Watcher supports three processing order modes:
+
+| Mode | Description | When to Use |
+|------|-------------|-------------|
+| **auto** | Automatically learns and optimizes | **Recommended** - Let Zen Watcher decide |
+| **filter_first** | Filter before deduplication | High LOW severity (>70%), many events to filter |
+| **dedup_first** | Deduplicate before filtering | High duplicate rate (>50%), retry patterns |
+
+**Auto Mode Logic:**
+- If LOW severity > 70% → Uses `filter_first`
+- If dedup effectiveness > 50% → Uses `dedup_first`
+- Otherwise → Uses source-specific default
+
+### Enabling Auto-Optimization
+
+```yaml
+spec:
+  processing:
+    order: auto
+    autoOptimize: true  # Enable automatic optimization
+```
+
+When enabled, Zen Watcher will:
+- Monitor metrics continuously
+- Adjust processing order based on patterns
+- Generate optimization suggestions
+- Track optimization impact
+
+### Optimization CLI Commands
+
+Zen Watcher provides CLI commands for optimization management:
+
+```bash
+# Analyze optimization opportunities
+zen-watcher-optimize --command=analyze --source=trivy
+
+# Enable auto-optimization globally
+zen-watcher-optimize --command=auto --enable
+
+# View optimization history
+zen-watcher-optimize --command=history --source=trivy
+
+# List all sources and their optimization status
+zen-watcher-optimize --command=list
+```
+
+See [docs/OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md) for complete CLI documentation.
+
+---
+
+## Thresholds and Warnings
+
+Configure thresholds to get early warnings about potential issues before they become critical.
+
+### Supported Thresholds
+
+#### 1. Observation Rate Thresholds
+
+Monitor the rate of observations being created:
+
+```yaml
+thresholds:
+  observationsPerMinute:
+    warning: 100    # Warn if >100 observations/minute
+    critical: 200   # Critical if >200 observations/minute
+```
+
+**Use Case**: Alert when a source is generating too many events (e.g., misconfigured scanner).
+
+#### 2. Low Severity Ratio Thresholds
+
+Monitor the percentage of LOW severity observations:
+
+```yaml
+thresholds:
+  lowSeverityPercent:
+    warning: 0.7    # Warn if >70% are LOW severity
+    critical: 0.9   # Critical if >90% are LOW severity
+```
+
+**Use Case**: Detect when a source is generating too much noise (e.g., Trivy scanning everything).
+
+#### 3. Deduplication Effectiveness Thresholds
+
+Monitor how well deduplication is working:
+
+```yaml
+thresholds:
+  dedupEffectiveness:
+    warning: 0.3    # Warn if <30% effectiveness
+    critical: 0.1   # Critical if <10% effectiveness
+```
+
+**Use Case**: Detect when deduplication isn't working well (may need larger window or different strategy).
+
+#### 4. Custom Thresholds
+
+Define custom thresholds against raw event data:
+
+```yaml
+thresholds:
+  custom:
+    - name: "high_error_rate"
+      field: "$.error_count"
+      operator: ">"
+      value: 50
+      message: "Error count exceeded threshold"
+    - name: "missing_field"
+      field: "$.required_field"
+      operator: "=="
+      value: null
+      message: "Required field is missing"
+```
+
+**Supported Operators**: `>`, `<`, `==`, `!=`, `contains`
+
+### Threshold Alerts
+
+When thresholds are exceeded:
+
+1. **Prometheus Metrics**: `zen_watcher_threshold_exceeded_total{source,threshold}` is incremented
+2. **Structured Logs**: Warning/critical messages logged
+3. **Grafana Alerts**: Configure Prometheus alert rules (see `config/monitoring/optimization-alerts.yaml`)
+
+### Example: Complete Threshold Configuration
+
+```yaml
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: trivy-with-thresholds
+spec:
+  source: trivy
+  adapterType: informer
+  processing:
+    order: auto
+    autoOptimize: true
+  thresholds:
+    observationsPerMinute:
+      warning: 100
+      critical: 200
+    lowSeverityPercent:
+      warning: 0.7
+      critical: 0.9
+    dedupEffectiveness:
+      warning: 0.3
+      critical: 0.1
+    custom:
+      - name: "critical_vulnerability_rate"
+        field: "$.summary.criticalCount"
+        operator: ">"
+        value: 10
+        message: "High number of critical vulnerabilities detected"
+```
+
+---
+
+## Best Practices
+
+### 1. Start with Auto-Optimization
+
+Enable auto-optimization and let Zen Watcher learn your patterns:
+
+```yaml
+processing:
+  order: auto
+  autoOptimize: true
+```
+
+### 2. Set Reasonable Thresholds
+
+Configure thresholds based on your cluster size and requirements:
+
+- **Small clusters**: Lower observation rate thresholds (50-100/min)
+- **Large clusters**: Higher thresholds (200-500/min)
+- **High-noise sources** (e.g., Trivy): Lower LOW severity threshold (0.6-0.7)
+
+### 3. Monitor Optimization Metrics
+
+Watch Prometheus metrics to track optimization effectiveness:
+
+- `zen_watcher_filter_pass_rate{source}` - Filter effectiveness
+- `zen_watcher_dedup_effectiveness{source}` - Dedup effectiveness
+- `zen_watcher_low_severity_percent{source}` - LOW severity ratio
+- `zen_watcher_observations_per_minute{source}` - Observation rate
+
+### 4. Review Optimization Suggestions
+
+Use CLI commands to review and apply optimization suggestions:
+
+```bash
+# Analyze and see suggestions
+zen-watcher-optimize --command=analyze --source=trivy
+
+# Apply a specific suggestion
+zen-watcher-optimize --command=apply --source=trivy --suggestion=1
+```
+
+### 5. Configure Alert Rules
+
+Set up Prometheus alert rules to get notified when thresholds are exceeded:
+
+```yaml
+# See config/monitoring/optimization-alerts.yaml
+groups:
+  - name: zen_watcher_optimization
+    rules:
+      - alert: HighObservationRate
+        expr: zen_watcher_observations_per_minute > 100
+        annotations:
+          summary: "High observation rate detected"
+```
+
+See [docs/OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md) and [docs/AUTO_OPTIMIZATION_COMPLETE.md](AUTO_OPTIMIZATION_COMPLETE.md) for complete documentation.
 
 ---
 
@@ -414,6 +911,8 @@ Common event types:
 
 ### 6. Severity Normalization
 
+See [NORMALIZATION.md](NORMALIZATION.md) for complete normalization documentation.
+
 Always normalize to uppercase:
 - `CRITICAL` > `HIGH` > `MEDIUM` > `LOW` > `UNKNOWN`
 
@@ -631,7 +1130,7 @@ Before submitting a new source adapter:
   - `pkg/watcher/kube_bench_watcher.go` (configmap-based)
 
 - Check [CONTRIBUTING.md](../CONTRIBUTING.md) for contribution guidelines
-- Review [ARCHITECTURE.md](../ARCHITECTURE.md) for design principles
+- Review [ARCHITECTURE.md](ARCHITECTURE.md) for design principles
 
 ---
 

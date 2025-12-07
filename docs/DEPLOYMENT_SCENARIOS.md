@@ -4,12 +4,12 @@ This guide covers different deployment scenarios for Zen Watcher, from quick dem
 
 ---
 
-## 🚀 Quick Demo (One Command!)
+## Quick Demo
 
-**Perfect for**: Evaluation, testing, seeing Zen Watcher in action
+**Use cases**: Evaluation, testing, local development
 
 ```bash
-./hack/quick-demo.sh
+./scripts/quick-demo.sh
 ```
 
 **What it does**:
@@ -40,7 +40,7 @@ This guide covers different deployment scenarios for Zen Watcher, from quick dem
 
 ```bash
 # For production, use Helm charts or kubectl apply directly
-# For demo/testing, use: ./hack/quick-demo.sh
+# For demo/testing, use: ./scripts/quick-demo.sh
 ```
 
 **Installs**:
@@ -60,7 +60,7 @@ This guide covers different deployment scenarios for Zen Watcher, from quick dem
 **Situation**: You already have Prometheus and Grafana deployed
 
 ```bash
-# For demo/testing, use: ./hack/quick-demo.sh
+# For demo/testing, use: ./scripts/quick-demo.sh
 # For production, use Helm charts or kubectl apply directly
 # Example:
   --use-prometheus http://prometheus.monitoring.svc:9090 \
@@ -83,7 +83,7 @@ This guide covers different deployment scenarios for Zen Watcher, from quick dem
 **Situation**: Trivy, Falco, Kyverno already deployed
 
 ```bash
-# For demo/testing, use: ./hack/quick-demo.sh
+# For demo/testing, use: ./scripts/quick-demo.sh
 # For production, use Helm charts or kubectl apply directly
 # Example:
   --skip-tools \
@@ -104,7 +104,7 @@ This guide covers different deployment scenarios for Zen Watcher, from quick dem
 **Situation**: Full monitoring & security stack already deployed
 
 ```bash
-# For demo/testing, use: ./hack/quick-demo.sh
+# For demo/testing, use: ./scripts/quick-demo.sh
 # For production, use Helm charts or kubectl apply directly
 # Example:
   --skip-tools \
@@ -139,7 +139,7 @@ global:
   
 image:
   repository: your-registry.io/zen-watcher
-  tag: 1.0.0
+  tag: 1.0.0-alpha
   pullPolicy: Always
 
 replicas: 3
@@ -207,7 +207,7 @@ autoscaling:
 k3d cluster create zen-dev --agents 2
 
 # Install
-./hack/quick-demo.sh
+./scripts/quick-demo.sh
 ```
 
 **Or manually**:
@@ -226,7 +226,7 @@ helm install zen-watcher ./charts/zen-watcher \
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
 # Install
-# For demo/testing: ./hack/quick-demo.sh
+# For demo/testing: ./scripts/quick-demo.sh
 # For production: Use Helm charts or kubectl apply
 ```
 
@@ -248,7 +248,7 @@ helm install zen-watcher ./charts/zen-watcher \
 kind create cluster --name zen-test
 
 # Install
-./hack/quick-demo.sh
+./scripts/quick-demo.sh
 ```
 
 **For CI**:
@@ -269,7 +269,7 @@ helm install zen-watcher ./charts/zen-watcher \
 minikube start --cpus 4 --memory 8192
 
 # Install
-./hack/quick-demo.sh
+./scripts/quick-demo.sh
 ```
 
 **Access services**:
@@ -368,7 +368,7 @@ helm install zen-watcher ./charts/zen-watcher \
 Want to see what will be installed without making changes?
 
 ```bash
-# For demo/testing: ./hack/quick-demo.sh --non-interactive
+# For demo/testing: ./scripts/quick-demo.sh --non-interactive
 # For production: Review Helm values and use kubectl apply --dry-run
 ```
 

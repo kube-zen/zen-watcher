@@ -9,10 +9,29 @@ Zen Watcher supports **per-source filtering** to reduce noise, cost, and keep Ob
 
 **Flow:**
 ```
-informer|cm|webhook → filter() → normalize() → dedup() → create Observation CRD + update metrics + log
+informer|cm|webhook → filter() → normalize() → dedup() → create Observation CRD → update metrics & log
 ```
 
-All components inside `()` are centralized in `ObservationCreator.CreateObservation()` - no duplicated code.
+**Processing Pipeline:**
+
+```mermaid
+graph LR
+    A[Event Source] --> B[FILTER<br/>Source-level filtering]
+    B -->|if allowed| C[NORMALIZE<br/>Severity/Category]
+    C --> D[DEDUP<br/>SHA-256 fingerprinting]
+    D -->|if not duplicate| E[CREATE CRD<br/>Observation CRD]
+    E --> F[METRICS<br/>Update counters]
+    E --> G[LOG<br/>Structured logging]
+    
+    style B fill:#fff3e0
+    style C fill:#e8f5e9
+    style D fill:#e3f2fd
+    style E fill:#f3e5f5
+```
+
+All components are centralized in `ObservationCreator.CreateObservation()` - no duplicated code.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md#2-event-processing-pipeline) for complete pipeline documentation.
 
 ## Configuration
 
@@ -444,7 +463,7 @@ When an observation is filtered out, zen-watcher logs:
 
 ### Cost
 - **Reduces agent noise** - Fewer events to process downstream
-- **Reduces SaaS ingestion costs** - Fewer events sent to external systems
+- **Reduces external system costs** - Fewer events sent to external systems
 - **Keeps Observations meaningful** - No low-value noise
 
 ### Use Cases
@@ -570,7 +589,7 @@ If unwanted events are still creating Observations:
 
 ## Related Documentation
 
-- [Architecture](./ARCHITECTURE.md) - Event processing pipeline
-- [Developer Guide](./DEVELOPER_GUIDE.md) - Adding new watchers
+- [Architecture](ARCHITECTURE.md) - Event processing pipeline
+- [Developer Guide](DEVELOPER_GUIDE.md) - Adding new watchers
 - [Contributing](./CONTRIBUTING.md) - Contribution guidelines
 

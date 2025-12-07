@@ -17,17 +17,27 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/kube-zen/zen-watcher/internal/kubernetes"
 	"github.com/kube-zen/zen-watcher/internal/lifecycle"
 	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/gc"
+	"github.com/kube-zen/zen-watcher/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/server"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
+)
+
+// Version, Commit, and BuildDate are set via ldflags during build
+var (
+	Version   = "1.0.0-alpha"
+	Commit    = "unknown"
+	BuildDate = "unknown"
 )
 
 func main() {
@@ -49,8 +59,9 @@ func main() {
 		logger.Fields{
 			Component: "main",
 			Additional: map[string]interface{}{
-				"version":    "1.0.22",
-				"go_version": "1.24",
+				"version":    Version,
+				"commit":     Commit,
+				"build_date": BuildDate,
 				"license":    "Apache 2.0",
 			},
 		})
@@ -94,9 +105,23 @@ func main() {
 	// Create ConfigMap loader for dynamic reloading
 	configMapLoader := config.NewConfigMapLoader(clients.Standard, filterInstance)
 
-	// Create centralized observation creator with filter
+	// Create SourceConfig and TypeConfig loaders for new universal event watcher architecture
+	sourceConfigLoader := config.NewSourceConfigLoader(clients.Dynamic)
+	typeConfigLoader := config.NewTypeConfigLoader(clients.Dynamic)
+
+	// Create optimization metrics wrapper
+	optimizationMetrics := watcher.NewOptimizationMetrics(
+		m.FilterPassRate,
+		m.DedupEffectiveness,
+		m.LowSeverityPercent,
+		m.ObservationsPerMinute,
+		m.ObservationsPerHour,
+		m.SeverityDistribution,
+	)
+
+	// Create centralized observation creator with filter and optimization metrics
 	// This is used by AdapterLauncher to process all events
-	observationCreator := watcher.NewObservationCreator(
+	observationCreator := watcher.NewObservationCreatorWithOptimization(
 		clients.Dynamic,
 		gvrs.Observations,
 		m.EventsTotal,
@@ -105,7 +130,11 @@ func main() {
 		m.ObservationsDeduped,
 		m.ObservationsCreateErrors,
 		filterInstance,
+		optimizationMetrics,
 	)
+
+	// Set source config loader for dynamic processing order
+	observationCreator.SetSourceConfigLoader(sourceConfigLoader)
 
 	// Create webhook channels for Falco and Audit adapters
 	falcoAlertsChan := make(chan map[string]interface{}, 100)
@@ -182,6 +211,78 @@ func main() {
 				})
 		}
 	}()
+
+	// Get default dedup window from env for ObservationDedupConfig loader
+	defaultDedupWindow := 60
+	if windowStr := os.Getenv("DEDUP_WINDOW_SECONDS"); windowStr != "" {
+		if w, err := strconv.Atoi(windowStr); err == nil && w > 0 {
+			defaultDedupWindow = w
+		}
+	}
+
+	// Create ObservationDedupConfig loader for CRD-based dedup configuration
+	// This allows per-source deduplication windows to be configured via CRD
+	observationDedupConfigLoader := config.NewObservationDedupConfigLoader(
+		clients.Dynamic,
+		observationCreator.GetDeduper(),
+		defaultDedupWindow,
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := observationDedupConfigLoader.Start(ctx); err != nil {
+			log.Error("ObservationDedupConfig loader stopped",
+				logger.Fields{
+					Component: "main",
+					Operation: "observationdedupconfig_loader",
+					Error:     err,
+				})
+		}
+	}()
+
+	// Start SourceConfig loader watcher (for new universal event watcher architecture)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := sourceConfigLoader.Start(ctx); err != nil {
+			log.Error("SourceConfig loader stopped",
+				logger.Fields{
+					Component: "main",
+					Operation: "sourceconfig_loader",
+					Error:     err,
+				})
+		}
+	}()
+
+	// Start TypeConfig loader watcher (for new universal event watcher architecture)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := typeConfigLoader.Start(ctx); err != nil {
+			log.Error("TypeConfig loader stopped",
+				logger.Fields{
+					Component: "main",
+					Operation: "typeconfig_loader",
+					Error:     err,
+				})
+		}
+	}()
+
+	// Initialize optimization advisor and logger
+	// Note: Prometheus client would be needed for full metrics analysis
+	// For now, we'll create a simplified version that works with the metrics we have
+	optimizationLogger := logging.NewOptimizationLogger(15 * time.Minute)
+
+	// Start optimization advisor (if Prometheus client is available)
+	// This is optional and can be enabled when Prometheus integration is ready
+	// advisor := advisor.NewAdvisor(metricsAnalyzer, suggestionEngine, impactTracker)
+	// wg.Add(1)
+	// go func() {
+	// 	defer wg.Done()
+	// 	if err := advisor.Start(ctx); err != nil {
+	// 		log.Error("Optimization advisor stopped", ...)
+	// 	}
+	// }()
 
 	// Create and start garbage collector
 	gcCollector := gc.NewCollector(

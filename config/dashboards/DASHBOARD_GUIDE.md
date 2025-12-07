@@ -360,7 +360,7 @@ Click panel title → More → Add link to:
 
 5. **Create Playlists**
    - Rotate between multiple dashboards
-   - Perfect for NOC displays
+   - Suitable for NOC displays
 
 ---
 
@@ -486,7 +486,7 @@ kubectl get servicemonitor -n zen-system
 
 You now have:
 - ✅ Real-time visibility
-- ✅ Beautiful visualizations
+- ✅ Clear visualizations
 - ✅ Actionable insights
 - ✅ Historical analysis
 - ✅ Alert integration

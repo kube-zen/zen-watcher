@@ -1,0 +1,44 @@
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: trivy-config
+spec:
+  source: trivy
+  adapterType: informer
+  informer:
+    gvr:
+      group: aquasecurity.github.io
+      version: v1alpha1
+      resource: vulnerabilityreports
+    resyncPeriod: "30m"
+  normalization:
+    domain: security
+    type: vulnerability
+    priority:
+      CRITICAL: 0.9
+      HIGH: 0.7
+      MEDIUM: 0.5
+      LOW: 0.3
+    fieldMapping:
+      - from: vulnerabilityID
+        to: cve_id
+      - from: resource.kind
+        to: resource_kind
+      - from: resource.name
+        to: resource_name
+  filter:
+    minPriority: 0.3
+    excludeNamespaces:
+      - kube-system
+      - kube-public
+  dedup:
+    window: "1h"
+    strategy: fingerprint
+  thresholds:
+    observationsPerMinute:
+      warning: 100
+      critical: 200
+  rateLimit:
+    observationsPerMinute: 500
+    burst: 10
+

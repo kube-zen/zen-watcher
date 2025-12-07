@@ -61,6 +61,18 @@ type Metrics struct {
 	ToolsActive             *prometheus.GaugeVec
 	InformerCacheSync       *prometheus.GaugeVec
 	EventProcessingDuration *prometheus.HistogramVec
+
+	// Optimization metrics (NEW)
+	FilterPassRate          *prometheus.GaugeVec // Filter pass rate (0.0-1.0)
+	DedupEffectiveness      *prometheus.GaugeVec // Dedup effectiveness (0.0-1.0)
+	LowSeverityPercent      *prometheus.GaugeVec // Low severity percentage (0.0-1.0)
+	ObservationsPerMinute   *prometheus.GaugeVec // Observations per minute
+	ObservationsPerHour     *prometheus.GaugeVec // Observations per hour
+	SeverityDistribution    *prometheus.CounterVec // Severity distribution counter
+	SuggestionsGenerated    *prometheus.CounterVec // Suggestions generated
+	SuggestionsApplied      *prometheus.CounterVec // Suggestions applied
+	OptimizationImpact      *prometheus.GaugeVec // Optimization impact (% improvement)
+	ThresholdExceeded       *prometheus.CounterVec // Threshold exceeded counter
 }
 
 // NewMetrics creates and registers all Prometheus metrics
@@ -68,9 +80,9 @@ func NewMetrics() *Metrics {
 	eventsTotal := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "zen_watcher_events_total",
-			Help: "Total number of events that resulted in Observation CRD creation (after filtering and deduplication), grouped by source, category, and severity",
+			Help: "Total number of events that resulted in Observation CRD creation (after filtering and deduplication), grouped by source, category, severity, eventType, namespace, and kind",
 		},
-		[]string{"source", "category", "severity"},
+		[]string{"source", "category", "severity", "eventType", "namespace", "kind"},
 	)
 
 	toolsActive := prometheus.NewGaugeVec(
@@ -309,6 +321,99 @@ func NewMetrics() *Metrics {
 	prometheus.MustRegister(dedupEvictions)
 	prometheus.MustRegister(observationsLive)
 
+	// Optimization metrics (NEW)
+	filterPassRate := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_filter_pass_rate",
+			Help: "Filter pass rate (0.0-1.0) - ratio of observations that passed filter",
+		},
+		[]string{"source"},
+	)
+
+	dedupEffectiveness := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_dedup_effectiveness",
+			Help: "Deduplication effectiveness (0.0-1.0) - ratio of duplicates caught",
+		},
+		[]string{"source"},
+	)
+
+	lowSeverityPercent := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_low_severity_percent",
+			Help: "Low severity percentage (0.0-1.0) - ratio of LOW severity observations",
+		},
+		[]string{"source"},
+	)
+
+	observationsPerMinute := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_observations_per_minute",
+			Help: "Observations created per minute",
+		},
+		[]string{"source"},
+	)
+
+	observationsPerHour := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_observations_per_hour",
+			Help: "Observations created per hour",
+		},
+		[]string{"source"},
+	)
+
+	severityDistribution := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_severity_distribution",
+			Help: "Severity distribution counter",
+		},
+		[]string{"source", "severity"},
+	)
+
+	suggestionsGenerated := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_suggestions_generated_total",
+			Help: "Total number of optimization suggestions generated",
+		},
+		[]string{"source", "type"},
+	)
+
+	suggestionsApplied := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_suggestions_applied_total",
+			Help: "Total number of optimization suggestions applied",
+		},
+		[]string{"source", "type"},
+	)
+
+	optimizationImpact := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_optimization_impact",
+			Help: "Optimization impact (% improvement)",
+		},
+		[]string{"source"},
+	)
+
+	thresholdExceeded := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_threshold_exceeded_total",
+			Help: "Total number of threshold exceedances",
+		},
+		[]string{"source", "threshold"},
+	)
+
+	// Register optimization metrics
+	prometheus.MustRegister(filterPassRate)
+	prometheus.MustRegister(dedupEffectiveness)
+	prometheus.MustRegister(lowSeverityPercent)
+	prometheus.MustRegister(observationsPerMinute)
+	prometheus.MustRegister(observationsPerHour)
+	prometheus.MustRegister(severityDistribution)
+	prometheus.MustRegister(suggestionsGenerated)
+	prometheus.MustRegister(suggestionsApplied)
+	prometheus.MustRegister(optimizationImpact)
+	prometheus.MustRegister(thresholdExceeded)
+
 	return &Metrics{
 		// Core event metrics
 		EventsTotal:              eventsTotal,
@@ -351,5 +456,17 @@ func NewMetrics() *Metrics {
 		ToolsActive:             toolsActive,
 		InformerCacheSync:       informerCacheSync,
 		EventProcessingDuration: eventProcessingDuration,
+
+		// Optimization metrics (NEW)
+		FilterPassRate:        filterPassRate,
+		DedupEffectiveness:    dedupEffectiveness,
+		LowSeverityPercent:    lowSeverityPercent,
+		ObservationsPerMinute: observationsPerMinute,
+		ObservationsPerHour:   observationsPerHour,
+		SeverityDistribution:  severityDistribution,
+		SuggestionsGenerated:  suggestionsGenerated,
+		SuggestionsApplied:    suggestionsApplied,
+		OptimizationImpact:    optimizationImpact,
+		ThresholdExceeded:     thresholdExceeded,
 	}
 }

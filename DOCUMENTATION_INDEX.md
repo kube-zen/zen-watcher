@@ -21,12 +21,6 @@ Complete guide to Zen Watcher documentation.
    - Monitoring setup
    - Troubleshooting
 
-3. **[PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md)** - Project summary
-   - Purpose and goals
-   - Architecture details
-   - Technology stack
-   - Use cases
-
 ### Operations (7 files)
 
 4. **[docs/OPERATIONS.md](docs/OPERATIONS.md)** - Day-to-day operations guide
@@ -110,16 +104,12 @@ Complete guide to Zen Watcher documentation.
 
 ### Deployment (2 files)
 
-13. **[charts/zen-watcher/README.md](charts/zen-watcher/README.md)** - Helm chart guide
+13. **[Helm Charts Repository](https://github.com/kube-zen/helm-charts)** - Helm chart guide
     - Installation
     - Configuration
     - Security settings
     - Troubleshooting
-
-14. **[charts/HELM_SUMMARY.md](charts/HELM_SUMMARY.md)** - Helm features
-    - Security features
-    - Configuration options
-    - Compliance info
+    - Chart values and upgrade paths
 
 ### Development (4 files)
 
@@ -140,11 +130,6 @@ Complete guide to Zen Watcher documentation.
     - Image and chart sync
     - Release process
 
-18. **[OSS_LAUNCH_CHECKLIST.md](OSS_LAUNCH_CHECKLIST.md)** - Launch readiness
-    - Pre-launch checklist
-    - Documentation status
-    - CI/CD setup
-    - Publication steps
 
 ### Examples (2 files)
 
@@ -179,8 +164,9 @@ Complete guide to Zen Watcher documentation.
 ### For Operators
 
 **Deployment?**
-1. [charts/zen-watcher/README.md](charts/zen-watcher/README.md)
-2. [docs/OPERATIONAL_EXCELLENCE.md](docs/OPERATIONAL_EXCELLENCE.md)
+1. [README.md#installation](README.md#installation)
+2. [Helm Charts Repository](https://github.com/kube-zen/helm-charts)
+3. [docs/OPERATIONAL_EXCELLENCE.md](docs/OPERATIONAL_EXCELLENCE.md)
 
 **Security?**
 1. [docs/SECURITY.md](docs/SECURITY.md)
@@ -191,7 +177,7 @@ Complete guide to Zen Watcher documentation.
 
 **Contributing?**
 1. [CONTRIBUTING.md](CONTRIBUTING.md)
-2. [PROJECT_OVERVIEW.md](PROJECT_OVERVIEW.md)
+2. [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
 3. [README.md](README.md#development)
 
 **Monitoring?**
@@ -211,7 +197,7 @@ Complete guide to Zen Watcher documentation.
 ### Configuration
 - [README.md#configuration](README.md#configuration)
 - [docs/FILTERING.md](docs/FILTERING.md) - Source-level filtering
-- [helm/zen-watcher/values.yaml](helm/zen-watcher/values.yaml)
+- [charts/zen-watcher/values.yaml](charts/zen-watcher/values.yaml) - Helm chart values
 - [docs/OPERATIONAL_EXCELLENCE.md](docs/OPERATIONAL_EXCELLENCE.md)
 
 ### Scaling
@@ -223,7 +209,7 @@ Complete guide to Zen Watcher documentation.
 - [docs/SECURITY.md](docs/SECURITY.md)
 - [docs/SBOM.md](docs/SBOM.md)
 - [docs/COSIGN.md](docs/COSIGN.md)
-- [charts/zen-watcher/README.md#security](charts/zen-watcher/README.md#security)
+- [Helm Charts Repository - Security](https://github.com/kube-zen/helm-charts) - Chart security settings
 
 ### Monitoring
 - [config/monitoring/README.md](config/monitoring/README.md)
@@ -234,7 +220,7 @@ Complete guide to Zen Watcher documentation.
 ### Troubleshooting
 - [QUICK_START.md#common-issues](QUICK_START.md#common-issues)
 - [docs/OPERATIONAL_EXCELLENCE.md](docs/OPERATIONAL_EXCELLENCE.md)
-- [charts/zen-watcher/README.md#troubleshooting](charts/zen-watcher/README.md#troubleshooting)
+- [README.md#troubleshooting](README.md#troubleshooting)
 
 ### API Reference
 - [README.md#api-endpoints](README.md#api-endpoints)
@@ -252,16 +238,17 @@ Complete guide to Zen Watcher documentation.
 4. docs/OPERATIONAL_EXCELLENCE.md
 
 ### Operators
-1. charts/zen-watcher/README.md
-2. docs/SECURITY.md
-3. docs/OPERATIONAL_EXCELLENCE.md
-4. monitoring/README.md
+1. [README.md#installation](README.md#installation)
+2. [Helm Charts Repository](https://github.com/kube-zen/helm-charts)
+3. [docs/SECURITY.md](docs/SECURITY.md)
+4. [docs/OPERATIONAL_EXCELLENCE.md](docs/OPERATIONAL_EXCELLENCE.md)
+5. [config/monitoring/README.md](config/monitoring/README.md)
 
 ### Developers
-1. PROJECT_OVERVIEW.md
-2. CONTRIBUTING.md
-3. Source code in `src/`
-4. README.md#development
+1. [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)
+2. [CONTRIBUTING.md](CONTRIBUTING.md)
+3. Source code in `pkg/` and `cmd/`
+4. [README.md#development](README.md#development)
 
 ---
 
@@ -271,7 +258,7 @@ Complete guide to Zen Watcher documentation.
 |-------|----------|
 | Getting Started | [README.md](README.md) |
 | 5-min Setup | [QUICK_START.md](QUICK_START.md) |
-| Helm Install | [charts/zen-watcher/README.md](charts/zen-watcher/README.md) |
+| Helm Install | [README.md#installation](README.md#installation) / [Helm Charts](https://github.com/kube-zen/helm-charts) |
 | Filtering | [docs/FILTERING.md](docs/FILTERING.md) |
 | Scaling | [docs/SCALING.md](docs/SCALING.md) |
 | Source Adapters | [docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md) |
@@ -291,8 +278,8 @@ Complete guide to Zen Watcher documentation.
 - **Getting Started**: 3 guides
 - **Operations**: 7 guides (including filtering, scaling, stability, and source adapters)
 - **Security**: 5 guides (including RBAC and threat model)
-- **Deployment**: 2 guides
-- **Development**: 5 guides (including versioning, changelog, launch checklist)
+- **Deployment**: Installation guide + Helm charts repository
+- **Development**: 4 guides (including versioning, changelog)
 - **Examples**: 3 use cases + integration examples
 
 ---

@@ -1,0 +1,109 @@
+# Prometheus Alert Rules for Zen Watcher Optimization
+# These alerts help identify optimization opportunities and resource issues
+
+groups:
+  - name: zen_watcher_optimization
+    interval: 30s
+    rules:
+      # Alert: High observation rate
+      - alert: ZenWatcherHighObservationRate
+        expr: zen_watcher_observations_per_minute > 100
+        for: 5m
+        labels:
+          severity: warning
+          component: optimization
+        annotations:
+          summary: "{{$labels.source}} creating {{$value}} observations/minute"
+          description: "Source {{$labels.source}} is creating {{$value}} observations per minute, exceeding the warning threshold of 100/min. Consider optimizing filter rules or dedup window."
+
+      # Alert: Critical observation rate
+      - alert: ZenWatcherCriticalObservationRate
+        expr: zen_watcher_observations_per_minute > 200
+        for: 2m
+        labels:
+          severity: critical
+          component: optimization
+        annotations:
+          summary: "{{$labels.source}} creating {{$value}} observations/minute (CRITICAL)"
+          description: "Source {{$labels.source}} is creating {{$value}} observations per minute, exceeding the critical threshold of 200/min. Immediate optimization required."
+
+      # Alert: High low severity ratio
+      - alert: ZenWatcherHighLowSeverityRatio
+        expr: zen_watcher_low_severity_percent > 0.7
+        for: 10m
+        labels:
+          severity: info
+          component: optimization
+        annotations:
+          summary: "High LOW severity ratio for {{$labels.source}}"
+          description: "{{$labels.source}} has {{$value | humanizePercentage}} LOW severity observations. Consider setting filter.minPriority to reduce noise."
+
+      # Alert: Critical low severity ratio
+      - alert: ZenWatcherCriticalLowSeverityRatio
+        expr: zen_watcher_low_severity_percent > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: optimization
+        annotations:
+          summary: "Critical LOW severity ratio for {{$labels.source}}"
+          description: "{{$labels.source}} has {{$value | humanizePercentage}} LOW severity observations. Strongly recommend setting filter.minPriority=0.5 to reduce noise by ~90%."
+
+      # Alert: Low dedup effectiveness
+      - alert: ZenWatcherLowDedupEffectiveness
+        expr: zen_watcher_dedup_effectiveness < 0.3
+        for: 10m
+        labels:
+          severity: info
+          component: optimization
+        annotations:
+          summary: "Low deduplication effectiveness for {{$labels.source}}"
+          description: "{{$labels.source}} has only {{$value | humanizePercentage}} deduplication effectiveness. Consider switching to dedup_first processing order."
+
+      # Alert: Critical low dedup effectiveness
+      - alert: ZenWatcherCriticalLowDedupEffectiveness
+        expr: zen_watcher_dedup_effectiveness < 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: optimization
+        annotations:
+          summary: "Critical low deduplication effectiveness for {{$labels.source}}"
+          description: "{{$labels.source}} has only {{$value | humanizePercentage}} deduplication effectiveness. Strongly recommend switching to dedup_first processing order or increasing dedup window."
+
+      # Alert: Threshold exceeded
+      - alert: ZenWatcherThresholdExceeded
+        expr: increase(zen_watcher_threshold_exceeded_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: monitoring
+        annotations:
+          summary: "Threshold exceeded for {{$labels.source}}"
+          description: "Source {{$labels.source}} exceeded threshold {{$labels.threshold}} with severity {{$labels.severity}}."
+
+  - name: zen_watcher_performance
+    interval: 30s
+    rules:
+      # Alert: Filter pass rate too low (filter too aggressive)
+      - alert: ZenWatcherLowFilterPassRate
+        expr: zen_watcher_filter_pass_rate < 0.2
+        for: 10m
+        labels:
+          severity: info
+          component: optimization
+        annotations:
+          summary: "Low filter pass rate for {{$labels.source}}"
+          description: "{{$labels.source}} has only {{$value | humanizePercentage}} filter pass rate. Filter may be too aggressive - consider relaxing filter rules."
+
+      # Alert: High filter pass rate (filter too permissive)
+      - alert: ZenWatcherHighFilterPassRate
+        expr: zen_watcher_filter_pass_rate > 0.95
+        for: 10m
+        labels:
+          severity: info
+          component: optimization
+        annotations:
+          summary: "High filter pass rate for {{$labels.source}}"
+          description: "{{$labels.source}} has {{$value | humanizePercentage}} filter pass rate. Consider adding more restrictive filter rules to reduce noise."
+

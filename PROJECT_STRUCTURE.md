@@ -76,7 +76,6 @@ zen-watcher/
 ├── CONTRIBUTING.md               # Contribution guide
 ├── CHANGELOG.md                  # Version history
 ├── QUICK_START.md                # Quick start guide
-├── PROJECT_OVERVIEW.md           # Project summary
 ├── PROJECT_STRUCTURE.md          # This file
 └── DOCUMENTATION_INDEX.md        # Doc index
 

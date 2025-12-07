@@ -6,7 +6,7 @@ Get Zen Watcher up and running in 5 minutes!
 
 ## Prerequisites
 
-- Kubernetes cluster (1.28+)
+- Kubernetes cluster (1.26+)
 - `kubectl` configured
 - (Optional) Helm 3.8+
 - (Optional) Security tools (Trivy, Falco, Kyverno, etc.)
@@ -17,31 +17,45 @@ Get Zen Watcher up and running in 5 minutes!
 
 ### Option 1: Helm (Recommended)
 
+**The official Helm chart for zen-watcher lives in a separate repository:**
+
+🔗 **[kube-zen/helm-charts](https://github.com/kube-zen/helm-charts)**
+
 ```bash
-# Install Zen Watcher
-helm install zen-watcher ./charts/zen-watcher \
+# Add Helm repository
+helm repo add kube-zen https://kube-zen.github.io/helm-charts
+helm repo update
+
+# Install zen-watcher
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
-  --create-namespace \
+  --create-namespace
 
 # Verify
 kubectl get pods -n zen-system
-kubectl get zenevents -n zen-system
+kubectl get observations -n zen-system
 ```
 
-### Option 2: kubectl
+See the [helm-charts repository](https://github.com/kube-zen/helm-charts) for chart values, configuration, and upgrade paths.
+
+### Option 2: Manual Installation (Advanced)
+
+For development or custom deployments:
 
 ```bash
 # Create namespace
 kubectl create namespace zen-system
 
 # Install CRD
-kubectl apply -f deployments/crds/zen_event_crd.yaml
+kubectl apply -f deployments/crds/observation_crd.yaml
 
-# Deploy Zen Watcher
-kubectl apply -f deployments/k8s-deployment.yaml
+# Deploy zen-watcher (see README.md for deployment manifest)
+# Note: Full deployment requires additional manifests (RBAC, Service, etc.)
+# Recommended: Use Helm chart for production deployments
 
 # Verify
 kubectl get pods -n zen-system
+kubectl get observations -n zen-system
 ```
 
 ---
@@ -52,13 +66,14 @@ kubectl get pods -n zen-system
 
 ```bash
 # List all events
-kubectl get zenevents -n zen-system
+kubectl get observations -n zen-system
 
 # Filter by severity
-kubectl get zenevents -l severity=critical -n zen-system
+kubectl get observations -n zen-system -o json | \
+  jq '.items[] | select(.spec.severity == "CRITICAL")'
 
 # View details
-kubectl describe zenevent <name> -n zen-system
+kubectl describe observation <name> -n zen-system
 ```
 
 ### Check Status
@@ -78,26 +93,32 @@ curl http://localhost:8080/tools/status
 
 ## Set Up Monitoring (5 minutes)
 
+> **Note**: For a complete automated setup with monitoring, use `./scripts/quick-demo.sh` which includes VictoriaMetrics and Grafana. The steps below are for manual setup.
+
 ### 1. Deploy VictoriaMetrics
 
-```bash
-kubectl apply -f deploy/victoriametrics.yaml
-```
+VictoriaMetrics can be deployed using the Helm chart or manually. See [VictoriaMetrics documentation](https://docs.victoriametrics.com/) for deployment options.
 
 ### 2. Deploy Grafana (if not already installed)
 
-```bash
-kubectl apply -f deploy/grafana-deployment.yaml
-```
+Grafana can be deployed using the Helm chart or manually. See [Grafana documentation](https://grafana.com/docs/grafana/latest/setup-grafana/installation/kubernetes/) for deployment options.
 
-### 3. Import Dashboard
+### 3. Import Dashboards
+
+Zen Watcher includes 3 pre-built dashboards:
+- **Executive Overview** (`zen-watcher-executive.json`) - High-level security posture
+- **Operations Dashboard** (`zen-watcher-operations.json`) - Performance and health metrics
+- **Security Analytics** (`zen-watcher-security.json`) - Security trends and analysis
+
+To import:
 
 1. Port-forward Grafana: `kubectl port-forward -n zen-system svc/grafana 3000:3000`
 2. Open http://localhost:3000 (admin/admin)
 3. Go to **Dashboards** → **Import**
-4. Upload `config/dashboards/zen-watcher-dashboard.json`
+4. Upload any of the dashboard JSON files from `config/dashboards/`
 5. Select datasource: VictoriaMetrics (http://victoriametrics:8428)
 6. Click **Import**
+7. Repeat for all 3 dashboards
 
 ### 4. Deploy Alerts
 
@@ -111,7 +132,7 @@ kubectl apply -f config/monitoring/prometheus-alerts.yaml
 
 - [ ] Pod is running: `kubectl get pods -n zen-system`
 - [ ] Health check passes: `curl http://localhost:8080/health`
-- [ ] CRD installed: `kubectl get crd zenevents.zen.kube-zen.io`
+- [ ] CRD installed: `kubectl get crd observations.zen.kube-zen.io`
 - [ ] Metrics available: `curl http://localhost:8080/metrics`
 - [ ] Dashboard showing data (if monitoring enabled)
 - [ ] No errors in logs: `kubectl logs -n zen-system -l app=zen-watcher`
@@ -122,9 +143,9 @@ kubectl apply -f config/monitoring/prometheus-alerts.yaml
 
 1. **Configure** your environment variables (see README.md)
 2. **Install** security tools (Trivy, Falco, etc.) if not present
-3. **Review** events: `kubectl get zenevents -n zen-system`
+3. **Review** events: `kubectl get observations -n zen-system`
 4. **Set up** alerts: `monitoring/prometheus-alerts.yaml`
-5. **Explore** the Grafana dashboard
+5. **Explore** the Grafana dashboards (3 pre-built dashboards available)
 6. **Read** operational guide: `docs/OPERATIONAL_EXCELLENCE.md`
 
 ---

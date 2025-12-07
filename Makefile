@@ -7,7 +7,7 @@
 .DEFAULT_GOAL := help
 
 # Variables
-VERSION ?= 1.1.0
+VERSION ?= 1.0.0-alpha
 COMMIT ?= $(shell git rev-parse --short HEAD)
 BUILD_DATE ?= $(shell date -u '+%Y-%m-%dT%H:%M:%SZ')
 IMAGE_NAME ?= kubezen/zen-watcher

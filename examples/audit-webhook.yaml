@@ -1,0 +1,43 @@
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: audit-config
+spec:
+  source: audit
+  adapterType: webhook
+  webhook:
+    path: /audit
+    port: 8080
+    bufferSize: 500
+    auth:
+      type: bearer
+      secretName: audit-webhook-token
+  normalization:
+    domain: security
+    type: audit_event
+    priority:
+      RequestResponse: 0.3
+      Request: 0.5
+      Response: 0.4
+    fieldMapping:
+      - from: verb
+        to: verb
+      - from: user.username
+        to: user
+      - from: objectRef.resource
+        to: resource
+  filter:
+    minPriority: 0.4
+    excludeNamespaces:
+      - kube-system
+  dedup:
+    window: "5m"
+    strategy: fingerprint
+  thresholds:
+    observationsPerMinute:
+      warning: 1000
+      critical: 5000
+  rateLimit:
+    observationsPerMinute: 10000
+    burst: 100
+

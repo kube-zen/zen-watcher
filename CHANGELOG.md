@@ -5,7 +5,41 @@ All notable changes to zen-watcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - 2024-12-04
+## [1.0.0-alpha] - 2025-12-06
+
+### 🎉 Initial Alpha Release
+
+**First public release** of Zen Watcher as an open-source Kubernetes security event aggregator.
+
+#### Added
+
+**Core Features:**
+- Multi-source event aggregation (Trivy, Falco, Kyverno, Checkov, Kube-bench, Audit logs)
+- Kubernetes-native CRD storage (Observation CRDs)
+- Intelligent noise reduction (SHA-256 fingerprinting, rate limiting, deduplication)
+- Source-level filtering (ConfigMap and CRD-based)
+- Comprehensive observability (Prometheus metrics, Grafana dashboards, structured logging)
+
+**Architecture:**
+- Pure core, extensible ecosystem model (zero secrets, zero egress)
+- Modular adapter architecture (SourceAdapter interface)
+- Kubernetes-native event consumption via CRDs
+- Infrastructure-blind design (preserves namespace/name/kind for RBAC)
+
+**Documentation:**
+- Complete architecture documentation
+- Quick start guide with automated demo
+- Integration guides (kubewatch, Robusta, custom controllers)
+- Scaling and operational excellence guides
+
+**CI/CD:**
+- Automated testing and build pipeline
+- Docker image builds and publishing
+- Security scanning and SBOM generation
+
+---
+
+## [1.1.0] - 2024-12-04 (Deprecated - Pre-alpha)
 
 ### 🎉 OSS Launch Release
 
@@ -20,8 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Documentation:**
 - `docs/STABILITY.md` - Production readiness and HA patterns
-- `VERSIONING.md` - Version sync strategy
-- `OSS_LAUNCH_CHECKLIST.md` - Launch readiness guide
+- `docs/VERSIONING.md` - Version sync strategy
 - Comparison table in README (vs Falco Sidekick, Kubescape)
 - Polished Quick Start section with copy-paste commands
 - Use case examples (`examples/use-cases/`)
@@ -100,7 +133,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Updated** KEP to "implementable" status with implementation history
 - **Enhanced** docs/SECURITY_RBAC.md with new CRD permissions
 - **Updated** README.md with v1.0.10 features
-- **Added** DEPLOYMENT_SUCCESS.md
 
 ### 🐛 Bug Fixes
 - **Fixed** ObservationFilter CRD validation error (removed conflicting additionalProperties)

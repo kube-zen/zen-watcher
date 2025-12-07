@@ -1,0 +1,38 @@
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: cert-manager-config
+spec:
+  source: cert-manager
+  adapterType: informer
+  informer:
+    gvr:
+      group: cert-manager.io
+      version: v1
+      resource: certificaterequests
+    resyncPeriod: "1h"
+  normalization:
+    domain: operations
+    type: certificate_status
+    priority:
+      Failed: 0.9
+      ExpiringSoon: 0.7
+      Ready: 0.1
+    fieldMapping:
+      - from: certificateName
+        to: certificate_name
+      - from: status
+        to: status
+  filter:
+    minPriority: 0.5
+  dedup:
+    window: "24h"
+    strategy: fingerprint
+  thresholds:
+    observationsPerMinute:
+      warning: 10
+      critical: 20
+  rateLimit:
+    observationsPerMinute: 50
+    burst: 5
+

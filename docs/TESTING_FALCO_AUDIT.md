@@ -353,9 +353,14 @@ kubectl delete namespace zen-system
 kubectl delete crd observations.zen.kube-zen.io
 
 # Delete cluster (if using kind/minikube/k3d)
-# kind delete cluster --name zen-test
-# minikube delete
-# k3d cluster delete zen-test
+# Recommended: Use cleanup script (works with all platforms)
+#   ZEN_CLUSTER_NAME=zen-test ./scripts/cleanup-demo.sh kind
+#   ZEN_CLUSTER_NAME=zen-test ./scripts/cleanup-demo.sh minikube
+#   ZEN_CLUSTER_NAME=zen-test ./scripts/cleanup-demo.sh k3d
+# Or manually:
+#   kind delete cluster --name zen-test
+#   minikube delete -p zen-test
+#   k3d cluster delete zen-test
 ```
 
 ## Summary

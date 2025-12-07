@@ -26,7 +26,7 @@ COPY . .
 # -trimpath: Remove file system paths (security + reproducible builds)
 # -tags netgo: Use pure Go network stack (no CGO)
 # -installsuffix cgo: Ensure separate output directory
-ARG VERSION=1.0.19
+ARG VERSION=1.0.0-alpha
 ARG COMMIT=unknown
 ARG BUILD_DATE=unknown
 
@@ -74,7 +74,7 @@ ENTRYPOINT ["/zen-watcher"]
 # Metadata labels
 LABEL org.opencontainers.image.title="zen-watcher"
 LABEL org.opencontainers.image.description="Kubernetes security event aggregator"
-ARG VERSION=1.0.19
+ARG VERSION=1.0.0-alpha
 LABEL org.opencontainers.image.version="${VERSION}"
 LABEL org.opencontainers.image.source="https://github.com/kube-zen/zen-watcher"
 LABEL org.opencontainers.image.licenses="Apache-2.0"

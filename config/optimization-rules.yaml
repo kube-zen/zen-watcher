@@ -1,0 +1,61 @@
+# Zen Watcher Optimization Rules
+# These rules define when and how to suggest optimizations
+
+rules:
+  # Rule 1: High LOW severity ratio
+  - name: "high_low_severity"
+    condition: "source.low_severity_percent > 0.8 && source.filter.minPriority == null"
+    suggestion: "Set filter.minPriority = 0.5 to reduce noise by {{.reduction}}%"
+    command: "kubectl patch observationsourceconfig {{.source}} --type=merge -p '{\"spec\":{\"filter\":{\"minPriority\":0.5}}}'"
+    confidence_formula: "source.low_severity_percent"
+    urgency: "medium"
+    impact: "Expected to reduce observations by {{.reduction}}% by filtering out LOW severity events"
+
+  # Rule 2: Low dedup effectiveness
+  - name: "low_dedup_effectiveness"
+    condition: "source.dedup_effectiveness < 0.3 && source.deduped_count > 0"
+    suggestion: "Switch processing order to dedup_first to improve deduplication"
+    command: "kubectl patch observationsourceconfig {{.source}} --type=merge -p '{\"spec\":{\"processing\":{\"order\":\"dedup_first\"}}}'"
+    confidence_formula: "1.0 - source.dedup_effectiveness"
+    urgency: "low"
+    impact: "Expected to improve deduplication effectiveness by processing duplicates earlier"
+
+  # Rule 3: High observation rate
+  - name: "high_observation_rate"
+    condition: "source.observations_per_minute > 100"
+    suggestion: "High observation rate detected - consider optimizing filter rules or dedup window"
+    command: "kubectl get observationsourceconfig {{.source}} -o yaml"
+    confidence_formula: "0.8"
+    urgency: "high"
+    impact: "Review current configuration and optimize to reduce observation rate"
+
+  # Rule 4: Pattern: cert failures retry frequently
+  - name: "cert_failures_retry"
+    condition: "source == 'cert-manager' && source.dedup_effectiveness < 0.5"
+    suggestion: "Certificate failures are retrying frequently - increase dedup window to 24h"
+    command: "kubectl patch observationsourceconfig cert-manager --type=merge -p '{\"spec\":{\"dedup\":{\"window\":\"24h\"}}}'"
+    confidence_formula: "0.9"
+    urgency: "medium"
+    impact: "Expected 90% reduction in duplicate certificate failure alerts"
+
+  # Rule 5: Low filter pass rate (filter too aggressive)
+  - name: "low_filter_pass_rate"
+    condition: "source.filter_pass_rate < 0.2 && source.filtered_count > 0"
+    suggestion: "Filter pass rate is low - consider relaxing filter rules"
+    command: "kubectl get observationsourceconfig {{.source}} -o yaml"
+    confidence_formula: "0.7"
+    urgency: "low"
+    impact: "Consider relaxing filter rules to allow more observations through"
+
+# Default thresholds (used when not specified in ObservationSourceConfig)
+defaults:
+  observations_per_minute:
+    warning: 100
+    critical: 200
+  low_severity_percent:
+    warning: 0.7  # >70% LOW severity = warning
+    critical: 0.9  # >90% LOW severity = critical
+  dedup_effectiveness:
+    warning: 0.3  # <30% dedup effectiveness = warning
+    critical: 0.1  # <10% dedup effectiveness = critical
+

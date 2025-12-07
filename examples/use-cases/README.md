@@ -93,5 +93,5 @@ Have a great use case? Contribute it!
 - [Filtering Guide](../../docs/FILTERING.md) - Complete filter documentation
 - [Source Adapters](../../docs/SOURCE_ADAPTERS.md) - Writing custom adapters
 - [CRD Documentation](../../docs/CRD.md) - Observation CRD schema
-- [Architecture](../../ARCHITECTURE.md) - System design
+- [Architecture](../../docs/ARCHITECTURE.md) - System design
 

@@ -112,15 +112,29 @@ kubectl apply -f my-filter.yaml
 
 ### Scale Replicas
 
-```bash
-# Scale up for HA
-kubectl scale deployment zen-watcher -n zen-system --replicas=3
+**⚠️ IMPORTANT: Single Replica Deployment Required**
 
-# Scale down
+Zen Watcher uses **in-memory deduplication** per pod. Multiple replicas will create **duplicate Observations** because each pod maintains its own independent deduplication cache.
+
+**Recommended Deployment:**
+```bash
+# Single replica (required for data integrity)
 kubectl scale deployment zen-watcher -n zen-system --replicas=1
 ```
 
-**Note:** Deduplication handles multiple replicas - no duplicate Observations created.
+**Scaling Strategy:**
+- **Vertical Scaling Only**: Increase CPU/memory resources for higher event volumes
+- **Resource Guidance**:
+  - Low traffic (<1,000 events/day): 100m CPU, 128Mi RAM
+  - Medium traffic (1,000-10,000 events/day): 200m CPU, 256Mi RAM
+  - High traffic (>10,000 events/day): 500m CPU, 512Mi RAM
+
+**Future: Multi-Replica Support**
+- Multi-replica HA with leader election is planned for v1.1.x+
+- Will enable HPA for webhook traffic without duplicate observations
+- Until then, **do NOT use HPA or multiple replicas** - it will create duplicate Observations
+
+See [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md#scaling-strategy) for complete scaling guidance.
 
 ### Restart zen-watcher
 
@@ -290,13 +304,14 @@ env:
 
 resources:
   requests:
-    memory: 256Mi
-    cpu: 200m
+    memory: 512Mi
+    cpu: 500m
   limits:
     memory: 1Gi
     cpu: 1000m
 
-replicas: 2-3
+# ⚠️ IMPORTANT: Single replica required (see scaling strategy above)
+replicas: 1
 ```
 
 ### Resource-Constrained Clusters
@@ -348,11 +363,13 @@ kubectl apply -f observations-backup.yaml
 
 See [STABILITY.md](STABILITY.md) for detailed capacity planning guidance.
 
-**Rule of Thumb:**
-- Small cluster (<50 nodes): 1 replica, 128Mi RAM
-- Medium cluster (50-200 nodes): 2 replicas, 256Mi RAM
-- Large cluster (200-1000 nodes): 3 replicas, 512Mi RAM
-- Very large (>1000 nodes): Tune based on event rate, consider shorter TTL
+**Rule of Thumb (Single Replica, Vertical Scaling):**
+- Small cluster (<50 nodes): 1 replica, 100m CPU, 128Mi RAM
+- Medium cluster (50-200 nodes): 1 replica, 200m CPU, 256Mi RAM
+- Large cluster (200-1000 nodes): 1 replica, 500m CPU, 512Mi RAM
+- Very large (>1000 nodes): 1 replica, 1000m CPU, 1Gi RAM, consider shorter TTL
+
+**⚠️ Do NOT use multiple replicas** - in-memory deduplication requires single replica until leader election is implemented (v1.1.x+).
 
 ## 🔐 Security Operations
 
@@ -390,10 +407,12 @@ kubectl get observations -A -o json | jq '.items[] | select(.spec.details | tost
 
 ## 🎯 Maintenance Windows
 
-### Zero-Downtime Upgrade (Multi-Replica)
+### Zero-Downtime Upgrade (Single Replica)
+
+**Note:** With single replica deployment, upgrades require brief downtime. Plan maintenance windows accordingly.
 
 ```bash
-# With 2+ replicas, rolling update is automatic
+# Rolling update (single replica)
 helm upgrade zen-watcher charts/zen-watcher -n zen-system
 ```
 
