@@ -68,7 +68,7 @@ This separation ensures that even if the core is compromised, **no credentials c
 git clone https://github.com/kube-zen/zen-watcher
 cd zen-watcher
 
-# Run automated demo (supports k3d, kind, or minikube - deploys everything, validates 8/8 sources)
+# Run automated demo (supports k3d, kind, or minikube - deploys everything, validates 9/9 sources)
 ./scripts/quick-demo.sh --non-interactive --deploy-mock-data
 # Or specify platform: ./scripts/quick-demo.sh kind --non-interactive --deploy-mock-data
 # Or: ./scripts/quick-demo.sh minikube --non-interactive --deploy-mock-data
@@ -80,9 +80,9 @@ cd zen-watcher
 ```
 
 **What you get:**
-- ✅ Kubernetes cluster (k3d, kind, or minikube) with all 8 security tools (Trivy, Falco, Kyverno, Checkov, KubeBench, Audit, cert-manager, sealed-secrets)
+- ✅ Kubernetes cluster (k3d, kind, or minikube) with all 9 security sources (Trivy, Falco, Kyverno, Checkov, KubeBench, Audit, cert-manager, sealed-secrets, Kubernetes Events)
 - ✅ VictoriaMetrics + Grafana with 3 pre-built dashboards (Executive, Operations, Security)
-- ✅ Mock observations from all 8 sources
+- ✅ Mock observations from all 9 sources
 - ✅ ~4 minutes total time
 
 **View observations:**
@@ -109,7 +109,7 @@ kubectl get observations -A --watch
 
 ## 🎯 Features
 
-### Multi-Source Event Aggregation (8 Sources - All Working ✅)
+### Multi-Source Event Aggregation (9 Sources - All Working ✅)
 
 Collects events from popular security and compliance tools:
 - 🛡️ **Trivy** - Container vulnerabilities (HIGH/CRITICAL) - CRD informer
@@ -120,6 +120,7 @@ Collects events from popular security and compliance tools:
 - ✅ **Kube-bench** - CIS benchmark compliance - ConfigMap polling
 - 🔒 **cert-manager** - Certificate lifecycle monitoring - CRD informer
 - 🔐 **sealed-secrets** - Sealed secret decryption failures - Logs adapter
+- 🎯 **Kubernetes Events** - Native cluster events (security-focused) - Events API watcher
 
 ### 🎯 Adding New Sources: Just YAML!
 
@@ -156,7 +157,7 @@ That's it! Apply the YAML and zen-watcher will start collecting observations. Se
 - ObservationMapping CRD for generic CRD integration
 - Infrastructure-blind design: avoids cluster-unique identifiers (e.g., AWS account ID, GKE project name) while preserving Kubernetes-native context (namespace, name, kind) for RBAC, auditing, and multi-tenancy
 - Filter merge semantics (ConfigMap + CRD with comprehensive tests)
-- Complete end-to-end automation (quick-demo.sh supports k3d/kind/minikube and validates all 8 sources in ~4 minutes)
+- Complete end-to-end automation (quick-demo.sh supports k3d/kind/minikube and validates all 9 sources in ~4 minutes)
 
 ### CRD-Based Storage
 - All events stored as **Observation** Custom Resources

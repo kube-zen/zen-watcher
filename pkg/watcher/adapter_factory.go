@@ -72,6 +72,8 @@ func (af *AdapterFactory) CreateAdapters() []SourceAdapter {
 	if af.clientSet != nil {
 		adapters = append(adapters, NewKubeBenchAdapter(af.clientSet))
 		adapters = append(adapters, NewCheckovAdapter(af.clientSet))
+		// Native Kubernetes Events adapter (watching v1.Event API)
+		adapters = append(adapters, NewK8sEventsAdapter(af.clientSet))
 	}
 
 	// Generic CRD adapter (for ObservationMapping CRDs - covers long tail of tools)

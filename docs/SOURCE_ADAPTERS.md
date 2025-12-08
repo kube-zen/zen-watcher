@@ -41,7 +41,7 @@ See [Generic Source Configuration](#generic-source-configuration-via-yaml) below
 
 Zen Watcher uses a **two-tier adapter strategy** that balances reliability with extensibility:
 
-### Tier 1: First-Class Adapters (The "Big Eight")
+### Tier 1: First-Class Adapters (The "Big Nine")
 
 **Official adapters** implemented in Go code for core security tools:
 - ✅ **TrivyAdapter** - Vulnerability scanning
@@ -52,6 +52,7 @@ Zen Watcher uses a **two-tier adapter strategy** that balances reliability with 
 - ✅ **CheckovAdapter** - Infrastructure-as-code security
 - ✅ **CertManagerAdapter** - Certificate lifecycle monitoring
 - ✅ **SealedSecretsAdapter** - Sealed secret decryption failures
+- ✅ **K8sEventsAdapter** - Native Kubernetes Events (security-focused filtering)
 
 **Why first-class adapters?**
 - ✅ **Strong semantics** - Hand-tested mappings ensure Observations are well-formed

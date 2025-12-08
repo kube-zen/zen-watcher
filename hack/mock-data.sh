@@ -148,6 +148,24 @@ create_observation "demo-sealed-secrets-medium-1" "sealed-secrets" "security" "m
     namespace: "demo-manifests"
     secret_name: "demo-sealed-secret"'
 
+# Create demo observations from Kubernetes Events (native cluster events)
+create_observation "demo-k8s-events-critical-1" "kubernetes_events" "security" "critical" "access-control-violation" "Secret" "demo-secret" "demo-manifests" '    reason: "Unauthorized"
+    message: "Unauthorized access attempt to secret demo-secret"
+    type: "Warning"
+    count: 3'
+create_observation "demo-k8s-events-high-1" "kubernetes_events" "security" "high" "policy-violation" "Pod" "demo-insecure-pod" "demo-manifests" '    reason: "FailedValidation"
+    message: "Pod security policy violation detected"
+    type: "Warning"
+    count: 1'
+create_observation "demo-k8s-events-high-2" "kubernetes_events" "security" "high" "image-pull-failure" "Pod" "demo-insecure-pod" "demo-manifests" '    reason: "FailedPull"
+    message: "Failed to pull image from unauthorized registry"
+    type: "Warning"
+    count: 2'
+create_observation "demo-k8s-events-medium-1" "kubernetes_events" "security" "medium" "resource-exhaustion" "Pod" "demo-resource-quota" "demo-manifests" '    reason: "FailedCreate"
+    message: "Resource quota exceeded for namespace"
+    type: "Warning"
+    count: 5'
+
 echo "✓ Demo observations created"
 
 # Deploy demo manifests for Checkov to scan
@@ -203,6 +221,10 @@ zen_watcher_events_total{{cluster_id="demo",category="operations",source="cert-m
 zen_watcher_events_total{{cluster_id="demo",category="operations",source="cert-manager",event_type="certificate_status",severity="medium"}} 2
 zen_watcher_events_total{{cluster_id="demo",category="security",source="sealed-secrets",event_type="secret_decryption_failure",severity="high"}} 2
 zen_watcher_events_total{{cluster_id="demo",category="security",source="sealed-secrets",event_type="sealed_secret_error",severity="medium"}} 1
+zen_watcher_events_total{{cluster_id="demo",category="security",source="kubernetes_events",event_type="access-control-violation",severity="critical"}} 1
+zen_watcher_events_total{{cluster_id="demo",category="security",source="kubernetes_events",event_type="policy-violation",severity="high"}} 1
+zen_watcher_events_total{{cluster_id="demo",category="security",source="kubernetes_events",event_type="image-pull-failure",severity="high"}} 1
+zen_watcher_events_total{{cluster_id="demo",category="security",source="kubernetes_events",event_type="resource-exhaustion",severity="medium"}} 1
 
 # HELP zen_watcher_active_events Currently active events
 # TYPE zen_watcher_active_events gauge
@@ -224,6 +246,7 @@ zen_watcher_watcher_status{{cluster_id="demo",watcher="kube-bench"}} 1
 zen_watcher_watcher_status{{cluster_id="demo",watcher="audit"}} 1
 zen_watcher_watcher_status{{cluster_id="demo",watcher="cert-manager"}} 1
 zen_watcher_watcher_status{{cluster_id="demo",watcher="sealed-secrets"}} 1
+zen_watcher_watcher_status{{cluster_id="demo",watcher="kubernetes_events"}} 1
 """
         
         class Handler(BaseHTTPRequestHandler):

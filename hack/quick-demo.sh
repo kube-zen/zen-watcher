@@ -1414,7 +1414,7 @@ if [ "$SKIP_MOCK_DATA" != true ]; then
         echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo -e "${CYAN}  Deploy Mock Data?${NC}"
         echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        echo -e "${CYAN}  This will create mock observations from all 8 sources:${NC}"
+        echo -e "${CYAN}  This will create mock observations from all 9 sources:${NC}"
         echo -e "${CYAN}    - Kyverno (policy violations)${NC}"
         echo -e "${CYAN}    - Trivy (vulnerability reports)${NC}"
         echo -e "${CYAN}    - Falco (runtime security events)${NC}"
@@ -1847,7 +1847,7 @@ EOF
         echo -e "${GREEN}   ✓${NC} Created cert-manager and sealed-secrets mock observations"
         
         echo -e "${GREEN}✓${NC} Mock data deployment completed"
-        echo -e "${CYAN}   Note: All 8 sources should now have observations${NC}"
+        echo -e "${CYAN}   Note: All 9 sources should now have observations${NC}"
     fi
 fi
 
@@ -2533,7 +2533,7 @@ if [ "$OBSERVATION_COUNT" -gt 0 ]; then
     fi
 fi
 
-# Validate all 8 sources appear in VictoriaMetrics (for Grafana dashboard)
+# Validate all 9 sources appear in VictoriaMetrics (for Grafana dashboard)
 if [ "$SKIP_MONITORING" != true ]; then
     echo ""
     echo -e "${YELLOW}→${NC} Validating dashboard sources..."
@@ -2549,9 +2549,9 @@ if [ "$SKIP_MONITORING" != true ]; then
             SOURCES_FOUND=$(echo "$SOURCES_QUERY" | jq -r '.data.result[] | .metric.source' 2>/dev/null | sort -u || echo "")
             SOURCES_COUNT=$(echo "$SOURCES_FOUND" | grep -v '^$' | wc -l | tr -d '[:space:]' || echo "0")
             
-            if [ "$SOURCES_COUNT" -ge 8 ]; then
+            if [ "$SOURCES_COUNT" -ge 9 ]; then
                 VALIDATION_SUCCESS=true
-                echo -e "${GREEN}✓${NC} All 8 sources visible in VictoriaMetrics:"
+                echo -e "${GREEN}✓${NC} All 9 sources visible in VictoriaMetrics:"
                 echo "$SOURCES_FOUND" | while read -r source; do
                     [ -n "$source" ] && echo -e "${GREEN}     ✓${NC} $source"
                 done
@@ -2559,7 +2559,7 @@ if [ "$SKIP_MONITORING" != true ]; then
             elif [ "$SOURCES_COUNT" -gt 0 ]; then
                 ELAPSED=$(($(date +%s) - VALIDATION_START))
                 if [ $((i % 10)) -eq 0 ]; then
-                    echo -e "${CYAN}   Found ${SOURCES_COUNT}/8 sources (${ELAPSED}s elapsed):${NC}"
+                    echo -e "${CYAN}   Found ${SOURCES_COUNT}/9 sources (${ELAPSED}s elapsed):${NC}"
                     echo "$SOURCES_FOUND" | while read -r source; do
                         [ -n "$source" ] && echo -e "${CYAN}     - ${source}${NC}"
                     done
@@ -2572,7 +2572,7 @@ if [ "$SKIP_MONITORING" != true ]; then
         if [ "$ELAPSED" -ge "$MAX_VALIDATION_WAIT" ]; then
             echo -e "${YELLOW}⚠${NC}  Validation timeout after ${MAX_VALIDATION_WAIT}s"
             if [ "$SOURCES_COUNT" -gt 0 ]; then
-                echo -e "${YELLOW}   Found ${SOURCES_COUNT}/8 sources:${NC}"
+                echo -e "${YELLOW}   Found ${SOURCES_COUNT}/9 sources:${NC}"
                 echo "$SOURCES_FOUND" | while read -r source; do
                     [ -n "$source" ] && echo -e "${YELLOW}     - ${source}${NC}"
                 done
@@ -2586,8 +2586,8 @@ if [ "$SKIP_MONITORING" != true ]; then
     # Ensure SOURCES_COUNT is set even if loop didn't execute
     SOURCES_COUNT=${SOURCES_COUNT:-0}
     
-    if [ "$VALIDATION_SUCCESS" = false ] && [ "$SOURCES_COUNT" -lt 8 ]; then
-        echo -e "${YELLOW}⚠${NC}  Only ${SOURCES_COUNT}/8 sources visible in dashboard"
+    if [ "$VALIDATION_SUCCESS" = false ] && [ "$SOURCES_COUNT" -lt 9 ]; then
+        echo -e "${YELLOW}⚠${NC}  Only ${SOURCES_COUNT}/9 sources visible in dashboard"
         echo -e "${CYAN}   Expected sources: kyverno, trivy, falco, audit, checkov, kube-bench, cert-manager, sealed-secrets${NC}"
         echo -e "${CYAN}   Run './hack/send-mock-webhooks.sh ${NAMESPACE}' to generate mock data${NC}"
     fi
