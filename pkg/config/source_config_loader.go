@@ -338,29 +338,84 @@ func (scl *SourceConfigLoader) convertToSourceConfig(osc *unstructured.Unstructu
 	if filterObj, found, _ := unstructured.NestedMap(osc.Object, "spec", "filter"); found {
 		if minPriority, ok := filterObj["minPriority"].(float64); ok {
 			config.FilterMinPriority = minPriority
+			config.Filter.MinPriority = minPriority
 		} else {
 			config.FilterMinPriority = defaults.FilterMinPriority
+			config.Filter.MinPriority = defaults.FilterMinPriority
 		}
 
 		if excludeNamespaces, ok := filterObj["excludeNamespaces"].([]interface{}); ok {
 			config.FilterExcludeNamespaces = make([]string, 0, len(excludeNamespaces))
+			config.Filter.ExcludeNamespaces = make([]string, 0, len(excludeNamespaces))
 			for _, ns := range excludeNamespaces {
 				if nsStr, ok := ns.(string); ok {
 					config.FilterExcludeNamespaces = append(config.FilterExcludeNamespaces, nsStr)
+					config.Filter.ExcludeNamespaces = append(config.Filter.ExcludeNamespaces, nsStr)
 				}
 			}
 		}
 
 		if includeTypes, ok := filterObj["includeTypes"].([]interface{}); ok {
 			config.FilterIncludeTypes = make([]string, 0, len(includeTypes))
+			config.Filter.IncludeTypes = make([]string, 0, len(includeTypes))
 			for _, t := range includeTypes {
 				if tStr, ok := t.(string); ok {
 					config.FilterIncludeTypes = append(config.FilterIncludeTypes, tStr)
+					config.Filter.IncludeTypes = append(config.Filter.IncludeTypes, tStr)
+				}
+			}
+		}
+
+		// Parse adaptive filtering settings
+		if adaptiveEnabled, ok := filterObj["adaptiveEnabled"].(bool); ok {
+			config.Filter.AdaptiveEnabled = adaptiveEnabled
+		}
+		if learningRate, ok := filterObj["learningRate"].(float64); ok {
+			config.Filter.LearningRate = learningRate
+		}
+
+		// Parse dynamic rules
+		if dynamicRules, ok := filterObj["dynamicRules"].([]interface{}); ok {
+			config.Filter.DynamicRules = make([]DynamicFilterRule, 0, len(dynamicRules))
+			for _, ruleObj := range dynamicRules {
+				if ruleMap, ok := ruleObj.(map[string]interface{}); ok {
+					rule := DynamicFilterRule{
+						Metrics: make(map[string]float64),
+					}
+					if id, ok := ruleMap["id"].(string); ok {
+						rule.ID = id
+					}
+					if priority, ok := ruleMap["priority"].(int64); ok {
+						rule.Priority = int(priority)
+					}
+					if enabled, ok := ruleMap["enabled"].(bool); ok {
+						rule.Enabled = enabled
+					}
+					if condition, ok := ruleMap["condition"].(string); ok {
+						rule.Condition = condition
+					}
+					if action, ok := ruleMap["action"].(string); ok {
+						rule.Action = action
+					}
+					if ttlStr, ok := ruleMap["ttl"].(string); ok {
+						if ttl, err := time.ParseDuration(ttlStr); err == nil {
+							rule.TTL = ttl
+						}
+					}
+					if metricsObj, ok := ruleMap["metrics"].(map[string]interface{}); ok {
+						for k, v := range metricsObj {
+							if val, ok := v.(float64); ok {
+								rule.Metrics[k] = val
+							}
+						}
+					}
+					config.Filter.DynamicRules = append(config.Filter.DynamicRules, rule)
 				}
 			}
 		}
 	} else {
 		config.FilterMinPriority = defaults.FilterMinPriority
+		config.Filter.MinPriority = defaults.FilterMinPriority
 	}
 
 	// Parse TTL configuration
@@ -390,18 +445,42 @@ func (scl *SourceConfigLoader) convertToSourceConfig(osc *unstructured.Unstructu
 	if rateLimitObj, found, _ := unstructured.NestedMap(osc.Object, "spec", "rateLimit"); found {
 		if maxPerMin, ok := rateLimitObj["maxPerMinute"].(int64); ok {
 			config.RateLimitMaxPerMinute = int(maxPerMin)
+			config.RateLimit.MaxPerMinute = int(maxPerMin)
 		} else {
 			config.RateLimitMaxPerMinute = defaults.RateLimitMax
+			config.RateLimit.MaxPerMinute = defaults.RateLimitMax
 		}
 
 		if burst, ok := rateLimitObj["burst"].(int64); ok {
 			config.RateLimitBurst = int(burst)
+			config.RateLimit.Burst = int(burst)
 		} else {
 			config.RateLimitBurst = defaults.RateLimitMax * 2
+			config.RateLimit.Burst = defaults.RateLimitMax * 2
+		}
+
+		// Parse adaptive rate limiting settings
+		if adaptive, ok := rateLimitObj["adaptive"].(bool); ok {
+			config.RateLimit.Adaptive = adaptive
+		}
+		if cooldownStr, ok := rateLimitObj["cooldownPeriod"].(string); ok {
+			if cooldown, err := time.ParseDuration(cooldownStr); err == nil {
+				config.RateLimit.CooldownPeriod = cooldown
+			}
+		}
+		if targetsObj, ok := rateLimitObj["targets"].(map[string]interface{}); ok {
+			config.RateLimit.Targets = make(map[string]int)
+			for k, v := range targetsObj {
+				if val, ok := v.(int64); ok {
+					config.RateLimit.Targets[k] = int(val)
+				}
+			}
 		}
 	} else {
 		config.RateLimitMaxPerMinute = defaults.RateLimitMax
 		config.RateLimitBurst = defaults.RateLimitMax * 2
+		config.RateLimit.MaxPerMinute = defaults.RateLimitMax
+		config.RateLimit.Burst = defaults.RateLimitMax * 2
 	}
 
 	// Parse processing configuration (enhanced with nested structure)

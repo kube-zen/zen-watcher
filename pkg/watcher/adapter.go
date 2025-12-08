@@ -70,6 +70,23 @@ type SourceAdapter interface {
 	// Stop gracefully stops the adapter and cleans up resources.
 	// This is called during shutdown.
 	Stop()
+	
+	// Optimization methods (optional - adapters can implement if they support optimization)
+	
+	// GetOptimizationMetrics returns optimization metrics for this adapter
+	// Returns nil if optimization is not supported
+	GetOptimizationMetrics() interface{} // Returns *optimization.OptimizationMetrics
+	
+	// ApplyOptimization applies optimization configuration to this adapter
+	// Returns error if optimization cannot be applied
+	ApplyOptimization(config interface{}) error // config is *config.SourceConfig
+	
+	// ValidateOptimization validates optimization configuration for this adapter
+	// Returns error if configuration is invalid
+	ValidateOptimization(config interface{}) error // config is *config.SourceConfig
+	
+	// ResetMetrics resets optimization metrics for this adapter
+	ResetMetrics()
 }
 
 // EventToObservation converts a normalized Event to an unstructured.Unstructured Observation CRD.

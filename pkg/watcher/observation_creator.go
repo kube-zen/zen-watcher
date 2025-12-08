@@ -215,6 +215,14 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 
 // processFilterFirst processes with filter-first order: Filter → Dedup → Create
 func (oc *ObservationCreator) processFilterFirst(ctx context.Context, observation *unstructured.Unstructured, source string) error {
+	startTime := time.Now()
+	
+	// Get SmartProcessor metrics collector if available
+	var collector *optimization.PerSourceMetricsCollector
+	if oc.smartProcessor != nil {
+		collector = oc.smartProcessor.GetOrCreateMetricsCollector(source)
+	}
+	
 	// STEP 1: FILTER
 	if oc.filter != nil {
 		allowed, reason := oc.filter.AllowWithReason(observation)
@@ -224,6 +232,11 @@ func (oc *ObservationCreator) processFilterFirst(ctx context.Context, observatio
 			}
 			if oc.optimizationMetrics != nil {
 				oc.recordEventFiltered(source, reason)
+			}
+			// Record in SmartProcessor metrics if available
+			if collector != nil {
+				collector.RecordFiltered(reason)
+				collector.RecordProcessing(time.Since(startTime), nil)
 			}
 			return nil
 		}
@@ -264,6 +277,14 @@ func (oc *ObservationCreator) processFilterFirst(ctx context.Context, observatio
 
 // processDedupFirst processes with dedup-first order: Dedup → Filter → Create
 func (oc *ObservationCreator) processDedupFirst(ctx context.Context, observation *unstructured.Unstructured, source string) error {
+	startTime := time.Now()
+	
+	// Get SmartProcessor metrics collector if available
+	var collector *optimization.PerSourceMetricsCollector
+	if oc.smartProcessor != nil {
+		collector = oc.smartProcessor.GetOrCreateMetricsCollector(source)
+	}
+	
 	// STEP 1: DEDUP
 	dedupKey := oc.extractDedupKey(observation)
 	if !oc.deduper.ShouldCreateWithContent(dedupKey, observation.Object) {
@@ -280,6 +301,11 @@ func (oc *ObservationCreator) processDedupFirst(ctx context.Context, observation
 		if oc.optimizationMetrics != nil {
 			oc.recordEventDeduped(source)
 		}
+		// Record in SmartProcessor metrics if available
+		if collector != nil {
+			collector.RecordDeduped()
+			collector.RecordProcessing(time.Since(startTime), nil)
+		}
 		return nil
 	}
 
@@ -293,12 +319,22 @@ func (oc *ObservationCreator) processDedupFirst(ctx context.Context, observation
 			if oc.optimizationMetrics != nil {
 				oc.recordEventFiltered(source, reason)
 			}
+			// Record in SmartProcessor metrics if available
+			if collector != nil {
+				collector.RecordFiltered(reason)
+				collector.RecordProcessing(time.Since(startTime), nil)
+			}
 			return nil
 		}
 	}
 
 	// STEP 3: CREATE
-	return oc.createObservation(ctx, observation, source)
+	err := oc.createObservation(ctx, observation, source)
+	// Record processing time in SmartProcessor metrics if available
+	if collector != nil {
+		collector.RecordProcessing(time.Since(startTime), err)
+	}
+	return err
 }
 
 // determineProcessingOrder determines the processing order for a source
