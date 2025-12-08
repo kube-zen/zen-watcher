@@ -6,6 +6,10 @@ Complete guide to all Zen Watcher documentation files.
 
 ## 📚 Core Documentation
 
+### Security & Compliance
+- **[SECURITY_COMPLIANCE_DASHBOARD.md](SECURITY_COMPLIANCE_DASHBOARD.md)** - Comprehensive security and compliance monitoring dashboard design
+- **[SECURITY_COMPLIANCE_IMPLEMENTATION_PLAN.md](SECURITY_COMPLIANCE_IMPLEMENTATION_PLAN.md)** - Implementation roadmap and technical plan
+
 ### Getting Started
 
 1. **[README.md](../README.md)** - Main project documentation
