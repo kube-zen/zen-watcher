@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Operations Dashboard - SRE-focused metrics, performance, and health monitoring",
+  "description": "Operations Dashboard - Real-time health monitoring, SLA tracking, capacity planning, and incident correlation. Enhanced with Phase 3 operational intelligence.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -33,7 +33,7 @@
       },
       "id": 100,
       "panels": [],
-      "title": "🏥 Health & Availability",
+      "title": "\ud83c\udfe5 Health & Availability",
       "type": "row"
     },
     {
@@ -539,7 +539,7 @@
       },
       "id": 101,
       "panels": [],
-      "title": "📊 Performance Metrics",
+      "title": "\ud83d\udcca Performance Metrics",
       "type": "row"
     },
     {
@@ -762,7 +762,7 @@
       },
       "id": 102,
       "panels": [],
-      "title": "🔧 Adapter & Filter Status",
+      "title": "\ud83d\udd27 Adapter & Filter Status",
       "type": "row"
     },
     {
@@ -988,7 +988,7 @@
       },
       "id": 103,
       "panels": [],
-      "title": "🗑️ Garbage Collection & Resource Management",
+      "title": "\ud83d\uddd1\ufe0f Garbage Collection & Resource Management",
       "type": "row"
     },
     {
@@ -1192,7 +1192,7 @@
       },
       "id": 104,
       "panels": [],
-      "title": "🌐 Webhook & Integration Health",
+      "title": "\ud83c\udf10 Webhook & Integration Health",
       "type": "row"
     },
     {
@@ -1423,7 +1423,7 @@
       },
       "id": 200,
       "panels": [],
-      "title": "📋 Resource Kind Analysis",
+      "title": "\ud83d\udccb Resource Kind Analysis",
       "type": "row"
     },
     {
@@ -1756,7 +1756,7 @@
           "refId": "A"
         }
       ],
-      "title": "Kind × Severity Heat Map (Last 1h)",
+      "title": "Kind \u00d7 Severity Heat Map (Last 1h)",
       "transformations": [
         {
           "id": "organize",
@@ -1851,7 +1851,7 @@
           "refId": "A"
         }
       ],
-      "title": "Kind × Event Type Heat Map (Last 1h)",
+      "title": "Kind \u00d7 Event Type Heat Map (Last 1h)",
       "transformations": [
         {
           "id": "organize",
@@ -1869,6 +1869,320 @@
         }
       ],
       "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Live system health status with traffic light indicators",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "text": "\ud83d\udd34 DOWN"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "1": {
+                  "color": "green",
+                  "text": "\ud83d\udfe2 HEALTHY"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 0,
+        "y": 59
+      },
+      "id": 205,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "expr": "up{job=\"zen-watcher\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udfe2 Real-time Health Status",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "System uptime percentage (SLA target: 99.9%)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 99
+              },
+              {
+                "color": "green",
+                "value": 99.9
+              }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 4,
+        "y": 59
+      },
+      "id": 206,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "avg_over_time(up{job=\"zen-watcher\"}[30d]) * 100",
+          "refId": "A"
+        }
+      ],
+      "title": "\u23f1\ufe0f Uptime SLA (30d)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "p95 processing latency (SLA target: <5s)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 3
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 8,
+        "y": 59
+      },
+      "id": 207,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le))",
+          "refId": "A"
+        }
+      ],
+      "title": "\u26a1 p95 Response Time",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "7-day resource utilization trends with 30-day forecast",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 59
+      },
+      "id": 208,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(zen_watcher_observations_created_total[5m])) / 1000 * 100",
+          "legendFormat": "Processing Rate %",
+          "refId": "A"
+        },
+        {
+          "expr": "predict_linear(sum(rate(zen_watcher_observations_created_total[5m]))[7d:5m], 30*24*3600)",
+          "legendFormat": "30-Day Forecast",
+          "refId": "B"
+        }
+      ],
+      "title": "\ud83d\udcca Capacity Planning - Processing Trends",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Correlated incidents across different sources and categories",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "spectrum"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 67
+      },
+      "id": 209,
+      "options": {
+        "calculate": false,
+        "cellGap": 2,
+        "color": {
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "mode": "spectrum",
+          "reverse": false,
+          "scale": "exponential",
+          "scheme": "Spectral",
+          "steps": 64
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(zen_watcher_events_total[1h])) by (source, category)",
+          "format": "heatmap",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udd17 Incident Correlation Matrix",
+      "type": "heatmap"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Performance metrics compared to industry benchmarks",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "ops/sec"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 67
+      },
+      "id": 210,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(zen_watcher_observations_created_total[5m]))",
+          "legendFormat": "Actual Throughput",
+          "refId": "A"
+        },
+        {
+          "expr": "1000",
+          "legendFormat": "Industry Benchmark (1000 ops/sec)",
+          "refId": "B"
+        }
+      ],
+      "title": "\ud83d\udcc8 Performance vs Industry Benchmarks",
+      "type": "timeseries"
     }
   ],
   "refresh": "10s",
@@ -1922,4 +2236,3 @@
   "version": 1,
   "weekStart": ""
 }
-

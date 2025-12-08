@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Security Analytics - Deep dive into security events, trends, and threat intelligence",
+  "description": "Security Dashboard - Advanced threat analysis, behavioral analytics, attack chain visualization, and investigation workflows. Enhanced with Phase 3 threat intelligence.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -33,7 +33,7 @@
       },
       "id": 100,
       "panels": [],
-      "title": "🚨 Security Posture Overview",
+      "title": "\ud83d\udea8 Security Posture Overview",
       "type": "row"
     },
     {
@@ -103,7 +103,7 @@
           "refId": "A"
         }
       ],
-      "title": "🔴 Critical Events",
+      "title": "\ud83d\udd34 Critical Events",
       "type": "stat"
     },
     {
@@ -173,7 +173,7 @@
           "refId": "A"
         }
       ],
-      "title": "🟠 High Severity",
+      "title": "\ud83d\udfe0 High Severity",
       "type": "stat"
     },
     {
@@ -239,7 +239,7 @@
           "refId": "A"
         }
       ],
-      "title": "🟡 Medium Severity",
+      "title": "\ud83d\udfe1 Medium Severity",
       "type": "stat"
     },
     {
@@ -309,7 +309,7 @@
           "refId": "A"
         }
       ],
-      "title": "📊 Total Events (24h)",
+      "title": "\ud83d\udcca Total Events (24h)",
       "type": "stat"
     },
     {
@@ -379,7 +379,7 @@
           "refId": "A"
         }
       ],
-      "title": "🛡️ Active Tools",
+      "title": "\ud83d\udee1\ufe0f Active Tools",
       "type": "stat"
     },
     {
@@ -392,7 +392,7 @@
       },
       "id": 101,
       "panels": [],
-      "title": "📈 Security Trends & Analysis",
+      "title": "\ud83d\udcc8 Security Trends & Analysis",
       "type": "row"
     },
     {
@@ -551,7 +551,7 @@
           "refId": "A"
         }
       ],
-      "title": "🔥 Security Event Rate (by Severity)",
+      "title": "\ud83d\udd25 Security Event Rate (by Severity)",
       "type": "timeseries"
     },
     {
@@ -564,7 +564,7 @@
       },
       "id": 102,
       "panels": [],
-      "title": "🔍 Source Analysis",
+      "title": "\ud83d\udd0d Source Analysis",
       "type": "row"
     },
     {
@@ -657,7 +657,7 @@
           "refId": "A"
         }
       ],
-      "title": "🛡️ Event Rate by Source Tool",
+      "title": "\ud83d\udee1\ufe0f Event Rate by Source Tool",
       "type": "timeseries"
     },
     {
@@ -741,7 +741,7 @@
       },
       "id": 103,
       "panels": [],
-      "title": "📂 Category Breakdown",
+      "title": "\ud83d\udcc2 Category Breakdown",
       "type": "row"
     },
     {
@@ -834,7 +834,7 @@
           "refId": "A"
         }
       ],
-      "title": "📂 Event Rate by Category",
+      "title": "\ud83d\udcc2 Event Rate by Category",
       "type": "timeseries"
     },
     {
@@ -918,15 +918,15 @@
       },
       "id": 104,
       "panels": [],
-      "title": "🎯 Heat Maps & Correlation",
+      "title": "\ud83c\udfaf Heat Maps & Correlation",
       "type": "row"
     },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
-          },
-      "description": "Security event intensity heat map (source × severity)",
+      },
+      "description": "Security event intensity heat map (source \u00d7 severity)",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -998,7 +998,7 @@
           "refId": "A"
         }
       ],
-      "title": "🔥 Security Event Heat Map (Source × Severity, Last 1h)",
+      "title": "\ud83d\udd25 Security Event Heat Map (Source \u00d7 Severity, Last 1h)",
       "transformations": [
         {
           "id": "organize",
@@ -1201,7 +1201,7 @@
       },
       "id": 200,
       "panels": [],
-      "title": "📊 Event Type Analysis",
+      "title": "\ud83d\udcca Event Type Analysis",
       "type": "row"
     },
     {
@@ -1350,7 +1350,7 @@
           "refId": "A"
         }
       ],
-      "title": "Event Type × Severity Heat Map (Last 1h)",
+      "title": "Event Type \u00d7 Severity Heat Map (Last 1h)",
       "transformations": [
         {
           "id": "organize",
@@ -1454,6 +1454,319 @@
       ],
       "title": "Event Type Trends Over Time (Last 6h)",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Status of integrated threat intelligence feeds",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 0,
+        "y": 59
+      },
+      "id": 204,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "count(zen_watcher_tools_active == 1)",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udd0d Threat Intelligence Status",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "User and entity behavior anomalies detected",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 5
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 4,
+        "y": 59
+      },
+      "id": 205,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(zen_watcher_events_total{category=~\"suspicious|anomaly\"}[1h]))",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udc64 Behavioral Anomalies (1h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Attack progression timeline across security events",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 8,
+        "y": 59
+      },
+      "id": 206,
+      "options": {
+        "legend": {
+          "calcs": [
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[5m])) by (source, category)",
+          "legendFormat": "{{source}} - {{category}}",
+          "refId": "A"
+        }
+      ],
+      "title": "\u2694\ufe0f Attack Chain Timeline",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Correlated security events across multiple sources",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "spectrum"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 67
+      },
+      "id": 207,
+      "options": {
+        "calculate": false,
+        "cellGap": 2,
+        "color": {
+          "exponent": 0.5,
+          "fill": "dark-red",
+          "mode": "spectrum",
+          "reverse": false,
+          "scale": "exponential",
+          "scheme": "Reds",
+          "steps": 64
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(zen_watcher_events_total{severity=~\"CRITICAL|HIGH\"}[1h])) by (source, category)",
+          "format": "heatmap",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udd17 Security Event Correlation",
+      "type": "heatmap"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Dynamic risk assessment scores for security events",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 40
+              },
+              {
+                "color": "orange",
+                "value": 60
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 67
+      },
+      "id": 208,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "(\n            sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[1h])) * 50 +\n            sum(rate(zen_watcher_events_total{severity=\"HIGH\"}[1h])) * 30 +\n            sum(rate(zen_watcher_events_total{severity=\"MEDIUM\"}[1h])) * 10\n        ) by (source)",
+          "legendFormat": "{{source}} Risk Score",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83c\udfaf Dynamic Risk Scoring",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Top security incidents requiring investigation",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 75
+      },
+      "id": 209,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[1h])) by (source, category, namespace))",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udd0d Investigation Workflow - Top 10 Critical Incidents",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "source": "Source",
+              "category": "Category",
+              "namespace": "Namespace",
+              "Value": "Events/hr"
+            }
+          }
+        }
+      ],
+      "type": "table"
     }
   ],
   "refresh": "10s",
@@ -1663,4 +1976,3 @@
   "version": 1,
   "weekStart": ""
 }
-
