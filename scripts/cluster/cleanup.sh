@@ -5,10 +5,10 @@
 # Destroys the demo cluster and cleans up resources
 #
 # Usage:
-#   ./hack/cleanup-demo.sh              # Uses k3d (default)
-#   ./hack/cleanup-demo.sh kind         # Uses kind
-#   ./hack/cleanup-demo.sh minikube     # Uses minikube
-#   ./hack/cleanup-demo.sh --all        # Cleanup all demo clusters
+#   ./scripts/cluster/cleanup.sh        # Uses k3d (default)
+#   ./scripts/cluster/cleanup.sh kind   # Uses kind
+#   ./scripts/cluster/cleanup.sh minikube  # Uses minikube
+#   ./scripts/cluster/cleanup.sh --all  # Cleanup all demo clusters
 #
 # Environment Variables:
 #   ZEN_CLUSTER_NAME=zen-demo           # Cluster name to delete (default: zen-demo)

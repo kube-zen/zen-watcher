@@ -176,7 +176,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "100",
+          "expr": "100 * (1 - (sum(rate(zen_watcher_observations_create_errors_total[5m])) / (sum(rate(zen_watcher_observations_created_total[5m])) + sum(rate(zen_watcher_observations_create_errors_total[5m])) + 0.001)))",
           "legendFormat": "Success Rate",
           "refId": "A"
         }
@@ -212,7 +212,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "ops/min"
         },
         "overrides": []
       },
@@ -245,7 +245,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "0",
+          "expr": "sum(rate(zen_watcher_observations_create_errors_total[5m])) * 60",
           "legendFormat": "Errors/min",
           "refId": "A"
         }
@@ -350,7 +350,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "ops/min"
         },
         "overrides": []
       },
@@ -592,7 +592,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "ops/sec"
         },
         "overrides": []
       },
@@ -815,7 +815,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "ops/sec"
         },
         "overrides": []
       },
@@ -906,7 +906,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "ops/sec"
         },
         "overrides": [
           {
@@ -1041,7 +1041,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "none"
         },
         "overrides": []
       },
@@ -1245,7 +1245,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "ops/sec"
         },
         "overrides": [
           {
@@ -1371,7 +1371,7 @@
               }
             ]
           },
-          "unit": "short"
+          "unit": "ops/sec"
         },
         "overrides": []
       },

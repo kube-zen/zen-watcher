@@ -30,7 +30,7 @@ This document provides performance benchmarks, profiling data, and scalability t
 
 ### Benchmark Tools
 
-See `hack/benchmark/` for benchmark scripts:
+See `scripts/benchmark/` for benchmark scripts:
 - `generate-observations.sh` - Generate test observations
 - `load-test.sh` - Load testing script
 - `profile.sh` - Profiling collection script
@@ -309,7 +309,7 @@ spec:
 
 ```bash
 # Run quick benchmark (100 observations)
-./hack/benchmark/quick-bench.sh
+./scripts/benchmark/quick-bench.sh
 
 # Expected output:
 # Observations created: 100
@@ -323,7 +323,7 @@ spec:
 
 ```bash
 # Run load test (1000 observations over 1 minute)
-./hack/benchmark/load-test.sh --count 1000 --duration 60s
+./scripts/benchmark/load-test.sh --count 1000 --duration 60s
 
 # Expected output:
 # Observations created: 1000
@@ -338,7 +338,7 @@ spec:
 
 ```bash
 # Create 20,000 observations
-./hack/benchmark/scale-test.sh --count 20000
+./scripts/benchmark/scale-test.sh --count 20000
 
 # Monitor impact:
 # - etcd storage
