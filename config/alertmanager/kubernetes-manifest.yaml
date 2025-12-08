@@ -1,0 +1,669 @@
+# Alertmanager Configuration Manifest for Kubernetes
+# This file demonstrates how to deploy the Zen Watcher Alertmanager configuration
+
+---
+# ConfigMap for Alertmanager main configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zen-watcher-alertmanager-config
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: config
+data:
+  alertmanager.yml: |
+    # Alertmanager Configuration for Zen Watcher
+    # Paste the content from alertmanager.yml here
+    global:
+      smtp_smarthost: 'smtp.company.com:587'
+      smtp_from: 'alerts@company.com'
+      smtp_auth_username: 'alerts@company.com'
+      smtp_auth_password: '${SMTP_PASSWORD}'
+      smtp_require_tls: true
+      slack_api_url: '${SLACK_API_URL}'
+      pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+    
+    templates:
+      - '/etc/alertmanager/templates/*.tmpl'
+    
+    route:
+      group_by: ['alertname', 'cluster', 'service']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 12h
+      receiver: 'default-notifications'
+      routes:
+      - match:
+          severity: critical
+        receiver: 'critical-alerts'
+        group_wait: 5s
+        group_interval: 2m
+        repeat_interval: 5m
+        continue: true
+        routes:
+        - match:
+            component: security
+          receiver: 'security-critical'
+          group_wait: 0s
+          group_interval: 1m
+          repeat_interval: 1m
+          repeat_count: 30
+          continue: true
+        - match:
+            component: availability
+          receiver: 'infrastructure-oncall'
+          group_wait: 0s
+          group_interval: 2m
+          repeat_interval: 5m
+          continue: true
+    
+    receivers:
+    - name: 'default-notifications'
+      email_configs:
+      - to: 'devops@company.com'
+        subject: 'Zen Watcher Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Component: {{ .Labels.component }}
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+          {{ end }}
+    
+    - name: 'critical-alerts'
+      email_configs:
+      - to: 'oncall@company.com'
+        subject: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ template "email.critical.body" . }}
+      slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#critical-alerts'
+        title: '🚨 CRITICAL Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          {{ end }}
+        send_resolved: true
+      pagerduty_configs:
+      - service_key: '${PAGERDUTY_CRITICAL_KEY}'
+        description: 'Critical alert: {{ .GroupLabels.alertname }}'
+        details:
+          severity: '{{ .CommonLabels.severity }}'
+          component: '{{ .CommonLabels.component }}'
+          alert_count: '{{ len .Alerts }}'
+    
+    - name: 'security-critical'
+      email_configs:
+      - to: 'security@company.com, soc@company.com'
+        subject: '🔒 SECURITY CRITICAL: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ template "email.security.body" . }}
+      slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#security-alerts'
+        title: '🔒 SECURITY CRITICAL: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Security Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        send_resolved: true
+      pagerduty_configs:
+      - service_key: '${PAGERDUTY_SECURITY_KEY}'
+        description: 'Security Critical: {{ .GroupLabels.alertname }}'
+        details:
+          severity: 'critical'
+          component: '{{ .CommonLabels.component }}'
+          incident_type: 'security'
+    
+    - name: 'infrastructure-oncall'
+      email_configs:
+      - to: 'infrastructure@company.com'
+        subject: '🏗️ INFRASTRUCTURE: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ template "email.infrastructure.body" . }}
+      slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#infrastructure'
+        title: '🏗️ Infrastructure Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          {{ end }}
+        send_resolved: true
+    
+    inhibit_rules:
+    - source_match:
+        severity: 'critical'
+      target_match:
+        severity: 'warning'
+      target_match_re:
+        component: 'performance|functionality'
+      equal: ['alertname', 'cluster']
+    
+    - source_match_re:
+        severity: 'critical|warning'
+      target_match:
+        severity: 'info'
+      equal: ['cluster']
+    
+    time_intervals:
+    - name: 'business-hours'
+      time_intervals:
+      - times:
+        - start_time: '09:00'
+          end_time: '17:00'
+        weekdays: ['monday:friday']
+        location: 'UTC'
+    
+    - name: 'after-hours'
+      time_intervals:
+      - times:
+        - start_time: '17:00'
+          end_time: '09:00'
+        weekdays: ['monday:friday']
+        location: 'UTC'
+      - times:
+        - start_time: '00:00'
+          end_time: '23:59'
+        weekdays: ['saturday', 'sunday']
+        location: 'UTC'
+    
+    mute_time_intervals:
+    - name: 'weekly-maintenance'
+      time_intervals:
+      - times:
+        - start_time: '02:00'
+          end_time: '04:00'
+        weekdays: ['sunday']
+        location: 'UTC'
+
+---
+# ConfigMap for Alertmanager templates
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zen-watcher-alertmanager-templates
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: templates
+data:
+  email.tmpl: |
+    {{ define "email.subject" -}}
+    [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .GroupLabels.alertname }}
+    {{- end }}
+
+    {{ define "email.critical.body" -}}
+    Critical Alert: {{ .GroupLabels.alertname }}
+
+    {{ range .Alerts }}
+    Alert: {{ .Annotations.summary }}
+    Description: {{ .Annotations.description }}
+    Severity: {{ .Labels.severity }}
+    Component: {{ .Labels.component }}
+    Cluster: {{ .Labels.cluster }}
+    Started: {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+    {{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}{{ end }}
+    {{ end }}
+
+    Immediate response required.
+    {{- end }}
+
+    {{ define "email.security.body" -}}
+    SECURITY CRITICAL ALERT: {{ .GroupLabels.alertname }}
+
+    SECURITY INCIDENT DETECTED - IMMEDIATE ACTION REQUIRED
+
+    {{ range .Alerts }}
+    Alert: {{ .Annotations.summary }}
+    Description: {{ .Annotations.description }}
+    Severity: {{ .Labels.severity }}
+    Component: {{ .Labels.component }}
+    Cluster: {{ .Labels.cluster }}
+    Started: {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+    {{ if .Annotations.runbook_url }}Runbook: {{ .Annotations.runbook_url }}{{ end }}
+    {{ end }}
+
+    Contact security team and follow incident response procedures.
+    {{- end }}
+
+---
+# Secret for Alertmanager environment variables
+apiVersion: v1
+kind: Secret
+metadata:
+  name: zen-watcher-alertmanager-secrets
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: secrets
+type: Opaque
+stringData:
+  SMTP_PASSWORD: "your-smtp-password"
+  SLACK_API_URL: "https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK"
+  PAGERDUTY_CRITICAL_KEY: "your-pagerduty-critical-service-key"
+  PAGERDUTY_SECURITY_KEY: "your-pagerduty-security-service-key"
+  PAGERDUTY_SECURITY_ONCALL_KEY: "your-pagerduty-security-oncall-key"
+  PAGERDUTY_INFRASTRUCTURE_KEY: "your-pagerduty-infrastructure-key"
+
+---
+# Alertmanager Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zen-watcher-alertmanager
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: alertmanager
+    app.kubernetes.io/part-of: zen-watcher
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+      app.kubernetes.io/component: alertmanager
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: alertmanager
+        app.kubernetes.io/component: alertmanager
+        app.kubernetes.io/part-of: zen-watcher
+    spec:
+      serviceAccountName: alertmanager
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        fsGroup: 65534
+      containers:
+      - name: alertmanager
+        image: prom/alertmanager:latest
+        args:
+        - --config.file=/etc/alertmanager/alertmanager.yml
+        - --storage.path=/alertmanager
+        - --web.external-url=http://alertmanager.monitoring.svc.cluster.local:9093
+        - --cluster.advertise-address=0.0.0.0:9094
+        - --cluster.listen-address=0.0.0.0:9094
+        ports:
+        - name: http
+          containerPort: 9093
+          protocol: TCP
+        - name: cluster
+          containerPort: 9094
+          protocol: TCP
+        volumeMounts:
+        - name: config
+          mountPath: /etc/alertmanager
+        - name: templates
+          mountPath: /etc/alertmanager/templates
+        - name: data
+          mountPath: /alertmanager
+        env:
+        - name: SMTP_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: zen-watcher-alertmanager-secrets
+              key: SMTP_PASSWORD
+        - name: SLACK_API_URL
+          valueFrom:
+            secretKeyRef:
+              name: zen-watcher-alertmanager-secrets
+              key: SLACK_API_URL
+        - name: PAGERDUTY_CRITICAL_KEY
+          valueFrom:
+            secretKeyRef:
+              name: zen-watcher-alertmanager-secrets
+              key: PAGERDUTY_CRITICAL_KEY
+        - name: PAGERDUTY_SECURITY_KEY
+          valueFrom:
+            secretKeyRef:
+              name: zen-watcher-alertmanager-secrets
+              key: PAGERDUTY_SECURITY_KEY
+        - name: PAGERDUTY_SECURITY_ONCALL_KEY
+          valueFrom:
+            secretKeyRef:
+              name: zen-watcher-alertmanager-secrets
+              key: PAGERDUTY_SECURITY_ONCALL_KEY
+        - name: PAGERDUTY_INFRASTRUCTURE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: zen-watcher-alertmanager-secrets
+              key: PAGERDUTY_INFRASTRUCTURE_KEY
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        resources:
+          limits:
+            memory: 512Mi
+            cpu: 500m
+          requests:
+            memory: 256Mi
+            cpu: 100m
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+      - name: config-reloader
+        image: jimmidyson/configmap-reload:latest
+        args:
+        - --volume-dir=/etc/alertmanager
+        - --webhook-url=http://localhost:9093/-/reload
+        volumeMounts:
+        - name: config
+          mountPath: /etc/alertmanager
+        resources:
+          limits:
+            cpu: 100m
+            memory: 50Mi
+          requests:
+            cpu: 50m
+            memory: 25Mi
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+      volumes:
+      - name: config
+        configMap:
+          name: zen-watcher-alertmanager-config
+      - name: templates
+        configMap:
+          name: zen-watcher-alertmanager-templates
+      - name: data
+        persistentVolumeClaim:
+          claimName: alertmanager-pvc
+
+---
+# Persistent Volume Claim for Alertmanager data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: alertmanager-pvc
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: storage
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: fast-ssd
+
+---
+# Service for Alertmanager
+apiVersion: v1
+kind: Service
+metadata:
+  name: zen-watcher-alertmanager
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: alertmanager
+    app.kubernetes.io/part-of: zen-watcher
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 9093
+    targetPort: http
+    protocol: TCP
+  - name: cluster
+    port: 9094
+    targetPort: cluster
+    protocol: TCP
+  selector:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: alertmanager
+
+---
+# ServiceAccount for Alertmanager
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: serviceaccount
+automountServiceAccountToken: false
+
+---
+# Role for Alertmanager
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: monitoring
+  name: alertmanager
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: rbac
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["zen-watcher-alertmanager-secrets"]
+  verbs: ["get"]
+
+---
+# RoleBinding for Alertmanager
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: rbac
+subjects:
+- kind: ServiceAccount
+  name: alertmanager
+  namespace: monitoring
+roleRef:
+  kind: Role
+  name: alertmanager
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# NetworkPolicy for Alertmanager
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: alertmanager-network-policy
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+      app.kubernetes.io/component: alertmanager
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - namespaceSelector:
+        matchLabels:
+          name: zen-system
+    ports:
+    - protocol: TCP
+      port: 9093
+  egress:
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 9090  # Prometheus
+
+---
+# PodDisruptionBudget for Alertmanager
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: alertmanager-pdb
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: pdb
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+      app.kubernetes.io/component: alertmanager
+
+---
+# HorizontalPodAutoscaler for Alertmanager
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: alertmanager-hpa
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: zen-watcher-alertmanager
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+# ServiceMonitor for Alertmanager (for Prometheus monitoring)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: alertmanager
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: servicemonitor
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: alertmanager
+      app.kubernetes.io/component: alertmanager
+  endpoints:
+  - port: http
+    interval: 30s
+    path: /metrics
+
+---
+# Ingress for Alertmanager (optional - for external access)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: alertmanager-ingress
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: ingress
+  annotations:
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: alertmanager-basic-auth
+    nginx.ingress.kubernetes.io/auth-realm: "Authentication Required"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  tls:
+  - hosts:
+    - alertmanager.company.com
+    secretName: alertmanager-tls
+  rules:
+  - host: alertmanager.company.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: zen-watcher-alertmanager
+            port:
+              number: 9093
+
+---
+# Basic Auth Secret for Ingress
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-basic-auth
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: auth
+type: Opaque
+data:
+  # Generate with: echo -n 'admin:password' | base64
+  auth: YWRtaW46JGFwcjEkSDY2eDBaRmUkeXZza0Z1cDVuV21hM1E1R1R5c25YMwo=
+
+---
+# TLS Secret for Ingress (placeholder)
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-tls
+  namespace: monitoring
+  labels:
+    app.kubernetes.io/name: alertmanager
+    app.kubernetes.io/component: tls
+type: kubernetes.io/tls
+data:
+  # Add your TLS certificate and key here
+  tls.crt: ""
+  tls.key: ""

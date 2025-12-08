@@ -1,0 +1,753 @@
+# Alertmanager Configuration for Zen Watcher
+# This configuration provides incident response and escalation alerting
+# with multi-channel notifications and automated escalation policies
+
+global:
+  # SMTP configuration for email notifications
+  smtp_smarthost: 'smtp.company.com:587'
+  smtp_from: 'alerts@company.com'
+  smtp_auth_username: 'alerts@company.com'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+  
+  # Slack configuration
+  slack_api_url: '${SLACK_API_URL}'
+  
+  # PagerDuty configuration
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+
+# Template files for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Root route - all alerts start here
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 12h
+  receiver: 'default-notifications'
+  routes:
+  
+  # CRITICAL SEVERITY ALERTS - Immediate response required
+  - match:
+      severity: critical
+    receiver: 'critical-alerts'
+    group_wait: 5s
+    group_interval: 2m
+    repeat_interval: 5m
+    continue: true
+    routes:
+    
+    # Security critical alerts - Immediate security team notification
+    - match:
+        component: security
+      receiver: 'security-critical'
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1m
+      repeat_count: 30
+      continue: true
+      routes:
+      
+      # Critical security events with auto-escalation
+      - match_re:
+          alertname: 'ZenWatcherCriticalEventsSpike|ZenWatcherMultipleToolsOffline'
+        receiver: 'security-oncall'
+        group_wait: 0s
+        group_interval: 30s
+        repeat_interval: 2m
+        continue: true
+        
+      # Security spikes - escalate to SOC
+      - match_re:
+          alertname: 'ZenWatcherSecuritySpike'
+        receiver: 'security-soc'
+        group_wait: 1m
+        group_interval: 5m
+        repeat_interval: 15m
+        continue: false
+    
+    # Infrastructure critical alerts
+    - match:
+        component: availability
+      receiver: 'infrastructure-oncall'
+      group_wait: 0s
+      group_interval: 2m
+      repeat_interval: 5m
+      continue: true
+      routes:
+      
+      # Zen Watcher down - immediate escalation
+      - match:
+          alertname: 'ZenWatcherDown'
+        receiver: 'infrastructure-critical'
+        group_wait: 0s
+        group_interval: 1m
+        repeat_interval: 1m
+        repeat_count: 60
+        continue: false
+    
+    # Reliability critical alerts
+    - match:
+        component: reliability
+      receiver: 'platform-oncall'
+      group_wait: 2m
+      group_interval: 5m
+      repeat_interval: 10m
+      continue: false
+    
+    # Integration critical alerts
+    - match:
+        component: integration
+      receiver: 'integrations-team'
+      group_wait: 5m
+      group_interval: 10m
+      repeat_interval: 30m
+      continue: false
+  
+  # WARNING SEVERITY ALERTS - Attention required within SLA
+  - match:
+      severity: warning
+    receiver: 'warning-alerts'
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 2h
+    routes:
+    
+    # Performance warnings
+    - match:
+        component: performance
+      receiver: 'performance-team'
+      group_wait: 1m
+      group_interval: 15m
+      repeat_interval: 4h
+      continue: true
+      routes:
+      
+      # Slow processing alerts
+      - match_re:
+          alertname: 'ZenWatcherSlowProcessing|ZenWatcherCacheEvictions|ZenWatcherWebhookQueueFull'
+        receiver: 'performance-engineering'
+        group_wait: 5m
+        group_interval: 30m
+        repeat_interval: 6h
+        continue: false
+    
+    # Configuration warnings
+    - match:
+        component: configuration
+      receiver: 'operations-team'
+      group_wait: 10m
+      group_interval: 30m
+      repeat_interval: 8h
+      continue: false
+      routes:
+      
+      # Filter configuration issues
+      - match_re:
+          alertname: 'ZenWatcherHighFilterRate'
+        receiver: 'configuration-team'
+        group_wait: 30m
+        group_interval: 2h
+        repeat_interval: 12h
+        continue: false
+    
+    # Integration warnings
+    - match:
+        component: integration
+      receiver: 'integrations-support'
+      group_wait: 15m
+      group_interval: 45m
+      repeat_interval: 4h
+      continue: true
+      routes:
+      
+      # Tool offline warnings
+      - match_re:
+          alertname: 'ZenWatcherToolOffline'
+        receiver: 'tool-owners'
+        group_wait: 30m
+        group_interval: 2h
+        repeat_interval: 8h
+        continue: false
+    
+    # Functionality warnings
+    - match:
+        component: functionality
+      receiver: 'functionality-team'
+      group_wait: 20m
+      group_interval: 1h
+      repeat_interval: 6h
+      continue: false
+    
+    # GC warnings
+    - match:
+        component: gc
+      receiver: 'gc-team'
+      group_wait: 1h
+      group_interval: 4h
+      repeat_interval: 24h
+      continue: false
+  
+  # INFO SEVERITY ALERTS - Informational notifications
+  - match:
+      severity: info
+    receiver: 'info-alerts'
+    group_wait: 2m
+    group_interval: 10m
+    repeat_interval: 24h
+    routes:
+    
+    # Performance insights
+    - match:
+        component: performance
+      receiver: 'performance-insights'
+      group_wait: 5m
+      group_interval: 1h
+      repeat_interval: 24h
+      continue: false
+    
+    # Discovery insights
+    - match:
+        component: discovery
+      receiver: 'discovery-team'
+      group_wait: 10m
+      group_interval: 2h
+      repeat_interval: 48h
+      continue: false
+    
+    # Deduplication insights
+    - match:
+        component: deduplication
+      receiver: 'optimization-team'
+      group_wait: 30m
+      group_interval: 4h
+      repeat_interval: 72h
+      continue: false
+
+# Inhibition rules - suppress less severe alerts when critical ones are active
+inhibit_rules:
+  # Inhibit performance warnings when critical availability alerts are active
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    target_match_re:
+      component: 'performance|functionality'
+    equal: ['alertname', 'cluster']
+  
+  # Inhibit info alerts when critical or warning alerts are active
+  - source_match_re:
+      severity: 'critical|warning'
+    target_match:
+      severity: 'info'
+    equal: ['cluster']
+  
+  # Inhibit multiple tool offline warnings when multiple tools offline critical alert is active
+  - source_match:
+      alertname: 'ZenWatcherMultipleToolsOffline'
+    target_match:
+      alertname: 'ZenWatcherToolOffline'
+    equal: ['tool']
+
+# Receiver configurations
+receivers:
+  # Default notifications for unmapped alerts
+  - name: 'default-notifications'
+    email_configs:
+      - to: 'devops@company.com'
+        subject: 'Zen Watcher Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Severity: {{ .Labels.severity }}
+          Component: {{ .Labels.component }}
+          Time: {{ .StartsAt.Format "2006-01-02 15:04:05 UTC" }}
+          {{ end }}
+  
+  # Critical alerts - multi-channel notification
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'oncall@company.com'
+        subject: '🚨 CRITICAL: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ template "email.critical.body" . }}
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#critical-alerts'
+        title: '🚨 CRITICAL Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Severity:* {{ .Labels.severity }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          {{ end }}
+        send_resolved: true
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_CRITICAL_KEY}'
+        description: 'Critical alert: {{ .GroupLabels.alertname }}'
+        details:
+          severity: '{{ .CommonLabels.severity }}'
+          component: '{{ .CommonLabels.component }}'
+          alert_count: '{{ len .Alerts }}'
+  
+  # Security critical alerts
+  - name: 'security-critical'
+    email_configs:
+      - to: 'security@company.com, soc@company.com'
+        subject: '🔒 SECURITY CRITICAL: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ template "email.security.body" . }}
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#security-alerts'
+        title: '🔒 SECURITY CRITICAL: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Security Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          *Runbook:* {{ .Annotations.runbook_url }}
+          {{ end }}
+        send_resolved: true
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SECURITY_KEY}'
+        description: 'Security Critical: {{ .GroupLabels.alertname }}'
+        details:
+          severity: 'critical'
+          component: '{{ .CommonLabels.component }}'
+          incident_type: 'security'
+  
+  # Security oncall - immediate response
+  - name: 'security-oncall'
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#security-oncall'
+        title: '🚨 SECURITY INCIDENT: {{ .GroupLabels.alertname }}'
+        text: |
+          IMMEDIATE ATTENTION REQUIRED
+          
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Component:* {{ .Labels.component }}
+          *Cluster:* {{ .Labels.cluster }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          
+          *Actions Required:*
+          1. Acknowledge this alert in PagerDuty
+          2. Check runbook: {{ .Annotations.runbook_url }}
+          3. Investigate cluster: kubectl get pods -n {{ .Labels.namespace }}
+          4. Update incident channel with findings
+          {{ end }}
+        send_resolved: true
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SECURITY_ONCALL_KEY}'
+        description: 'Security Incident - Immediate Response Required'
+        incident_type: 'security'
+        urgency: 'high'
+  
+  # Security SOC - escalated response
+  - name: 'security-soc'
+    email_configs:
+      - to: 'soc@company.com'
+        subject: '⚠️ SECURITY SPIKE ESCALATION: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ template "email.security.escalation.body" . }}
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#security-soc'
+        title: '⚠️ Security Event Spike Escalation'
+        text: |
+          {{ range .Alerts }}
+          *Escalated Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Current Rate:* {{ .Value }} events/min
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          *Initial Response:* @security-oncall
+          *Escalation Reason:* Event rate 3x above baseline
+          {{ end }}
+  
+  # Infrastructure oncall
+  - name: 'infrastructure-oncall'
+    email_configs:
+      - to: 'infrastructure@company.com'
+        subject: '🏗️ INFRASTRUCTURE: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ template "email.infrastructure.body" . }}
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#infrastructure'
+        title: '🏗️ Infrastructure Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          {{ end }}
+        send_resolved: true
+  
+  # Infrastructure critical
+  - name: 'infrastructure-critical'
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#infrastructure-critical'
+        title: '🚨 INFRASTRUCTURE DOWN: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *CRITICAL INFRASTRUCTURE ALERT*
+          *Service:* {{ .Annotations.summary }}
+          *Issue:* {{ .Annotations.description }}
+          *Cluster:* {{ .Labels.cluster }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          
+          *Immediate Actions:*
+          1. Check pod status: kubectl get pods -n zen-system -l app.kubernetes.io/name=zen-watcher
+          2. Check node health: kubectl get nodes
+          3. Review recent deployments
+          4. Update status page
+          {{ end }}
+        send_resolved: true
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_INFRASTRUCTURE_KEY}'
+        description: 'Infrastructure Critical: Service Down'
+        urgency: 'high'
+  
+  # Platform oncall
+  - name: 'platform-oncall'
+    email_configs:
+      - to: 'platform@company.com'
+        subject: '⚙️ PLATFORM: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ template "email.platform.body" . }}
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#platform'
+        title: '⚙️ Platform Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          {{ end }}
+  
+  # Integrations team
+  - name: 'integrations-team'
+    email_configs:
+      - to: 'integrations@company.com'
+        subject: '🔌 INTEGRATIONS: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ template "email.integrations.body" . }}
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#integrations'
+        title: '🔌 Integration Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          {{ end }}
+  
+  # Warning alerts
+  - name: 'warning-alerts'
+    email_configs:
+      - to: 'team-leads@company.com'
+        subject: '⚠️ WARNING: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ template "email.warning.body" . }}
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#warnings'
+        title: '⚠️ Warning: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Warning:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          {{ end }}
+        send_resolved: true
+  
+  # Performance team
+  - name: 'performance-team'
+    email_configs:
+      - to: 'performance@company.com'
+        subject: '🚀 PERFORMANCE: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ template "email.performance.body" . }}
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#performance'
+        title: '🚀 Performance Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          {{ end }}
+  
+  # Performance engineering
+  - name: 'performance-engineering'
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#performance-eng'
+        title: '⚡ Performance Engineering Alert'
+        text: |
+          {{ range .Alerts }}
+          *Performance Issue:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Metric Value:* {{ .Value }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          
+          *Investigation Steps:*
+          1. Check resource usage: kubectl top pods -n zen-system
+          2. Review event processing latency
+          3. Check API server performance
+          {{ end }}
+  
+  # Operations team
+  - name: 'operations-team'
+    email_configs:
+      - to: 'operations@company.com'
+        subject: '⚙️ OPERATIONS: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ template "email.operations.body" . }}
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#operations'
+        title: '⚙️ Operations Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          {{ end }}
+  
+  # Configuration team
+  - name: 'configuration-team'
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#configuration'
+        title: '⚙️ Configuration Alert'
+        text: |
+          {{ range .Alerts }}
+          *Configuration Issue:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Filter Rate:* {{ .Value | humanizePercentage }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          
+          *Recommended Actions:*
+          1. Review filter configuration
+          2. Check observation patterns
+          3. Adjust filtering rules if needed
+          {{ end }}
+  
+  # Integrations support
+  - name: 'integrations-support'
+    email_configs:
+      - to: 'integrations-support@company.com'
+        subject: '🔌 INTEGRATION SUPPORT: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ template "email.integrations_support.body" . }}
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#integrations-support'
+        title: '🔌 Integration Support Alert'
+        text: |
+          {{ range .Alerts }}
+          *Integration Issue:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Tool:* {{ .Labels.tool }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          
+          *Troubleshooting:*
+          1. Check tool status
+          2. Verify network connectivity
+          3. Check authentication
+          {{ end }}
+  
+  # Tool owners
+  - name: 'tool-owners'
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#tool-owners'
+        title: '🔧 Tool Offline Alert'
+        text: |
+          {{ range .Alerts }}
+          *Tool Offline:* {{ .Labels.tool }}
+          *Description:* {{ .Annotations.description }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          
+          *Actions:*
+          1. Check if tool is running
+          2. Verify deployment status
+          3. Check logs and metrics
+          {{ end }}
+  
+  # Functionality team
+  - name: 'functionality-team'
+    email_configs:
+      - to: 'functionality@company.com'
+        subject: '🔧 FUNCTIONALITY: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ template "email.functionality.body" . }}
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#functionality'
+        title: '🔧 Functionality Alert: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Alert:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          {{ end }}
+  
+  # GC team
+  - name: 'gc-team'
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#gc-team'
+        title: '🗑️ Garbage Collection Alert'
+        text: |
+          {{ range .Alerts }}
+          *GC Issue:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Error Rate:* {{ .Value }} errors/sec
+          *Operation:* {{ .Labels.operation }}
+          *Error Type:* {{ .Labels.error_type }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          {{ end }}
+  
+  # Info alerts
+  - name: 'info-alerts'
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#info'
+        title: 'ℹ️ Info: {{ .GroupLabels.alertname }}'
+        text: |
+          {{ range .Alerts }}
+          *Info:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          {{ end }}
+        send_resolved: false
+  
+  # Performance insights
+  - name: 'performance-insights'
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#performance-insights'
+        title: '🚀 Performance Insight'
+        text: |
+          {{ range .Alerts }}
+          *Performance Insight:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Throughput:* {{ .Value }} events/min
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          {{ end }}
+        send_resolved: false
+  
+  # Discovery team
+  - name: 'discovery-team'
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#discovery'
+        title: '🔍 Discovery Alert'
+        text: |
+          {{ range .Alerts }}
+          *Discovery:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Tool:* {{ .Labels.tool }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          {{ end }}
+        send_resolved: false
+  
+  # Optimization team
+  - name: 'optimization-team'
+    slack_configs:
+      - api_url: '${SLACK_API_URL}'
+        channel: '#optimization'
+        title: '⚡ Optimization Alert'
+        text: |
+          {{ range .Alerts }}
+          *Optimization Opportunity:* {{ .Annotations.summary }}
+          *Description:* {{ .Annotations.description }}
+          *Deduplication Rate:* {{ .Value | humanizePercentage }}
+          *Component:* {{ .Labels.component }}
+          *Time:* {{ .StartsAt.Format "15:04:05 UTC" }}
+          
+          *Recommendations:*
+          1. Review deduplication window
+          2. Analyze source behavior
+          3. Consider optimization opportunities
+          {{ end }}
+        send_resolved: false
+
+# Time intervals for escalation policies
+time_intervals:
+  - name: 'business-hours'
+    time_intervals:
+      - times:
+          - start_time: '09:00'
+            end_time: '17:00'
+        weekdays: ['monday:friday']
+        location: 'UTC'
+  
+  - name: 'after-hours'
+    time_intervals:
+      - times:
+          - start_time: '17:00'
+            end_time: '09:00'
+        weekdays: ['monday:friday']
+        location: 'UTC'
+      - times:
+          - start_time: '00:00'
+            end_time: '23:59'
+        weekdays: ['saturday', 'sunday']
+        location: 'UTC'
+  
+  - name: 'maintenance-window'
+    time_intervals:
+      - times:
+          - start_time: '02:00'
+            end_time: '04:00'
+        weekdays: ['sunday']
+        location: 'UTC'
+
+# Mute time intervals for scheduled maintenance
+mute_time_intervals:
+  - name: 'weekly-maintenance'
+    time_intervals:
+      - times:
+          - start_time: '02:00'
+            end_time: '04:00'
+        weekdays: ['sunday']
+        location: 'UTC'
+  
+  - name: 'emergency-maintenance'
+    time_intervals:
+      - times:
+          - start_time: '00:00'
+            end_time: '23:59'
+        dates: ['2025-12-25', '2025-12-26']  # Christmas maintenance
+        location: 'UTC'

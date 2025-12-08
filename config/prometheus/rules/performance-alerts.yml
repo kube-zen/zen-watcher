@@ -1,0 +1,423 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zen-watcher-performance-alerts
+  namespace: zen-system
+  labels:
+    app.kubernetes.io/name: zen-watcher
+    app.kubernetes.io/component: performance-monitoring
+spec:
+  groups:
+  - name: zen-watcher.latency-alerts
+    interval: 30s
+    rules:
+    # High latency alerts - Critical thresholds
+    - alert: ZenWatcherCriticalLatency
+      expr: |
+        histogram_quantile(0.95, 
+          sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le)
+        ) > 10
+      for: 3m
+      labels:
+        severity: critical
+        component: latency
+        team: sre
+      annotations:
+        summary: "Critical latency detected in zen-watcher"
+        description: "p95 processing latency is {{$value}}s (threshold: 10s). System is under severe stress."
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/HIGH_LATENCY.md"
+
+    - alert: ZenWatcherHighLatency
+      expr: |
+        histogram_quantile(0.95, 
+          sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le)
+        ) > 5
+      for: 5m
+      labels:
+        severity: warning
+        component: latency
+        team: sre
+      annotations:
+        summary: "High latency detected in zen-watcher"
+        description: "p95 processing latency is {{$value}}s (threshold: 5s). Performance degradation detected."
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/HIGH_LATENCY.md"
+
+    # Per-source latency alerts
+    - alert: ZenWatcherSourceCriticalLatency
+      expr: |
+        histogram_quantile(0.95, 
+          sum(rate(zen_watcher_optimization_source_processing_latency_seconds_bucket[5m])) by (le, source)
+        ) > 15
+      for: 3m
+      labels:
+        severity: critical
+        component: latency
+        team: sre
+      annotations:
+        summary: "Critical latency on source {{$labels.source}}"
+        description: "Source {{$labels.source}} has p95 latency of {{$value}}s. Source may be overwhelmed or experiencing issues."
+
+    # Trend-based latency alerts
+    - alert: ZenWatcherLatencyIncreasing
+      expr: |
+        (
+          histogram_quantile(0.95, 
+            sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le)
+          ) - 
+          histogram_quantile(0.95, 
+            sum(rate(zen_watcher_event_processing_duration_seconds_bucket[1h])) by (le)
+          )
+        ) > 2
+      for: 10m
+      labels:
+        severity: warning
+        component: latency
+        team: sre
+      annotations:
+        summary: "Latency trending upward"
+        description: "Latency has increased by {{$value}}s compared to 1h average. Investigate resource constraints."
+
+  - name: zen-watcher.throughput-alerts
+    interval: 30s
+    rules:
+    # Low processing rate alerts
+    - alert: ZenWatcherLowProcessingRate
+      expr: |
+        sum(rate(zen_watcher_observations_created_total[5m])) * 60 < 1
+      for: 15m
+      labels:
+        severity: warning
+        component: throughput
+        team: operations
+      annotations:
+        summary: "Very low processing rate detected"
+        description: "Processing rate is {{$value}} observations/min (expected: >1/min). Check if sources are active."
+
+    - alert: ZenWatcherNoProcessing
+      expr: |
+        sum(rate(zen_watcher_observations_created_total[10m])) == 0
+      for: 20m
+      labels:
+        severity: critical
+        component: throughput
+        team: operations
+      annotations:
+        summary: "No observations being processed"
+        description: "No observations created in last 20 minutes. System may be down or all sources are inactive."
+
+    # Per-source throughput alerts
+    - alert: ZenWatcherSourceNoProcessing
+      expr: |
+        sum(rate(zen_watcher_optimization_source_events_processed_total[10m])) by (source) == 0
+      for: 15m
+      labels:
+        severity: warning
+        component: throughput
+        team: operations
+      annotations:
+        summary: "Source {{$labels.source}} not processing events"
+        description: "Source {{$labels.source}} has not processed events in 15+ minutes. Check source health."
+
+    # Throughput trend alerts
+    - alert: ZenWatcherThroughputDrop
+      expr: |
+        (
+          sum(rate(zen_watcher_observations_created_total[5m])) * 60 -
+          avg_over_time(sum(rate(zen_watcher_observations_created_total[5m]))[1h:5m]) * 60
+        ) / 
+        avg_over_time(sum(rate(zen_watcher_observations_created_total[5m]))[1h:5m]) * 60 < -0.5
+      for: 10m
+      labels:
+        severity: warning
+        component: throughput
+        team: operations
+      annotations:
+        summary: "Significant throughput drop detected"
+        description: "Throughput has dropped by more than 50% compared to 1h average. Investigate system health."
+
+  - name: zen-watcher.resource-exhaustion
+    interval: 30s
+    rules:
+    # Cache utilization alerts
+    - alert: ZenWatcherDedupCacheExhausted
+      expr: |
+        avg(zen_watcher_dedup_cache_usage_ratio) > 0.95
+      for: 5m
+      labels:
+        severity: critical
+        component: resource
+        team: sre
+      annotations:
+        summary: "Dedup cache near capacity"
+        description: "Dedup cache utilization is {{$value | humanizePercentage}}. High risk of performance degradation."
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/CACHE_TUNING.md"
+
+    - alert: ZenWatcherDedupCacheHigh
+      expr: |
+        avg(zen_watcher_dedup_cache_usage_ratio) > 0.8
+      for: 10m
+      labels:
+        severity: warning
+        component: resource
+        team: sre
+      annotations:
+        summary: "Dedup cache utilization high"
+        description: "Dedup cache utilization is {{$value | humanizePercentage}}. Consider increasing cache size."
+
+    # Webhook queue alerts
+    - alert: ZenWatcherWebhookQueueExhausted
+      expr: |
+        avg(zen_watcher_webhook_queue_usage_ratio) > 0.95
+      for: 3m
+      labels:
+        severity: critical
+        component: resource
+        team: sre
+      annotations:
+        summary: "Webhook queue near capacity"
+        description: "Webhook queue utilization is {{$value | humanizePercentage}}. Risk of event loss."
+
+    - alert: ZenWatcherWebhookQueueHigh
+      expr: |
+        avg(zen_watcher_webhook_queue_usage_ratio) > 0.8
+      for: 5m
+      labels:
+        severity: warning
+        component: resource
+        team: sre
+      annotations:
+        summary: "Webhook queue utilization high"
+        description: "Webhook queue utilization is {{$value | humanizePercentage}}. Monitor for potential backpressure."
+
+    # GC and storage alerts
+    - alert: ZenWatcherGCDurationHigh
+      expr: |
+        histogram_quantile(0.95, 
+          sum(rate(zen_watcher_gc_duration_seconds_bucket[10m])) by (le, operation)
+        ) > 60
+      for: 5m
+      labels:
+        severity: warning
+        component: resource
+        team: sre
+      annotations:
+        summary: "GC operation taking too long"
+        description: "GC {{$labels.operation}} p95 duration is {{$value}}s. May impact system performance."
+
+    - alert: ZenWatcherHighObservationCount
+      expr: |
+        sum(zen_watcher_observations_live) > 10000
+      for: 10m
+      labels:
+        severity: warning
+        component: storage
+        team: operations
+      annotations:
+        summary: "High observation count in etcd"
+        description: "Current live observations: {{$value}}. May impact etcd performance and GC frequency."
+
+  - name: zen-watcher.service-availability
+    interval: 30s
+    rules:
+    # Service health alerts
+    - alert: ZenWatcherServiceDown
+      expr: |
+        up{job="zen-watcher"} == 0
+      for: 1m
+      labels:
+        severity: critical
+        component: availability
+        team: sre
+      annotations:
+        summary: "Zen Watcher service is down"
+        description: "Zen Watcher pod is not responding. Check pod status immediately."
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/SERVICE_DOWN.md"
+
+    # Tool integration alerts
+    - alert: ZenWatcherToolsOffline
+      expr: |
+        count(zen_watcher_tools_active == 0) >= 3
+      for: 5m
+      labels:
+        severity: critical
+        component: integration
+        team: security
+      annotations:
+        summary: "Multiple security tools offline"
+        description: "{{$value}} security tools are offline. Check tool deployments and cluster health."
+
+    - alert: ZenWatcherSingleToolOffline
+      expr: |
+        zen_watcher_tools_active == 0
+      for: 10m
+      labels:
+        severity: warning
+        component: integration
+        team: security
+      annotations:
+        summary: "Security tool {{$labels.tool}} offline"
+        description: "Tool {{$labels.tool}} has been offline for 10+ minutes. Check tool status."
+
+    # Adapter health alerts
+    - alert: ZenWatcherAdapterFailing
+      expr: |
+        sum(rate(zen_watcher_adapter_runs_total{outcome="error"}[5m])) > 0.5
+      for: 5m
+      labels:
+        severity: warning
+        component: adapter
+        team: sre
+      annotations:
+        summary: "Adapter {{$labels.adapter}} experiencing errors"
+        description: "Adapter {{$labels.adapter}} has {{$value}} errors/sec. Check adapter configuration."
+
+    - alert: ZenWatcherCRDAdapterDown
+      expr: |
+        sum(rate(zen_watcher_crd_adapter_errors_total[5m])) > 1
+      for: 3m
+      labels:
+        severity: critical
+        component: adapter
+        team: sre
+      annotations:
+        summary: "CRD adapter {{$labels.mapping}} failing"
+        description: "CRD adapter {{$labels.mapping}} has {{$value}} errors/sec. Mapping: {{$labels.mapping}}, Stage: {{$labels.stage}}"
+
+  - name: zen-watcher.trend-analysis
+    interval: 2m
+    rules:
+    # Predictive performance alerts
+    - alert: ZenWatcherPerformanceDegradationTrend
+      expr: |
+        (
+          avg_over_time(histogram_quantile(0.95, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le))[30m:5m]) >
+          avg_over_time(histogram_quantile(0.95, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le))[2h:10m]) * 1.5
+        )
+      for: 15m
+      labels:
+        severity: warning
+        component: performance
+        team: sre
+      annotations:
+        summary: "Performance degradation trend detected"
+        description: "Latency has increased 50% over 2h baseline. Predictive alert - investigate before critical failure."
+
+    # Capacity planning alerts
+    - alert: ZenWatcherCapacityTrendingHigh
+      expr: |
+        (
+          avg_over_time(sum(zen_watcher_dedup_cache_usage_ratio)[1h:5m]) > 0.7 and
+          avg_over_time(sum(zen_watcher_observations_per_minute)[1h:5m]) > avg_over_time(sum(zen_watcher_observations_per_minute)[24h:1h]) * 1.2
+        )
+      for: 30m
+      labels:
+        severity: warning
+        component: capacity
+        team: sre
+      annotations:
+        summary: "Capacity trending toward limits"
+        description: "Cache usage high ({{$value | humanizePercentage}}) with increasing throughput. Plan for capacity expansion."
+
+    # Error rate trend alerts
+    - alert: ZenWatcherErrorRateIncreasing
+      expr: |
+        (
+          sum(rate(zen_watcher_observations_create_errors_total[5m])) +
+          sum(rate(zen_watcher_gc_errors_total[5m]))
+        ) > 
+        avg_over_time((sum(rate(zen_watcher_observations_create_errors_total[5m])) + sum(rate(zen_watcher_gc_errors_total[5m])))[2h:10m]) * 2
+      for: 10m
+      labels:
+        severity: warning
+        component: reliability
+        team: sre
+      annotations:
+        summary: "Error rate trending upward"
+        description: "Error rate is 2x higher than 2h baseline. Investigate root cause to prevent escalation."
+
+  - name: zen-watcher.optimization-opportunities
+    interval: 5m
+    rules:
+    # Filter effectiveness alerts
+    - alert: ZenWatcherFilterIneffective
+      expr: |
+        zen_watcher_optimization_filter_effectiveness_ratio < 0.3
+      for: 30m
+      labels:
+        severity: info
+        component: optimization
+        team: operations
+      annotations:
+        summary: "Filter effectiveness low for {{$labels.source}}"
+        description: "Filter effectiveness is only {{$value | humanizePercentage}} for {{$labels.source}}. Consider filter optimization."
+
+    # Dedup optimization alerts
+    - alert: ZenWatcherDedupOpportunity
+      expr: |
+        zen_watcher_optimization_deduplication_rate_ratio < 0.2
+      for: 30m
+      labels:
+        severity: info
+        component: optimization
+        team: operations
+      annotations:
+        summary: "Low dedup rate for {{$labels.source}}"
+        description: "Deduplication rate is only {{$value | humanizePercentage}} for {{$labels.source}}. Consider increasing dedup window."
+
+    # Processing strategy alerts
+    - alert: ZenWatcherFrequentStrategyChanges
+      expr: |
+        rate(zen_watcher_optimization_strategy_changes_total[1h]) > 5
+      for: 1h
+      labels:
+        severity: warning
+        component: optimization
+        team: sre
+      annotations:
+        summary: "Frequent processing strategy changes"
+        description: "{{$value}} strategy changes/hour detected for {{$labels.source}}. System may be unstable."
+
+  - name: zen-watcher.predictive-warnings
+    interval: 5m
+    rules:
+    # Predictive capacity warnings
+    - alert: ZenWatcherPredictiveCapacityAlert
+      expr: |
+        (
+          predict_linear(avg_over_time(sum(zen_watcher_dedup_cache_usage_ratio)[2h:5m])[2h:], 4*3600) > 0.9 or
+          predict_linear(avg_over_time(sum(zen_watcher_webhook_queue_usage_ratio)[2h:5m])[2h:], 4*3600) > 0.9
+        )
+      for: 30m
+      labels:
+        severity: warning
+        component: capacity
+        team: sre
+      annotations:
+        summary: "Predictive capacity alert"
+        description: "Based on current trends, resource utilization will exceed 90% capacity in ~4 hours. Plan maintenance window."
+
+    # Predictive latency warnings
+    - alert: ZenWatcherPredictiveLatencyAlert
+      expr: |
+        predict_linear(histogram_quantile(0.95, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le))[2h:], 4*3600) > 8
+      for: 30m
+      labels:
+        severity: warning
+        component: performance
+        team: sre
+      annotations:
+        summary: "Predictive latency alert"
+        description: "Based on current trends, p95 latency will exceed 8s in ~4 hours. Investigate performance bottlenecks."
+
+    # Predictive error rate warnings
+    - alert: ZenWatcherPredictiveErrorAlert
+      expr: |
+        predict_linear(sum(rate(zen_watcher_observations_create_errors_total[1h]))[2h:], 4*3600) > 5
+      for: 1h
+      labels:
+        severity: warning
+        component: reliability
+        team: sre
+      annotations:
+        summary: "Predictive error rate alert"
+        description: "Based on current trends, error rate will exceed 5 errors/sec in ~4 hours. Preventive maintenance recommended."

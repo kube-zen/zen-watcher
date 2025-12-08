@@ -106,40 +106,83 @@ Complete guide to all Zen Watcher documentation files.
     - Auto-optimization status
     - Grafana dashboard configuration
 
+### Alerting & Incident Response
+
+13. **[alerting/SECURITY_ALERTING_OVERVIEW.md](alerting/SECURITY_ALERTING_OVERVIEW.md)** - Security alerting system overview ⭐ **NEW**
+    - Alert categories and severity levels
+    - Response time SLAs
+    - Key metrics and thresholds
+    - Alert configuration
+
+14. **[alerting/SECURITY_INCIDENT_RESPONSE.md](alerting/SECURITY_INCIDENT_RESPONSE.md)** - Security incident response runbooks ⭐ **NEW**
+    - Falco runtime threat response
+    - Critical vulnerability handling
+    - CIS benchmark compliance failures
+    - IaC security issue remediation
+    - Suspicious audit activity investigation
+
+15. **[alerting/alerting-integration-guide.md](alerting/alerting-integration-guide.md)** - Alerting integration guide ⭐ **NEW**
+    - AlertManager configuration
+    - Alert routing and escalation
+    - Multi-channel notifications
+    - Dashboard integration
+    - Testing procedures
+
+16. **[alerting/INCIDENT_RESPONSE_SUMMARY.md](alerting/INCIDENT_RESPONSE_SUMMARY.md)** - Incident response summary ⭐ **NEW**
+    - Executive summary
+    - Best practices
+    - Response workflows
+    - Escalation procedures
+
+17. **[alerting/alert-testing-procedures.md](alerting/alert-testing-procedures.md)** - Alert testing procedures ⭐ **NEW**
+    - Production validation
+    - Testing workflows
+    - Alert verification
+
+18. **[alerting/testing-procedures.md](alerting/testing-procedures.md)** - Comprehensive testing procedures ⭐ **NEW**
+    - End-to-end testing
+    - Validation workflows
+    - Quality assurance
+
+19. **[alerting/silence-management.md](alerting/silence-management.md)** - Alert silence management ⭐ **NEW**
+    - Silence configuration
+    - Maintenance windows
+    - Incident response silences
+
 ---
 
 ## 🔐 Security Documentation
 
-16. **[SECURITY.md](SECURITY.md)** - Security policy
+20. **[SECURITY.md](SECURITY.md)** - Security policy
     - Vulnerability reporting
     - Security features
     - Best practices
     - Compliance
     - Incident response
 
-17. **[SECURITY_MODEL.md](SECURITY_MODEL.md)** - Security model & threat analysis
+21. **[SECURITY_MODEL.md](SECURITY_MODEL.md)** - Security model & threat analysis
     - Trust boundaries
     - Threat model
     - Security layers
     - Mitigations
 
-18. **[SECURITY_RBAC.md](SECURITY_RBAC.md)** - RBAC permissions
+22. **[SECURITY_RBAC.md](SECURITY_RBAC.md)** - RBAC permissions
     - Permission rationale
     - ClusterRole details
     - Security audit guide
 
-19. **[SECURITY_THREAT_MODEL.md](SECURITY_THREAT_MODEL.md)** - Threat modeling
+23. **[SECURITY_THREAT_MODEL.md](SECURITY_THREAT_MODEL.md)** - Threat modeling
     - Threat identification
     - Risk assessment
     - Mitigation strategies
 
-20. **[SBOM.md](SBOM.md)** - Software Bill of Materials
+24. **[SBOM.md](SBOM.md)** - Software Bill of Materials
     - SBOM generation
     - Vulnerability scanning
     - Supply chain security
     - Compliance
 
-21. **[COSIGN.md](COSIGN.md)** - Image signing
+25. **[COSIGN.md](COSIGN.md)** - Image signing
     - Cosign setup
     - Image verification
     - Key management
