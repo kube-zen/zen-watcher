@@ -1,16 +1,19 @@
-# Zen Watcher Auto-Optimization Usage Guide
+# Zen Watcher Per-Source Auto-Optimization Usage Guide
 
 ## Overview
 
-Zen Watcher includes an intelligent auto-optimization system that learns from your cluster patterns and provides actionable optimization suggestions.
+Zen Watcher includes an intelligent **per-source auto-optimization system** that continuously learns from cluster patterns and automatically optimizes processing strategies for each source independently. This system dynamically adjusts filtering, deduplication, and processing order to maximize efficiency while maintaining data integrity.
 
 ## Features
 
-- **Self-Learning**: Analyzes metrics to find optimization opportunities
-- **Dynamic Processing Order**: Automatically adjusts processing order (filter_first vs dedup_first)
-- **Actionable Suggestions**: Provides kubectl commands for easy application
-- **Real-Time Monitoring**: Tracks effectiveness and alerts on thresholds
-- **Professional Logging**: Clean, structured logs
+- **Per-Source Optimization**: Each source (Trivy, Falco, Kyverno, etc.) is optimized independently
+- **Dynamic Processing Order**: Automatically selects optimal order (filter_first, dedup_first, hybrid, adaptive)
+- **Adaptive Filtering**: Adjusts filter thresholds based on event patterns
+- **Adaptive Deduplication**: Optimizes deduplication windows based on effectiveness
+- **Intelligent Strategy Selection**: Uses metrics-driven decision making with confidence scoring
+- **Real-Time Monitoring**: Comprehensive Prometheus metrics for all optimization decisions
+- **State Management**: Tracks optimization history and decision reasoning
+- **Zero Blast Radius**: All optimizations are safe, tested, and reversible
 
 ## CLI Commands
 
@@ -106,9 +109,26 @@ Zen Watcher automatically determines optimal processing order:
 - **dedup_first**: Used when dedup effectiveness > 50% (many duplicates)
 - **Default**: Source-specific defaults (trivy: filter_first, cert-manager: dedup_first)
 
-## Metrics
+## Metrics & Monitoring
 
-Zen Watcher exposes optimization metrics:
+### Per-Source Processing Metrics
+
+- `zen_watcher_optimization_source_events_processed_total{source}` - Total events processed per source
+- `zen_watcher_optimization_source_events_filtered_total{source}` - Total events filtered per source
+- `zen_watcher_optimization_source_events_deduped_total{source}` - Total events deduplicated per source
+- `zen_watcher_optimization_source_processing_latency_seconds{source}` - Processing latency histogram (p50, p95, p99)
+- `zen_watcher_optimization_filter_effectiveness_ratio{source}` - Filter effectiveness (0.0-1.0)
+- `zen_watcher_optimization_deduplication_rate_ratio{source}` - Deduplication rate (0.0-1.0)
+- `zen_watcher_optimization_observations_per_minute{source}` - Observations per minute per source
+
+### Optimization Decision Metrics
+
+- `zen_watcher_optimization_decisions_total{source,decision_type,strategy}` - Total optimization decisions
+- `zen_watcher_optimization_strategy_changes_total{source,old_strategy,new_strategy}` - Processing strategy changes
+- `zen_watcher_optimization_adaptive_adjustments_total{source,adjustment_type}` - Adaptive adjustments applied
+- `zen_watcher_optimization_confidence{source}` - Confidence level of optimization decisions (0.0-1.0)
+
+### Legacy Metrics (Still Available)
 
 - `zen_watcher_filter_pass_rate{source}` - Filter effectiveness (0.0-1.0)
 - `zen_watcher_dedup_effectiveness{source}` - Dedup effectiveness (0.0-1.0)
@@ -118,6 +138,16 @@ Zen Watcher exposes optimization metrics:
 - `zen_watcher_suggestions_applied_total{source,type}` - Suggestions applied
 - `zen_watcher_optimization_impact{source}` - Impact tracking
 - `zen_watcher_threshold_exceeded_total{source,threshold}` - Threshold alerts
+
+### Grafana Dashboard
+
+The Grafana dashboard (`config/monitoring/zen-watcher-dashboard.json`) includes optimization panels showing:
+- **Events Processing Breakdown**: Processed, filtered, and deduplicated events per source
+- **Filter & Dedup Effectiveness**: Real-time effectiveness ratios
+- **Processing Latency**: P50, P95, P99 latencies per source
+- **Observations per Minute**: Throughput metrics per source
+- **Strategy Changes**: Processing strategy changes over time
+- **Optimization Confidence**: Confidence levels for optimization decisions
 
 ## Alerts
 
@@ -168,6 +198,81 @@ zen-watcher-optimize --command=auto --enable
 ```
 
 This enables auto-optimization for all sources that have `autoOptimize: true` in their config.
+
+## Architecture Components
+
+The per-source optimization system consists of several integrated components that work together to provide intelligent, adaptive optimization:
+
+### Core Components
+
+- **StrategyDecider**: Determines optimal processing order (filter_first, dedup_first, hybrid, adaptive) based on metrics and thresholds
+- **AdaptiveFilter**: Adaptive filtering with learning capabilities, dynamic rules, and effectiveness tracking
+- **PerSourceMetricsCollector**: Per-source metrics collection with Prometheus integration, sliding window aggregation, and real-time KPIs
+- **PerformanceTracker**: Performance tracking per source including latency (p50, p95, p99), throughput, filter hit rates, and resource utilization
+- **SmartProcessor**: Main orchestrator that coordinates all optimization components and applies strategies
+- **OptimizationStateManager**: Tracks optimization state, decision history, performance data, and active rules per source
+- **OptimizationEngine**: Continuous optimization loop that runs periodic analysis, evaluates metrics, and applies optimizations
+- **AdaptiveProcessor**: Per-source adaptive processing adjustments for filters, deduplication, and rate limiting
+- **Optimizer**: Unified coordinator that ties all components together and manages the optimization lifecycle
+
+### Processing Strategies
+
+The system supports four processing strategies, automatically selected based on source characteristics:
+
+1. **filter_first**: Filter → Normalize → Dedup → Create
+   - **Best for**: High-volume sources with many LOW severity events (>70%)
+   - **Benefit**: Removes noise early, reduces dedup cache pressure
+   - **Use case**: Trivy with high LOW severity rate
+
+2. **dedup_first**: Dedup → Filter → Normalize → Create
+   - **Best for**: Sources with high deduplication effectiveness (>50%)
+   - **Benefit**: Removes duplicates early, reduces filter processing load
+   - **Use case**: cert-manager with retry patterns
+
+3. **hybrid**: Dynamic combination based on event characteristics
+   - **Best for**: Variable workload patterns, mixed event types
+   - **Benefit**: Optimal balance for complex sources
+   - **Use case**: Falco with varying event patterns
+
+4. **adaptive**: Machine learning-based dynamic adaptation
+   - **Best for**: Very high volume, complex workloads requiring continuous learning
+   - **Benefit**: Continuous learning and optimization without manual tuning
+   - **Use case**: Large-scale deployments with multiple high-volume sources
+
+### Optimization Loop
+
+The system runs continuous optimization cycles:
+
+1. **Metrics Collection** (continuous)
+   - Per-source events processed, filtered, deduplicated
+   - Processing latency (p50, p95, p99)
+   - Filter and deduplication effectiveness ratios
+   - Event patterns (low severity percentage, throughput)
+   - Resource usage (CPU, memory per source)
+
+2. **Analysis** (every 5 minutes by default, configurable via `analysisInterval`)
+   - Evaluate metrics against configured thresholds
+   - Calculate confidence scores based on data volume and consistency
+   - Identify optimization opportunities
+   - Compare current performance to historical data
+
+3. **Decision Making** (when thresholds exceeded or auto-optimize enabled)
+   - Determine optimal strategy using StrategyDecider
+   - Calculate confidence level (requires minimum threshold: `confidenceThreshold`)
+   - Generate decision with reasoning and expected impact
+   - Store decision in OptimizationStateManager
+
+4. **Application** (if confidence > `confidenceThreshold`)
+   - Apply strategy changes via SmartProcessor
+   - Adjust adaptive parameters (filter thresholds, dedup windows)
+   - Update rate limits based on targets
+   - Record decision in state manager with timestamp
+
+5. **Monitoring** (continuous)
+   - Track optimization effectiveness
+   - Measure impact metrics (latency improvement, resource savings)
+   - Export comprehensive metrics to Prometheus
+   - Alert on threshold exceedances
 
 ## Troubleshooting
 

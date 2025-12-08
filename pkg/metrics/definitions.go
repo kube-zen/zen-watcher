@@ -73,6 +73,21 @@ type Metrics struct {
 	SuggestionsApplied      *prometheus.CounterVec // Suggestions applied
 	OptimizationImpact      *prometheus.GaugeVec // Optimization impact (% improvement)
 	ThresholdExceeded       *prometheus.CounterVec // Threshold exceeded counter
+	
+	// Per-source optimization metrics (from PerSourceMetricsCollector)
+	SourceEventsProcessed   *prometheus.CounterVec // Events processed per source
+	SourceEventsFiltered    *prometheus.CounterVec // Events filtered per source
+	SourceEventsDeduped     *prometheus.CounterVec // Events deduplicated per source
+	SourceProcessingLatency *prometheus.HistogramVec // Processing latency per source
+	SourceFilterEffectiveness *prometheus.GaugeVec // Filter effectiveness per source
+	SourceDedupRate         *prometheus.GaugeVec // Deduplication rate per source
+	SourceObservationsPerMinute *prometheus.GaugeVec // Observations per minute per source
+	
+	// Optimization decision metrics
+	OptimizationDecisions   *prometheus.CounterVec // Optimization decisions made
+	StrategyChanges         *prometheus.CounterVec // Processing strategy changes
+	AdaptiveAdjustments     *prometheus.CounterVec // Adaptive adjustments applied
+	OptimizationConfidence  *prometheus.GaugeVec // Confidence level of optimizations
 }
 
 // NewMetrics creates and registers all Prometheus metrics
@@ -402,6 +417,97 @@ func NewMetrics() *Metrics {
 		[]string{"source", "threshold"},
 	)
 
+	// Per-source optimization metrics (from PerSourceMetricsCollector)
+	sourceEventsProcessed := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_optimization_source_events_processed_total",
+			Help: "Total number of events processed per source (optimization metrics)",
+		},
+		[]string{"source"},
+	)
+
+	sourceEventsFiltered := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_optimization_source_events_filtered_total",
+			Help: "Total number of events filtered per source (optimization metrics)",
+		},
+		[]string{"source"},
+	)
+
+	sourceEventsDeduped := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_optimization_source_events_deduped_total",
+			Help: "Total number of events deduplicated per source (optimization metrics)",
+		},
+		[]string{"source"},
+	)
+
+	sourceProcessingLatency := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "zen_watcher_optimization_source_processing_latency_seconds",
+			Help:    "Processing latency per source in seconds (optimization metrics)",
+			Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0},
+		},
+		[]string{"source"},
+	)
+
+	sourceFilterEffectiveness := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_optimization_filter_effectiveness_ratio",
+			Help: "Filter effectiveness ratio per source (0.0-1.0)",
+		},
+		[]string{"source"},
+	)
+
+	sourceDedupRate := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_optimization_deduplication_rate_ratio",
+			Help: "Deduplication rate ratio per source (0.0-1.0)",
+		},
+		[]string{"source"},
+	)
+
+	sourceObservationsPerMinute := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_optimization_observations_per_minute",
+			Help: "Observations per minute per source (optimization metrics)",
+		},
+		[]string{"source"},
+	)
+
+	// Optimization decision metrics
+	optimizationDecisions := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_optimization_decisions_total",
+			Help: "Total number of optimization decisions made",
+		},
+		[]string{"source", "decision_type", "strategy"},
+	)
+
+	strategyChanges := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_optimization_strategy_changes_total",
+			Help: "Total number of processing strategy changes",
+		},
+		[]string{"source", "old_strategy", "new_strategy"},
+	)
+
+	adaptiveAdjustments := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_optimization_adaptive_adjustments_total",
+			Help: "Total number of adaptive adjustments applied",
+		},
+		[]string{"source", "adjustment_type"},
+	)
+
+	optimizationConfidence := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_optimization_confidence",
+			Help: "Confidence level of optimization decisions (0.0-1.0)",
+		},
+		[]string{"source"},
+	)
+
 	// Register optimization metrics
 	prometheus.MustRegister(filterPassRate)
 	prometheus.MustRegister(dedupEffectiveness)
@@ -413,6 +519,21 @@ func NewMetrics() *Metrics {
 	prometheus.MustRegister(suggestionsApplied)
 	prometheus.MustRegister(optimizationImpact)
 	prometheus.MustRegister(thresholdExceeded)
+	
+	// Register per-source optimization metrics
+	prometheus.MustRegister(sourceEventsProcessed)
+	prometheus.MustRegister(sourceEventsFiltered)
+	prometheus.MustRegister(sourceEventsDeduped)
+	prometheus.MustRegister(sourceProcessingLatency)
+	prometheus.MustRegister(sourceFilterEffectiveness)
+	prometheus.MustRegister(sourceDedupRate)
+	prometheus.MustRegister(sourceObservationsPerMinute)
+	
+	// Register optimization decision metrics
+	prometheus.MustRegister(optimizationDecisions)
+	prometheus.MustRegister(strategyChanges)
+	prometheus.MustRegister(adaptiveAdjustments)
+	prometheus.MustRegister(optimizationConfidence)
 
 	return &Metrics{
 		// Core event metrics
@@ -468,5 +589,20 @@ func NewMetrics() *Metrics {
 		SuggestionsApplied:    suggestionsApplied,
 		OptimizationImpact:    optimizationImpact,
 		ThresholdExceeded:     thresholdExceeded,
+		
+		// Per-source optimization metrics
+		SourceEventsProcessed:     sourceEventsProcessed,
+		SourceEventsFiltered:      sourceEventsFiltered,
+		SourceEventsDeduped:       sourceEventsDeduped,
+		SourceProcessingLatency:   sourceProcessingLatency,
+		SourceFilterEffectiveness: sourceFilterEffectiveness,
+		SourceDedupRate:           sourceDedupRate,
+		SourceObservationsPerMinute: sourceObservationsPerMinute,
+		
+		// Optimization decision metrics
+		OptimizationDecisions:  optimizationDecisions,
+		StrategyChanges:        strategyChanges,
+		AdaptiveAdjustments:    adaptiveAdjustments,
+		OptimizationConfidence: optimizationConfidence,
 	}
 }

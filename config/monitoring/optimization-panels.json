@@ -1,0 +1,501 @@
+[
+  {
+    "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+    },
+    "fieldConfig": {
+      "defaults": {
+        "color": {
+          "mode": "palette-classic"
+        },
+        "custom": {
+          "axisLabel": "",
+          "axisPlacement": "auto",
+          "barAlignment": 0,
+          "drawStyle": "line",
+          "fillOpacity": 10,
+          "gradientMode": "none",
+          "hideFrom": {
+            "tooltip": false,
+            "viz": false,
+            "legend": false
+          },
+          "lineInterpolation": "linear",
+          "lineWidth": 1,
+          "pointSize": 5,
+          "scaleDistribution": {
+            "type": "linear"
+          },
+          "showPoints": "never",
+          "spanNulls": false
+        },
+        "mappings": [],
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {
+              "color": "green",
+              "value": null
+            }
+          ]
+        },
+        "unit": "short"
+      },
+      "overrides": []
+    },
+    "gridPos": {
+      "h": 8,
+      "w": 12,
+      "x": 0,
+      "y": 32
+    },
+    "id": 20,
+    "options": {
+      "legend": {
+        "calcs": ["last", "max"],
+        "displayMode": "table",
+        "placement": "bottom"
+      },
+      "tooltip": {
+        "mode": "multi"
+      }
+    },
+    "pluginVersion": "10.0.0",
+    "targets": [
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "expr": "zen_watcher_optimization_source_events_processed_total",
+        "legendFormat": "{{source}} - Processed",
+        "refId": "A"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "expr": "zen_watcher_optimization_source_events_filtered_total",
+        "legendFormat": "{{source}} - Filtered",
+        "refId": "B"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "expr": "zen_watcher_optimization_source_events_deduped_total",
+        "legendFormat": "{{source}} - Deduped",
+        "refId": "C"
+      }
+    ],
+    "title": "Optimization: Events Processing Breakdown",
+    "type": "timeseries"
+  },
+  {
+    "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+    },
+    "fieldConfig": {
+      "defaults": {
+        "color": {
+          "mode": "continuous-GrYlRd"
+        },
+        "mappings": [],
+        "max": 1,
+        "min": 0,
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {
+              "color": "green",
+              "value": null
+            },
+            {
+              "color": "yellow",
+              "value": 0.5
+            },
+            {
+              "color": "red",
+              "value": 0.8
+            }
+          ]
+        },
+        "unit": "percentunit"
+      },
+      "overrides": []
+    },
+    "gridPos": {
+      "h": 8,
+      "w": 12,
+      "x": 12,
+      "y": 32
+    },
+    "id": 21,
+    "options": {
+      "displayMode": "gradient",
+      "minVizHeight": 10,
+      "minVizWidth": 0,
+      "orientation": "horizontal",
+      "reduceOptions": {
+        "calcs": ["lastNotNull"],
+        "fields": "",
+        "values": false
+      },
+      "showUnfilled": true
+    },
+    "pluginVersion": "10.0.0",
+    "targets": [
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "expr": "zen_watcher_optimization_filter_effectiveness_ratio",
+        "legendFormat": "{{source}}",
+        "refId": "A"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "expr": "zen_watcher_optimization_deduplication_rate_ratio",
+        "legendFormat": "{{source}} - Dedup",
+        "refId": "B"
+      }
+    ],
+    "title": "Optimization: Filter & Dedup Effectiveness",
+    "type": "bargauge"
+  },
+  {
+    "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+    },
+    "fieldConfig": {
+      "defaults": {
+        "color": {
+          "mode": "palette-classic"
+        },
+        "custom": {
+          "axisLabel": "",
+          "axisPlacement": "auto",
+          "barAlignment": 0,
+          "drawStyle": "line",
+          "fillOpacity": 10,
+          "gradientMode": "none",
+          "hideFrom": {
+            "tooltip": false,
+            "viz": false,
+            "legend": false
+          },
+          "lineInterpolation": "linear",
+          "lineWidth": 1,
+          "pointSize": 5,
+          "scaleDistribution": {
+            "type": "linear"
+          },
+          "showPoints": "never",
+          "spanNulls": false
+        },
+        "mappings": [],
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {
+              "color": "green",
+              "value": null
+            }
+          ]
+        },
+        "unit": "s"
+      },
+      "overrides": []
+    },
+    "gridPos": {
+      "h": 8,
+      "w": 12,
+      "x": 0,
+      "y": 40
+    },
+    "id": 22,
+    "options": {
+      "legend": {
+        "calcs": ["mean", "max", "p95", "p99"],
+        "displayMode": "table",
+        "placement": "bottom"
+      },
+      "tooltip": {
+        "mode": "multi"
+      }
+    },
+    "pluginVersion": "10.0.0",
+    "targets": [
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "expr": "histogram_quantile(0.95, rate(zen_watcher_optimization_source_processing_latency_seconds_bucket[5m]))",
+        "legendFormat": "{{source}} - p95",
+        "refId": "A"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "expr": "histogram_quantile(0.99, rate(zen_watcher_optimization_source_processing_latency_seconds_bucket[5m]))",
+        "legendFormat": "{{source}} - p99",
+        "refId": "B"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "expr": "rate(zen_watcher_optimization_source_processing_latency_seconds_sum[5m]) / rate(zen_watcher_optimization_source_processing_latency_seconds_count[5m])",
+        "legendFormat": "{{source}} - avg",
+        "refId": "C"
+      }
+    ],
+    "title": "Optimization: Processing Latency by Source",
+    "type": "timeseries"
+  },
+  {
+    "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+    },
+    "fieldConfig": {
+      "defaults": {
+        "color": {
+          "mode": "palette-classic"
+        },
+        "custom": {
+          "axisLabel": "",
+          "axisPlacement": "auto",
+          "barAlignment": 0,
+          "drawStyle": "line",
+          "fillOpacity": 10,
+          "gradientMode": "none",
+          "hideFrom": {
+            "tooltip": false,
+            "viz": false,
+            "legend": false
+          },
+          "lineInterpolation": "linear",
+          "lineWidth": 1,
+          "pointSize": 5,
+          "scaleDistribution": {
+            "type": "linear"
+          },
+          "showPoints": "never",
+          "spanNulls": false
+        },
+        "mappings": [],
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {
+              "color": "green",
+              "value": null
+            }
+          ]
+        },
+        "unit": "ops"
+      },
+      "overrides": []
+    },
+    "gridPos": {
+      "h": 8,
+      "w": 12,
+      "x": 12,
+      "y": 40
+    },
+    "id": 23,
+    "options": {
+      "legend": {
+        "calcs": ["last", "mean"],
+        "displayMode": "table",
+        "placement": "bottom"
+      },
+      "tooltip": {
+        "mode": "multi"
+      }
+    },
+    "pluginVersion": "10.0.0",
+    "targets": [
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "expr": "zen_watcher_optimization_observations_per_minute",
+        "legendFormat": "{{source}}",
+        "refId": "A"
+      }
+    ],
+    "title": "Optimization: Observations per Minute by Source",
+    "type": "timeseries"
+  },
+  {
+    "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+    },
+    "fieldConfig": {
+      "defaults": {
+        "color": {
+          "mode": "palette-classic"
+        },
+        "custom": {
+          "axisLabel": "",
+          "axisPlacement": "auto",
+          "barAlignment": 0,
+          "drawStyle": "bars",
+          "fillOpacity": 100,
+          "gradientMode": "none",
+          "hideFrom": {
+            "tooltip": false,
+            "viz": false,
+            "legend": false
+          },
+          "lineInterpolation": "linear",
+          "lineWidth": 1,
+          "pointSize": 5,
+          "scaleDistribution": {
+            "type": "linear"
+          },
+          "showPoints": "never",
+          "spanNulls": false
+        },
+        "mappings": [],
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {
+              "color": "green",
+              "value": null
+            }
+          ]
+        },
+        "unit": "short"
+      },
+      "overrides": []
+    },
+    "gridPos": {
+      "h": 8,
+      "w": 12,
+      "x": 0,
+      "y": 48
+    },
+    "id": 24,
+    "options": {
+      "legend": {
+        "calcs": ["sum"],
+        "displayMode": "table",
+        "placement": "bottom"
+      },
+      "tooltip": {
+        "mode": "multi"
+      }
+    },
+    "pluginVersion": "10.0.0",
+    "targets": [
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "expr": "zen_watcher_optimization_strategy_changes_total",
+        "legendFormat": "{{source}}: {{old_strategy}} → {{new_strategy}}",
+        "refId": "A"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "expr": "zen_watcher_optimization_adaptive_adjustments_total",
+        "legendFormat": "{{source}} - {{adjustment_type}}",
+        "refId": "B"
+      }
+    ],
+    "title": "Optimization: Strategy Changes & Adjustments",
+    "type": "timeseries"
+  },
+  {
+    "datasource": {
+      "type": "prometheus",
+      "uid": "${DS_PROMETHEUS}"
+    },
+    "fieldConfig": {
+      "defaults": {
+        "color": {
+          "mode": "continuous-BlPu"
+        },
+        "mappings": [],
+        "max": 1,
+        "min": 0,
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            {
+              "color": "red",
+              "value": null
+            },
+            {
+              "color": "yellow",
+              "value": 0.5
+            },
+            {
+              "color": "green",
+              "value": 0.7
+            }
+          ]
+        },
+        "unit": "percentunit"
+      },
+      "overrides": []
+    },
+    "gridPos": {
+      "h": 8,
+      "w": 12,
+      "x": 12,
+      "y": 48
+    },
+    "id": 25,
+    "options": {
+      "displayMode": "gradient",
+      "minVizHeight": 10,
+      "minVizWidth": 0,
+      "orientation": "horizontal",
+      "reduceOptions": {
+        "calcs": ["lastNotNull"],
+        "fields": "",
+        "values": false
+      },
+      "showUnfilled": true
+    },
+    "pluginVersion": "10.0.0",
+    "targets": [
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "expr": "zen_watcher_optimization_confidence",
+        "legendFormat": "{{source}}",
+        "refId": "A"
+      }
+    ],
+    "title": "Optimization: Decision Confidence Levels",
+    "type": "bargauge"
+  }
+]
+

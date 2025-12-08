@@ -172,7 +172,12 @@ That's it! Apply the YAML and zen-watcher will start collecting observations. Se
 - **Time-bucketed aggregation**: Collapses repeating events within configurable windows
 - **LRU eviction**: Efficient memory management even under high load
 - **Dynamic processing order**: System automatically switches between `filter_first` and `dedup_first` based on real-time traffic patterns
-- **Auto-optimization**: Self-managing system that learns from metrics and optimizes filter rules, dedup windows, and rate limits automatically
+- **Per-Source Auto-Optimization**: Intelligent system that learns from metrics and automatically optimizes processing strategies per source:
+  - Dynamic processing order selection (filter_first, dedup_first, hybrid, adaptive)
+  - Adaptive filtering with learning capabilities
+  - Adaptive deduplication with window optimization
+  - Metrics-driven decision making with confidence scoring
+  - Comprehensive Prometheus metrics for all optimization decisions
 - **Result**: <100ms CPU spikes and minimal etcd churn—even under firehose conditions
 
 See [docs/INTELLIGENT_EVENT_PIPELINE.md](docs/INTELLIGENT_EVENT_PIPELINE.md) for the complete guide to the intelligent event integrity system, or [docs/DEDUPLICATION.md](docs/DEDUPLICATION.md) for detailed deduplication documentation.

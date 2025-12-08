@@ -259,11 +259,29 @@ spec:
     includeTypes:
       - error
       - warning
+    adaptiveEnabled: true  # Enable adaptive filtering with learning
+    learningRate: 0.1  # Learning rate for adaptive adjustments (0.0-1.0)
+    dynamicRules:  # Dynamic filter rules with conditions
+      - id: high-volume-filter
+        priority: 100
+        enabled: true
+        condition: "$.metrics.events_per_minute > 1000"
+        action: exclude
+        ttl: "1h"
+        metrics:
+          effectiveness: 0.85
   
   # Deduplication
   dedup:
     window: "1h"
-    strategy: fingerprint  # or "key"
+    strategy: fingerprint  # fingerprint, key, hybrid, or adaptive
+    adaptive: true  # Enable adaptive deduplication
+    minChange: 0.05  # Minimum change threshold to trigger adaptation (5%)
+    learningRate: 0.1  # Learning rate for adaptive dedup (0.0-1.0)
+    fields:  # Fields to use (for key/hybrid strategies)
+      - cve
+      - resource.name
+      - namespace
   
   # TTL configuration
   ttl:
@@ -275,6 +293,13 @@ spec:
   rateLimit:
     maxPerMinute: 100
     burst: 200
+    adaptive: true  # Enable adaptive rate limiting
+    cooldownPeriod: "5m"  # Cooldown after adjustments
+    targets:  # Per-severity or per-type rate limit targets
+      LOW: 100
+      MEDIUM: 150
+      HIGH: 200
+      CRITICAL: 300
   
   # Normalization rules
   normalization:
@@ -291,8 +316,10 @@ spec:
   
   # Processing order and auto-optimization
   processing:
-    order: auto  # auto, filter_first, or dedup_first
+    order: auto  # auto, filter_first, dedup_first, hybrid, or adaptive
     autoOptimize: true  # Enable automatic optimization
+    analysisInterval: "15m"  # How often to analyze and optimize (default: 5m)
+    confidenceThreshold: 0.7  # Minimum confidence for auto-changes (0.0-1.0, default: 0.7)
   
   # Thresholds for monitoring and alerts
   thresholds:
@@ -328,18 +355,21 @@ Zen Watcher includes an intelligent auto-optimization system that learns from yo
 
 ### Processing Order Modes
 
-Zen Watcher supports three processing order modes:
+Zen Watcher supports five processing order modes:
 
 | Mode | Description | When to Use |
 |------|-------------|-------------|
-| **auto** | Automatically learns and optimizes | **Recommended** - Let Zen Watcher decide |
-| **filter_first** | Filter before deduplication | High LOW severity (>70%), many events to filter |
-| **dedup_first** | Deduplicate before filtering | High duplicate rate (>50%), retry patterns |
+| **auto** | Automatically learns and optimizes | **Recommended** - Let Zen Watcher decide based on metrics |
+| **filter_first** | Filter → Normalize → Dedup → Create | High LOW severity (>70%), many events to filter |
+| **dedup_first** | Dedup → Filter → Normalize → Create | High duplicate rate (>50%), retry patterns |
+| **hybrid** | Dynamic combination based on event characteristics | Variable workload patterns, mixed event types |
+| **adaptive** | Machine learning-based continuous adaptation | Very high volume, complex workloads requiring continuous learning |
 
 **Auto Mode Logic:**
 - If LOW severity > 70% → Uses `filter_first`
 - If dedup effectiveness > 50% → Uses `dedup_first`
-- Otherwise → Uses source-specific default
+- If very high volume + auto-optimize enabled → Uses `adaptive`
+- Otherwise → Uses source-specific default or `hybrid`
 
 ### Enabling Auto-Optimization
 
