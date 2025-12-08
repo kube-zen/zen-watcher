@@ -3,7 +3,7 @@ kep-number: 0000
 title: zen-watcher - Kubernetes Observation Collector
 authors:
   - "@kube-zen"
-owning-sig: sig-foo  # TODO: Update to appropriate SIG (sig-security, sig-observability, etc.)
+owning-sig: sig-observability  # Primary SIG for observability infrastructure
 participating-sigs:
   - sig-security
   - sig-observability
@@ -13,7 +13,7 @@ approvers:
   - TBD
 status: implementable
 creation-date: 2024-11-27
-last-updated: 2024-12-04
+last-updated: 2025-12-08
 see-also:
   - https://github.com/kube-zen/zen-watcher
 replaces:
