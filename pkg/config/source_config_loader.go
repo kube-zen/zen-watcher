@@ -41,6 +41,64 @@ var (
 	}
 )
 
+// ThresholdConfig represents a threshold configuration for monitoring
+type ThresholdConfig struct {
+	Warning    float64
+	Critical   float64
+	Window     time.Duration
+	Action     string // warn, alert, optimize
+	Description string
+}
+
+// ProcessingConfig represents processing optimization configuration
+type ProcessingConfig struct {
+	Order            string                      // auto, filter_first, dedup_first
+	AutoOptimize     bool                        // Enable auto-optimization
+	Thresholds       map[string]*ThresholdConfig // Per-metric thresholds
+	AnalysisInterval time.Duration               // How often to analyze performance
+	ConfidenceThreshold float64                  // Minimum confidence for auto-optimization (0.0-1.0)
+}
+
+// FilterConfig represents advanced filtering configuration
+type FilterConfig struct {
+	MinPriority        float64
+	ExcludeNamespaces  []string
+	IncludeTypes       []string
+	DynamicRules       []DynamicFilterRule
+	AdaptiveEnabled    bool
+	LearningRate       float64
+}
+
+// DynamicFilterRule represents a dynamic filter rule
+type DynamicFilterRule struct {
+	ID        string
+	Priority  int
+	Enabled   bool
+	Condition string // JSONPath condition
+	Action    string // include, exclude, modify
+	TTL       time.Duration
+	Metrics   map[string]float64
+}
+
+// DeduplicationConfig represents intelligent deduplication configuration
+type DeduplicationConfig struct {
+	Window      time.Duration
+	Strategy    string   // fingerprint, content, hybrid, adaptive
+	Adaptive    bool     // Enable adaptive deduplication
+	Fields      []string // Fields to consider
+	MinChange   float64  // Minimum change threshold to trigger adaptation
+	LearningRate float64
+}
+
+// RateLimitConfig represents rate limiting and throttling configuration
+type RateLimitConfig struct {
+	MaxPerMinute   int
+	Burst          int
+	Adaptive       bool           // Enable adaptive rate limiting
+	CooldownPeriod time.Duration
+	Targets        map[string]int // Per-severity or per-type targets
+}
+
 // SourceConfig represents the configuration for a source
 type SourceConfig struct {
 	Source      string
@@ -60,6 +118,12 @@ type SourceConfig struct {
 	StaticType    string
 	ProcessingOrder string // auto, filter_first, dedup_first
 	AutoOptimize bool
+	
+	// Enhanced optimization configuration (backward compatible - flat fields remain)
+	Processing    ProcessingConfig
+	Filter        FilterConfig
+	Deduplication DeduplicationConfig
+	RateLimit     RateLimitConfig
 }
 
 // SourceConfigLoader watches ObservationSourceConfig CRDs and caches configuration
@@ -340,23 +404,138 @@ func (scl *SourceConfigLoader) convertToSourceConfig(osc *unstructured.Unstructu
 		config.RateLimitBurst = defaults.RateLimitMax * 2
 	}
 
-	// Parse processing configuration
+	// Parse processing configuration (enhanced with nested structure)
 	if processingObj, found, _ := unstructured.NestedMap(osc.Object, "spec", "processing"); found {
 		if order, ok := processingObj["order"].(string); ok {
 			config.ProcessingOrder = order
+			config.Processing.Order = order
 		} else {
 			config.ProcessingOrder = "auto"
+			config.Processing.Order = "auto"
 		}
 
 		if autoOptimize, ok := processingObj["autoOptimize"].(bool); ok {
 			config.AutoOptimize = autoOptimize
+			config.Processing.AutoOptimize = autoOptimize
 		} else {
 			config.AutoOptimize = true // Default to true
+			config.Processing.AutoOptimize = true
+		}
+
+		// Parse analysis interval
+		if intervalStr, ok := processingObj["analysisInterval"].(string); ok {
+			if interval, err := time.ParseDuration(intervalStr); err == nil {
+				config.Processing.AnalysisInterval = interval
+			} else {
+				config.Processing.AnalysisInterval = 15 * time.Minute // Default
+			}
+		} else {
+			config.Processing.AnalysisInterval = 15 * time.Minute
+		}
+
+		// Parse confidence threshold
+		if confidence, ok := processingObj["confidenceThreshold"].(float64); ok {
+			config.Processing.ConfidenceThreshold = confidence
+		} else {
+			config.Processing.ConfidenceThreshold = 0.7 // Default 70%
+		}
+
+		// Parse thresholds (if present)
+		if thresholdsObj, ok := processingObj["thresholds"].(map[string]interface{}); ok {
+			config.Processing.Thresholds = make(map[string]*ThresholdConfig)
+			// Thresholds will be parsed in detail below
 		}
 	} else {
 		config.ProcessingOrder = "auto"
 		config.AutoOptimize = true
+		config.Processing.Order = "auto"
+		config.Processing.AutoOptimize = true
+		config.Processing.AnalysisInterval = 15 * time.Minute
+		config.Processing.ConfidenceThreshold = 0.7
 	}
+
+	// Parse thresholds configuration from top-level thresholds field
+	if thresholdsObj, found, _ := unstructured.NestedMap(osc.Object, "spec", "thresholds"); found {
+		if config.Processing.Thresholds == nil {
+			config.Processing.Thresholds = make(map[string]*ThresholdConfig)
+		}
+
+		// Parse observationsPerMinute threshold
+		if obsPerMinObj, ok := thresholdsObj["observationsPerMinute"].(map[string]interface{}); ok {
+			thresh := &ThresholdConfig{
+				Action: "alert",
+				Description: "Observation rate per minute",
+			}
+			if warning, ok := obsPerMinObj["warning"].(int64); ok {
+				thresh.Warning = float64(warning)
+			}
+			if critical, ok := obsPerMinObj["critical"].(int64); ok {
+				thresh.Critical = float64(critical)
+			}
+			if action, ok := obsPerMinObj["action"].(string); ok {
+				thresh.Action = action
+			}
+			config.Processing.Thresholds["observationsPerMinute"] = thresh
+		}
+
+		// Parse lowSeverityPercent threshold
+		if lowSevObj, ok := thresholdsObj["lowSeverityPercent"].(map[string]interface{}); ok {
+			thresh := &ThresholdConfig{
+				Action: "filter",
+				Description: "Low severity event percentage",
+			}
+			if warning, ok := lowSevObj["warning"].(float64); ok {
+				thresh.Warning = warning
+			}
+			if critical, ok := lowSevObj["critical"].(float64); ok {
+				thresh.Critical = critical
+			}
+			if action, ok := lowSevObj["action"].(string); ok {
+				thresh.Action = action
+			}
+			config.Processing.Thresholds["lowSeverityPercent"] = thresh
+		}
+
+		// Parse dedupEffectiveness threshold
+		if dedupEffObj, ok := thresholdsObj["dedupEffectiveness"].(map[string]interface{}); ok {
+			thresh := &ThresholdConfig{
+				Action: "optimize",
+				Description: "Deduplication effectiveness",
+			}
+			if warning, ok := dedupEffObj["warning"].(float64); ok {
+				thresh.Warning = warning
+			}
+			if critical, ok := dedupEffObj["critical"].(float64); ok {
+				thresh.Critical = critical
+			}
+			if action, ok := dedupEffObj["action"].(string); ok {
+				thresh.Action = action
+			}
+			config.Processing.Thresholds["dedupEffectiveness"] = thresh
+		}
+	}
+
+	// Populate enhanced Filter config from existing filter data
+	config.Filter.MinPriority = config.FilterMinPriority
+	config.Filter.ExcludeNamespaces = config.FilterExcludeNamespaces
+	config.Filter.IncludeTypes = config.FilterIncludeTypes
+	config.Filter.AdaptiveEnabled = false // Default, can be enabled via CRD later
+	config.Filter.LearningRate = 0.1      // Default learning rate
+
+	// Populate enhanced Deduplication config from existing dedup data
+	config.Deduplication.Window = config.DedupWindow
+	config.Deduplication.Strategy = config.DedupStrategy
+	config.Deduplication.Fields = config.DedupFields
+	config.Deduplication.Adaptive = false // Default, can be enabled via CRD later
+	config.Deduplication.MinChange = 0.05 // Default 5% minimum change
+	config.Deduplication.LearningRate = 0.1
+
+	// Populate enhanced RateLimit config from existing rate limit data
+	config.RateLimit.MaxPerMinute = config.RateLimitMaxPerMinute
+	config.RateLimit.Burst = config.RateLimitBurst
+	config.RateLimit.Adaptive = false           // Default, can be enabled via CRD later
+	config.RateLimit.CooldownPeriod = 5 * time.Minute // Default cooldown
+	config.RateLimit.Targets = make(map[string]int)
 
 	return config
 }

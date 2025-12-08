@@ -20,11 +20,14 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
+	"github.com/kube-zen/zen-watcher/pkg/optimization"
 	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -53,6 +56,8 @@ type ObservationCreator struct {
 	// Current processing order per source (for logging changes)
 	currentOrder map[string]ProcessingOrder
 	orderMu      sync.RWMutex
+	// SmartProcessor for per-source optimization (optional)
+	smartProcessor *optimization.SmartProcessor
 }
 
 // OptimizationMetrics holds optimization-related metrics
@@ -155,6 +160,7 @@ func NewObservationCreatorWithOptimization(
 		filter:                   filter,
 		optimizationMetrics:      optimizationMetrics,
 		currentOrder:             make(map[string]ProcessingOrder),
+		smartProcessor:           optimization.NewSmartProcessor(),
 	}
 }
 
@@ -239,11 +245,21 @@ func (oc *ObservationCreator) processFilterFirst(ctx context.Context, observatio
 		if oc.optimizationMetrics != nil {
 			oc.recordEventDeduped(source)
 		}
+		// Record in SmartProcessor metrics if available
+		if collector != nil {
+			collector.RecordDeduped()
+			collector.RecordProcessing(time.Since(startTime), nil)
+		}
 		return nil
 	}
 
 	// STEP 3: CREATE
-	return oc.createObservation(ctx, observation, source)
+	err := oc.createObservation(ctx, observation, source)
+	// Record processing time in SmartProcessor metrics if available
+	if collector != nil {
+		collector.RecordProcessing(time.Since(startTime), err)
+	}
+	return err
 }
 
 // processDedupFirst processes with dedup-first order: Dedup → Filter → Create
@@ -292,7 +308,45 @@ func (oc *ObservationCreator) determineProcessingOrder(source string) Processing
 		sourceConfig = oc.sourceConfigLoader.GetSourceConfig(source)
 	}
 
-	// Get current metrics for this source
+	// Use SmartProcessor if available for enhanced optimization
+	if oc.smartProcessor != nil && sourceConfig != nil && sourceConfig.Processing.AutoOptimize {
+		// Get metrics from SmartProcessor's PerSourceMetricsCollector
+		optMetrics := oc.smartProcessor.GetSourceMetrics(source)
+		if optMetrics != nil {
+			// Use StrategyDecider from SmartProcessor
+			strategy := oc.smartProcessor.DetermineOptimalStrategy(
+				&optimization.RawEvent{Source: source},
+				sourceConfig,
+			)
+			// Convert strategy to ProcessingOrder
+			optimalOrder := ProcessingOrder(strategy.String())
+			
+			// Check if order changed and log it
+			oc.orderMu.Lock()
+			oldOrder, exists := oc.currentOrder[source]
+			if !exists || oldOrder != optimalOrder {
+				if exists {
+					logger.Info("Processing order changed via SmartProcessor",
+						logger.Fields{
+							Component: "watcher",
+							Operation: "order_change",
+							Source:    source,
+							Additional: map[string]interface{}{
+								"old_order": string(oldOrder),
+								"new_order": string(optimalOrder),
+								"reason":    "smart_processor_optimization",
+							},
+						})
+				}
+				oc.currentOrder[source] = optimalOrder
+			}
+			oc.orderMu.Unlock()
+			
+			return optimalOrder
+		}
+	}
+
+	// Fallback to existing logic if SmartProcessor not available or not enabled
 	var sourceMetrics *SourceMetrics
 	if oc.optimizationMetrics != nil {
 		sourceMetrics = oc.getSourceMetrics(source)
