@@ -339,12 +339,32 @@ rules:
 | `kubectl get obs --chunk-size=500` | 1.2s | 2.8s |
 
 **Key Findings:**
-- ✅ Sustained throughput: 200 observations/sec
-- ✅ Burst capacity: 500 observations/sec for 30 seconds
+- ✅ Sustained throughput: 16-22 observations/sec (validated through stress testing)
+- ✅ Burst capacity: 15-18 observations/sec (validated with 500 observations)
 - ✅ Minimal informer overhead: ~8m CPU total
 - ✅ Linear etcd storage: ~2.2KB per Observation
 - ✅ No performance degradation at 20k objects
 - ✅ List operations remain fast with chunking
+
+**Stress Testing Validation (2025-12-08):**
+
+Comprehensive stress testing was performed to validate performance claims:
+
+### Test Results
+
+- **Sustained Load**: 16-22 obs/sec (validated with 2000 observations)
+- **Burst Capacity**: 15-18 obs/sec (validated with 500 observations)
+- **Multi-Phase Stress**: 18-22 avg, 28-32 peak obs/sec (validated with 5000 observations)
+- **Scale Testing**: 10,000 observations processed successfully
+
+### Updated Performance Claims
+
+- **Sustained Throughput**: 16-22 obs/sec (validated through stress testing)
+- **Burst Capacity**: 15-18 obs/sec (validated)
+- **Resource Impact**: Predictable linear scaling
+- **Recovery**: <60 seconds for burst loads
+
+See [Stress Testing Results](../../../docs/STRESS_TEST_RESULTS.md) for complete details.
 
 **Memory Breakdown:**
 - Base: ~35MB (binary + runtime)
