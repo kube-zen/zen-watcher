@@ -510,7 +510,7 @@ See [CHANGELOG.md](../CHANGELOG.md) for complete version history and updates.
 
 ## 💡 Tips
 
-1. **Start with README.md** - Gives complete overview with all 8 sources
+1. **Start with README.md** - Gives complete overview with all 9 sources
 2. **Use QUICK_START.md** - For fast deployment in 5 minutes
 3. **Bookmark this INDEX** - Quick access to all 50+ documentation files
 4. **Check SOURCE_ADAPTERS.md** - For adding new sources with just YAML
