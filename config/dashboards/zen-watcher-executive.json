@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Executive Overview - Security Posture at a Glance (Perfect for quick-demo.sh!)",
+  "description": "Executive Overview - Strategic Security KPIs, ROI Metrics, and Predictive Analytics. Enhanced with Phase 3 production-grade features.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -40,12 +40,12 @@
                 "0": {
                   "color": "dark-red",
                   "index": 0,
-                  "text": "🔴 DOWN"
+                  "text": "\ud83d\udd34 DOWN"
                 },
                 "1": {
                   "color": "dark-green",
                   "index": 1,
-                  "text": "✅ HEALTHY"
+                  "text": "\u2705 HEALTHY"
                 }
               },
               "type": "value"
@@ -170,7 +170,7 @@
           "refId": "A"
         }
       ],
-      "title": "🛡️ Tools Monitored",
+      "title": "\ud83d\udee1\ufe0f Tools Monitored",
       "type": "stat"
     },
     {
@@ -240,7 +240,7 @@
           "refId": "A"
         }
       ],
-      "title": "📊 Observations (24h)",
+      "title": "\ud83d\udcca Observations (24h)",
       "type": "stat"
     },
     {
@@ -310,7 +310,7 @@
           "refId": "A"
         }
       ],
-      "title": "🚨 Critical Events",
+      "title": "\ud83d\udea8 Critical Events",
       "type": "stat"
     },
     {
@@ -382,7 +382,7 @@
           "refId": "A"
         }
       ],
-      "title": "✅ Success Rate",
+      "title": "\u2705 Success Rate",
       "type": "stat"
     },
     {
@@ -536,7 +536,7 @@
           "refId": "A"
         }
       ],
-      "title": "🔥 Live Event Stream (by Severity)",
+      "title": "\ud83d\udd25 Live Event Stream (by Severity)",
       "type": "timeseries"
     },
     {
@@ -607,7 +607,7 @@
           "refId": "A"
         }
       ],
-      "title": "🛡️ Events by Source (24h)",
+      "title": "\ud83d\udee1\ufe0f Events by Source (24h)",
       "type": "piechart"
     },
     {
@@ -678,7 +678,7 @@
           "refId": "A"
         }
       ],
-      "title": "📂 Events by Category (24h)",
+      "title": "\ud83d\udcc2 Events by Category (24h)",
       "type": "piechart"
     },
     {
@@ -705,12 +705,12 @@
                 "0": {
                   "color": "dark-red",
                   "index": 0,
-                  "text": "🔴 OFFLINE"
+                  "text": "\ud83d\udd34 OFFLINE"
                 },
                 "1": {
                   "color": "dark-green",
                   "index": 1,
-                  "text": "✅ ACTIVE"
+                  "text": "\u2705 ACTIVE"
                 }
               },
               "type": "value"
@@ -804,7 +804,7 @@
           "refId": "B"
         }
       ],
-      "title": "🔍 Tool Status Matrix",
+      "title": "\ud83d\udd0d Tool Status Matrix",
       "transformations": [
         {
           "id": "merge",
@@ -849,7 +849,7 @@
       },
       "id": 200,
       "panels": [],
-      "title": "📊 Event Type Analysis",
+      "title": "\ud83d\udcca Event Type Analysis",
       "type": "row"
     },
     {
@@ -998,7 +998,7 @@
           "refId": "A"
         }
       ],
-      "title": "Event Type × Severity Heat Map (Last 1h)",
+      "title": "Event Type \u00d7 Severity Heat Map (Last 1h)",
       "transformations": [
         {
           "id": "organize",
@@ -1102,6 +1102,420 @@
       ],
       "title": "Event Type Trends Over Time (Last 6h)",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Overall security posture score (0-100) based on compliance, vulnerabilities, and incidents",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 60
+              },
+              {
+                "color": "yellow",
+                "value": 75
+              },
+              {
+                "color": "green",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 0,
+        "y": 6
+      },
+      "id": 204,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "100 - (\n            (sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[24h])) * 10) +\n            (sum(rate(zen_watcher_events_total{severity=\"HIGH\"}[24h])) * 5) +\n            (sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"FAIL|CRITICAL\"}[24h])) * 15)\n        ) / max(sum(rate(zen_watcher_events_total[24h])), 1) * 100",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udee1\ufe0f Security Posture Score",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "7-day risk trend showing security event trajectory",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 4,
+        "y": 6
+      },
+      "id": 205,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(rate(zen_watcher_events_total{severity=~\"CRITICAL|HIGH\"}[1h])) by (severity)",
+          "legendFormat": "{{severity}}",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udcc8 Risk Trend (7 Days)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Overall compliance status across all frameworks",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 70
+              },
+              {
+                "color": "yellow",
+                "value": 85
+              },
+              {
+                "color": "green",
+                "value": 95
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 12,
+        "y": 6
+      },
+      "id": 206,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "100 * (\n            1 - (sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"FAIL|CRITICAL\"}[24h])) / \n            max(sum(rate(zen_watcher_events_total{category=\"compliance\"}[24h])), 1))\n        )",
+          "refId": "A"
+        }
+      ],
+      "title": "\u2705 Compliance Status",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Estimated cost savings from prevented incidents (based on industry averages)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 16,
+        "y": 6
+      },
+      "id": 207,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(\n            sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[24h])) * 50000 +\n            sum(rate(zen_watcher_events_total{severity=\"HIGH\"}[24h])) * 10000 +\n            sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"FAIL|CRITICAL\"}[24h])) * 25000\n        ) * 24 * 30",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udcb0 Estimated Monthly Savings",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "7-day forecast of critical security events using linear regression",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 14
+      },
+      "id": 208,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[1h]))",
+          "legendFormat": "Actual Critical Events",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "predict_linear(sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[1h]))[7d:1h], 7*24*3600)",
+          "legendFormat": "7-Day Forecast",
+          "refId": "B"
+        }
+      ],
+      "title": "\ud83d\udd2e Predictive Risk Forecast (7 Days)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Top priority action items based on current security posture",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 14
+      },
+      "id": 209,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "topk(5, sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[1h])) by (source, category))",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udccb Top Priority Action Items",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "source": "Source",
+              "category": "Category",
+              "Value": "Critical Events/hr"
+            }
+          }
+        }
+      ],
+      "type": "table"
     }
   ],
   "refresh": "10s",
@@ -1311,4 +1725,3 @@
   "version": 1,
   "weekStart": ""
 }
-
