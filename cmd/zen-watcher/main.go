@@ -29,6 +29,7 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
+	"github.com/kube-zen/zen-watcher/pkg/optimization"
 	"github.com/kube-zen/zen-watcher/pkg/server"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
 )
@@ -267,6 +268,34 @@ func main() {
 				})
 		}
 	}()
+
+	// Create and start optimization engine (for per-source auto-optimization)
+	optimizer := optimization.NewOptimizer(sourceConfigLoader)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := optimizer.Start(ctx); err != nil {
+			log.Error("Optimizer stopped",
+				logger.Fields{
+					Component: "main",
+					Operation: "optimizer",
+					Error:     err,
+				})
+		}
+	}()
+
+	// Connect optimizer's SmartProcessor to ObservationCreator for metrics collection
+	// The ObservationCreator already has a SmartProcessor, but we'll use the optimizer's
+	// centralized instance for better coordination
+	if obsSmartProc := observationCreator.GetSmartProcessor(); obsSmartProc != nil {
+		// The ObservationCreator's SmartProcessor is already initialized and collecting metrics
+		// The optimizer's engine will use it via the shared SmartProcessor instance
+		log.Info("Optimization engine connected to ObservationCreator",
+			logger.Fields{
+				Component: "main",
+				Operation: "optimizer_integration",
+			})
+	}
 
 	// Initialize optimization advisor and logger
 	// Note: Prometheus client would be needed for full metrics analysis

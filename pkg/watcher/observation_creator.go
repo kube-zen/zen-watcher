@@ -176,6 +176,11 @@ func (oc *ObservationCreator) SetSourceConfigLoader(loader interface {
 	oc.sourceConfigLoader = loader
 }
 
+// GetSmartProcessor returns the SmartProcessor instance (for integration with optimizer)
+func (oc *ObservationCreator) GetSmartProcessor() *optimization.SmartProcessor {
+	return oc.smartProcessor
+}
+
 // CreateObservation creates an Observation CRD and increments metrics
 // This is the centralized place where all Observations are created
 // Flow: filter() → normalize() → dedup() → create Observation CRD + update metrics + log
