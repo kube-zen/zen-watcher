@@ -19,7 +19,48 @@
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
-  "links": [],
+  "links": [
+    {
+      "icon": "external link",
+      "tags": [],
+      "title": "Executive Dashboard",
+      "tooltip": "Strategic KPIs & ROI",
+      "type": "link",
+      "url": "../dashboards/zen-watcher-executive.json"
+    },
+    {
+      "icon": "external link",
+      "tags": [],
+      "title": "Operations Dashboard",
+      "tooltip": "SRE Monitoring",
+      "type": "link",
+      "url": "../dashboards/zen-watcher-operations.json"
+    },
+    {
+      "icon": "external link",
+      "tags": [],
+      "title": "Security Dashboard",
+      "tooltip": "Threat Analysis",
+      "type": "link",
+      "url": "../dashboards/zen-watcher-security.json"
+    },
+    {
+      "icon": "external link",
+      "tags": [],
+      "title": "Namespace Health",
+      "tooltip": "Per-Namespace Analysis",
+      "type": "link",
+      "url": "../dashboards/zen-watcher-namespace-health.json"
+    },
+    {
+      "icon": "external link",
+      "tags": [],
+      "title": "Data Explorer",
+      "tooltip": "Advanced Querying",
+      "type": "link",
+      "url": "../dashboards/zen-watcher-explorer.json"
+    }
+  ],
   "liveNow": false,
   "panels": [
     {
@@ -1748,6 +1789,185 @@
       "title": "Event Processing Latency",
       "description": "Processing duration percentiles (p50, p95, p99)",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Quick navigation to all Zen Watcher dashboards",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "id": 20,
+      "options": {
+        "content": "# \ud83c\udfaf Zen Watcher Dashboard Hub\n\n## Quick Navigation\n- **[Executive Dashboard](../dashboards/zen-watcher-executive.json)** - Strategic KPIs & ROI\n- **[Operations Dashboard](../dashboards/zen-watcher-operations.json)** - SRE Monitoring\n- **[Security Dashboard](../dashboards/zen-watcher-security.json)** - Threat Analysis\n- **[Namespace Health](../dashboards/zen-watcher-namespace-health.json)** - Per-Namespace Analysis\n- **[Data Explorer](../dashboards/zen-watcher-explorer.json)** - Advanced Querying\n\n## Current Status\n- **System Health**: Check Operations Dashboard\n- **Security Posture**: Check Executive Dashboard\n- **Active Alerts**: Check Security Dashboard",
+        "mode": "markdown"
+      },
+      "pluginVersion": "10.0.0",
+      "title": "\ud83e\udded Dashboard Navigation Hub",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Events correlated across all dashboards and sources",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "id": 21,
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(zen_watcher_events_total[5m])) by (source, category)",
+          "legendFormat": "{{source}} - {{category}}",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udd17 Cross-Dashboard Event Correlation",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Live alert feed with direct links to investigation dashboards",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
+      "id": 22,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "expr": "topk(10, sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[5m])) by (source, category, namespace))",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udea8 Live Alert Feed - Top 10",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "source": "Source",
+              "category": "Category",
+              "namespace": "Namespace",
+              "Value": "Events/min"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Common operational tasks and shortcuts",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 48
+      },
+      "id": 23,
+      "options": {
+        "content": "## \u26a1 Quick Actions\n\n### Investigation\n- **View Critical Events**: Navigate to Security Dashboard\n- **Check System Health**: Navigate to Operations Dashboard\n- **Review Compliance**: Navigate to Executive Dashboard\n\n### Operations\n- **View Namespace Health**: Navigate to Namespace Health Dashboard\n- **Query Events**: Navigate to Data Explorer\n- **Check Alerts**: View AlertManager UI\n\n### Documentation\n- [Alerting Guide](../../docs/alerting/SECURITY_ALERTING_OVERVIEW.md)\n- [Incident Response](../../docs/alerting/SECURITY_INCIDENT_RESPONSE.md)\n- [Operations Guide](../../docs/OPERATIONS.md)",
+        "mode": "markdown"
+      },
+      "pluginVersion": "10.0.0",
+      "title": "\u26a1 Quick Actions & Shortcuts",
+      "type": "text"
     }
   ],
   "refresh": "10s",
@@ -1817,5 +2037,6 @@
   "title": "Zen Watcher - Security & Compliance Observations",
   "uid": "zen-watcher",
   "version": 3,
-  "weekStart": ""
+  "weekStart": "",
+  "description": "Main Dashboard - Central hub with unified navigation, cross-dashboard correlation, live alert feed, and quick actions. Enhanced with Phase 3 navigation and context features."
 }

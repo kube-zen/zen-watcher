@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Observations Explorer - Comprehensive table view with filters for detailed analysis",
+  "description": "Data Explorer Dashboard - Advanced querying with saved searches, custom visualizations, and query performance metrics. Enhanced with Phase 3 query builder features.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -33,7 +33,7 @@
       },
       "id": 100,
       "panels": [],
-      "title": "📊 Summary Statistics",
+      "title": "\ud83d\udcca Summary Statistics",
       "type": "row"
     },
     {
@@ -420,7 +420,7 @@
       },
       "id": 200,
       "panels": [],
-      "title": "🔍 Observations Table",
+      "title": "\ud83d\udd0d Observations Table",
       "type": "row"
     },
     {
@@ -630,6 +630,145 @@
       ],
       "title": "All Observations",
       "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Query builder guide and saved searches",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": []
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 201,
+      "options": {
+        "content": "## \ud83d\udd0d Advanced Query Builder\n\n### Pre-built Queries (Saved Searches)\n\n**Critical Security Events:**\n\\`\\`\\`\nsum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[5m]))\n\\`\\`\\`\n\n**Compliance Failures:**\n\\`\\`\\`\nsum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"FAIL|CRITICAL\"}[5m]))\n\\`\\`\\`\n\n**High Severity by Source:**\n\\`\\`\\`\nsum(rate(zen_watcher_events_total{severity=\"HIGH\"}[5m])) by (source)\n\\`\\`\\`\n\n**Namespace Event Distribution:**\n\\`\\`\\`\nsum(rate(zen_watcher_events_total[5m])) by (namespace, severity)\n\\`\\`\\`\n\n### Query Performance\n- Execution time displayed for each query\n- Optimized queries use recording rules when available",
+        "mode": "markdown"
+      },
+      "pluginVersion": "10.0.0",
+      "title": "\ud83d\udcda Query Builder & Saved Searches",
+      "type": "text"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Custom visualization of event flow through processing pipeline",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 34
+      },
+      "id": 202,
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(zen_watcher_observations_created_total[5m]))",
+          "legendFormat": "Created",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(zen_watcher_observations_filtered_total[5m]))",
+          "legendFormat": "Filtered",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(zen_watcher_observations_deduped_total[5m]))",
+          "legendFormat": "Deduped",
+          "refId": "C"
+        }
+      ],
+      "title": "\ud83d\udcca Event Processing Flow",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Query execution time and performance metrics",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 34
+      },
+      "id": 203,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(prometheus_engine_query_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95 Query Time",
+          "refId": "A"
+        }
+      ],
+      "title": "\u26a1 Query Performance (p95)",
+      "type": "timeseries"
     }
   ],
   "refresh": "10s",
@@ -839,4 +978,3 @@
   "version": 1,
   "weekStart": ""
 }
-

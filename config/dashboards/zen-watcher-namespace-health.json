@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Namespace Health Dashboard - Multi-tenant security posture analysis by namespace",
+  "description": "Namespace Health Dashboard - Per-namespace analysis with drill-down capabilities, tenant correlation, and compliance tracking. Enhanced with Phase 3 drill-down features.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -33,7 +33,7 @@
       },
       "id": 100,
       "panels": [],
-      "title": "📊 Namespace Overview",
+      "title": "\ud83d\udcca Namespace Overview",
       "type": "row"
     },
     {
@@ -408,7 +408,7 @@
       },
       "id": 101,
       "panels": [],
-      "title": "🔍 Top Problematic Namespaces",
+      "title": "\ud83d\udd0d Top Problematic Namespaces",
       "type": "row"
     },
     {
@@ -675,7 +675,7 @@
       },
       "id": 102,
       "panels": [],
-      "title": "📈 Namespace Trends & Analysis",
+      "title": "\ud83d\udcc8 Namespace Trends & Analysis",
       "type": "row"
     },
     {
@@ -860,7 +860,7 @@
       },
       "id": 103,
       "panels": [],
-      "title": "🔥 Heat Maps & Correlations",
+      "title": "\ud83d\udd25 Heat Maps & Correlations",
       "type": "row"
     },
     {
@@ -939,7 +939,7 @@
           "refId": "A"
         }
       ],
-      "title": "Namespace × Severity Heat Map (Last 1h)",
+      "title": "Namespace \u00d7 Severity Heat Map (Last 1h)",
       "transformations": [
         {
           "id": "organize",
@@ -1034,7 +1034,7 @@
           "refId": "A"
         }
       ],
-      "title": "Namespace × Event Type Heat Map (Last 1h)",
+      "title": "Namespace \u00d7 Event Type Heat Map (Last 1h)",
       "transformations": [
         {
           "id": "organize",
@@ -1063,7 +1063,7 @@
       },
       "id": 104,
       "panels": [],
-      "title": "📋 Detailed Breakdown",
+      "title": "\ud83d\udccb Detailed Breakdown",
       "type": "row"
     },
     {
@@ -1205,6 +1205,175 @@
       ],
       "title": "Resource Kind Distribution (All Namespaces)",
       "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Click any namespace row to view detailed analysis",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 49
+      },
+      "id": 105,
+      "options": {
+        "footer": {
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(zen_watcher_events_total[1h])) by (namespace, severity)",
+          "format": "table",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udcc2 Namespace Drill-down - Click for Details",
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "indexByName": {},
+            "renameByName": {
+              "namespace": "Namespace",
+              "severity": "Severity",
+              "Value": "Events/hr"
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Cross-namespace incident correlation and pattern detection",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "spectrum"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 49
+      },
+      "id": 106,
+      "options": {
+        "calculate": false,
+        "cellGap": 2,
+        "color": {
+          "exponent": 0.5,
+          "fill": "dark-blue",
+          "mode": "spectrum",
+          "reverse": false,
+          "scale": "exponential",
+          "scheme": "Blues",
+          "steps": 64
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(zen_watcher_events_total[1h])) by (namespace, category)",
+          "format": "heatmap",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udd17 Tenant Correlation - Cross-Namespace Patterns",
+      "type": "heatmap"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Individual compliance scores and historical trends per namespace",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 70
+              },
+              {
+                "color": "yellow",
+                "value": 85
+              },
+              {
+                "color": "green",
+                "value": 95
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 57
+      },
+      "id": 107,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "last"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "100 * (\n            1 - (sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"FAIL|CRITICAL\"}[1h])) by (namespace) / \n            max(sum(rate(zen_watcher_events_total{category=\"compliance\"}[1h])) by (namespace), 1))\n        )",
+          "legendFormat": "{{namespace}} Compliance",
+          "refId": "A"
+        }
+      ],
+      "title": "\u2705 Compliance Score per Namespace (7 Days)",
+      "type": "timeseries"
     }
   ],
   "refresh": "10s",
@@ -1414,4 +1583,3 @@
   "version": 1,
   "weekStart": ""
 }
-
