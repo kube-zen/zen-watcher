@@ -270,7 +270,31 @@ func main() {
 	}()
 
 	// Create and start optimization engine (for per-source auto-optimization)
-	optimizer := optimization.NewOptimizer(sourceConfigLoader)
+	// Share the SmartProcessor instance from ObservationCreator so metrics are unified
+	obsSmartProc := observationCreator.GetSmartProcessor()
+	var optimizer *optimization.Optimizer
+	
+	if obsSmartProc != nil {
+		// Create optimizer with shared SmartProcessor
+		optimizer = optimization.NewOptimizerWithProcessor(obsSmartProc, sourceConfigLoader)
+		log.Info("Optimization engine initialized with shared SmartProcessor",
+			logger.Fields{
+				Component: "main",
+				Operation: "optimizer_integration",
+				Additional: map[string]interface{}{
+					"optimization_enabled": true,
+				},
+			})
+	} else {
+		// Fallback: create optimizer with its own SmartProcessor
+		optimizer = optimization.NewOptimizer(sourceConfigLoader)
+		log.Info("Optimization engine initialized with independent SmartProcessor",
+			logger.Fields{
+				Component: "main",
+				Operation: "optimizer_integration",
+			})
+	}
+	
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -283,19 +307,6 @@ func main() {
 				})
 		}
 	}()
-
-	// Connect optimizer's SmartProcessor to ObservationCreator for metrics collection
-	// The ObservationCreator already has a SmartProcessor, but we'll use the optimizer's
-	// centralized instance for better coordination
-	if obsSmartProc := observationCreator.GetSmartProcessor(); obsSmartProc != nil {
-		// The ObservationCreator's SmartProcessor is already initialized and collecting metrics
-		// The optimizer's engine will use it via the shared SmartProcessor instance
-		log.Info("Optimization engine connected to ObservationCreator",
-			logger.Fields{
-				Component: "main",
-				Operation: "optimizer_integration",
-			})
-	}
 
 	// Initialize optimization advisor and logger
 	// Note: Prometheus client would be needed for full metrics analysis

@@ -160,7 +160,7 @@ func NewObservationCreatorWithOptimization(
 		filter:                   filter,
 		optimizationMetrics:      optimizationMetrics,
 		currentOrder:             make(map[string]ProcessingOrder),
-		smartProcessor:           optimization.NewSmartProcessor(),
+		smartProcessor:           optimization.NewSmartProcessor(), // Created here, can be shared with optimizer
 	}
 }
 
