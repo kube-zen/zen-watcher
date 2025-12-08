@@ -559,7 +559,7 @@ kubectl port-forward -n zen-system svc/zen-watcher 8080:8080
 curl http://localhost:8080/metrics
 
 # Is Prometheus scraping?
-kubectl logs -n monitoring prometheus-xxx | grep zen-watcher
+kubectl logs -n monitoring prometheus-server | grep zen-watcher
 ```
 
 ### Issue: No events captured

@@ -129,10 +129,11 @@ kubectl scale deployment zen-watcher -n zen-system --replicas=1
   - Medium traffic (1,000-10,000 events/day): 200m CPU, 256Mi RAM
   - High traffic (>10,000 events/day): 500m CPU, 512Mi RAM
 
-**Future: Multi-Replica Support**
-- Multi-replica HA with leader election is planned for v1.1.x+
-- Will enable HPA for webhook traffic without duplicate observations
-- Until then, **do NOT use HPA or multiple replicas** - it will create duplicate Observations
+**HA Optimization Support (v1.1.0+)**
+- HA optimization features are available when `haOptimization.enabled: true` in Helm values
+- Enables dynamic dedup window adjustment, adaptive cache sizing, and load balancing
+- For standard deployments, single replica is recommended (in-memory deduplication)
+- See HA configuration documentation for multi-replica deployment guidance
 
 See [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md#scaling-strategy) for complete scaling guidance.
 

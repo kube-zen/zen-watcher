@@ -1,4 +1,4 @@
-// Copyright 2024 The Zen Watcher Authors
+// Copyright 2025 The Zen Watcher Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,6 +23,7 @@ import (
 
 	"github.com/kube-zen/zen-watcher/internal/kubernetes"
 	"github.com/kube-zen/zen-watcher/internal/lifecycle"
+	"github.com/kube-zen/zen-watcher/pkg/balancer"
 	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/gc"
@@ -30,6 +31,7 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/optimization"
+	"github.com/kube-zen/zen-watcher/pkg/scaling"
 	"github.com/kube-zen/zen-watcher/pkg/server"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
 )
@@ -338,6 +340,158 @@ func main() {
 		defer wg.Done()
 		gcCollector.Start(ctx)
 	}()
+
+	// Initialize HA optimization components (if HA is enabled)
+	haConfig := config.LoadHAConfig()
+	var haDedupOptimizer *optimization.HADedupOptimizer
+	var haScalingCoordinator *scaling.HPACoordinator
+	var haLoadBalancer *balancer.LoadBalancer
+	var haCacheManager *optimization.AdaptiveCacheManager
+	var haMetrics *metrics.HAMetrics
+
+	if haConfig.IsHAEnabled() {
+		log.Info("HA optimization enabled, initializing HA components",
+			logger.Fields{
+				Component: "main",
+				Operation: "ha_init",
+			})
+
+		// Initialize HA metrics
+		haMetrics = metrics.NewHAMetrics()
+
+		// Get replica ID from environment
+		replicaID := os.Getenv("HOSTNAME")
+		if replicaID == "" {
+			replicaID = fmt.Sprintf("replica-%d", time.Now().UnixNano())
+		}
+
+		// Initialize HA Dedup Optimizer
+		if haConfig.DedupOptimization.Enabled {
+			eventCounter := m.EventsTotal.WithLabelValues("", "", "", "", "", "")
+			haDedupOptimizer = optimization.NewHADedupOptimizer(&haConfig.DedupOptimization, eventCounter)
+			if haDedupOptimizer != nil {
+				haDedupOptimizer.Start(30 * time.Second) // Update every 30 seconds
+				log.Info("HA dedup optimizer started",
+					logger.Fields{
+						Component: "main",
+						Operation: "ha_dedup_init",
+					})
+			}
+		}
+
+		// Initialize HA Scaling Coordinator
+		if haConfig.AutoScaling.Enabled {
+			haScalingCoordinator = scaling.NewHPACoordinator(&haConfig.AutoScaling, haMetrics, replicaID)
+			if haScalingCoordinator != nil {
+				haScalingCoordinator.Start(ctx, 1*time.Minute) // Evaluate every minute
+				log.Info("HA scaling coordinator started",
+					logger.Fields{
+						Component: "main",
+						Operation: "ha_scaling_init",
+					})
+			}
+		}
+
+		// Initialize HA Load Balancer
+		if haConfig.LoadBalancing.Strategy != "" {
+			haLoadBalancer = balancer.NewLoadBalancer(&haConfig.LoadBalancing)
+			log.Info("HA load balancer initialized",
+				logger.Fields{
+					Component: "main",
+					Operation: "ha_balancer_init",
+					Additional: map[string]interface{}{
+						"strategy": haConfig.LoadBalancing.Strategy,
+					},
+				})
+		}
+
+		// Initialize Adaptive Cache Manager
+		if haConfig.CacheOptimization.Enabled {
+			deduper := observationCreator.GetDeduper()
+			if deduper != nil {
+				initialSize := 10000 // Default, will be adjusted
+				haCacheManager = optimization.NewAdaptiveCacheManager(&haConfig.CacheOptimization, initialSize)
+				if haCacheManager != nil {
+					haCacheManager.Start(2 * time.Minute) // Adjust every 2 minutes
+					log.Info("HA adaptive cache manager started",
+						logger.Fields{
+							Component: "main",
+							Operation: "ha_cache_init",
+						})
+				}
+			}
+		}
+
+		// Start metrics collection loop for HA components
+		if haScalingCoordinator != nil || haLoadBalancer != nil {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				ticker := time.NewTicker(30 * time.Second)
+				defer ticker.Stop()
+
+				for {
+					select {
+					case <-ticker.C:
+						// Collect system metrics
+						var m runtime.MemStats
+						runtime.ReadMemStats(&m)
+
+						// Calculate CPU usage (simplified - in production, use proper CPU metrics)
+						cpuUsage := 0.0 // TODO: Implement proper CPU usage collection
+						memoryUsage := float64(m.Alloc)
+						eventsPerSec := 0.0 // TODO: Calculate from metrics
+						queueDepth := 0     // TODO: Get from actual queue depth
+						responseTime := 0.0 // TODO: Calculate from metrics
+
+						// Update scaling coordinator
+						if haScalingCoordinator != nil {
+							haScalingCoordinator.UpdateMetrics(cpuUsage, memoryUsage, eventsPerSec, queueDepth, responseTime)
+						}
+
+						// Update load balancer
+						if haLoadBalancer != nil {
+							load := 0.0 // TODO: Calculate load factor
+							haLoadBalancer.UpdateReplica(replicaID, load, cpuUsage, memoryUsage, eventsPerSec, true)
+						}
+
+						// Update HTTP server HA status
+						httpServer.UpdateHAStatus(cpuUsage, memoryUsage, eventsPerSec, 0.0, queueDepth)
+
+						// Update cache manager metrics
+						if haCacheManager != nil {
+							cacheHitRate := 0.0 // TODO: Calculate from deduper
+							gcFrequency := 0.0  // TODO: Calculate GC frequency
+							haCacheManager.UpdateMetrics(eventsPerSec, cacheHitRate, gcFrequency)
+						}
+
+						// Update HA dedup optimizer with events
+						if haDedupOptimizer != nil {
+							// Events are recorded automatically via the event counter
+							// Get optimal window and update deduper
+							optimalWindow := haDedupOptimizer.GetOptimalWindow()
+							deduper := observationCreator.GetDeduper()
+							if deduper != nil {
+								deduper.SetDefaultWindow(int(optimalWindow.Seconds()))
+							}
+						}
+
+						// Update adaptive cache size
+						if haCacheManager != nil {
+							targetSize := haCacheManager.GetTargetSize()
+							deduper := observationCreator.GetDeduper()
+							if deduper != nil {
+								deduper.SetMaxSize(targetSize)
+							}
+						}
+
+					case <-ctx.Done():
+						return
+					}
+				}
+			}()
+		}
+	}
 
 	// Log configuration
 	log.Info("zen-watcher ready",

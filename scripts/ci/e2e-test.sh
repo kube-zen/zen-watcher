@@ -4,7 +4,7 @@
 #
 # Complete E2E test that:
 # 1. Deploys a fresh cluster with quick-demo.sh
-# 2. Verifies all 6 sources create observations
+# 2. Verifies all 9 sources create observations
 # 3. Validates the dashboard shows all sources
 #
 
@@ -66,7 +66,7 @@ echo -e "${GREEN}✓${NC} zen-watcher restarted"
 echo ""
 
 # Step 6: Send mock data for all sources
-echo -e "${YELLOW}→${NC} Sending mock data for all 6 sources..."
+echo -e "${YELLOW}→${NC} Sending mock data for all 9 sources..."
 ./scripts/data/send-webhooks.sh zen-system 2>&1 | grep -E "(✓|✗|→)" || true
 echo -e "${GREEN}✓${NC} Mock data sent"
 echo ""
@@ -112,7 +112,7 @@ echo ""
 if [ ${#MISSING_SOURCES[@]} -eq 0 ]; then
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${GREEN}  ✅ E2E Test PASSED!${NC}"
-    echo -e "${GREEN}  All 6 sources are creating observations${NC}"
+    echo -e "${GREEN}  All 9 sources are creating observations${NC}"
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     exit 0
 else

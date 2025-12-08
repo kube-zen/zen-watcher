@@ -105,10 +105,13 @@ Grafana can be deployed using the Helm chart or manually. See [Grafana documenta
 
 ### 3. Import Dashboards
 
-Zen Watcher includes 3 pre-built dashboards:
+Zen Watcher includes 6 pre-built dashboards:
 - **Executive Overview** (`zen-watcher-executive.json`) - High-level security posture
 - **Operations Dashboard** (`zen-watcher-operations.json`) - Performance and health metrics
 - **Security Analytics** (`zen-watcher-security.json`) - Security trends and analysis
+- **Main Dashboard** (`zen-watcher-dashboard.json`) - Unified overview with navigation
+- **Namespace Health** (`zen-watcher-namespace-health.json`) - Per-namespace health metrics
+- **Explorer** (`zen-watcher-explorer.json`) - Data exploration and query builder
 
 To import:
 
@@ -118,7 +121,7 @@ To import:
 4. Upload any of the dashboard JSON files from `config/dashboards/`
 5. Select datasource: VictoriaMetrics (http://victoriametrics:8428)
 6. Click **Import**
-7. Repeat for all 3 dashboards
+7. Repeat for all 6 dashboards
 
 ### 4. Deploy Alerts
 
@@ -145,7 +148,7 @@ kubectl apply -f config/monitoring/prometheus-alerts.yaml
 2. **Install** security tools (Trivy, Falco, etc.) if not present
 3. **Review** events: `kubectl get observations -n zen-system`
 4. **Set up** alerts: `monitoring/prometheus-alerts.yaml`
-5. **Explore** the Grafana dashboards (3 pre-built dashboards available)
+5. **Explore** the Grafana dashboards (6 pre-built dashboards available)
 6. **Read** operational guide: `docs/OPERATIONAL_EXCELLENCE.md`
 
 ---

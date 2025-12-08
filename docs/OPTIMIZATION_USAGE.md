@@ -2,12 +2,12 @@
 
 ## Overview
 
-Zen Watcher includes an intelligent **per-source auto-optimization system** that continuously learns from cluster patterns and automatically optimizes processing strategies for each source independently. This system dynamically adjusts filtering, deduplication, and processing order to maximize efficiency while maintaining data integrity.
+Zen Watcher includes a **per-source auto-optimization system** that continuously learns from cluster patterns and optimizes processing strategies for each source independently. This system dynamically adjusts filtering, deduplication, and processing order to maximize efficiency while maintaining data integrity.
 
 ## Features
 
 - **Per-Source Optimization**: Each source (Trivy, Falco, Kyverno, etc.) is optimized independently
-- **Dynamic Processing Order**: Automatically selects optimal order (filter_first, dedup_first, hybrid, adaptive)
+- **Dynamic Processing Order**: Selects optimal order based on metrics (filter_first, dedup_first, hybrid, adaptive)
 - **Adaptive Filtering**: Adjusts filter thresholds based on event patterns
 - **Adaptive Deduplication**: Optimizes deduplication windows based on effectiveness
 - **Intelligent Strategy Selection**: Uses metrics-driven decision making with confidence scoring

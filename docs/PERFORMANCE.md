@@ -375,7 +375,8 @@ spec:
 - Very aggressive filtering
 - Short TTL: `OBSERVATION_TTL_SECONDS=86400` (1 day)
 - Large dedup cache: `DEDUP_MAX_SIZE=50000`
-- Consider horizontal scaling (multiple replicas)
+- For HA deployments, enable HA optimization features (see HA configuration in Helm values)
+- Single replica recommended for standard deployments (in-memory deduplication)
 - Resource requests: 500m CPU, 512MB memory
 - Resource limits: 1000m CPU, 1GB memory
 

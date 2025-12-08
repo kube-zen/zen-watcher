@@ -1,4 +1,4 @@
-// Copyright 2024 The Zen Watcher Authors
+// Copyright 2025 The Zen Watcher Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -40,6 +41,22 @@ type Server struct {
 	webhookDropped  *prometheus.CounterVec
 	auth            *WebhookAuth
 	rateLimiter     *RateLimiter
+	haConfig        *config.HAConfig
+	haStatus        *HAStatus
+	haStatusMu      sync.RWMutex
+}
+
+// HAStatus holds current HA status information
+type HAStatus struct {
+	Enabled      bool    `json:"enabled"`
+	ReplicaID    string  `json:"replica_id"`
+	CurrentLoad  float64 `json:"current_load"`
+	CPUUsage     float64 `json:"cpu_usage"`
+	MemoryUsage  float64 `json:"memory_usage"`
+	EventsPerSec float64 `json:"events_per_sec"`
+	QueueDepth   int     `json:"queue_depth"`
+	Healthy      bool    `json:"healthy"`
+	LastUpdate   string  `json:"last_update"`
 }
 
 // NewServer creates a new HTTP server with handlers
@@ -61,6 +78,13 @@ func NewServer(falcoChan, auditChan chan map[string]interface{}, webhookMetrics,
 	}
 	rateLimiter := NewRateLimiter(maxRequests, 1*time.Minute)
 
+	// Load HA configuration
+	haConfig := config.LoadHAConfig()
+	replicaID := os.Getenv("HOSTNAME")
+	if replicaID == "" {
+		replicaID = fmt.Sprintf("replica-%d", time.Now().UnixNano())
+	}
+
 	s := &Server{
 		server: &http.Server{
 			Addr:         ":" + port,
@@ -75,6 +99,13 @@ func NewServer(falcoChan, auditChan chan map[string]interface{}, webhookMetrics,
 		webhookDropped:  webhookDropped,
 		auth:            auth,
 		rateLimiter:     rateLimiter,
+		haConfig:        haConfig,
+		haStatus: &HAStatus{
+			Enabled:    haConfig.IsHAEnabled(),
+			ReplicaID:  replicaID,
+			Healthy:    true,
+			LastUpdate: time.Now().Format(time.RFC3339),
+		},
 	}
 
 	s.registerHandlers(mux)
@@ -111,6 +142,18 @@ func (s *Server) registerHandlers(mux *http.ServeMux) {
 
 	// Prometheus metrics endpoint
 	mux.Handle("/metrics", promhttp.Handler())
+
+	// HA-aware endpoints (only if HA is enabled)
+	if s.haConfig != nil && s.haConfig.IsHAEnabled() {
+		// HA health check endpoint
+		mux.HandleFunc("/ha/health", s.handleHAHealth)
+
+		// HA metrics endpoint
+		mux.HandleFunc("/ha/metrics", s.handleHAMetrics)
+
+		// HA status endpoint
+		mux.HandleFunc("/ha/status", s.handleHAStatus)
+	}
 
 	// Falco webhook handler (with authentication and rate limiting)
 	falcoHandler := s.auth.RequireAuth(s.handleFalcoWebhook)
@@ -418,4 +461,84 @@ func (s *Server) SetReady(ready bool) {
 	s.readyMu.Lock()
 	defer s.readyMu.Unlock()
 	s.ready = ready
+}
+
+// handleHAHealth handles GET /ha/health - HA health check endpoint
+func (s *Server) handleHAHealth(w http.ResponseWriter, r *http.Request) {
+	s.haStatusMu.RLock()
+	status := s.haStatus
+	s.haStatusMu.RUnlock()
+
+	if status == nil || !status.Healthy {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":     "unhealthy",
+			"replica_id": status.ReplicaID,
+		})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"status":     "healthy",
+		"replica_id": status.ReplicaID,
+		"enabled":    status.Enabled,
+	})
+}
+
+// handleHAMetrics handles GET /ha/metrics - HA-specific metrics for auto-scaling
+func (s *Server) handleHAMetrics(w http.ResponseWriter, r *http.Request) {
+	s.haStatusMu.RLock()
+	status := s.haStatus
+	s.haStatusMu.RUnlock()
+
+	if status == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"replica_id":     status.ReplicaID,
+		"cpu_usage":      status.CPUUsage,
+		"memory_usage":   status.MemoryUsage,
+		"events_per_sec": status.EventsPerSec,
+		"queue_depth":    status.QueueDepth,
+		"current_load":   status.CurrentLoad,
+		"timestamp":      time.Now().Format(time.RFC3339),
+	})
+}
+
+// handleHAStatus handles GET /ha/status - Current HA status and load
+func (s *Server) handleHAStatus(w http.ResponseWriter, r *http.Request) {
+	s.haStatusMu.RLock()
+	status := s.haStatus
+	s.haStatusMu.RUnlock()
+
+	if status == nil {
+		w.WriteHeader(http.StatusServiceUnavailable)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(status)
+}
+
+// UpdateHAStatus updates the HA status with current metrics
+func (s *Server) UpdateHAStatus(cpuUsage, memoryUsage, eventsPerSec, currentLoad float64, queueDepth int) {
+	s.haStatusMu.Lock()
+	defer s.haStatusMu.Unlock()
+
+	if s.haStatus != nil {
+		s.haStatus.CPUUsage = cpuUsage
+		s.haStatus.MemoryUsage = memoryUsage
+		s.haStatus.EventsPerSec = eventsPerSec
+		s.haStatus.CurrentLoad = currentLoad
+		s.haStatus.QueueDepth = queueDepth
+		s.haStatus.LastUpdate = time.Now().Format(time.RFC3339)
+		s.haStatus.Healthy = true
+	}
 }

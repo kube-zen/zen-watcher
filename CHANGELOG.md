@@ -115,7 +115,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Enhanced** metrics definitions for filter, adapter, mapping, dedup, GC
 - **Enabled** VictoriaMetrics scraping by default (vmServiceScrape)
 - **Added** Prometheus annotations to service for automatic discovery
-- **Fixed** metrics exposure for all 6 sources (previously only informer-based)
+- **Fixed** metrics exposure for all 9 sources (previously only informer-based)
 
 #### Testing
 - **Added** filter merger unit tests (pkg/filter/merger_test.go)

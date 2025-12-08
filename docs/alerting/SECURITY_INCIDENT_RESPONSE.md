@@ -644,7 +644,7 @@ kubectl get clusterpolicies -o yaml
 [Brief overview of security posture this week]
 
 ## Key Metrics
-- **Total Security Events**: XXX (↑/↓ X% vs last week)
+- **Total Security Events**: [Review dashboard metrics] (↑/↓ [calculate]% vs last week)
 - **Critical Events**: XX (↑/↓ X% vs last week)
 - **High Events**: XX (↑/↓ X% vs last week)
 - **Compliance Score**: XX% (↑/↓ X% vs last week)

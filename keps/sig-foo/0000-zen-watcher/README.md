@@ -12,7 +12,7 @@ reviewers:
 approvers:
   - TBD
 status: implementable
-creation-date: 2024-11-27
+creation-date: 2025-12-08
 last-updated: 2025-12-08
 see-also:
   - https://github.com/kube-zen/zen-watcher
@@ -167,11 +167,11 @@ spec:
     vulnerabilityID: CVE-2024-001
     package: openssl
     version: 1.0.0
-  detectedAt: "2024-11-27T10:00:00Z"
+    detectedAt: "2025-12-08T10:00:00Z"
   ttlSecondsAfterCreation: 604800  # Optional TTL (7 days)
 status:
   processed: true
-  lastProcessedAt: "2024-11-27T10:00:01Z"
+  lastProcessedAt: "2025-12-08T10:00:01Z"
 ```
 
 **Key Design Decisions:**
@@ -458,14 +458,14 @@ func (ep *EventProcessor) ProcessMyToolReport(ctx context.Context, report *unstr
 
 ### Phase 2: Advanced Features (v1.0.10) ✅ COMPLETE
 
-- [x] **Modular Adapter Architecture** - SourceAdapter interface for all 6 sources
+- [x] **Modular Adapter Architecture** - SourceAdapter interface for all 9 sources
 - [x] **ObservationFilter CRD** - Kubernetes-native dynamic filtering
 - [x] **ObservationMapping CRD** - Generic CRD adapter for "long tail" integrations
 - [x] **Filter Merge Semantics** - ConfigMap + ObservationFilter CRD merging with comprehensive tests
 - [x] **Cluster-Blind Design** - Removed all CLUSTER_ID/TENANT_ID metadata
 - [x] **Enhanced Metrics** - Filter, adapter, mapping, dedup, GC metrics defined
 - [x] **VictoriaMetrics Integration** - VMServiceScrape with automatic discovery
-- [x] **Automated Demo** - quick-demo.sh validates all 6 sources in ~4 minutes
+- [x] **Automated Demo** - quick-demo.sh validates all 9 sources in ~4 minutes
 - [x] **Production Stability** - HA support, graceful degradation, comprehensive docs
 
 ### Phase 3: Future Enhancements

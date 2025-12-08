@@ -81,7 +81,7 @@ cd zen-watcher
 
 **What you get:**
 - ✅ Kubernetes cluster (k3d, kind, or minikube) with all 9 security sources (Trivy, Falco, Kyverno, Checkov, KubeBench, Audit, cert-manager, sealed-secrets, Kubernetes Events)
-- ✅ VictoriaMetrics + Grafana with 3 pre-built dashboards (Executive, Operations, Security)
+- ✅ VictoriaMetrics + Grafana with 6 pre-built dashboards (Executive, Operations, Security, Main, Namespace Health, Explorer)
 - ✅ Mock observations from all 9 sources
 - ✅ ~4 minutes total time
 

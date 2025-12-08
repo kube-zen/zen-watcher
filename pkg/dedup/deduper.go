@@ -1,4 +1,4 @@
-// Copyright 2024 The Zen Watcher Authors
+// Copyright 2025 The Zen Watcher Authors
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -803,4 +803,37 @@ func (d *Deduper) Clear() {
 	defer d.mu.Unlock()
 	d.cache = make(map[string]*entry)
 	d.lruList = make([]string, 0, d.maxSize)
+}
+
+// SetMaxSize updates the maximum cache size (for HA adaptive cache sizing)
+func (d *Deduper) SetMaxSize(newMaxSize int) {
+	if newMaxSize <= 0 {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	
+	oldMaxSize := d.maxSize
+	d.maxSize = newMaxSize
+	
+	// If new size is smaller, evict oldest entries
+	if newMaxSize < oldMaxSize && len(d.cache) > newMaxSize {
+		entriesToRemove := len(d.cache) - newMaxSize
+		for i := 0; i < entriesToRemove && len(d.lruList) > 0; i++ {
+			oldest := d.lruList[0]
+			delete(d.cache, oldest)
+			d.lruList = d.lruList[1:]
+		}
+	}
+}
+
+// SetDefaultWindow updates the default deduplication window (for HA dynamic dedup optimization)
+func (d *Deduper) SetDefaultWindow(windowSeconds int) {
+	if windowSeconds <= 0 {
+		return
+	}
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.defaultWindowSeconds = windowSeconds
+	d.windowSeconds = windowSeconds // Also update for backward compatibility
 }

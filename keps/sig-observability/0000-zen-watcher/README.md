@@ -5,7 +5,7 @@ participating-sigs:
   - sig-security
   - sig-architecture
 status: draft
-creation-date: 2024-11-27
+creation-date: 2025-12-08
 last-updated: 2025-12-08
 reviewers:
   - TBD
@@ -84,7 +84,7 @@ See [Stress Testing Results](../../../docs/STRESS_TEST_RESULTS.md) for complete 
 
 ## Implementation History
 
-- **2024-11-27**: Initial KEP creation
+- **2025-12-08**: Initial KEP creation
 - **2025-12-08**: Stress testing validation, SIG assignment update
 
 ## Alternatives Considered
