@@ -44,6 +44,17 @@ func NewOptimizer(
 	},
 ) *Optimizer {
 	smartProcessor := NewSmartProcessor()
+	return NewOptimizerWithProcessor(smartProcessor, sourceConfigLoader)
+}
+
+// NewOptimizerWithProcessor creates a new optimizer with a shared SmartProcessor
+func NewOptimizerWithProcessor(
+	smartProcessor *SmartProcessor,
+	sourceConfigLoader interface {
+		GetSourceConfig(source string) *config.SourceConfig
+		GetAllSourceConfigs() map[string]*config.SourceConfig
+	},
+) *Optimizer {
 	stateManager := NewOptimizationStateManager()
 	engine := NewOptimizationEngine(smartProcessor, stateManager, sourceConfigLoader)
 
