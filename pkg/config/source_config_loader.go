@@ -308,30 +308,50 @@ func (scl *SourceConfigLoader) convertToSourceConfig(osc *unstructured.Unstructu
 		if windowStr, ok := dedupObj["window"].(string); ok {
 			if window, err := time.ParseDuration(windowStr); err == nil {
 				config.DedupWindow = window
+				config.Deduplication.Window = window
 			} else {
 				config.DedupWindow = defaults.DedupWindow
+				config.Deduplication.Window = defaults.DedupWindow
 			}
 		} else {
 			config.DedupWindow = defaults.DedupWindow
+			config.Deduplication.Window = defaults.DedupWindow
 		}
 
 		if strategy, ok := dedupObj["strategy"].(string); ok {
 			config.DedupStrategy = strategy
+			config.Deduplication.Strategy = strategy
 		} else {
 			config.DedupStrategy = "fingerprint"
+			config.Deduplication.Strategy = "fingerprint"
 		}
 
 		if fields, ok := dedupObj["fields"].([]interface{}); ok {
 			config.DedupFields = make([]string, 0, len(fields))
+			config.Deduplication.Fields = make([]string, 0, len(fields))
 			for _, f := range fields {
 				if fieldStr, ok := f.(string); ok {
 					config.DedupFields = append(config.DedupFields, fieldStr)
+					config.Deduplication.Fields = append(config.Deduplication.Fields, fieldStr)
 				}
 			}
+		}
+
+		// Parse adaptive deduplication settings
+		if adaptive, ok := dedupObj["adaptive"].(bool); ok {
+			config.Deduplication.Adaptive = adaptive
+		}
+		if minChange, ok := dedupObj["minChange"].(float64); ok {
+			config.Deduplication.MinChange = minChange
+		}
+		if learningRate, ok := dedupObj["learningRate"].(float64); ok {
+			config.Deduplication.LearningRate = learningRate
 		}
 	} else {
 		config.DedupWindow = defaults.DedupWindow
 		config.DedupStrategy = "fingerprint"
+		config.Deduplication.Window = defaults.DedupWindow
+		config.Deduplication.Strategy = "fingerprint"
 	}
 
 	// Parse filter configuration
