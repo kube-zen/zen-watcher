@@ -90,7 +90,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Modular Adapter Architecture
 - **Added** SourceAdapter interface for all 6 event sources
 - **Implemented** adapter factory pattern for lifecycle management
-- **Migrated** all sources to new adapter architecture (Trivy, Kyverno, Falco, Audit, Checkov, KubeBench)
+- Implemented ingester-based architecture for all sources (Trivy, Kyverno, Falco, Audit, Checkov, KubeBench)
 
 #### Dynamic Filtering with CRDs
 - **Added** ObservationFilter CRD for Kubernetes-native filtering

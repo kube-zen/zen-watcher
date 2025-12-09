@@ -353,7 +353,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#2-event-processing-pipeline) for
 
 See that repository for:
 - Chart values and configuration
-- Upgrade paths and migration notes
+- Upgrade paths and version notes
 - Version compatibility matrix
 
 **Quick Install:**

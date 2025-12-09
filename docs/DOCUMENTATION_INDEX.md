@@ -318,10 +318,10 @@ Complete guide to all Zen Watcher documentation files.
     - Prometheus config
     - Loki integration
 
-48. **[ADAPTER_MIGRATION.md](ADAPTER_MIGRATION.md)** - Adapter migration guide
-    - Migration from old adapters
+48. **[ADAPTER_MIGRATION.md](ADAPTER_MIGRATION.md)** - Adapter development guide
+    - Adapter architecture
     - Compatibility notes
-    - Migration steps
+    - Development steps
 
 49. **[THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md)** - Third-party licenses
     - License information
