@@ -23,16 +23,16 @@ spec:
           properties:
             spec:
               type: object
-              required: ["source", "adapterType"]
+              required: ["source", "ingester"]
               properties:
                 source:
                   type: string
                   description: "Tool name (trivy, kyverno, sealed-secrets, etc.)"
                   pattern: "^[a-z0-9-]+$"
-                adapterType:
+                ingester:
                   type: string
-                  description: "Adapter type: informer, webhook, logs, or configmap"
-                  enum: [informer, webhook, logs, configmap]
+                  description: "Ingester type: informer, webhook, logs, cm, or k8s-events"
+                  enum: [informer, webhook, logs, cm, k8s-events]
                 filter:
                   type: object
                   description: "Filter configuration for this source"
@@ -336,7 +336,9 @@ spec:
                           operator:
                             type: string
                             enum: [">", "<", "==", "!=", "contains"]
-                          value: {}
+                          value:
+                            type: string
+                            description: "Value to compare against"
                           message:
                             type: string
                 processing:
@@ -399,7 +401,7 @@ spec:
           priority: 1
         - name: Min Priority
           type: number
-          format: "0.00"
+          format: double
           jsonPath: .spec.filter.minPriority
           priority: 1
         - name: Age

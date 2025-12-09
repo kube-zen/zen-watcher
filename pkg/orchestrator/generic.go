@@ -146,7 +146,7 @@ func (o *GenericOrchestrator) reloadAdapters() {
 		}
 
 		// Create new adapter
-		adapter, err := o.adapterFactory.NewAdapter(genericConfig.AdapterType)
+		adapter, err := o.adapterFactory.NewAdapter(genericConfig.Ingester)
 		if err != nil {
 			logger.Error("Failed to create adapter",
 				logger.Fields{
@@ -197,7 +197,7 @@ func (o *GenericOrchestrator) reloadAdapters() {
 				Operation: "adapter_started",
 				Source:    source,
 				Additional: map[string]interface{}{
-					"adapterType": genericConfig.AdapterType,
+					"ingester": genericConfig.Ingester,
 				},
 			})
 	}
@@ -241,7 +241,7 @@ func (o *GenericOrchestrator) configChanged(source string, newConfig *generic.So
 		return true // New config
 	}
 	// Simplified comparison - in production, would do deep comparison
-	return oldConfig.AdapterType != newConfig.AdapterType
+	return oldConfig.Ingester != newConfig.Ingester
 }
 
 // Stop stops all adapters

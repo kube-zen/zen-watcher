@@ -16,6 +16,7 @@ package optimization
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/config"
@@ -34,6 +35,7 @@ type SmartProcessor struct {
 	adaptiveFilters     map[string]*AdaptiveFilter
 	metricsCollectors   map[string]*PerSourceMetricsCollector
 	performanceTrackers map[string]*PerformanceTracker
+	mu                  sync.RWMutex // Protects maps from concurrent access
 }
 
 // NewSmartProcessor creates a new SmartProcessor
@@ -48,6 +50,16 @@ func NewSmartProcessor() *SmartProcessor {
 
 // GetOrCreateAdaptiveFilter gets or creates an adaptive filter for a source
 func (sp *SmartProcessor) GetOrCreateAdaptiveFilter(source string, filterConfig config.FilterConfig) *AdaptiveFilter {
+	sp.mu.RLock()
+	if filter, exists := sp.adaptiveFilters[source]; exists {
+		sp.mu.RUnlock()
+		return filter
+	}
+	sp.mu.RUnlock()
+
+	sp.mu.Lock()
+	defer sp.mu.Unlock()
+	// Double-check after acquiring write lock
 	if filter, exists := sp.adaptiveFilters[source]; exists {
 		return filter
 	}
@@ -59,6 +71,16 @@ func (sp *SmartProcessor) GetOrCreateAdaptiveFilter(source string, filterConfig 
 
 // GetOrCreateMetricsCollector gets or creates a metrics collector for a source
 func (sp *SmartProcessor) GetOrCreateMetricsCollector(source string) *PerSourceMetricsCollector {
+	sp.mu.RLock()
+	if collector, exists := sp.metricsCollectors[source]; exists {
+		sp.mu.RUnlock()
+		return collector
+	}
+	sp.mu.RUnlock()
+
+	sp.mu.Lock()
+	defer sp.mu.Unlock()
+	// Double-check after acquiring write lock
 	if collector, exists := sp.metricsCollectors[source]; exists {
 		return collector
 	}
@@ -70,6 +92,16 @@ func (sp *SmartProcessor) GetOrCreateMetricsCollector(source string) *PerSourceM
 
 // GetOrCreatePerformanceTracker gets or creates a performance tracker for a source
 func (sp *SmartProcessor) GetOrCreatePerformanceTracker(source string) *PerformanceTracker {
+	sp.mu.RLock()
+	if tracker, exists := sp.performanceTrackers[source]; exists {
+		sp.mu.RUnlock()
+		return tracker
+	}
+	sp.mu.RUnlock()
+
+	sp.mu.Lock()
+	defer sp.mu.Unlock()
+	// Double-check after acquiring write lock
 	if tracker, exists := sp.performanceTrackers[source]; exists {
 		return tracker
 	}
@@ -170,5 +202,12 @@ func (sp *SmartProcessor) GetSourceMetrics(source string) *OptimizationMetrics {
 
 // GetAllMetricsCollectors returns all metrics collectors
 func (sp *SmartProcessor) GetAllMetricsCollectors() map[string]*PerSourceMetricsCollector {
-	return sp.metricsCollectors
+	sp.mu.RLock()
+	defer sp.mu.RUnlock()
+
+	result := make(map[string]*PerSourceMetricsCollector)
+	for k, v := range sp.metricsCollectors {
+		result[k] = v
+	}
+	return result
 }

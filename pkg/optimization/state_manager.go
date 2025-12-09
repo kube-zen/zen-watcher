@@ -62,18 +62,20 @@ type StatePersistence interface {
 
 // NewOptimizationStateManager creates a new optimization state manager
 func NewOptimizationStateManager() *OptimizationStateManager {
+	config := DefaultOptimizationConfig()
 	return &OptimizationStateManager{
 		states:         make(map[string]*OptimizationState),
-		maxHistorySize: 100, // Keep last 100 decisions per source
+		maxHistorySize: config.MaxHistorySize,
 	}
 }
 
 // NewOptimizationStateManagerWithPersistence creates a new state manager with persistence
 func NewOptimizationStateManagerWithPersistence(persistence StatePersistence) *OptimizationStateManager {
+	config := DefaultOptimizationConfig()
 	return &OptimizationStateManager{
 		states:         make(map[string]*OptimizationState),
 		persistence:    persistence,
-		maxHistorySize: 100,
+		maxHistorySize: config.MaxHistorySize,
 	}
 }
 

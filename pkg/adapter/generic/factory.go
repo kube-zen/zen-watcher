@@ -44,9 +44,9 @@ func NewFactory(
 	}
 }
 
-// NewAdapter creates a new generic adapter based on adapterType
-func (f *Factory) NewAdapter(adapterType string) (GenericAdapter, error) {
-	switch adapterType {
+// NewAdapter creates a new generic adapter based on ingester type
+func (f *Factory) NewAdapter(ingester string) (GenericAdapter, error) {
+	switch ingester {
 	case "informer":
 		return NewInformerAdapter(f.dynFactory), nil
 	case "webhook":
@@ -56,12 +56,16 @@ func (f *Factory) NewAdapter(adapterType string) (GenericAdapter, error) {
 			return nil, fmt.Errorf("kubernetes client required for logs adapter")
 		}
 		return NewLogsAdapter(f.clientSet), nil
-	case "configmap":
+	case "cm", "configmap": // Support both "cm" (new) and "configmap" (legacy) for backward compatibility
 		if f.clientSet == nil {
 			return nil, fmt.Errorf("kubernetes client required for configmap adapter")
 		}
 		return NewConfigMapAdapter(f.clientSet), nil
+	case "k8s-events":
+		// k8s-events is handled by K8sEventsAdapter which is created separately
+		// This factory only handles generic adapters
+		return nil, fmt.Errorf("k8s-events ingester is handled by K8sEventsAdapter, not generic factory")
 	default:
-		return nil, fmt.Errorf("unknown adapter type: %s", adapterType)
+		return nil, fmt.Errorf("unknown ingester type: %s", ingester)
 	}
 }

@@ -4,7 +4,7 @@ metadata:
   name: trivy-config
 spec:
   source: trivy
-  adapterType: informer
+  ingester: informer
   informer:
     gvr:
       group: aquasecurity.github.io

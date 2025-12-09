@@ -4,7 +4,7 @@ metadata:
   name: cert-manager-config
 spec:
   source: cert-manager
-  adapterType: informer
+  ingester: informer
   informer:
     gvr:
       group: cert-manager.io

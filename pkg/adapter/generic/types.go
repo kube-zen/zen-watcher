@@ -29,10 +29,10 @@ type RawEvent struct {
 
 // SourceConfig represents the adapter configuration from ObservationSourceConfig CRD
 type SourceConfig struct {
-	Source      string
-	AdapterType string // informer, webhook, logs, configmap
+	Source   string
+	Ingester string // informer, webhook, logs, cm, k8s-events
 
-	// Adapter-specific configs (only one should be set based on adapterType)
+	// Adapter-specific configs (only one should be set based on ingester)
 	Informer  *InformerConfig
 	Webhook   *WebhookConfig
 	Logs      *LogsConfig

@@ -81,6 +81,10 @@ func main() {
 	// Initialize metrics
 	m := metrics.NewMetrics()
 
+	// Register optimization decision metrics
+	// This registers Prometheus metrics for optimization decisions
+	optimization.RegisterDecisionMetrics()
+
 	// Initialize Kubernetes clients
 	clients, err := kubernetes.NewClients()
 	if err != nil {

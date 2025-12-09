@@ -336,6 +336,10 @@ func NewMetrics() *Metrics {
 	prometheus.MustRegister(dedupEvictions)
 	prometheus.MustRegister(observationsLive)
 
+	// Register optimization decision metrics
+	// Note: This uses the optimization package's decision metrics
+	// which are registered as a singleton collector
+
 	// Optimization metrics (NEW)
 	filterPassRate := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{

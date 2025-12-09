@@ -4,7 +4,7 @@ metadata:
   name: checkov-config
 spec:
   source: checkov
-  adapterType: configmap
+  ingester: cm
   configmap:
     namespace: ""
     labelSelector: app=checkov

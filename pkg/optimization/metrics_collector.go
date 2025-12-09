@@ -114,7 +114,10 @@ func (mw *MetricsWindow) GetWindowMetrics() map[string]float64 {
 	avgMetrics := []string{"processing_latency", "cpu_usage", "memory_usage"}
 	for _, name := range avgMetrics {
 		if count, ok := counts[name]; ok && count > 0 {
-			result[name+"_avg"] = result[name] / float64(count)
+			// Guard against division by zero
+			if count > 0 {
+				result[name+"_avg"] = result[name] / float64(count)
+			}
 		}
 	}
 
@@ -275,6 +278,7 @@ func (c *PerSourceMetricsCollector) updateDerivedMetrics() {
 	filtered := c.eventsFiltered
 	deduped := c.eventsDeduped
 
+	// Guard against division by zero
 	if processed > 0 {
 		c.filterEffectiveness = float64(filtered) / float64(processed)
 		c.dedupEffectiveness = float64(deduped) / float64(processed)
@@ -282,6 +286,12 @@ func (c *PerSourceMetricsCollector) updateDerivedMetrics() {
 		// Update Prometheus gauges
 		c.promFilterEffectiveness.Set(c.filterEffectiveness)
 		c.promDedupEffectiveness.Set(c.dedupEffectiveness)
+	} else {
+		// Reset to zero if no events processed
+		c.filterEffectiveness = 0.0
+		c.dedupEffectiveness = 0.0
+		c.promFilterEffectiveness.Set(0.0)
+		c.promDedupEffectiveness.Set(0.0)
 	}
 }
 

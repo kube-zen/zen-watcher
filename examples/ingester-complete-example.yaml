@@ -1,0 +1,142 @@
+# Complete Ingester Example - Demonstrating All Ingester Types
+# This example shows how to configure different ingester types in Zen Watcher
+
+---
+# Example 1: Informer Ingester (for CRD-based tools like Trivy, Kyverno)
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: trivy-informer-example
+  namespace: zen-system
+spec:
+  source: trivy
+  ingester: informer
+  informer:
+    gvr:
+      group: aquasecurity.github.io
+      version: v1alpha1
+      resource: vulnerabilityreports
+    namespace: ""  # Empty = all namespaces
+    resyncPeriod: "30m"
+  normalization:
+    domain: security
+    type: vulnerability
+    priority:
+      CRITICAL: 0.9
+      HIGH: 0.7
+      MEDIUM: 0.5
+      LOW: 0.3
+  filter:
+    minPriority: 0.3
+  dedup:
+    window: "1h"
+    strategy: fingerprint
+
+---
+# Example 2: Webhook Ingester (for push-based tools like Falco, Audit)
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: falco-webhook-example
+  namespace: zen-system
+spec:
+  source: falco
+  ingester: webhook
+  webhook:
+    path: "/webhooks/falco"
+    port: 8080
+    bufferSize: 1000
+    auth:
+      type: bearer
+      secretName: falco-webhook-token
+  normalization:
+    domain: security
+    type: runtime_threat
+  filter:
+    minPriority: 0.5
+  dedup:
+    window: "5m"
+    strategy: fingerprint
+
+---
+# Example 3: Logs Ingester (for log-based monitoring)
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: sealed-secrets-logs-example
+  namespace: zen-system
+spec:
+  source: sealed-secrets
+  ingester: logs
+  logs:
+    podSelector: app=sealed-secrets
+    container: sealed-secrets
+    patterns:
+      - regex: "ERROR.*(?P<message>.*)"
+        type: error
+        priority: 0.7
+      - regex: "WARN.*(?P<message>.*)"
+        type: warning
+        priority: 0.5
+    sinceSeconds: 300
+    pollInterval: "10s"
+  normalization:
+    domain: operations
+    type: log_error
+  filter:
+    minPriority: 0.4
+
+---
+# Example 4: ConfigMap Ingester (for batch tools like Checkov, Kube-Bench)
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: checkov-cm-example
+  namespace: zen-system
+spec:
+  source: checkov
+  ingester: cm  # Note: 'cm' is the new short form (configmap is also supported for backward compatibility)
+  configmap:
+    namespace: ""
+    labelSelector: app=checkov
+    pollInterval: "30m"
+    jsonPath: ""
+  normalization:
+    domain: security
+    type: iac_vulnerability
+    priority:
+      CRITICAL: 0.9
+      HIGH: 0.7
+      MEDIUM: 0.5
+      LOW: 0.3
+  filter:
+    minPriority: 0.3
+  dedup:
+    window: "2h"
+    strategy: fingerprint
+
+---
+# Example 5: K8s Events Ingester (native Kubernetes Events API)
+# Note: k8s-events ingester is handled by K8sEventsAdapter which is built-in
+# This example shows how it would be configured (if supported via CRD)
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: ObservationSourceConfig
+metadata:
+  name: kubernetes-events-example
+  namespace: zen-system
+spec:
+  source: kubernetes-events
+  ingester: k8s-events
+  # k8s-events doesn't require additional config as it uses native K8s Events API
+  normalization:
+    domain: operations
+    type: kubernetes_event
+  filter:
+    minPriority: 0.2
+    excludeNamespaces:
+      - kube-system
+      - kube-public
+  dedup:
+    window: "10m"
+    strategy: fingerprint
+

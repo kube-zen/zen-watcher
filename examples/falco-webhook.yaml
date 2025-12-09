@@ -4,7 +4,7 @@ metadata:
   name: falco-config
 spec:
   source: falco
-  adapterType: webhook
+  ingester: webhook
   webhook:
     path: /falco
     port: 8080

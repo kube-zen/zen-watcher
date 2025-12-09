@@ -4,7 +4,7 @@ metadata:
   name: kyverno-config
 spec:
   source: kyverno
-  adapterType: informer
+  ingester: informer
   informer:
     gvr:
       group: wgpolicyk8s.io

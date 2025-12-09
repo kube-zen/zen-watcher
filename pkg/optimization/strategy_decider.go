@@ -68,30 +68,37 @@ type OptimizationMetrics struct {
 
 // StrategyDecider determines the optimal processing strategy based on metrics and configuration
 type StrategyDecider struct {
-	// Decision rules and thresholds
-	filterFirstThresholdLowSeverity  float64 // Default: 0.7 (70%)
-	dedupFirstThresholdEffectiveness float64 // Default: 0.5 (50%)
-	adaptiveThresholdVolume          int64   // Default: 100 events/min
+	config *OptimizationConfig
 }
 
 // NewStrategyDecider creates a new StrategyDecider with default thresholds
 func NewStrategyDecider() *StrategyDecider {
 	return &StrategyDecider{
-		filterFirstThresholdLowSeverity:  0.7,
-		dedupFirstThresholdEffectiveness: 0.5,
-		adaptiveThresholdVolume:          100,
+		config: DefaultOptimizationConfig(),
 	}
 }
 
-// NewStrategyDeciderWithThresholds creates a new StrategyDecider with custom thresholds
+// NewStrategyDeciderWithConfig creates a new StrategyDecider with custom config
+func NewStrategyDeciderWithConfig(config *OptimizationConfig) *StrategyDecider {
+	if config == nil {
+		config = DefaultOptimizationConfig()
+	}
+	return &StrategyDecider{
+		config: config,
+	}
+}
+
+// NewStrategyDeciderWithThresholds creates a new StrategyDecider with custom thresholds (deprecated, use NewStrategyDeciderWithConfig)
 func NewStrategyDeciderWithThresholds(
 	filterFirstThreshold, dedupFirstThreshold float64,
 	adaptiveThreshold int64,
 ) *StrategyDecider {
+	config := DefaultOptimizationConfig()
+	config.FilterFirstThresholdLowSeverity = filterFirstThreshold
+	config.DedupFirstThresholdEffectiveness = dedupFirstThreshold
+	config.AdaptiveThresholdVolume = adaptiveThreshold
 	return &StrategyDecider{
-		filterFirstThresholdLowSeverity:  filterFirstThreshold,
-		dedupFirstThresholdEffectiveness: dedupFirstThreshold,
-		adaptiveThresholdVolume:          adaptiveThreshold,
+		config: config,
 	}
 }
 
@@ -117,25 +124,25 @@ func (sd *StrategyDecider) DetermineStrategy(
 
 	// Rule 1: If high LOW severity (>70%), filter_first
 	// This removes noise early before expensive dedup operations
-	if metrics.LowSeverityPercent >= sd.filterFirstThresholdLowSeverity {
+	if metrics.LowSeverityPercent >= sd.config.FilterFirstThresholdLowSeverity {
 		return ProcessingStrategyFilterFirst
 	}
 
 	// Rule 2: If high dedup effectiveness (>50%), dedup_first
 	// This removes duplicates early before filter operations
-	if metrics.DeduplicationRate >= sd.dedupFirstThresholdEffectiveness {
+	if metrics.DeduplicationRate >= sd.config.DedupFirstThresholdEffectiveness {
 		return ProcessingStrategyDedupFirst
 	}
 
 	// Rule 3: If high volume and moderate dedup, use hybrid
-	if metrics.EventsProcessed >= sd.adaptiveThresholdVolume &&
+	if metrics.EventsProcessed >= sd.config.AdaptiveThresholdVolume &&
 		metrics.DeduplicationRate > 0.3 && metrics.DeduplicationRate < 0.5 {
 		return ProcessingStrategyHybrid
 	}
 
 	// Rule 4: If very high volume and auto-optimize enabled, use adaptive
 	if config != nil && config.Processing.AutoOptimize &&
-		metrics.EventsProcessed >= sd.adaptiveThresholdVolume*2 {
+		metrics.EventsProcessed >= sd.config.AdaptiveThresholdVolume*2 {
 		return ProcessingStrategyAdaptive
 	}
 

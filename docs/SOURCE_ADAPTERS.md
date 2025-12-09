@@ -21,7 +21,7 @@ metadata:
   namespace: zen-system
 spec:
   source: my-tool
-  adapterType: logs
+  ingester: logs
   logs:
     podSelector: app=my-tool
     patterns:
@@ -94,10 +94,11 @@ See [Generic Source Configuration](#generic-source-configuration-via-yaml) secti
 
 | Method | Use Case | Configuration Type |
 |--------|----------|-------------------|
-| **Logs** | Monitor pod logs, parse log lines with regex | `adapterType: logs` |
-| **Webhooks** | Receive HTTP webhooks from external tools | `adapterType: webhook` |
-| **ConfigMaps** | Poll ConfigMaps for batch scan results | `adapterType: configmap` |
-| **CRDs (Informers)** | Watch Kubernetes Custom Resource Definitions | `adapterType: informer` |
+| **Logs** | Monitor pod logs, parse log lines with regex | `ingester: logs` |
+| **Webhooks** | Receive HTTP webhooks from external tools | `ingester: webhook` |
+| **ConfigMaps** | Poll ConfigMaps for batch scan results | `ingester: cm` |
+| **CRDs (Informers)** | Watch Kubernetes Custom Resource Definitions | `ingester: informer` |
+| **K8s Events** | Native Kubernetes Events API | `ingester: k8s-events` |
 
 ### Method 1: Logs Adapter
 
@@ -111,7 +112,7 @@ metadata:
   namespace: zen-system
 spec:
   source: sealed-secrets
-  adapterType: logs
+  ingester: logs
   logs:
     podSelector: app=sealed-secrets-controller
     container: sealed-secrets-controller
@@ -148,7 +149,7 @@ metadata:
   namespace: zen-system
 spec:
   source: my-external-tool
-  adapterType: webhook
+  ingester: webhook
   webhook:
     path: /webhook/my-tool
     port: 8080
@@ -179,7 +180,7 @@ metadata:
   namespace: zen-system
 spec:
   source: checkov
-  adapterType: configmap
+  ingester: cm
   configmap:
     namespace: checkov
     labelSelector: app=checkov
@@ -208,7 +209,7 @@ metadata:
   namespace: zen-system
 spec:
   source: cert-manager
-  adapterType: informer
+  ingester: informer
   informer:
     gvr:
       group: cert-manager.io
@@ -240,7 +241,7 @@ metadata:
   namespace: zen-system
 spec:
   source: my-tool
-  adapterType: logs
+  ingester: logs
   
   # Adapter-specific configuration
   logs:
@@ -492,7 +493,7 @@ metadata:
   name: trivy-with-thresholds
 spec:
   source: trivy
-  adapterType: informer
+  ingester: informer
   processing:
     order: auto
     autoOptimize: true

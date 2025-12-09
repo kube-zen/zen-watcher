@@ -48,10 +48,11 @@ type PerformanceTracker struct {
 
 // NewPerformanceTracker creates a new performance tracker
 func NewPerformanceTracker(source string) *PerformanceTracker {
+	config := DefaultOptimizationConfig()
 	return &PerformanceTracker{
 		source:       source,
-		maxLatencies: 1000, // Keep last 1000 latency measurements
-		latencies:    make([]time.Duration, 0, 1000),
+		maxLatencies: config.MaxLatencies,
+		latencies:    make([]time.Duration, 0, config.MaxLatencies),
 	}
 }
 
@@ -102,7 +103,12 @@ func (pt *PerformanceTracker) GetAverageLatency() time.Duration {
 		sum += lat
 	}
 
-	return sum / time.Duration(len(pt.latencies))
+	count := len(pt.latencies)
+	if count == 0 {
+		return 0
+	}
+
+	return sum / time.Duration(count)
 }
 
 // GetPeakLatency returns the peak processing latency

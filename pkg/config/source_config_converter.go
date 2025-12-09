@@ -30,25 +30,29 @@ func ConvertToGenericSourceConfig(u *unstructured.Unstructured) (*generic.Source
 	}
 
 	source, _ := spec["source"].(string)
-	adapterType, _ := spec["adapterType"].(string)
+	ingester, _ := spec["ingester"].(string)
 
 	config := &generic.SourceConfig{
-		Source:      source,
-		AdapterType: adapterType,
+		Source:   source,
+		Ingester: ingester,
 	}
 
 	// Parse adapter-specific configs
-	switch adapterType {
+	switch ingester {
 	case "informer":
 		config.Informer = parseInformerConfig(spec)
 	case "webhook":
 		config.Webhook = parseWebhookConfig(spec)
 	case "logs":
 		config.Logs = parseLogsConfig(spec)
-	case "configmap":
+	case "cm", "configmap": // Support both "cm" (new) and "configmap" (legacy) for backward compatibility
 		config.ConfigMap = parseConfigMapConfig(spec)
+	case "k8s-events":
+		// k8s-events uses the native Kubernetes Events API, no additional config needed
+		// This is handled by the K8sEventsAdapter which is created separately
+		// We just need to mark it as k8s-events ingester type
 	default:
-		return nil, fmt.Errorf("unknown adapter type: %s", adapterType)
+		return nil, fmt.Errorf("unknown ingester type: %s", ingester)
 	}
 
 	// Parse normalization

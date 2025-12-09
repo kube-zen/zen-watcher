@@ -4,7 +4,7 @@ metadata:
   name: audit-config
 spec:
   source: audit
-  adapterType: webhook
+  ingester: webhook
   webhook:
     path: /audit
     port: 8080

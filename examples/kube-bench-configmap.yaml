@@ -4,7 +4,7 @@ metadata:
   name: kube-bench-config
 spec:
   source: kube-bench
-  adapterType: configmap
+  ingester: cm
   configmap:
     namespace: ""
     labelSelector: app=kube-bench

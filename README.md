@@ -139,7 +139,7 @@ metadata:
   name: my-tool-source
 spec:
   source: my-tool
-  adapterType: logs
+  ingester: logs
   logs:
     podSelector: app=my-tool
     patterns:
@@ -560,7 +560,7 @@ metadata:
   namespace: zen-system
 spec:
   source: trivy
-  adapterType: informer
+  ingester: informer
   
   # Auto-optimization
   processing:

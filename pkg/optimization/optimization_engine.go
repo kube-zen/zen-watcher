@@ -37,6 +37,7 @@ type OptimizationEngine struct {
 	running              bool
 	mu                   sync.RWMutex
 	cancel               context.CancelFunc
+	wg                   sync.WaitGroup // For graceful shutdown
 }
 
 // NewOptimizationEngine creates a new optimization engine
@@ -48,11 +49,12 @@ func NewOptimizationEngine(
 		GetAllSourceConfigs() map[string]*config.SourceConfig
 	},
 ) *OptimizationEngine {
+	config := DefaultOptimizationConfig()
 	return &OptimizationEngine{
 		smartProcessor:       smartProcessor,
 		stateManager:         stateManager,
 		sourceConfigLoader:   sourceConfigLoader,
-		optimizationInterval: 5 * time.Minute, // Default: optimize every 5 minutes
+		optimizationInterval: config.OptimizationInterval,
 	}
 }
 
@@ -83,12 +85,11 @@ func (oe *OptimizationEngine) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop stops the optimization engine
+// Stop stops the optimization engine and waits for goroutines to finish
 func (oe *OptimizationEngine) Stop() {
 	oe.mu.Lock()
-	defer oe.mu.Unlock()
-
 	if !oe.running {
+		oe.mu.Unlock()
 		return
 	}
 
@@ -97,6 +98,10 @@ func (oe *OptimizationEngine) Stop() {
 	}
 
 	oe.running = false
+	oe.mu.Unlock()
+
+	// Wait for goroutines to finish
+	oe.wg.Wait()
 
 	logger.Info("Optimization engine stopped",
 		logger.Fields{
@@ -107,6 +112,9 @@ func (oe *OptimizationEngine) Stop() {
 
 // optimizationLoop runs the continuous optimization loop
 func (oe *OptimizationEngine) optimizationLoop(ctx context.Context) {
+	oe.wg.Add(1)
+	defer oe.wg.Done()
+
 	ticker := time.NewTicker(oe.optimizationInterval)
 	defer ticker.Stop()
 
@@ -116,6 +124,11 @@ func (oe *OptimizationEngine) optimizationLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			logger.Info("Optimization loop received shutdown signal",
+				logger.Fields{
+					Component: "optimization",
+					Operation: "loop_shutdown",
+				})
 			return
 		case <-ticker.C:
 			oe.runOptimizationCycle(ctx)
@@ -166,8 +179,24 @@ func (oe *OptimizationEngine) applyOptimization(
 	newStrategy ProcessingStrategy,
 	metrics *OptimizationMetrics,
 ) {
+	startTime := time.Now()
 	state := oe.stateManager.GetState(source)
 	oldStrategy := state.CurrentStrategy
+
+	// Check cooldown period (hysteresis) to prevent oscillation
+	if !oe.canMakeDecision(source, state) {
+		logger.Debug("Optimization skipped due to cooldown period",
+			logger.Fields{
+				Component: "optimization",
+				Operation: "optimization_cooldown",
+				Source:    source,
+				Additional: map[string]interface{}{
+					"last_decision": state.LastDecision,
+				},
+			})
+		RecordDecision("strategy_change", "skipped_cooldown", source, time.Since(startTime), 0.0)
+		return
+	}
 
 	// Calculate confidence based on metrics
 	confidence := oe.calculateConfidence(metrics, sourceConfig)
@@ -185,6 +214,7 @@ func (oe *OptimizationEngine) applyOptimization(
 					"proposed_strategy": newStrategy.String(),
 				},
 			})
+		RecordDecision("strategy_change", "skipped_low_confidence", source, time.Since(startTime), confidence)
 		return
 	}
 
@@ -207,7 +237,12 @@ func (oe *OptimizationEngine) applyOptimization(
 				Source:    source,
 				Error:     err,
 			})
+		RecordDecision("strategy_change", "error", source, time.Since(startTime), confidence)
+		return
 	}
+
+	// Record successful decision metrics
+	RecordDecision("strategy_change", "success", source, time.Since(startTime), confidence)
 
 	logger.Info("Optimization applied",
 		logger.Fields{
@@ -224,29 +259,41 @@ func (oe *OptimizationEngine) applyOptimization(
 		})
 }
 
+// canMakeDecision checks if enough time has passed since the last decision (cooldown/hysteresis)
+func (oe *OptimizationEngine) canMakeDecision(source string, state *OptimizationState) bool {
+	config := DefaultOptimizationConfig()
+	if state.LastDecision.IsZero() {
+		return true // No previous decision, allow
+	}
+
+	cooldownPeriod := config.CooldownPeriod
+	return time.Since(state.LastDecision) >= cooldownPeriod
+}
+
 // calculateConfidence calculates the confidence level for an optimization decision
 func (oe *OptimizationEngine) calculateConfidence(
 	metrics *OptimizationMetrics,
 	sourceConfig *config.SourceConfig,
 ) float64 {
+	config := DefaultOptimizationConfig()
 	confidence := 0.5 // Base confidence
 
 	// Increase confidence based on metrics consistency
-	if metrics.EventsProcessed > 100 {
+	if metrics.EventsProcessed > config.MinEventsForConfidence {
 		confidence += 0.2 // More data = higher confidence
 	}
 
 	// Increase confidence if dedup effectiveness is clearly high/low
-	if metrics.DeduplicationRate > 0.7 {
+	if metrics.DeduplicationRate > config.HighDedupRate {
 		confidence += 0.1 // Very high dedup rate
-	} else if metrics.DeduplicationRate < 0.2 {
+	} else if metrics.DeduplicationRate < config.LowDedupRate {
 		confidence += 0.1 // Very low dedup rate
 	}
 
 	// Increase confidence if filter effectiveness is clearly high/low
-	if metrics.FilterEffectiveness > 0.7 {
+	if metrics.FilterEffectiveness > config.HighFilterRate {
 		confidence += 0.1 // Very high filter rate
-	} else if metrics.FilterEffectiveness < 0.2 {
+	} else if metrics.FilterEffectiveness < config.LowFilterRate {
 		confidence += 0.1 // Very low filter rate
 	}
 
