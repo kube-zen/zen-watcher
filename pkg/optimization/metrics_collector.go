@@ -23,10 +23,10 @@ import (
 
 // MetricsWindow represents a sliding window of metrics
 type MetricsWindow struct {
-	windowSize   time.Duration
-	entries      []MetricsEntry
-	mu           sync.RWMutex
-	maxEntries   int
+	windowSize time.Duration
+	entries    []MetricsEntry
+	mu         sync.RWMutex
+	maxEntries int
 }
 
 // MetricsEntry represents a single metrics entry in the window
@@ -50,7 +50,7 @@ func (mw *MetricsWindow) AddMetric(name string, value float64) {
 	defer mw.mu.Unlock()
 
 	now := time.Now()
-	
+
 	// Remove old entries outside window
 	mw.cleanup(now)
 
@@ -59,7 +59,7 @@ func (mw *MetricsWindow) AddMetric(name string, value float64) {
 		Timestamp: now,
 		Metrics:   map[string]float64{name: value},
 	}
-	
+
 	mw.entries = append(mw.entries, entry)
 
 	// Trim if too many entries
@@ -71,7 +71,7 @@ func (mw *MetricsWindow) AddMetric(name string, value float64) {
 // cleanup removes entries older than the window
 func (mw *MetricsWindow) cleanup(now time.Time) {
 	cutoff := now.Add(-mw.windowSize)
-	
+
 	// Find first entry within window
 	startIdx := 0
 	for i, entry := range mw.entries {
@@ -132,37 +132,37 @@ type PerSourceMetricsCollector struct {
 	source             string
 	collectionInterval time.Duration
 	window             *MetricsWindow
-	
+
 	// Counters
-	eventsProcessed    int64
-	eventsFiltered     int64
-	eventsDeduped      int64
-	
+	eventsProcessed int64
+	eventsFiltered  int64
+	eventsDeduped   int64
+
 	// Quality metrics
 	filterEffectiveness float64
 	dedupEffectiveness  float64
-	
+
 	// Prometheus metrics
-	promEventsProcessed    prometheus.Counter
-	promEventsFiltered     prometheus.Counter
-	promEventsDeduped      prometheus.Counter
-	promProcessingLatency  prometheus.Histogram
+	promEventsProcessed     prometheus.Counter
+	promEventsFiltered      prometheus.Counter
+	promEventsDeduped       prometheus.Counter
+	promProcessingLatency   prometheus.Histogram
 	promFilterEffectiveness prometheus.Gauge
 	promDedupEffectiveness  prometheus.Gauge
 	promObservationsPerMin  prometheus.Gauge
-	
+
 	mu sync.RWMutex
 }
 
 // NewPerSourceMetricsCollector creates a new per-source metrics collector
 func NewPerSourceMetricsCollector(source string) *PerSourceMetricsCollector {
 	labels := prometheus.Labels{"source": source}
-	
+
 	return &PerSourceMetricsCollector{
 		source:             source,
 		collectionInterval: 30 * time.Second,
 		window:             NewMetricsWindow(10 * time.Minute),
-		
+
 		// Initialize Prometheus metrics
 		promEventsProcessed: prometheus.NewCounter(prometheus.CounterOpts{
 			Namespace:   "zen_watcher",
@@ -278,7 +278,7 @@ func (c *PerSourceMetricsCollector) updateDerivedMetrics() {
 	if processed > 0 {
 		c.filterEffectiveness = float64(filtered) / float64(processed)
 		c.dedupEffectiveness = float64(deduped) / float64(processed)
-		
+
 		// Update Prometheus gauges
 		c.promFilterEffectiveness.Set(c.filterEffectiveness)
 		c.promDedupEffectiveness.Set(c.dedupEffectiveness)
@@ -295,7 +295,7 @@ func (c *PerSourceMetricsCollector) GetOptimizationMetrics() *OptimizationMetric
 	// Calculate observations per minute
 	processed := c.window.GetMetric("events_processed")
 	observationsPerMinute := (processed / 10.0) * 6.0 // Assuming 10-minute window
-	
+
 	// Update Prometheus gauge
 	c.promObservationsPerMin.Set(observationsPerMinute)
 
@@ -327,7 +327,7 @@ func (c *PerSourceMetricsCollector) Describe(ch chan<- *prometheus.Desc) {
 func (c *PerSourceMetricsCollector) Collect(ch chan<- prometheus.Metric) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	
+
 	c.promEventsProcessed.Collect(ch)
 	c.promEventsFiltered.Collect(ch)
 	c.promEventsDeduped.Collect(ch)
@@ -349,4 +349,3 @@ func (c *PerSourceMetricsCollector) Reset() {
 	c.dedupEffectiveness = 0.0
 	c.window = NewMetricsWindow(10 * time.Minute)
 }
-

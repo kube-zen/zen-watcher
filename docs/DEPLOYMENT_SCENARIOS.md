@@ -126,7 +126,7 @@ This guide covers different deployment scenarios for Zen Watcher, from quick dem
 **Situation**: Production deployment with custom values
 
 ```bash
-helm install zen-watcher ./charts/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --values production-values.yaml
@@ -212,7 +212,7 @@ k3d cluster create zen-dev --agents 2
 
 **Or manually**:
 ```bash
-helm install zen-watcher ./charts/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace
 ```
@@ -232,7 +232,7 @@ export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
 **Optimized for k3s**:
 ```bash
-helm install zen-watcher ./charts/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --set resources.limits.memory=256Mi \
   --set resources.requests.memory=128Mi \
@@ -254,7 +254,7 @@ kind create cluster --name zen-test
 **For CI**:
 ```bash
 # Minimal installation for testing
-helm install zen-watcher ./charts/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --wait --timeout=5m
@@ -290,7 +290,7 @@ minikube service zen-watcher -n zen-system
 export KUBECONFIG=~/.kube/eks-config
 
 # Install with production settings
-helm install zen-watcher ./charts/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --values eks-values.yaml \
@@ -325,7 +325,7 @@ ingress:
 gcloud container clusters get-credentials prod-cluster --region us-central1
 
 # Install
-helm install zen-watcher ./charts/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --values gke-values.yaml
@@ -355,7 +355,7 @@ persistence:
 az aks get-credentials --resource-group rg-prod --name aks-prod
 
 # Install
-helm install zen-watcher ./charts/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --values aks-values.yaml

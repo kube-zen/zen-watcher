@@ -25,7 +25,7 @@ import (
 // This is the standard interface that all source adapters must produce.
 type Event struct {
 	// Core required fields (map to Observation spec)
-	Source    string                 `json:"source"`    // Tool name (e.g., "falco", "trivy", "opagatekeeper")
+	Source    string                 `json:"source"`    // Tool name (e.g., "falco", "opagatekeeper")
 	Category  string                 `json:"category"`  // Event category (security, compliance, performance)
 	Severity  string                 `json:"severity"`  // Severity level (CRITICAL, HIGH, MEDIUM, LOW)
 	EventType string                 `json:"eventType"` // Type of event (vulnerability, runtime-threat, policy-violation)
@@ -49,15 +49,15 @@ type ResourceRef struct {
 // This interface makes it easy for community contributors to add new sources.
 //
 // Implementations can:
-// - Use informers (Kyverno, Trivy)
-// - Tail logs (Falco, Trivy)
-// - Poll ConfigMaps (kube-bench, Checkov)
-// - Call external APIs (Kubecost, etc.)
+// - Use informers (for CRD-based sources)
+// - Tail logs (for log-based sources)
+// - Poll ConfigMaps (for ConfigMap-based sources)
+// - Call external APIs (for API-based sources)
 //
 // All adapters output normalized Event objects that are then processed
 // through the centralized ObservationCreator (filter → dedup → create CRD).
 type SourceAdapter interface {
-	// Name returns the unique source name (e.g., "falco", "trivy", "opagatekeeper")
+	// Name returns the unique source name (e.g., "falco", "opagatekeeper")
 	// This must match the source name used in filter configuration and metrics.
 	Name() string
 
@@ -70,21 +70,21 @@ type SourceAdapter interface {
 	// Stop gracefully stops the adapter and cleans up resources.
 	// This is called during shutdown.
 	Stop()
-	
+
 	// Optimization methods (optional - adapters can implement if they support optimization)
-	
+
 	// GetOptimizationMetrics returns optimization metrics for this adapter
 	// Returns nil if optimization is not supported
 	GetOptimizationMetrics() interface{} // Returns *optimization.OptimizationMetrics
-	
+
 	// ApplyOptimization applies optimization configuration to this adapter
 	// Returns error if optimization cannot be applied
 	ApplyOptimization(config interface{}) error // config is *config.SourceConfig
-	
+
 	// ValidateOptimization validates optimization configuration for this adapter
 	// Returns error if configuration is invalid
 	ValidateOptimization(config interface{}) error // config is *config.SourceConfig
-	
+
 	// ResetMetrics resets optimization metrics for this adapter
 	ResetMetrics()
 }
@@ -146,7 +146,24 @@ func EventToObservation(event *Event) *unstructured.Unstructured {
 
 	// Add details if provided
 	if len(event.Details) > 0 {
-		unstructured.SetNestedMap(obs.Object, event.Details, "spec", "details")
+		// Convert details to a safe format (deep copy compatible)
+		details := make(map[string]interface{})
+		for k, v := range event.Details {
+			// Convert numeric types to float64 for JSON compatibility
+			switch val := v.(type) {
+			case int32:
+				details[k] = float64(val)
+			case int64:
+				details[k] = float64(val)
+			case int:
+				details[k] = float64(val)
+			case float32:
+				details[k] = float64(val)
+			default:
+				details[k] = v
+			}
+		}
+		unstructured.SetNestedMap(obs.Object, details, "spec", "details")
 	}
 
 	return obs

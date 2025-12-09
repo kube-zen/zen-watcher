@@ -24,7 +24,7 @@ import (
 // OptimizationDecision represents a decision made by the optimization system
 type OptimizationDecision struct {
 	Timestamp     time.Time
-	Type          string      // strategy_change, rule_update, threshold_adjustment
+	Type          string // strategy_change, rule_update, threshold_adjustment
 	PreviousValue interface{}
 	NewValue      interface{}
 	Confidence    float64
@@ -204,4 +204,3 @@ func (osm *OptimizationStateManager) GetAllStates() map[string]*OptimizationStat
 	}
 	return result
 }
-

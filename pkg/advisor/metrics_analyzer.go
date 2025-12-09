@@ -18,9 +18,9 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/logger"
-	"github.com/prometheus/client_golang/api"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 )
@@ -98,7 +98,7 @@ func (ma *MetricsAnalyzer) analyzeSource(ctx context.Context, source string) ([]
 			Confidence: confidence,
 			Metrics: map[string]interface{}{
 				"dedup_effectiveness": metrics.DedupEffectiveness,
-				"deduped_count":      metrics.DedupedCount,
+				"deduped_count":       metrics.DedupedCount,
 			},
 			Description: fmt.Sprintf("Deduplication effectiveness is only %.0f%%", metrics.DedupEffectiveness*100),
 		})
@@ -152,10 +152,10 @@ func (ma *MetricsAnalyzer) getSourceMetrics(ctx context.Context, source string) 
 	// Note: This is a simplified implementation - in production, use proper Prometheus queries
 
 	// Example queries (simplified - actual implementation would use PromQL):
-	// - zen_watcher_observations_per_minute{source="trivy"}
-	// - zen_watcher_low_severity_percent{source="trivy"}
-	// - zen_watcher_dedup_effectiveness{source="trivy"}
-	// - zen_watcher_filter_pass_rate{source="trivy"}
+	// - zen_watcher_observations_per_minute{source="<source-name>"}
+	// - zen_watcher_low_severity_percent{source="<source-name>"}
+	// - zen_watcher_dedup_effectiveness{source="<source-name>"}
+	// - zen_watcher_filter_pass_rate{source="<source-name>"}
 
 	// For now, return empty metrics - actual implementation would query Prometheus
 	// This is a placeholder that will be implemented when metrics are added
@@ -187,7 +187,7 @@ func (ma *MetricsAnalyzer) QueryPrometheus(ctx context.Context, query string) (m
 	if ma.promClient == nil {
 		return nil, fmt.Errorf("prometheus client not initialized")
 	}
-	result, warnings, err := ma.promClient.Query(ctx, query, model.Now())
+	result, warnings, err := ma.promClient.Query(ctx, query, time.Now())
 	if err != nil {
 		return nil, err
 	}
@@ -203,4 +203,3 @@ func (ma *MetricsAnalyzer) QueryPrometheus(ctx context.Context, query string) (m
 	}
 	return result, nil
 }
-

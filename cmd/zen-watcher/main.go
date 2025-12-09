@@ -27,7 +27,6 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/gc"
-	"github.com/kube-zen/zen-watcher/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/optimization"
@@ -43,6 +42,9 @@ var (
 	BuildDate = "unknown"
 )
 
+// Global system metrics tracker for HA coordination
+var systemMetrics *metrics.SystemMetrics
+
 func main() {
 	// Initialize structured logger
 	logLevel := os.Getenv("LOG_LEVEL")
@@ -56,6 +58,10 @@ func main() {
 		os.Exit(1)
 	}
 	defer logger.Sync()
+
+	// Initialize system metrics early for HA coordination
+	systemMetrics = metrics.NewSystemMetrics()
+	defer systemMetrics.Close()
 
 	log := logger.GetLogger()
 	log.Info("zen-watcher starting",
@@ -88,9 +94,6 @@ func main() {
 
 	// Get GVRs
 	gvrs := kubernetes.NewGVRs()
-
-	// Create informer factory
-	informerFactory := kubernetes.NewInformerFactory(clients.Dynamic)
 
 	// Load filter configuration from ConfigMap (initial load)
 	filterConfig, err := filter.LoadFilterConfig(clients.Standard)
@@ -139,22 +142,22 @@ func main() {
 	// Set source config loader for dynamic processing order
 	observationCreator.SetSourceConfigLoader(sourceConfigLoader)
 
-	// Create webhook channels for Falco and Audit adapters
+	// Set system metrics tracker for HA coordination
+	if systemMetrics != nil {
+		observationCreator.SetSystemMetrics(systemMetrics)
+	}
+
+	// Create webhook channels for Falco and Audit webhooks
+	// Note: Other webhook sources can be configured via ObservationSourceConfig CRDs
 	falcoAlertsChan := make(chan map[string]interface{}, 100)
 	auditEventsChan := make(chan map[string]interface{}, 200)
 
-	// Create HTTP server (adapters will read from channels)
+	// Create HTTP server (handles Falco and Audit webhooks)
 	httpServer := server.NewServer(falcoAlertsChan, auditEventsChan, m.WebhookRequests, m.WebhookDropped)
 
-	// Create adapter factory to build all source adapters
-	adapterFactory := watcher.NewAdapterFactory(
-		informerFactory,
-		gvrs.PolicyReport,
-		gvrs.TrivyReport,
-		clients.Standard,
-		falcoAlertsChan,
-		auditEventsChan,
-	)
+	// Create adapter factory - only creates K8sEventsAdapter (exception)
+	// All other sources are configured via ObservationSourceConfig CRDs
+	adapterFactory := watcher.NewAdapterFactory(clients.Standard)
 
 	// Create all adapters
 	adapters := adapterFactory.CreateAdapters()
@@ -275,7 +278,7 @@ func main() {
 	// Share the SmartProcessor instance from ObservationCreator so metrics are unified
 	obsSmartProc := observationCreator.GetSmartProcessor()
 	var optimizer *optimization.Optimizer
-	
+
 	if obsSmartProc != nil {
 		// Create optimizer with shared SmartProcessor
 		optimizer = optimization.NewOptimizerWithProcessor(obsSmartProc, sourceConfigLoader)
@@ -296,7 +299,7 @@ func main() {
 				Operation: "optimizer_integration",
 			})
 	}
-	
+
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -310,10 +313,10 @@ func main() {
 		}
 	}()
 
-	// Initialize optimization advisor and logger
+	// Initialize optimization advisor (if Prometheus client is available)
 	// Note: Prometheus client would be needed for full metrics analysis
 	// For now, we'll create a simplified version that works with the metrics we have
-	optimizationLogger := logging.NewOptimizationLogger(15 * time.Minute)
+	// optimizationLogger := logging.NewOptimizationLogger(15 * time.Minute)
 
 	// Start optimization advisor (if Prometheus client is available)
 	// This is optional and can be enabled when Prometheus integration is ready
@@ -433,16 +436,28 @@ func main() {
 				for {
 					select {
 					case <-ticker.C:
-						// Collect system metrics
-						var m runtime.MemStats
-						runtime.ReadMemStats(&m)
+						// Collect real system metrics
+						cpuUsage := systemMetrics.GetCPUUsagePercent()
+						memoryUsage := float64(systemMetrics.GetMemoryUsage())
+						eventsPerSec := systemMetrics.GetEventsPerSecond()
+						queueDepth := systemMetrics.GetQueueDepth()
+						responseTime := systemMetrics.GetResponseTime()
 
-						// Calculate CPU usage (simplified - in production, use proper CPU metrics)
-						cpuUsage := 0.0 // TODO: Implement proper CPU usage collection
-						memoryUsage := float64(m.Alloc)
-						eventsPerSec := 0.0 // TODO: Calculate from metrics
-						queueDepth := 0     // TODO: Get from actual queue depth
-						responseTime := 0.0 // TODO: Calculate from metrics
+						// Log real metrics for debugging (if debug mode enabled)
+						if os.Getenv("DEBUG_METRICS") == "true" {
+							log.Debug("HA Metrics collected",
+								logger.Fields{
+									Component: "ha",
+									Operation: "metrics_collection",
+									Additional: map[string]interface{}{
+										"cpu_usage":      cpuUsage,
+										"memory_usage":   memoryUsage,
+										"events_per_sec": eventsPerSec,
+										"queue_depth":    queueDepth,
+										"response_time":  responseTime,
+									},
+								})
+						}
 
 						// Update scaling coordinator
 						if haScalingCoordinator != nil {
@@ -474,6 +489,12 @@ func main() {
 							if deduper != nil {
 								deduper.SetDefaultWindow(int(optimalWindow.Seconds()))
 							}
+						}
+
+						// Update queue depth from actual channels
+						if systemMetrics != nil {
+							queueDepth := len(falcoAlertsChan) + len(auditEventsChan)
+							systemMetrics.SetQueueDepth(queueDepth)
 						}
 
 						// Update adaptive cache size

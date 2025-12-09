@@ -27,9 +27,9 @@ import (
 // GenericThresholdMonitor monitors thresholds for generic adapters
 // Thresholds are warnings only - they log but don't block events
 type GenericThresholdMonitor struct {
-	mu              sync.RWMutex
-	rateLimiters    map[string]*rate.Limiter // source -> rate limiter
-	observationRates map[string]*rateCounter // source -> observation rate counter
+	mu               sync.RWMutex
+	rateLimiters     map[string]*rate.Limiter // source -> rate limiter
+	observationRates map[string]*rateCounter  // source -> observation rate counter
 }
 
 type rateCounter struct {
@@ -80,9 +80,9 @@ func (gtm *GenericThresholdMonitor) CheckEvent(raw *generic.RawEvent, config *ge
 					Operation: "threshold_warning",
 					Source:    raw.Source,
 					Additional: map[string]interface{}{
-						"rate":              rate,
+						"rate":               rate,
 						"critical_threshold": config.Thresholds.ObservationsPerMinute.Critical,
-						"message":           "High observation rate detected - consider adjusting filters or dedup window",
+						"message":            "High observation rate detected - consider adjusting filters or dedup window",
 					},
 				})
 		} else if rate > float64(config.Thresholds.ObservationsPerMinute.Warning) {
@@ -92,9 +92,9 @@ func (gtm *GenericThresholdMonitor) CheckEvent(raw *generic.RawEvent, config *ge
 					Operation: "threshold_warning",
 					Source:    raw.Source,
 					Additional: map[string]interface{}{
-						"rate":             rate,
+						"rate":              rate,
 						"warning_threshold": config.Thresholds.ObservationsPerMinute.Warning,
-						"message":          "Observation rate is high - monitor for potential issues",
+						"message":           "Observation rate is high - monitor for potential issues",
 					},
 				})
 		}
@@ -295,4 +295,3 @@ func findSubstring(s, substr string) bool {
 	}
 	return false
 }
-

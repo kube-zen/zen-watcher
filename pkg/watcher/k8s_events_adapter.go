@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
 )
 
 // K8sEventsAdapter implements SourceAdapter for native Kubernetes Events API
@@ -47,7 +46,7 @@ func NewK8sEventsAdapter(clientSet kubernetes.Interface) *K8sEventsAdapter {
 }
 
 func (a *K8sEventsAdapter) Name() string {
-	return "kubernetes_events"
+	return "kubernetes-events"
 }
 
 func (a *K8sEventsAdapter) Run(ctx context.Context, out chan<- *Event) error {
@@ -57,7 +56,7 @@ func (a *K8sEventsAdapter) Run(ctx context.Context, out chan<- *Event) error {
 		logger.Fields{
 			Component: "watcher",
 			Operation: "k8s_events_adapter_start",
-			Source:    "kubernetes_events",
+			Source:    "kubernetes-events",
 		})
 
 	// Create a field selector to filter events
@@ -76,7 +75,7 @@ func (a *K8sEventsAdapter) Run(ctx context.Context, out chan<- *Event) error {
 			logger.Fields{
 				Component: "watcher",
 				Operation: "k8s_events_watcher_create",
-				Source:    "kubernetes_events",
+				Source:    "kubernetes-events",
 				Error:     err,
 			})
 		return err
@@ -96,7 +95,7 @@ func (a *K8sEventsAdapter) Run(ctx context.Context, out chan<- *Event) error {
 						logger.Fields{
 							Component: "watcher",
 							Operation: "k8s_events_watcher_closed",
-							Source:    "kubernetes_events",
+							Source:    "kubernetes-events",
 						})
 					return
 				}
@@ -143,16 +142,16 @@ func (a *K8sEventsAdapter) isSecurityRelevant(event *corev1.Event) bool {
 
 	// Security-relevant reasons
 	securityReasons := []string{
-		"Failed",          // Failed authentication, failed mount, etc.
-		"Unauthorized",    // Unauthorized access attempts
-		"Forbidden",       // Forbidden operations
-		"FailedCreate",    // Failed pod/container creation (potential security issue)
-		"FailedDelete",    // Failed deletions (potential privilege escalation)
-		"FailedMount",     // Failed volume mounts (security implications)
-		"BackOff",         // Backoff events (could indicate DoS attempts)
-		"FailedSync",      // Failed synchronization (could indicate security issues)
-		"FailedAttach",    // Failed volume attachment
-		"FailedPull",      // Failed image pulls (supply chain security)
+		"Failed",           // Failed authentication, failed mount, etc.
+		"Unauthorized",     // Unauthorized access attempts
+		"Forbidden",        // Forbidden operations
+		"FailedCreate",     // Failed pod/container creation (potential security issue)
+		"FailedDelete",     // Failed deletions (potential privilege escalation)
+		"FailedMount",      // Failed volume mounts (security implications)
+		"BackOff",          // Backoff events (could indicate DoS attempts)
+		"FailedSync",       // Failed synchronization (could indicate security issues)
+		"FailedAttach",     // Failed volume attachment
+		"FailedPull",       // Failed image pulls (supply chain security)
 		"FailedValidation", // Failed validation (policy violations)
 	}
 
@@ -271,7 +270,7 @@ func (a *K8sEventsAdapter) convertToNormalizedEvent(k8sEvent *corev1.Event) *Eve
 	}
 
 	return &Event{
-		Source:     "kubernetes_events",
+		Source:     "kubernetes-events",
 		Category:   "security", // K8s events are primarily security/compliance related
 		Severity:   severity,
 		EventType:  eventType,
@@ -385,4 +384,3 @@ func (a *K8sEventsAdapter) ValidateOptimization(config interface{}) error {
 // ResetMetrics resets optimization metrics (not implemented for K8s Events)
 func (a *K8sEventsAdapter) ResetMetrics() {
 }
-

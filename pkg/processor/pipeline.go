@@ -47,7 +47,7 @@ func NewProcessor(
 		genericThresholdMonitor: monitoring.NewGenericThresholdMonitor(),
 		filter:                  filter,
 		deduper:                 deduper,
-		observationCreator:     observationCreator,
+		observationCreator:      observationCreator,
 	}
 }
 

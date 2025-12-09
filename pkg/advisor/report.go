@@ -21,9 +21,9 @@ import (
 
 // WeeklyReport generates a weekly optimization impact report
 type WeeklyReport struct {
-	StartDate            time.Time
-	EndDate              time.Time
-	TotalOptimizations   int
+	StartDate                time.Time
+	EndDate                  time.Time
+	TotalOptimizations       int
 	TotalObservationsReduced int64
 	AverageReductionPercent  float64
 	TotalCPUSavingsMinutes   float64
@@ -38,10 +38,10 @@ func (it *ImpactTracker) GenerateWeeklyReport() *WeeklyReport {
 	allImpacts := it.GetAllImpacts()
 
 	report := &WeeklyReport{
-		StartDate:          time.Now().AddDate(0, 0, -7),
-		EndDate:            time.Now(),
+		StartDate:         time.Now().AddDate(0, 0, -7),
+		EndDate:           time.Now(),
 		SourcesOptimized:  make([]string, 0),
-		NextOpportunities:  make([]Opportunity, 0),
+		NextOpportunities: make([]Opportunity, 0),
 	}
 
 	for source, impact := range allImpacts {
@@ -90,4 +90,3 @@ func (wr *WeeklyReport) Format() string {
 
 	return report
 }
-

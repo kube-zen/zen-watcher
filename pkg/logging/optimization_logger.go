@@ -81,9 +81,9 @@ func (ol *OptimizationLogger) LogSummary(source string, stats map[string]interfa
 
 	logger.Info("Optimization summary",
 		logger.Fields{
-			Component: "optimization",
-			Operation: "summary",
-			Source:    source,
+			Component:  "optimization",
+			Operation:  "summary",
+			Source:     source,
 			Additional: stats,
 		})
 }
@@ -101,11 +101,11 @@ func (ol *OptimizationLogger) LogThresholdAlert(source, threshold string, value 
 			Operation: "threshold_alert",
 			Source:    source,
 			Additional: map[string]interface{}{
-				"threshold":         threshold,
-				"value":             value,
-				"warning_threshold": warningThreshold,
+				"threshold":          threshold,
+				"value":              value,
+				"warning_threshold":  warningThreshold,
 				"critical_threshold": criticalThreshold,
-				"severity":          severity,
+				"severity":           severity,
 			},
 		})
 }
@@ -159,10 +159,9 @@ func (ol *OptimizationLogger) LogWeeklyReport(impacts map[string]*advisor.Impact
 			Component: "optimization",
 			Operation: "weekly_report",
 			Additional: map[string]interface{}{
-				"total_optimizations": totalOptimizations,
+				"total_optimizations":        totalOptimizations,
 				"total_observations_reduced": totalReduced,
-				"most_effective":     mostEffective,
+				"most_effective":             mostEffective,
 			},
 		})
 }
-

@@ -23,15 +23,15 @@ import (
 
 // AdaptiveProcessor provides adaptive processing capabilities
 type AdaptiveProcessor struct {
-	source          string
-	config          *config.SourceConfig
-	metricsCollector *PerSourceMetricsCollector
+	source             string
+	config             *config.SourceConfig
+	metricsCollector   *PerSourceMetricsCollector
 	performanceTracker *PerformanceTracker
-	
+
 	// Adaptation parameters
-	learningRate    float64
+	learningRate     float64
 	adaptationWindow time.Duration
-	lastAdaptation  time.Time
+	lastAdaptation   time.Time
 }
 
 // NewAdaptiveProcessor creates a new adaptive processor
@@ -42,12 +42,12 @@ func NewAdaptiveProcessor(
 	performanceTracker *PerformanceTracker,
 ) *AdaptiveProcessor {
 	return &AdaptiveProcessor{
-		source:            source,
-		config:            config,
-		metricsCollector:  metricsCollector,
+		source:             source,
+		config:             config,
+		metricsCollector:   metricsCollector,
 		performanceTracker: performanceTracker,
-		learningRate:      0.1, // Default learning rate
-		adaptationWindow:  15 * time.Minute,
+		learningRate:       0.1, // Default learning rate
+		adaptationWindow:   15 * time.Minute,
 	}
 }
 
@@ -127,19 +127,19 @@ func (ap *AdaptiveProcessor) adaptFilter(metrics *OptimizationMetrics) {
 		if newPriority > 1.0 {
 			newPriority = 1.0
 		}
-		
+
 		logger.Info("Adapting filter priority",
 			logger.Fields{
 				Component: "optimization",
 				Operation: "adapt_filter",
 				Source:    ap.source,
 				Additional: map[string]interface{}{
-					"old_priority": ap.config.Filter.MinPriority,
-					"new_priority": newPriority,
+					"old_priority":         ap.config.Filter.MinPriority,
+					"new_priority":         newPriority,
 					"low_severity_percent": metrics.LowSeverityPercent,
 				},
 			})
-		
+
 		ap.config.Filter.MinPriority = newPriority
 		ap.config.FilterMinPriority = newPriority
 	}
@@ -150,19 +150,19 @@ func (ap *AdaptiveProcessor) adaptFilter(metrics *OptimizationMetrics) {
 		if newPriority < 0.0 {
 			newPriority = 0.0
 		}
-		
+
 		logger.Info("Relaxing filter priority",
 			logger.Fields{
 				Component: "optimization",
 				Operation: "relax_filter",
 				Source:    ap.source,
 				Additional: map[string]interface{}{
-					"old_priority": ap.config.Filter.MinPriority,
-					"new_priority": newPriority,
+					"old_priority":         ap.config.Filter.MinPriority,
+					"new_priority":         newPriority,
 					"filter_effectiveness": metrics.FilterEffectiveness,
 				},
 			})
-		
+
 		ap.config.Filter.MinPriority = newPriority
 		ap.config.FilterMinPriority = newPriority
 	}
@@ -178,7 +178,7 @@ func (ap *AdaptiveProcessor) adaptDeduplication(metrics *OptimizationMetrics) {
 		if newWindow < 5*time.Minute {
 			newWindow = 5 * time.Minute
 		}
-		
+
 		logger.Info("Reducing dedup window",
 			logger.Fields{
 				Component: "optimization",
@@ -190,7 +190,7 @@ func (ap *AdaptiveProcessor) adaptDeduplication(metrics *OptimizationMetrics) {
 					"dedup_rate": metrics.DeduplicationRate,
 				},
 			})
-		
+
 		ap.config.Deduplication.Window = newWindow
 		ap.config.DedupWindow = newWindow
 	} else if metrics.DeduplicationRate < 0.2 && ap.config.Deduplication.Window < 24*time.Hour {
@@ -199,7 +199,7 @@ func (ap *AdaptiveProcessor) adaptDeduplication(metrics *OptimizationMetrics) {
 		if newWindow > 24*time.Hour {
 			newWindow = 24 * time.Hour
 		}
-		
+
 		logger.Info("Increasing dedup window",
 			logger.Fields{
 				Component: "optimization",
@@ -211,9 +211,8 @@ func (ap *AdaptiveProcessor) adaptDeduplication(metrics *OptimizationMetrics) {
 					"dedup_rate": metrics.DeduplicationRate,
 				},
 			})
-		
+
 		ap.config.Deduplication.Window = newWindow
 		ap.config.DedupWindow = newWindow
 	}
 }
-

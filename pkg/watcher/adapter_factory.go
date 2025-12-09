@@ -18,66 +18,37 @@ import (
 	"context"
 
 	"github.com/kube-zen/zen-watcher/pkg/logger"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/kubernetes"
 )
 
 // AdapterFactory creates SourceAdapter instances for all configured sources
+// Only creates the K8sEventsAdapter (exception). All other sources are configured
+// via ObservationSourceConfig CRDs and handled by the GenericOrchestrator.
 type AdapterFactory struct {
-	factory         dynamicinformer.DynamicSharedInformerFactory
-	policyReportGVR schema.GroupVersionResource
-	trivyReportGVR  schema.GroupVersionResource
-	clientSet       kubernetes.Interface
-	falcoChan       chan map[string]interface{}
-	auditChan       chan map[string]interface{}
+	clientSet kubernetes.Interface
 }
 
 // NewAdapterFactory creates a new adapter factory
 func NewAdapterFactory(
-	factory dynamicinformer.DynamicSharedInformerFactory,
-	policyReportGVR, trivyReportGVR schema.GroupVersionResource,
 	clientSet kubernetes.Interface,
-	falcoChan, auditChan chan map[string]interface{},
 ) *AdapterFactory {
 	return &AdapterFactory{
-		factory:         factory,
-		policyReportGVR: policyReportGVR,
-		trivyReportGVR:  trivyReportGVR,
-		clientSet:       clientSet,
-		falcoChan:       falcoChan,
-		auditChan:       auditChan,
+		clientSet: clientSet,
 	}
 }
 
 // CreateAdapters creates all enabled source adapters
-// This returns a slice of adapters that implement the SourceAdapter interface
+// Only creates K8sEventsAdapter. All other sources are configured via
+// ObservationSourceConfig CRDs and handled by GenericOrchestrator.
 func (af *AdapterFactory) CreateAdapters() []SourceAdapter {
 	var adapters []SourceAdapter
 
-	// First-class adapters (explicit, battle-tested)
-	// Informer-based adapters
-	adapters = append(adapters, NewTrivyAdapter(af.factory, af.trivyReportGVR))
-	adapters = append(adapters, NewKyvernoAdapter(af.factory, af.policyReportGVR))
-
-	// Webhook-based adapters
-	if af.falcoChan != nil {
-		adapters = append(adapters, NewFalcoAdapter(af.falcoChan))
-	}
-	if af.auditChan != nil {
-		adapters = append(adapters, NewAuditAdapter(af.auditChan))
-	}
-
-	// ConfigMap-based adapters
+	// Only create K8sEventsAdapter (exception - watching native Kubernetes Events API)
+	// All other sources are configured via ObservationSourceConfig CRDs and handled by GenericOrchestrator
+	// which creates generic adapters (informer, webhook, logs, configmap) based on YAML config.
 	if af.clientSet != nil {
-		adapters = append(adapters, NewKubeBenchAdapter(af.clientSet))
-		adapters = append(adapters, NewCheckovAdapter(af.clientSet))
-		// Native Kubernetes Events adapter (watching v1.Event API)
 		adapters = append(adapters, NewK8sEventsAdapter(af.clientSet))
 	}
-
-	// Generic CRD adapter (for ObservationMapping CRDs - covers long tail of tools)
-	adapters = append(adapters, NewCRDSourceAdapter(af.factory, ObservationMappingGVR))
 
 	return adapters
 }

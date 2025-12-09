@@ -220,4 +220,3 @@ func (a *Advisor) ApplySuggestion(ctx context.Context, suggestion Suggestion) er
 func (a *Advisor) GetImpact(source string) *ImpactMetrics {
 	return a.impactTracker.GetImpact(source)
 }
-

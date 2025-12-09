@@ -17,22 +17,21 @@ package optimization
 import (
 	"context"
 	"sync"
-	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/config"
 )
 
 // Optimizer is the main optimization coordinator that ties everything together
 type Optimizer struct {
-	engine              *OptimizationEngine
-	smartProcessor      *SmartProcessor
-	stateManager        *OptimizationStateManager
-	adaptiveProcessors  map[string]*AdaptiveProcessor
-	sourceConfigLoader  interface {
+	engine             *OptimizationEngine
+	smartProcessor     *SmartProcessor
+	stateManager       *OptimizationStateManager
+	adaptiveProcessors map[string]*AdaptiveProcessor
+	sourceConfigLoader interface {
 		GetSourceConfig(source string) *config.SourceConfig
 		GetAllSourceConfigs() map[string]*config.SourceConfig
 	}
-	
+
 	mu sync.RWMutex
 }
 
@@ -142,4 +141,3 @@ func (o *Optimizer) TriggerAdaptation(source string) error {
 func (o *Optimizer) GetOptimizationStatus(source string) *OptimizationStatus {
 	return o.engine.GetOptimizationStatus(source)
 }
-

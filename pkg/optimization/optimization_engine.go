@@ -25,13 +25,13 @@ import (
 
 // OptimizationEngine orchestrates the optimization process for all sources
 type OptimizationEngine struct {
-	smartProcessor    *SmartProcessor
-	stateManager      *OptimizationStateManager
+	smartProcessor     *SmartProcessor
+	stateManager       *OptimizationStateManager
 	sourceConfigLoader interface {
 		GetSourceConfig(source string) *config.SourceConfig
 		GetAllSourceConfigs() map[string]*config.SourceConfig
 	}
-	
+
 	// Optimization loop control
 	optimizationInterval time.Duration
 	running              bool
@@ -130,7 +130,7 @@ func (oe *OptimizationEngine) runOptimizationCycle(ctx context.Context) {
 	}
 
 	allConfigs := oe.sourceConfigLoader.GetAllSourceConfigs()
-	
+
 	for source, sourceConfig := range allConfigs {
 		if sourceConfig == nil || !sourceConfig.Processing.AutoOptimize {
 			continue // Skip sources without auto-optimization enabled
@@ -180,8 +180,8 @@ func (oe *OptimizationEngine) applyOptimization(
 				Operation: "optimization_skipped",
 				Source:    source,
 				Additional: map[string]interface{}{
-					"confidence":      confidence,
-					"threshold":       sourceConfig.Processing.ConfidenceThreshold,
+					"confidence":        confidence,
+					"threshold":         sourceConfig.Processing.ConfidenceThreshold,
 					"proposed_strategy": newStrategy.String(),
 				},
 			})
@@ -215,11 +215,11 @@ func (oe *OptimizationEngine) applyOptimization(
 			Operation: "optimization_applied",
 			Source:    source,
 			Additional: map[string]interface{}{
-				"old_strategy":    oldStrategy,
-				"new_strategy":    newStrategy.String(),
-				"confidence":      confidence,
-				"reason":          decision.Reason,
-				"impact_metrics":  decision.ImpactMetrics,
+				"old_strategy":   oldStrategy,
+				"new_strategy":   newStrategy.String(),
+				"confidence":     confidence,
+				"reason":         decision.Reason,
+				"impact_metrics": decision.ImpactMetrics,
 			},
 		})
 }
@@ -269,19 +269,19 @@ func (oe *OptimizationEngine) generateReason(
 			return "High low-severity percentage (>70%), filtering first to reduce noise early"
 		}
 		return "Filter-first strategy selected based on current metrics"
-		
+
 	case ProcessingStrategyDedupFirst:
 		if metrics.DeduplicationRate > 0.5 {
 			return "High deduplication effectiveness (>50%), deduplicating first to remove duplicates early"
 		}
 		return "Dedup-first strategy selected based on current metrics"
-		
+
 	case ProcessingStrategyHybrid:
 		return "Hybrid strategy selected for variable workload patterns"
-		
+
 	case ProcessingStrategyAdaptive:
 		return "Adaptive strategy selected for high-volume, complex workload"
-		
+
 	default:
 		return "Strategy change based on optimization analysis"
 	}
@@ -303,7 +303,7 @@ func (oe *OptimizationEngine) getImpactMetrics(metrics *OptimizationMetrics) map
 func (oe *OptimizationEngine) GetOptimizationStatus(source string) *OptimizationStatus {
 	state := oe.stateManager.GetState(source)
 	metrics := oe.smartProcessor.GetSourceMetrics(source)
-	
+
 	return &OptimizationStatus{
 		Source:          source,
 		CurrentStrategy: state.CurrentStrategy,
@@ -321,4 +321,3 @@ type OptimizationStatus struct {
 	Metrics         *OptimizationMetrics
 	DecisionCount   int
 }
-

@@ -28,11 +28,11 @@ import (
 
 func main() {
 	var (
-		command      = flag.String("command", "", "Command to execute: analyze, apply, auto, history, list")
-		source       = flag.String("source", "", "Source name (required for analyze, apply, history)")
-		suggestion   = flag.Int("suggestion", 0, "Suggestion index (required for apply)")
-		enable       = flag.Bool("enable", false, "Enable auto-optimization (for auto command)")
-		logLevel     = flag.String("log-level", "INFO", "Log level")
+		command    = flag.String("command", "", "Command to execute: analyze, apply, auto, history, list")
+		source     = flag.String("source", "", "Source name (required for analyze, apply, history)")
+		suggestion = flag.Int("suggestion", 0, "Suggestion index (required for apply)")
+		enable     = flag.Bool("enable", false, "Enable auto-optimization (for auto command)")
+		logLevel   = flag.String("log-level", "INFO", "Log level")
 	)
 	flag.Parse()
 
@@ -114,12 +114,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, "  history    - Show optimization history for a source\n")
 		fmt.Fprintf(os.Stderr, "  list       - List all sources and their optimization status\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
-		fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=analyze --source=trivy\n")
-		fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=apply --source=trivy --suggestion=1\n")
+		fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=analyze --source=<source-name>\n")
+		fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=apply --source=<source-name> --suggestion=1\n")
 		fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=auto --enable\n")
-		fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=history --source=trivy\n")
+		fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=history --source=<source-name>\n")
 		fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=list\n")
 		os.Exit(1)
 	}
 }
-

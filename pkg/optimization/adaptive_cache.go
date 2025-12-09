@@ -25,19 +25,19 @@ import (
 
 // AdaptiveCacheManager manages adaptive cache sizing based on memory pressure and traffic
 type AdaptiveCacheManager struct {
-	haConfig          *config.CacheOptimizationConfig
-	currentSize       int
-	targetSize        int
-	lowTrafficSize    int
-	highTrafficSize   int
-	sizeMu            sync.RWMutex
-	memoryPressure    float64 // 0.0-1.0, where 1.0 is high pressure
-	eventsPerSec      float64
-	updateTicker      *time.Ticker
-	stopChan          chan struct{}
-	wg                sync.WaitGroup
-	cacheHitRate      float64
-	gcFrequency       float64 // garbage collection frequency per minute
+	haConfig        *config.CacheOptimizationConfig
+	currentSize     int
+	targetSize      int
+	lowTrafficSize  int
+	highTrafficSize int
+	sizeMu          sync.RWMutex
+	memoryPressure  float64 // 0.0-1.0, where 1.0 is high pressure
+	eventsPerSec    float64
+	updateTicker    *time.Ticker
+	stopChan        chan struct{}
+	wg              sync.WaitGroup
+	cacheHitRate    float64
+	gcFrequency     float64 // garbage collection frequency per minute
 }
 
 // NewAdaptiveCacheManager creates a new adaptive cache manager
@@ -57,12 +57,12 @@ func NewAdaptiveCacheManager(haConfig *config.CacheOptimizationConfig, initialSi
 	}
 
 	return &AdaptiveCacheManager{
-		haConfig:       haConfig,
-		currentSize:    initialSize,
-		targetSize:     initialSize,
-		lowTrafficSize: lowSize,
+		haConfig:        haConfig,
+		currentSize:     initialSize,
+		targetSize:      initialSize,
+		lowTrafficSize:  lowSize,
 		highTrafficSize: highSize,
-		stopChan:       make(chan struct{}),
+		stopChan:        make(chan struct{}),
 	}
 }
 
@@ -249,4 +249,3 @@ func (acm *AdaptiveCacheManager) GetCacheEfficiency() map[string]interface{} {
 		"events_per_sec":  acm.eventsPerSec,
 	}
 }
-

@@ -69,7 +69,7 @@ type OptimizationMetrics struct {
 // StrategyDecider determines the optimal processing strategy based on metrics and configuration
 type StrategyDecider struct {
 	// Decision rules and thresholds
-	filterFirstThresholdLowSeverity float64 // Default: 0.7 (70%)
+	filterFirstThresholdLowSeverity  float64 // Default: 0.7 (70%)
 	dedupFirstThresholdEffectiveness float64 // Default: 0.5 (50%)
 	adaptiveThresholdVolume          int64   // Default: 100 events/min
 }
@@ -77,7 +77,7 @@ type StrategyDecider struct {
 // NewStrategyDecider creates a new StrategyDecider with default thresholds
 func NewStrategyDecider() *StrategyDecider {
 	return &StrategyDecider{
-		filterFirstThresholdLowSeverity: 0.7,
+		filterFirstThresholdLowSeverity:  0.7,
 		dedupFirstThresholdEffectiveness: 0.5,
 		adaptiveThresholdVolume:          100,
 	}
@@ -89,7 +89,7 @@ func NewStrategyDeciderWithThresholds(
 	adaptiveThreshold int64,
 ) *StrategyDecider {
 	return &StrategyDecider{
-		filterFirstThresholdLowSeverity: filterFirstThreshold,
+		filterFirstThresholdLowSeverity:  filterFirstThreshold,
 		dedupFirstThresholdEffectiveness: dedupFirstThreshold,
 		adaptiveThresholdVolume:          adaptiveThreshold,
 	}
@@ -161,35 +161,9 @@ func (sd *StrategyDecider) parseStrategy(strategy string) ProcessingStrategy {
 
 // getDefaultStrategy returns the default strategy for a source
 func (sd *StrategyDecider) getDefaultStrategy(source string) ProcessingStrategy {
-	switch source {
-	case "trivy":
-		// Many LOW severity to filter
-		return ProcessingStrategyFilterFirst
-	case "cert-manager":
-		// Same failures retry frequently
-		return ProcessingStrategyDedupFirst
-	case "falco":
-		// Same rule firing repeatedly
-		return ProcessingStrategyDedupFirst
-	case "kyverno":
-		// Audit vs security - filter first
-		return ProcessingStrategyFilterFirst
-	case "audit":
-		// Many INFO events
-		return ProcessingStrategyFilterFirst
-	case "kube-bench":
-		// One-time reports
-		return ProcessingStrategyFilterFirst
-	case "checkov":
-		// One-time scans
-		return ProcessingStrategyFilterFirst
-	case "sealed-secrets":
-		// Failures repeat
-		return ProcessingStrategyDedupFirst
-	default:
-		// Default: filter first
-		return ProcessingStrategyFilterFirst
-	}
+	// Default: filter first (configurable via ObservationSourceConfig)
+	// Source-specific defaults are configured via YAML, not hardcoded
+	return ProcessingStrategyFilterFirst
 }
 
 // ShouldOptimize determines if optimization should be triggered based on metrics
@@ -231,4 +205,3 @@ func (sd *StrategyDecider) ShouldOptimize(
 
 	return false
 }
-

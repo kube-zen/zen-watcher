@@ -10,7 +10,7 @@ Zen-watcher uses semantic versioning with synchronized releases across component
 
 | Component | Version | Location |
 |-----------|---------|----------|
-| Docker Image | 1.1.0 | `kubezen/zen-watcher:1.1.0` |
+| Docker Image | 1.0.0-alpha | `kubezen/zen-watcher:1.0.0-alpha` |
 | Helm Chart | 1.1.0 | `kube-zen/helm-charts/charts/zen-watcher` |
 | Git Tag | v1.1.0 | `github.com:kube-zen/zen-watcher` |
 

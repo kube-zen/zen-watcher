@@ -112,13 +112,13 @@ kubectl apply -f my-filter.yaml
 
 ### Scale Replicas
 
-**⚠️ IMPORTANT: Single Replica Deployment Required**
+**✅ HA Support Available**
 
-Zen Watcher uses **in-memory deduplication** per pod. Multiple replicas will create **duplicate Observations** because each pod maintains its own independent deduplication cache.
+Zen Watcher supports high availability with multiple replicas. HA optimization features (enabled via `haOptimization.enabled: true` in Helm values) provide dynamic deduplication window adjustment, adaptive cache sizing, and load balancing to ensure proper operation across replicas.
 
 **Recommended Deployment:**
 ```bash
-# Single replica (required for data integrity)
+# Standard deployment (HA optimization available)
 kubectl scale deployment zen-watcher -n zen-system --replicas=1
 ```
 
@@ -129,10 +129,10 @@ kubectl scale deployment zen-watcher -n zen-system --replicas=1
   - Medium traffic (1,000-10,000 events/day): 200m CPU, 256Mi RAM
   - High traffic (>10,000 events/day): 500m CPU, 512Mi RAM
 
-**HA Optimization Support (v1.1.0+)**
+**HA Optimization Support (v1.0.0-alpha+)**
 - HA optimization features are available when `haOptimization.enabled: true` in Helm values
 - Enables dynamic dedup window adjustment, adaptive cache sizing, and load balancing
-- For standard deployments, single replica is recommended (in-memory deduplication)
+- For standard deployments, single replica is sufficient. For HA, enable `haOptimization.enabled: true` with multiple replicas.
 - See HA configuration documentation for multi-replica deployment guidance
 
 See [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md#scaling-strategy) for complete scaling guidance.
@@ -151,10 +151,10 @@ kubectl delete pod -n zen-system -l app.kubernetes.io/name=zen-watcher
 
 ```bash
 # Via Helm (recommended)
-helm upgrade zen-watcher charts/zen-watcher -n zen-system --reuse-values
+helm upgrade zen-watcher kube-zen/zen-watcher -n zen-system --reuse-values
 
 # Change image version
-helm upgrade zen-watcher charts/zen-watcher -n zen-system --set image.tag=1.1.0
+helm upgrade zen-watcher kube-zen/zen-watcher -n zen-system --set image.tag=1.0.0-alpha
 
 # Rollback if needed
 helm rollback zen-watcher -n zen-system
@@ -286,7 +286,7 @@ curl -s 'http://localhost:8080/victoriametrics/api/v1/query?query=zen_watcher_ev
 
 **Fix: Enable VMServiceScrape**
 ```bash
-helm upgrade zen-watcher charts/zen-watcher -n zen-system --set vmServiceScrape.enabled=true
+helm upgrade zen-watcher kube-zen/zen-watcher -n zen-system --set vmServiceScrape.enabled=true
 ```
 
 ## 📈 Performance Tuning
@@ -311,7 +311,7 @@ resources:
     memory: 1Gi
     cpu: 1000m
 
-# ⚠️ IMPORTANT: Single replica required (see scaling strategy above)
+# HA optimization available (see scaling strategy above)
 replicas: 1
 ```
 
@@ -364,13 +364,13 @@ kubectl apply -f observations-backup.yaml
 
 See [STABILITY.md](STABILITY.md) for detailed capacity planning guidance.
 
-**Rule of Thumb (Single Replica, Vertical Scaling):**
+**Rule of Thumb (Vertical Scaling or HA):**
 - Small cluster (<50 nodes): 1 replica, 100m CPU, 128Mi RAM
 - Medium cluster (50-200 nodes): 1 replica, 200m CPU, 256Mi RAM
 - Large cluster (200-1000 nodes): 1 replica, 500m CPU, 512Mi RAM
 - Very large (>1000 nodes): 1 replica, 1000m CPU, 1Gi RAM, consider shorter TTL
 
-**⚠️ Do NOT use multiple replicas** - in-memory deduplication requires single replica until leader election is implemented (v1.1.x+).
+**✅ HA Support:** Multiple replicas are supported with HA optimization enabled (`haOptimization.enabled: true`). This provides dynamic deduplication window adjustment, adaptive cache sizing, and load balancing.
 
 ## 🔐 Security Operations
 
@@ -408,16 +408,16 @@ kubectl get observations -A -o json | jq '.items[] | select(.spec.details | tost
 
 ## 🎯 Maintenance Windows
 
-### Zero-Downtime Upgrade (Single Replica)
+### Zero-Downtime Upgrade
 
-**Note:** With single replica deployment, upgrades require brief downtime. Plan maintenance windows accordingly.
+**Note:** With HA enabled, rolling updates provide zero-downtime upgrades. Single replica deployments require brief downtime during upgrades.
 
 ```bash
-# Rolling update (single replica)
-helm upgrade zen-watcher charts/zen-watcher -n zen-system
+# Rolling update (works with HA or single replica)
+helm upgrade zen-watcher kube-zen/zen-watcher -n zen-system
 ```
 
-### Planned Maintenance (Single Replica)
+### Planned Maintenance
 
 ```bash
 # Scale to 0 (stops processing)

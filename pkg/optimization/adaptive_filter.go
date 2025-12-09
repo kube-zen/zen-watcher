@@ -23,23 +23,23 @@ import (
 
 // Event represents an event being processed
 type Event struct {
-	Source      string
-	Priority    float64
-	Severity    string
-	Category    string
-	Namespace   string
-	Type        string
-	RawData     map[string]interface{}
+	Source    string
+	Priority  float64
+	Severity  string
+	Category  string
+	Namespace string
+	Type      string
+	RawData   map[string]interface{}
 }
 
 // FilterMetrics tracks filter performance
 type FilterMetrics struct {
-	TotalProcessed    int64
-	TotalAllowed      int64
-	TotalFiltered     int64
-	FalsePositives    int64
-	FalseNegatives    int64
-	LastUpdated       time.Time
+	TotalProcessed int64
+	TotalAllowed   int64
+	TotalFiltered  int64
+	FalsePositives int64
+	FalseNegatives int64
+	LastUpdated    time.Time
 }
 
 // AdaptiveFilter provides adaptive filtering with learning capabilities
@@ -90,11 +90,11 @@ func (f *AdaptiveFilter) applyStaticRules(event *Event) bool {
 	// Note: This is a simplified version. In a full implementation,
 	// the actual filter configuration from config.FilterConfig would be used.
 	// For now, we assume the filter has access to the full FilterConfig.
-	
+
 	// Priority check would be done here
 	// Namespace exclusion would be done here
 	// Type inclusion would be done here
-	
+
 	return true // Placeholder - actual implementation would use FilterConfig
 }
 
@@ -102,7 +102,7 @@ func (f *AdaptiveFilter) applyStaticRules(event *Event) bool {
 func (f *AdaptiveFilter) adaptiveRuleAdjustment(event *Event) {
 	// This would implement adaptive learning logic
 	// For now, it's a placeholder for the adaptive adjustment mechanism
-	
+
 	// Example: Track patterns and adjust rules based on:
 	// - Event frequency
 	// - Priority distribution
@@ -144,4 +144,3 @@ func (f *AdaptiveFilter) Reset() {
 
 	f.metrics = &FilterMetrics{LastUpdated: time.Now()}
 }
-

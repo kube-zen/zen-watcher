@@ -36,7 +36,6 @@ type Clients struct {
 type GVRs struct {
 	Observations schema.GroupVersionResource
 	PolicyReport schema.GroupVersionResource
-	TrivyReport  schema.GroupVersionResource
 }
 
 // NewClients creates Kubernetes clients from in-cluster config
@@ -87,11 +86,6 @@ func NewGVRs() *GVRs {
 			Group:    "wgpolicyk8s.io",
 			Version:  "v1alpha2",
 			Resource: "policyreports",
-		},
-		TrivyReport: schema.GroupVersionResource{
-			Group:    "aquasecurity.github.io",
-			Version:  "v1alpha1",
-			Resource: "vulnerabilityreports",
 		},
 	}
 }

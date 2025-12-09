@@ -86,13 +86,13 @@ type Deduper struct {
 	mu sync.RWMutex
 
 	// Original cache for backward compatibility
-	cache         map[string]*entry // key -> entry
-	lruList       []string          // LRU list (most recent at end)
-	maxSize       int               // Maximum cache size (LRU eviction)
-	windowSeconds int               // Default sliding window in seconds (for backward compatibility)
-	defaultWindowSeconds int        // Default window for sources not in sourceWindows map
-	sourceWindows map[string]int    // Per-source deduplication windows (source -> seconds)
-	ttl           time.Duration     // TTL for entries (default)
+	cache                map[string]*entry // key -> entry
+	lruList              []string          // LRU list (most recent at end)
+	maxSize              int               // Maximum cache size (LRU eviction)
+	windowSeconds        int               // Default sliding window in seconds (for backward compatibility)
+	defaultWindowSeconds int               // Default window for sources not in sourceWindows map
+	sourceWindows        map[string]int    // Per-source deduplication windows (source -> seconds)
+	ttl                  time.Duration     // TTL for entries (default)
 
 	// Enhanced features
 	// Time-based buckets
@@ -129,7 +129,7 @@ func NewDeduper(windowSeconds, maxSize int) *Deduper {
 	// Format: JSON object like {"cert-manager": 86400, "falco": 60, "default": 60}
 	sourceWindows := make(map[string]int)
 	defaultWindowSeconds := windowSeconds
-	
+
 	if sourceWindowsStr := os.Getenv("DEDUP_WINDOW_BY_SOURCE"); sourceWindowsStr != "" {
 		var config map[string]interface{}
 		if err := json.Unmarshal([]byte(sourceWindowsStr), &config); err == nil {
@@ -463,7 +463,7 @@ func (d *Deduper) cleanupOldBuckets(now time.Time) {
 			maxWindowSeconds = window
 		}
 	}
-	
+
 	cutoffTime := now.Add(-time.Duration(maxWindowSeconds) * time.Second)
 	cutoffBucket := d.getBucketKey(cutoffTime)
 
@@ -506,7 +506,7 @@ func (d *Deduper) cleanupOldFingerprints(now time.Time) {
 			maxWindowSeconds = window
 		}
 	}
-	
+
 	cutoff := now.Add(-time.Duration(maxWindowSeconds) * time.Second)
 	for hash, fp := range d.fingerprints {
 		if fp.timestamp.Before(cutoff) {
@@ -662,31 +662,29 @@ func (d *Deduper) cleanupExpired(now time.Time) {
 // cleanupExpiredForSource removes expired entries for a specific source (called with lock held)
 // Uses source-specific window if configured
 func (d *Deduper) cleanupExpiredForSource(source string, now time.Time) {
-	windowSeconds := d.getWindowForSource(source)
-	ttl := time.Duration(windowSeconds) * time.Second
 	expired := make([]string, 0)
-	
+
 	// Parse source from cache keys to check expiration with source-specific window
 	// Cache keys format: "source/namespace/kind/name/reason/messageHash"
 	for keyStr, ent := range d.cache {
 		// Extract source from key (first part before /)
 		keySource := ""
-		if idx := 0; idx < len(keyStr); idx++ {
+		for idx := 0; idx < len(keyStr); idx++ {
 			if keyStr[idx] == '/' {
 				keySource = keyStr[:idx]
 				break
 			}
 		}
-		
+
 		// Use source-specific window if this entry matches the source
 		entryWindowSeconds := d.getWindowForSource(keySource)
 		entryTTL := time.Duration(entryWindowSeconds) * time.Second
-		
+
 		if now.Sub(ent.timestamp) >= entryTTL {
 			expired = append(expired, keyStr)
 		}
 	}
-	
+
 	for _, keyStr := range expired {
 		delete(d.cache, keyStr)
 		d.removeFromLRU(keyStr)
@@ -765,14 +763,14 @@ func (d *Deduper) GetDefaultWindow() int {
 func (d *Deduper) UpdateSourceWindows(sourceWindows map[string]int, defaultWindow int) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	
+
 	// Update default window if provided
 	if defaultWindow > 0 {
 		d.defaultWindowSeconds = defaultWindow
 		// Update TTL based on new default (used for backward compatibility)
 		d.ttl = time.Duration(d.defaultWindowSeconds) * time.Second
 	}
-	
+
 	// Update source windows
 	d.sourceWindows = make(map[string]int)
 	for source, window := range sourceWindows {
@@ -780,7 +778,7 @@ func (d *Deduper) UpdateSourceWindows(sourceWindows map[string]int, defaultWindo
 			d.sourceWindows[source] = window
 		}
 	}
-	
+
 	// Update windowSeconds for backward compatibility (use default or max)
 	d.windowSeconds = d.defaultWindowSeconds
 	for _, window := range d.sourceWindows {
@@ -812,10 +810,10 @@ func (d *Deduper) SetMaxSize(newMaxSize int) {
 	}
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	
+
 	oldMaxSize := d.maxSize
 	d.maxSize = newMaxSize
-	
+
 	// If new size is smaller, evict oldest entries
 	if newMaxSize < oldMaxSize && len(d.cache) > newMaxSize {
 		entriesToRemove := len(d.cache) - newMaxSize

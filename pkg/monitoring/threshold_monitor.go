@@ -192,4 +192,3 @@ func (tm *ThresholdMonitor) CheckDedupEffectiveness(source string, dedupEffectiv
 		tm.CheckThreshold(source, "dedup_effectiveness", dedupEffectiveness, warningThreshold, criticalThreshold)
 	}
 }
-

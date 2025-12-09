@@ -33,7 +33,7 @@ type GenericOrchestrator struct {
 	adapterFactory     *generic.Factory
 	dynClient          dynamic.Interface
 	processor          *processor.Processor
-	activeAdapters     map[string]generic.GenericAdapter // source -> adapter
+	activeAdapters     map[string]generic.GenericAdapter  // source -> adapter
 	activeConfigs      map[string]*generic.SourceConfig   // source -> config
 	activeEventStreams map[string]<-chan generic.RawEvent // source -> event stream
 	mu                 sync.RWMutex
@@ -202,7 +202,7 @@ func (o *GenericOrchestrator) reloadAdapters() {
 			})
 	}
 
-		// Stop adapters for sources that no longer exist
+	// Stop adapters for sources that no longer exist
 	for source, adapter := range o.activeAdapters {
 		if !activeSources[source] {
 			adapter.Stop()
@@ -256,4 +256,3 @@ func (o *GenericOrchestrator) Stop() {
 		delete(o.activeEventStreams, source)
 	}
 }
-

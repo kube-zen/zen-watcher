@@ -18,7 +18,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -43,30 +42,30 @@ var (
 
 // ThresholdConfig represents a threshold configuration for monitoring
 type ThresholdConfig struct {
-	Warning    float64
-	Critical   float64
-	Window     time.Duration
-	Action     string // warn, alert, optimize
+	Warning     float64
+	Critical    float64
+	Window      time.Duration
+	Action      string // warn, alert, optimize
 	Description string
 }
 
 // ProcessingConfig represents processing optimization configuration
 type ProcessingConfig struct {
-	Order            string                      // auto, filter_first, dedup_first
-	AutoOptimize     bool                        // Enable auto-optimization
-	Thresholds       map[string]*ThresholdConfig // Per-metric thresholds
-	AnalysisInterval time.Duration               // How often to analyze performance
-	ConfidenceThreshold float64                  // Minimum confidence for auto-optimization (0.0-1.0)
+	Order               string                      // auto, filter_first, dedup_first
+	AutoOptimize        bool                        // Enable auto-optimization
+	Thresholds          map[string]*ThresholdConfig // Per-metric thresholds
+	AnalysisInterval    time.Duration               // How often to analyze performance
+	ConfidenceThreshold float64                     // Minimum confidence for auto-optimization (0.0-1.0)
 }
 
 // FilterConfig represents advanced filtering configuration
 type FilterConfig struct {
-	MinPriority        float64
-	ExcludeNamespaces  []string
-	IncludeTypes       []string
-	DynamicRules       []DynamicFilterRule
-	AdaptiveEnabled    bool
-	LearningRate       float64
+	MinPriority       float64
+	ExcludeNamespaces []string
+	IncludeTypes      []string
+	DynamicRules      []DynamicFilterRule
+	AdaptiveEnabled   bool
+	LearningRate      float64
 }
 
 // DynamicFilterRule represents a dynamic filter rule
@@ -82,11 +81,11 @@ type DynamicFilterRule struct {
 
 // DeduplicationConfig represents intelligent deduplication configuration
 type DeduplicationConfig struct {
-	Window      time.Duration
-	Strategy    string   // fingerprint, content, hybrid, adaptive
-	Adaptive    bool     // Enable adaptive deduplication
-	Fields      []string // Fields to consider
-	MinChange   float64  // Minimum change threshold to trigger adaptation
+	Window       time.Duration
+	Strategy     string   // fingerprint, content, hybrid, adaptive
+	Adaptive     bool     // Enable adaptive deduplication
+	Fields       []string // Fields to consider
+	MinChange    float64  // Minimum change threshold to trigger adaptation
 	LearningRate float64
 }
 
@@ -94,31 +93,31 @@ type DeduplicationConfig struct {
 type RateLimitConfig struct {
 	MaxPerMinute   int
 	Burst          int
-	Adaptive       bool           // Enable adaptive rate limiting
+	Adaptive       bool // Enable adaptive rate limiting
 	CooldownPeriod time.Duration
 	Targets        map[string]int // Per-severity or per-type targets
 }
 
 // SourceConfig represents the configuration for a source
 type SourceConfig struct {
-	Source      string
-	DedupWindow time.Duration
-	DedupStrategy string
-	DedupFields []string
-	FilterMinPriority float64
+	Source                  string
+	DedupWindow             time.Duration
+	DedupStrategy           string
+	DedupFields             []string
+	FilterMinPriority       float64
 	FilterExcludeNamespaces []string
-	FilterIncludeTypes []string
-	TTLDefault time.Duration
-	TTLMin     time.Duration
-	TTLMax     time.Duration
-	RateLimitMaxPerMinute int
-	RateLimitBurst int
-	TypeDetection string
-	TypeField     string
-	StaticType    string
-	ProcessingOrder string // auto, filter_first, dedup_first
-	AutoOptimize bool
-	
+	FilterIncludeTypes      []string
+	TTLDefault              time.Duration
+	TTLMin                  time.Duration
+	TTLMax                  time.Duration
+	RateLimitMaxPerMinute   int
+	RateLimitBurst          int
+	TypeDetection           string
+	TypeField               string
+	StaticType              string
+	ProcessingOrder         string // auto, filter_first, dedup_first
+	AutoOptimize            bool
+
 	// Enhanced optimization configuration (backward compatible - flat fields remain)
 	Processing    ProcessingConfig
 	Filter        FilterConfig
@@ -540,7 +539,7 @@ func (scl *SourceConfigLoader) convertToSourceConfig(osc *unstructured.Unstructu
 		}
 
 		// Parse thresholds (if present)
-		if thresholdsObj, ok := processingObj["thresholds"].(map[string]interface{}); ok {
+		if _, ok := processingObj["thresholds"].(map[string]interface{}); ok {
 			config.Processing.Thresholds = make(map[string]*ThresholdConfig)
 			// Thresholds will be parsed in detail below
 		}
@@ -562,7 +561,7 @@ func (scl *SourceConfigLoader) convertToSourceConfig(osc *unstructured.Unstructu
 		// Parse observationsPerMinute threshold
 		if obsPerMinObj, ok := thresholdsObj["observationsPerMinute"].(map[string]interface{}); ok {
 			thresh := &ThresholdConfig{
-				Action: "alert",
+				Action:      "alert",
 				Description: "Observation rate per minute",
 			}
 			if warning, ok := obsPerMinObj["warning"].(int64); ok {
@@ -580,7 +579,7 @@ func (scl *SourceConfigLoader) convertToSourceConfig(osc *unstructured.Unstructu
 		// Parse lowSeverityPercent threshold
 		if lowSevObj, ok := thresholdsObj["lowSeverityPercent"].(map[string]interface{}); ok {
 			thresh := &ThresholdConfig{
-				Action: "filter",
+				Action:      "filter",
 				Description: "Low severity event percentage",
 			}
 			if warning, ok := lowSevObj["warning"].(float64); ok {
@@ -598,7 +597,7 @@ func (scl *SourceConfigLoader) convertToSourceConfig(osc *unstructured.Unstructu
 		// Parse dedupEffectiveness threshold
 		if dedupEffObj, ok := thresholdsObj["dedupEffectiveness"].(map[string]interface{}); ok {
 			thresh := &ThresholdConfig{
-				Action: "optimize",
+				Action:      "optimize",
 				Description: "Deduplication effectiveness",
 			}
 			if warning, ok := dedupEffObj["warning"].(float64); ok {
@@ -632,7 +631,7 @@ func (scl *SourceConfigLoader) convertToSourceConfig(osc *unstructured.Unstructu
 	// Populate enhanced RateLimit config from existing rate limit data
 	config.RateLimit.MaxPerMinute = config.RateLimitMaxPerMinute
 	config.RateLimit.Burst = config.RateLimitBurst
-	config.RateLimit.Adaptive = false           // Default, can be enabled via CRD later
+	config.RateLimit.Adaptive = false                 // Default, can be enabled via CRD later
 	config.RateLimit.CooldownPeriod = 5 * time.Minute // Default cooldown
 	config.RateLimit.Targets = make(map[string]int)
 
@@ -701,15 +700,15 @@ func (scl *SourceConfigLoader) GetSourceConfig(source string) *SourceConfig {
 	// Return defaults if no config exists
 	defaults := GetDefaultSourceConfig(source)
 	return &SourceConfig{
-		Source:            strings.ToLower(source),
-		DedupWindow:       defaults.DedupWindow,
-		DedupStrategy:     "fingerprint",
-		FilterMinPriority: defaults.FilterMinPriority,
-		TTLDefault:        defaults.TTLDefault,
+		Source:                strings.ToLower(source),
+		DedupWindow:           defaults.DedupWindow,
+		DedupStrategy:         "fingerprint",
+		FilterMinPriority:     defaults.FilterMinPriority,
+		TTLDefault:            defaults.TTLDefault,
 		RateLimitMaxPerMinute: defaults.RateLimitMax,
-		RateLimitBurst:    defaults.RateLimitMax * 2,
-		ProcessingOrder:   "auto",
-		AutoOptimize:      true,
+		RateLimitBurst:        defaults.RateLimitMax * 2,
+		ProcessingOrder:       "auto",
+		AutoOptimize:          true,
 	}
 }
 
@@ -724,4 +723,3 @@ func (scl *SourceConfigLoader) GetAllSourceConfigs() map[string]*SourceConfig {
 	}
 	return result
 }
-

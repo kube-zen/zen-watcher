@@ -69,10 +69,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Helm Chart:**
 - ArtifactHub metadata for publishing
 - Enhanced Chart.yaml annotations
-- Synced version (1.1.0) with image
+- Synced version (1.0.0-alpha) with image
 
 #### Changed
-- **Version Sync:** Image and chart now use same version (1.1.0)
+- **Version Sync:** Image and chart now use same version (1.0.0-alpha)
 - KEP status: draft → implementable
 - README: Clearer positioning and value proposition
 - SECURITY_RBAC.md: Added ObservationFilter and ObservationMapping permissions

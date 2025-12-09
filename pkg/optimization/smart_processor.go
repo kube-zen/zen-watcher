@@ -23,9 +23,9 @@ import (
 
 // RawEvent represents a raw event from a source
 type RawEvent struct {
-	Source      string
-	RawData     map[string]interface{}
-	Timestamp   time.Time
+	Source    string
+	RawData   map[string]interface{}
+	Timestamp time.Time
 }
 
 // SmartProcessor processes events using intelligent optimization strategies
@@ -51,7 +51,7 @@ func (sp *SmartProcessor) GetOrCreateAdaptiveFilter(source string, filterConfig 
 	if filter, exists := sp.adaptiveFilters[source]; exists {
 		return filter
 	}
-	
+
 	filter := NewAdaptiveFilter(source, filterConfig)
 	sp.adaptiveFilters[source] = filter
 	return filter
@@ -62,7 +62,7 @@ func (sp *SmartProcessor) GetOrCreateMetricsCollector(source string) *PerSourceM
 	if collector, exists := sp.metricsCollectors[source]; exists {
 		return collector
 	}
-	
+
 	collector := NewPerSourceMetricsCollector(source)
 	sp.metricsCollectors[source] = collector
 	return collector
@@ -73,7 +73,7 @@ func (sp *SmartProcessor) GetOrCreatePerformanceTracker(source string) *Performa
 	if tracker, exists := sp.performanceTrackers[source]; exists {
 		return tracker
 	}
-	
+
 	tracker := NewPerformanceTracker(source)
 	sp.performanceTrackers[source] = tracker
 	return tracker
@@ -87,7 +87,7 @@ func (sp *SmartProcessor) DetermineOptimalStrategy(
 	// Get current metrics for this source
 	collector := sp.GetOrCreateMetricsCollector(raw.Source)
 	metrics := collector.GetOptimizationMetrics()
-	
+
 	// Use StrategyDecider to determine optimal strategy
 	return sp.strategyDecider.DetermineStrategy(metrics, sourceConfig)
 }
@@ -100,16 +100,16 @@ func (sp *SmartProcessor) ProcessEvent(
 	sourceConfig *config.SourceConfig,
 ) error {
 	startTime := time.Now()
-	
+
 	// Get components for this source
 	collector := sp.GetOrCreateMetricsCollector(raw.Source)
 	tracker := sp.GetOrCreatePerformanceTracker(raw.Source)
 	filter := sp.GetOrCreateAdaptiveFilter(raw.Source, sourceConfig.Filter)
-	
+
 	// Determine optimal strategy
 	strategy := sp.DetermineOptimalStrategy(raw, sourceConfig)
 	tracker.RecordStrategyDecision(raw.Source, strategy)
-	
+
 	// Convert raw event to Event for filtering
 	event := &Event{
 		Source:    raw.Source,
@@ -120,7 +120,7 @@ func (sp *SmartProcessor) ProcessEvent(
 		Namespace: "",  // Would be extracted from raw data
 		Type:      "",  // Would be extracted from raw data
 	}
-	
+
 	// Apply filtering based on strategy
 	switch strategy {
 	case ProcessingStrategyFilterFirst:
@@ -131,7 +131,7 @@ func (sp *SmartProcessor) ProcessEvent(
 			return nil
 		}
 		// Continue to dedup and create...
-		
+
 	case ProcessingStrategyDedupFirst:
 		// Dedup first, then filter
 		// Dedup check would happen first...
@@ -142,7 +142,7 @@ func (sp *SmartProcessor) ProcessEvent(
 			return nil
 		}
 		// Continue to create...
-		
+
 	case ProcessingStrategyHybrid, ProcessingStrategyAdaptive:
 		// Hybrid or adaptive processing
 		// This would use more sophisticated logic
@@ -153,12 +153,12 @@ func (sp *SmartProcessor) ProcessEvent(
 		}
 		// Continue to create...
 	}
-	
+
 	// Record processing metrics
 	processingTime := time.Since(startTime)
 	collector.RecordProcessing(processingTime, nil)
 	tracker.RecordEvent(processingTime)
-	
+
 	return nil
 }
 
@@ -172,4 +172,3 @@ func (sp *SmartProcessor) GetSourceMetrics(source string) *OptimizationMetrics {
 func (sp *SmartProcessor) GetAllMetricsCollectors() map[string]*PerSourceMetricsCollector {
 	return sp.metricsCollectors
 }
-

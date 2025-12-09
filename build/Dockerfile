@@ -11,10 +11,13 @@ WORKDIR /build
 # Copy go.mod and go.sum first for better layer caching
 # This allows Docker to cache dependencies if code changes but deps don't
 COPY go.mod go.sum* ./
-RUN go mod download && go mod verify
+RUN go mod download
 
-# Copy source code
+# Copy source code (needed for go mod tidy to work correctly)
 COPY . .
+
+# Run go mod tidy to ensure all dependencies are resolved
+RUN go mod tidy && go mod verify
 
 # Build with aggressive optimizations for production
 # CGO_ENABLED=0: Static binary, no C dependencies

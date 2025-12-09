@@ -22,9 +22,9 @@ import (
 type ProcessingOrder string
 
 const (
-	ProcessingOrderAuto       ProcessingOrder = "auto"
+	ProcessingOrderAuto        ProcessingOrder = "auto"
 	ProcessingOrderFilterFirst ProcessingOrder = "filter_first"
-	ProcessingOrderDedupFirst ProcessingOrder = "dedup_first"
+	ProcessingOrderDedupFirst  ProcessingOrder = "dedup_first"
 )
 
 // DetermineOptimalOrder determines the optimal processing order based on source config and metrics
@@ -55,32 +55,9 @@ func DetermineOptimalOrder(source string, sourceConfig *config.SourceConfig, met
 
 // GetDefaultOrder returns the default processing order for a source
 func GetDefaultOrder(source string) ProcessingOrder {
-	switch source {
-	case "trivy":
-		// Many LOW severity to filter
-		return ProcessingOrderFilterFirst
-	case "cert-manager":
-		// Same failures retry frequently
-		return ProcessingOrderDedupFirst
-	case "falco":
-		// Same rule firing repeatedly
-		return ProcessingOrderDedupFirst
-	case "kyverno":
-		// Audit vs security - filter first
-		return ProcessingOrderFilterFirst
-	case "audit":
-		// Many INFO events
-		return ProcessingOrderFilterFirst
-	case "kube-bench":
-		// One-time reports
-		return ProcessingOrderFilterFirst
-	case "checkov":
-		// One-time scans
-		return ProcessingOrderFilterFirst
-	default:
-		// Default: filter first
-		return ProcessingOrderFilterFirst
-	}
+	// Default: filter first (configurable via ObservationSourceConfig)
+	// Source-specific defaults are configured via YAML, not hardcoded
+	return ProcessingOrderFilterFirst
 }
 
 // SourceMetrics represents metrics for a source (used for order determination)
@@ -95,4 +72,3 @@ type SourceMetrics struct {
 	DedupedCount          int64
 	CreatedCount          int64
 }
-

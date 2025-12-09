@@ -45,26 +45,8 @@ func GetDefaultSourceConfig(source string) DefaultSourceConfig {
 		RateLimitMax:      100,
 	}
 
-	// Source-specific overrides
-	switch source {
-	case "cert-manager":
-		// Certificate expiration events: longer dedup window to avoid flooding
-		defaults.DedupWindow = 24 * time.Hour
-		defaults.TTLDefault = 30 * 24 * time.Hour // 30 days
-		defaults.FilterMinPriority = 0.5
-	case "falco":
-		// Runtime security: shorter window for faster detection
-		defaults.DedupWindow = 60 * time.Second
-		defaults.TTLDefault = 7 * 24 * time.Hour
-	case "trivy":
-		// Vulnerability scans: medium window
-		defaults.DedupWindow = 1 * time.Hour
-		defaults.TTLDefault = 14 * 24 * time.Hour // 14 days
-	case "kyverno":
-		// Policy violations: short window
-		defaults.DedupWindow = 5 * time.Minute
-		defaults.TTLDefault = 7 * 24 * time.Hour
-	}
+	// Source-specific overrides are configured via ObservationSourceConfig CRDs
+	// No hardcoded defaults for specific tools
 
 	return defaults
 }
@@ -96,4 +78,3 @@ func GetDefaultTypeConfig(obsType string) DefaultTypeConfig {
 
 	return defaults
 }
-

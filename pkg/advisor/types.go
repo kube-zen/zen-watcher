@@ -23,9 +23,9 @@ import (
 // Opportunity represents an optimization opportunity found by metrics analysis
 type Opportunity struct {
 	Source      string
-	Type        string // high_low_severity, low_dedup_effectiveness, high_observation_rate, etc.
-	Severity    string // low, medium, high
-	Confidence  float64 // 0.0-1.0
+	Type        string                 // high_low_severity, low_dedup_effectiveness, high_observation_rate, etc.
+	Severity    string                 // low, medium, high
+	Confidence  float64                // 0.0-1.0
 	Metrics     map[string]interface{} // Source-specific metrics
 	Description string
 }
@@ -34,12 +34,12 @@ type Opportunity struct {
 type Suggestion struct {
 	Source      string
 	Type        string
-	Urgency     string // low, medium, high
+	Urgency     string  // low, medium, high
 	Confidence  float64 // 0.0-1.0
 	Title       string
 	Description string
-	Command     string // kubectl command to apply
-	Impact      string // Expected impact description
+	Command     string  // kubectl command to apply
+	Impact      string  // Expected impact description
 	Reduction   float64 // Expected reduction percentage (0.0-1.0)
 }
 
@@ -66,7 +66,7 @@ func (s Suggestion) FormatForLog() string {
 
 // ImpactMetrics tracks the impact of optimizations
 type ImpactMetrics struct {
-	Source              string
+	Source               string
 	OptimizationsApplied int
 	ObservationsReduced  int64
 	ReductionPercent     float64
@@ -79,9 +79,9 @@ type ImpactMetrics struct {
 type ProcessingOrder string
 
 const (
-	ProcessingOrderAuto       ProcessingOrder = "auto"
+	ProcessingOrderAuto        ProcessingOrder = "auto"
 	ProcessingOrderFilterFirst ProcessingOrder = "filter_first"
-	ProcessingOrderDedupFirst ProcessingOrder = "dedup_first"
+	ProcessingOrderDedupFirst  ProcessingOrder = "dedup_first"
 )
 
 // SourceMetrics represents metrics for a source
@@ -92,9 +92,9 @@ type SourceMetrics struct {
 	DedupEffectiveness    float64
 	FilterPassRate        float64
 	TotalObservations     int64
-	FilteredCount          int64
-	DedupedCount           int64
-	CreatedCount           int64
+	FilteredCount         int64
+	DedupedCount          int64
+	CreatedCount          int64
 }
 
 // formatPercent formats a float as a percentage string
@@ -111,4 +111,3 @@ func formatFloat(v float64) string {
 func formatFloatPrec(v float64, prec int) string {
 	return strconv.FormatFloat(v, 'f', prec, 64)
 }
-

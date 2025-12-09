@@ -21,28 +21,28 @@ import (
 
 // PerformanceData tracks performance metrics for a source
 type PerformanceData struct {
-	Source                string
-	AverageLatency        time.Duration
-	PeakLatency           time.Duration
-	TotalProcessed        int64
+	Source                 string
+	AverageLatency         time.Duration
+	PeakLatency            time.Duration
+	TotalProcessed         int64
 	ThroughputEventsPerSec float64
-	LastUpdated           time.Time
+	LastUpdated            time.Time
 }
 
 // PerformanceTracker tracks performance metrics per source
 type PerformanceTracker struct {
-	source       string
-	startTime    time.Time
-	endTime      time.Time
-	active       bool
-	
+	source    string
+	startTime time.Time
+	endTime   time.Time
+	active    bool
+
 	// Latency tracking
 	latencies    []time.Duration
 	maxLatencies int
-	
+
 	// Counters
 	totalProcessed int64
-	
+
 	mu sync.RWMutex
 }
 
@@ -59,7 +59,7 @@ func NewPerformanceTracker(source string) *PerformanceTracker {
 func (pt *PerformanceTracker) StartProcessing() {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
-	
+
 	pt.startTime = time.Now()
 	pt.active = true
 }
@@ -68,7 +68,7 @@ func (pt *PerformanceTracker) StartProcessing() {
 func (pt *PerformanceTracker) EndProcessing() {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
-	
+
 	pt.endTime = time.Now()
 	pt.active = false
 }
@@ -77,9 +77,9 @@ func (pt *PerformanceTracker) EndProcessing() {
 func (pt *PerformanceTracker) RecordEvent(processingTime time.Duration) {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
-	
+
 	pt.totalProcessed++
-	
+
 	// Track latency
 	if len(pt.latencies) >= pt.maxLatencies {
 		// Remove oldest
@@ -92,16 +92,16 @@ func (pt *PerformanceTracker) RecordEvent(processingTime time.Duration) {
 func (pt *PerformanceTracker) GetAverageLatency() time.Duration {
 	pt.mu.RLock()
 	defer pt.mu.RUnlock()
-	
+
 	if len(pt.latencies) == 0 {
 		return 0
 	}
-	
+
 	var sum time.Duration
 	for _, lat := range pt.latencies {
 		sum += lat
 	}
-	
+
 	return sum / time.Duration(len(pt.latencies))
 }
 
@@ -109,18 +109,18 @@ func (pt *PerformanceTracker) GetAverageLatency() time.Duration {
 func (pt *PerformanceTracker) GetPeakLatency() time.Duration {
 	pt.mu.RLock()
 	defer pt.mu.RUnlock()
-	
+
 	if len(pt.latencies) == 0 {
 		return 0
 	}
-	
+
 	var peak time.Duration
 	for _, lat := range pt.latencies {
 		if lat > peak {
 			peak = lat
 		}
 	}
-	
+
 	return peak
 }
 
@@ -128,16 +128,16 @@ func (pt *PerformanceTracker) GetPeakLatency() time.Duration {
 func (pt *PerformanceTracker) GetThroughput() float64 {
 	pt.mu.RLock()
 	defer pt.mu.RUnlock()
-	
+
 	if !pt.active || pt.startTime.IsZero() {
 		return 0
 	}
-	
+
 	duration := time.Since(pt.startTime)
 	if duration.Seconds() == 0 {
 		return 0
 	}
-	
+
 	return float64(pt.totalProcessed) / duration.Seconds()
 }
 
@@ -145,14 +145,14 @@ func (pt *PerformanceTracker) GetThroughput() float64 {
 func (pt *PerformanceTracker) GetPerformanceData() *PerformanceData {
 	pt.mu.RLock()
 	defer pt.mu.RUnlock()
-	
+
 	return &PerformanceData{
-		Source:                pt.source,
-		AverageLatency:        pt.GetAverageLatency(),
-		PeakLatency:           pt.GetPeakLatency(),
-		TotalProcessed:        pt.totalProcessed,
+		Source:                 pt.source,
+		AverageLatency:         pt.GetAverageLatency(),
+		PeakLatency:            pt.GetPeakLatency(),
+		TotalProcessed:         pt.totalProcessed,
 		ThroughputEventsPerSec: pt.GetThroughput(),
-		LastUpdated:           time.Now(),
+		LastUpdated:            time.Now(),
 	}
 }
 
@@ -166,11 +166,10 @@ func (pt *PerformanceTracker) RecordStrategyDecision(source string, strategy Pro
 func (pt *PerformanceTracker) Reset() {
 	pt.mu.Lock()
 	defer pt.mu.Unlock()
-	
+
 	pt.startTime = time.Time{}
 	pt.endTime = time.Time{}
 	pt.active = false
 	pt.totalProcessed = 0
 	pt.latencies = pt.latencies[:0]
 }
-

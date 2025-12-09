@@ -48,10 +48,10 @@ type FieldMapping struct {
 
 // ResourceExtractionConfig represents how to extract Kubernetes resources
 type ResourceExtractionConfig struct {
-	Strategy   string                 // jsonpath, k8s_owner, or manual
-	JSONPath   string                 // JSONPath expression
-	K8SOwner   map[string]string      // Field paths for K8s owner
-	Manual     []map[string]string    // Manually specified resources
+	Strategy string              // jsonpath, k8s_owner, or manual
+	JSONPath string              // JSONPath expression
+	K8SOwner map[string]string   // Field paths for K8s owner
+	Manual   []map[string]string // Manually specified resources
 }
 
 // TypeConfig represents the configuration for an observation type
@@ -292,15 +292,15 @@ func (tcl *TypeConfigLoader) convertToTypeConfig(otc *unstructured.Unstructured)
 	// Parse resource extraction
 	if resourceExtraction, found, _ := unstructured.NestedMap(otc.Object, "spec", "resourceExtraction"); found {
 		config.ResourceExtraction = ResourceExtractionConfig{}
-		
+
 		if strategy, ok := resourceExtraction["strategy"].(string); ok {
 			config.ResourceExtraction.Strategy = strategy
 		}
-		
+
 		if jsonpath, ok := resourceExtraction["jsonpath"].(string); ok {
 			config.ResourceExtraction.JSONPath = jsonpath
 		}
-		
+
 		if k8sOwner, ok := resourceExtraction["k8sOwner"].(map[string]interface{}); ok {
 			config.ResourceExtraction.K8SOwner = make(map[string]string)
 			if apiVersion, ok := k8sOwner["apiVersionField"].(string); ok {
@@ -316,7 +316,7 @@ func (tcl *TypeConfigLoader) convertToTypeConfig(otc *unstructured.Unstructured)
 				config.ResourceExtraction.K8SOwner["namespace"] = ns
 			}
 		}
-		
+
 		if manual, ok := resourceExtraction["manual"].([]interface{}); ok {
 			config.ResourceExtraction.Manual = make([]map[string]string, 0, len(manual))
 			for _, m := range manual {
@@ -357,11 +357,11 @@ func (tcl *TypeConfigLoader) GetTypeConfig(obsType string) *TypeConfig {
 	// Return defaults if no config exists
 	defaults := GetDefaultTypeConfig(obsType)
 	return &TypeConfig{
-		Type:        strings.ToLower(obsType),
-		Domain:      defaults.Domain,
-		PriorityMap: make(map[string]float64),
-		FieldMappings: []FieldMapping{},
-		Templates:   make(map[string]string),
+		Type:               strings.ToLower(obsType),
+		Domain:             defaults.Domain,
+		PriorityMap:        make(map[string]float64),
+		FieldMappings:      []FieldMapping{},
+		Templates:          make(map[string]string),
 		ResourceExtraction: ResourceExtractionConfig{},
 	}
 }
@@ -377,4 +377,3 @@ func (tcl *TypeConfigLoader) GetAllTypeConfigs() map[string]*TypeConfig {
 	}
 	return result
 }
-

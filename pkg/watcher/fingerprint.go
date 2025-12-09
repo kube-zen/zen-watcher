@@ -44,39 +44,11 @@ func GenerateFingerprint(rawEvent RawEvent) string {
 		source = "unknown"
 	}
 
-	// Source-specific fingerprint generation
-	switch source {
-	case "trivy":
-		// For vulnerabilities: CVE + resource + package
-		if cveID := extractString(rawEvent.Data, "vulnerabilityID", "cve_id", "CVE-ID"); cveID != "" {
-			resourceName := extractResourceName(rawEvent.Resources)
-			packageName := extractString(rawEvent.Data, "package", "packageName", "Package")
-			return fmt.Sprintf("%s/%s/%s/%s", source, cveID, resourceName, packageName)
-		}
-
-	case "cert-manager":
-		// For certificates: certificate name + status
-		certName := extractString(rawEvent.Data, "certificate_name", "certificateName", "name")
-		status := extractString(rawEvent.Data, "status", "Status")
-		if certName != "" {
-			return fmt.Sprintf("%s/%s/%s", source, certName, status)
-		}
-
-	case "falco":
-		// For runtime security: rule + resource
-		rule := extractString(rawEvent.Data, "rule", "Rule", "rule_name")
+	// Generate fingerprint from raw event data
+	// Try common identifier fields (configurable via ObservationSourceConfig)
+	if idField := extractString(rawEvent.Data, "id", "identifier", "ID", "Identifier"); idField != "" {
 		resourceName := extractResourceName(rawEvent.Resources)
-		if rule != "" {
-			return fmt.Sprintf("%s/%s/%s", source, rule, resourceName)
-		}
-
-	case "kyverno":
-		// For policy violations: policy + resource
-		policy := extractString(rawEvent.Data, "policy", "Policy", "policy_name")
-		resourceName := extractResourceName(rawEvent.Resources)
-		if policy != "" {
-			return fmt.Sprintf("%s/%s/%s", source, policy, resourceName)
-		}
+		return fmt.Sprintf("%s/%s/%s", source, idField, resourceName)
 	}
 
 	// Fallback: hash the raw JSON data

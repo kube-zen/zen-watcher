@@ -17,7 +17,6 @@ package config
 import (
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -321,4 +320,3 @@ func getFloat(m map[string]interface{}, key string) float64 {
 	}
 	return 0.0
 }
-

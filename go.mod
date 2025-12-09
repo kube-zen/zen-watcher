@@ -4,6 +4,7 @@ go 1.23
 
 require (
 	github.com/prometheus/client_golang v1.19.0
+	github.com/shirou/gopsutil/v3 v3.24.5
 	go.uber.org/zap v1.27.1
 	k8s.io/api v0.28.15
 	k8s.io/apimachinery v0.28.15

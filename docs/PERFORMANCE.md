@@ -376,7 +376,7 @@ spec:
 - Short TTL: `OBSERVATION_TTL_SECONDS=86400` (1 day)
 - Large dedup cache: `DEDUP_MAX_SIZE=50000`
 - For HA deployments, enable HA optimization features (see HA configuration in Helm values)
-- Single replica recommended for standard deployments (in-memory deduplication)
+- Single replica sufficient for standard deployments. HA optimization available for multi-replica deployments.
 - Resource requests: 500m CPU, 512MB memory
 - Resource limits: 1000m CPU, 1GB memory
 

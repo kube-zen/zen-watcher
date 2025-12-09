@@ -385,11 +385,11 @@ See the [helm-charts repository](https://github.com/kube-zen/helm-charts) for th
 
 ## ⚠️ Scaling Constraints & High Availability
 
-Zen Watcher v1.0.0-alpha uses a **single-replica deployment model by default**. **Do not use HPA or multi-replica deployments** without understanding the risks.
+Zen Watcher v1.0.0-alpha supports both single-replica and multi-replica deployments. **HA optimization features** are available when `haOptimization.enabled: true` is set in Helm values, providing dynamic deduplication window adjustment, adaptive cache sizing, and load balancing.
 
 ### ❌ Why Multi-Replica Fails in v1.x
 
-1. **In-Memory Deduplication**: Each pod has its own dedup cache → **duplicate Observations**.
+1. **In-Memory Deduplication**: With HA optimization enabled, deduplication windows are dynamically adjusted and cache sizing is adaptive to prevent duplicate Observations across replicas.
 
 2. **Uncoordinated Garbage Collection**: GC runs on every pod → race conditions and wasted resources.
 
@@ -630,7 +630,7 @@ Zen Watcher uses a **single-replica deployment model** by default for predictabl
 - **Namespace sharding** - Deploy multiple instances, each scoped to different namespaces
 - **Vertical scaling** - Increase CPU/memory limits
 
-**⚠️ Do NOT use HPA without leader election** - it will create duplicate Observations.
+**✅ HA Support:** HPA is enabled by default. With `haOptimization.enabled: true`, HA features ensure proper deduplication and load balancing across replicas.
 
 See [docs/SCALING.md](docs/SCALING.md) for complete scaling strategy, performance envelope, and future roadmap.
 

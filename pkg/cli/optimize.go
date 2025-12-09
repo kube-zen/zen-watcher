@@ -28,9 +28,9 @@ import (
 
 // OptimizeCLI provides CLI commands for optimization
 type OptimizeCLI struct {
-	dynClient         dynamic.Interface
+	dynClient          dynamic.Interface
 	sourceConfigLoader *config.SourceConfigLoader
-	advisor           *advisor.Advisor
+	advisor            *advisor.Advisor
 }
 
 // NewOptimizeCLI creates a new optimization CLI
@@ -38,7 +38,7 @@ func NewOptimizeCLI(dynClient dynamic.Interface, sourceConfigLoader *config.Sour
 	return &OptimizeCLI{
 		dynClient:          dynClient,
 		sourceConfigLoader: sourceConfigLoader,
-		advisor:           advisor,
+		advisor:            advisor,
 	}
 }
 
@@ -215,4 +215,3 @@ func (cli *OptimizeCLI) ListSources(ctx context.Context) error {
 
 	return nil
 }
-

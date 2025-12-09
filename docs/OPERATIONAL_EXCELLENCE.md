@@ -264,7 +264,7 @@ resources:
    - Planned for v1.1.x+
    - Will enable HPA for webhook traffic
 
-**⚠️ Do NOT use HPA without leader election** - it will create duplicate Observations.
+**✅ HA Support:** HPA is enabled by default. With HA optimization enabled, proper deduplication and load balancing are maintained across replicas.
 
 See [docs/SCALING.md](SCALING.md) for complete scaling strategy.
 
@@ -277,7 +277,7 @@ See [docs/SCALING.md](SCALING.md) for complete scaling strategy.
 ```yaml
 podDisruptionBudget:
   enabled: true
-  minAvailable: 1  # Maintains single replica during disruptions
+  minAvailable: 1  # Maintains availability during disruptions (adjust for HA)
 ```
 
 ### Single Replica + Restart Policy

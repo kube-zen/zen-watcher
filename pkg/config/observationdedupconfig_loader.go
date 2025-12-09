@@ -89,8 +89,8 @@ func (odcl *ObservationDedupConfigLoader) Start(ctx context.Context) error {
 			Component: "config",
 			Operation: "observationdedupconfig_watcher_start",
 			Additional: map[string]interface{}{
-				"namespace":    odcl.watchNamespace,
-				"gvr":          ObservationDedupConfigGVR.String(),
+				"namespace":      odcl.watchNamespace,
+				"gvr":            ObservationDedupConfigGVR.String(),
 				"default_window": odcl.defaultWindow,
 			},
 		})
@@ -275,9 +275,9 @@ func (odcl *ObservationDedupConfigLoader) loadAllObservationDedupConfigs(ctx con
 			if windowSeconds < existing {
 				logger.Debug("Multiple ObservationDedupConfigs for same source, using smaller window",
 					logger.Fields{
-						Component:    "config",
-						Operation:    "observationdedupconfig_merge",
-						Source:       targetSource,
+						Component: "config",
+						Operation: "observationdedupconfig_merge",
+						Source:    targetSource,
 						Additional: map[string]interface{}{
 							"existing_window": existing,
 							"new_window":      windowSeconds,
@@ -288,9 +288,9 @@ func (odcl *ObservationDedupConfigLoader) loadAllObservationDedupConfigs(ctx con
 			} else {
 				logger.Debug("Multiple ObservationDedupConfigs for same source, keeping existing window",
 					logger.Fields{
-						Component:    "config",
-						Operation:    "observationdedupconfig_merge",
-						Source:       targetSource,
+						Component: "config",
+						Operation: "observationdedupconfig_merge",
+						Source:    targetSource,
 						Additional: map[string]interface{}{
 							"existing_window": existing,
 							"new_window":      windowSeconds,
@@ -320,7 +320,7 @@ func (odcl *ObservationDedupConfigLoader) updateDeduper(config map[string]int) {
 			Component: "config",
 			Operation: "deduper_update",
 			Additional: map[string]interface{}{
-				"source_count": len(config),
+				"source_count":   len(config),
 				"default_window": odcl.defaultWindow,
 			},
 		})
@@ -346,4 +346,3 @@ func (odcl *ObservationDedupConfigLoader) GetLastGoodConfig() map[string]int {
 	}
 	return result
 }
-

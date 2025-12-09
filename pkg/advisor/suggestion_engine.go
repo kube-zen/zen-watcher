@@ -185,4 +185,3 @@ func getDefaultRules() []SuggestionRule {
 		},
 	}
 }
-

@@ -58,6 +58,11 @@ type ObservationCreator struct {
 	orderMu      sync.RWMutex
 	// SmartProcessor for per-source optimization (optional)
 	smartProcessor *optimization.SmartProcessor
+	// System metrics tracker for HA coordination (optional)
+	systemMetrics interface {
+		RecordEvent()
+		SetQueueDepth(int)
+	}
 }
 
 // OptimizationMetrics holds optimization-related metrics
@@ -75,12 +80,12 @@ type OptimizationMetrics struct {
 
 // sourceCounters tracks counters per source for rate calculations
 type sourceCounters struct {
-	attempted   int64     // Total events attempted
-	filtered    int64     // Events filtered out
-	deduped     int64     // Events deduplicated
-	created     int64     // Events created
-	lowSeverity int64     // LOW severity count
-	totalCount  int64     // Total count for severity distribution
+	attempted   int64 // Total events attempted
+	filtered    int64 // Events filtered out
+	deduped     int64 // Events deduplicated
+	created     int64 // Events created
+	lowSeverity int64 // LOW severity count
+	totalCount  int64 // Total count for severity distribution
 	lastUpdate  time.Time
 }
 
@@ -102,6 +107,14 @@ func NewOptimizationMetrics(filterPassRate, dedupEffectiveness, lowSeverityPerce
 // GetDeduper returns a reference to the deduper for dynamic configuration updates
 func (oc *ObservationCreator) GetDeduper() *dedup.Deduper {
 	return oc.deduper
+}
+
+// SetSystemMetrics sets the system metrics tracker for HA coordination
+func (oc *ObservationCreator) SetSystemMetrics(sm interface {
+	RecordEvent()
+	SetQueueDepth(int)
+}) {
+	oc.systemMetrics = sm
 }
 
 // NewObservationCreator creates a new observation creator with optional filter and metrics
@@ -203,7 +216,7 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 
 	// Determine processing order (dynamic or static)
 	processingOrder := oc.determineProcessingOrder(source)
-	
+
 	// Execute processing steps based on determined order
 	switch processingOrder {
 	case ProcessingOrderFilterFirst:
@@ -221,13 +234,13 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 // processFilterFirst processes with filter-first order: Filter → Dedup → Create
 func (oc *ObservationCreator) processFilterFirst(ctx context.Context, observation *unstructured.Unstructured, source string) error {
 	startTime := time.Now()
-	
+
 	// Get SmartProcessor metrics collector if available
 	var collector *optimization.PerSourceMetricsCollector
 	if oc.smartProcessor != nil {
 		collector = oc.smartProcessor.GetOrCreateMetricsCollector(source)
 	}
-	
+
 	// STEP 1: FILTER
 	if oc.filter != nil {
 		allowed, reason := oc.filter.AllowWithReason(observation)
@@ -283,13 +296,13 @@ func (oc *ObservationCreator) processFilterFirst(ctx context.Context, observatio
 // processDedupFirst processes with dedup-first order: Dedup → Filter → Create
 func (oc *ObservationCreator) processDedupFirst(ctx context.Context, observation *unstructured.Unstructured, source string) error {
 	startTime := time.Now()
-	
+
 	// Get SmartProcessor metrics collector if available
 	var collector *optimization.PerSourceMetricsCollector
 	if oc.smartProcessor != nil {
 		collector = oc.smartProcessor.GetOrCreateMetricsCollector(source)
 	}
-	
+
 	// STEP 1: DEDUP
 	dedupKey := oc.extractDedupKey(observation)
 	if !oc.deduper.ShouldCreateWithContent(dedupKey, observation.Object) {
@@ -361,7 +374,7 @@ func (oc *ObservationCreator) determineProcessingOrder(source string) Processing
 			)
 			// Convert strategy to ProcessingOrder
 			optimalOrder := ProcessingOrder(strategy.String())
-			
+
 			// Check if order changed and log it
 			oc.orderMu.Lock()
 			oldOrder, exists := oc.currentOrder[source]
@@ -382,7 +395,7 @@ func (oc *ObservationCreator) determineProcessingOrder(source string) Processing
 				oc.currentOrder[source] = optimalOrder
 			}
 			oc.orderMu.Unlock()
-			
+
 			return optimalOrder
 		}
 	}
@@ -555,6 +568,11 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 		oc.observationsCreated.WithLabelValues(source).Inc()
 	}
 
+	// Track event for HA metrics
+	if oc.systemMetrics != nil {
+		oc.systemMetrics.RecordEvent()
+	}
+
 	// Record created event for optimization metrics
 	if oc.optimizationMetrics != nil {
 		oc.recordEventCreated(source, severity)
@@ -573,7 +591,7 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 		if eventType == "" {
 			eventType = "unknown"
 		}
-		
+
 		// Extract namespace and kind from resource
 		resourceNamespace := namespace // Use observation namespace as fallback
 		resourceKind := ""
@@ -596,7 +614,7 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 		if resourceKind == "" {
 			resourceKind = "Unknown"
 		}
-		
+
 		oc.eventsTotal.WithLabelValues(source, category, severity, eventType, resourceNamespace, resourceKind).Inc()
 		logger.Debug("Metric incremented after observation creation",
 			logger.Fields{
@@ -821,11 +839,11 @@ func (oc *ObservationCreator) recordEventAttempted(source string) {
 	}
 	oc.optimizationMetrics.countersMu.Lock()
 	defer oc.optimizationMetrics.countersMu.Unlock()
-	
+
 	if oc.optimizationMetrics.sourceCounters == nil {
 		oc.optimizationMetrics.sourceCounters = make(map[string]*sourceCounters)
 	}
-	
+
 	if _, exists := oc.optimizationMetrics.sourceCounters[source]; !exists {
 		oc.optimizationMetrics.sourceCounters[source] = &sourceCounters{
 			lastUpdate: time.Now(),
@@ -841,11 +859,11 @@ func (oc *ObservationCreator) recordEventFiltered(source, reason string) {
 	}
 	oc.optimizationMetrics.countersMu.Lock()
 	defer oc.optimizationMetrics.countersMu.Unlock()
-	
+
 	if oc.optimizationMetrics.sourceCounters == nil {
 		oc.optimizationMetrics.sourceCounters = make(map[string]*sourceCounters)
 	}
-	
+
 	if _, exists := oc.optimizationMetrics.sourceCounters[source]; !exists {
 		oc.optimizationMetrics.sourceCounters[source] = &sourceCounters{
 			lastUpdate: time.Now(),
@@ -861,11 +879,11 @@ func (oc *ObservationCreator) recordEventDeduped(source string) {
 	}
 	oc.optimizationMetrics.countersMu.Lock()
 	defer oc.optimizationMetrics.countersMu.Unlock()
-	
+
 	if oc.optimizationMetrics.sourceCounters == nil {
 		oc.optimizationMetrics.sourceCounters = make(map[string]*sourceCounters)
 	}
-	
+
 	if _, exists := oc.optimizationMetrics.sourceCounters[source]; !exists {
 		oc.optimizationMetrics.sourceCounters[source] = &sourceCounters{
 			lastUpdate: time.Now(),
@@ -881,11 +899,11 @@ func (oc *ObservationCreator) recordEventCreated(source, severity string) {
 	}
 	oc.optimizationMetrics.countersMu.Lock()
 	defer oc.optimizationMetrics.countersMu.Unlock()
-	
+
 	if oc.optimizationMetrics.sourceCounters == nil {
 		oc.optimizationMetrics.sourceCounters = make(map[string]*sourceCounters)
 	}
-	
+
 	if _, exists := oc.optimizationMetrics.sourceCounters[source]; !exists {
 		oc.optimizationMetrics.sourceCounters[source] = &sourceCounters{
 			lastUpdate: time.Now(),
@@ -893,12 +911,12 @@ func (oc *ObservationCreator) recordEventCreated(source, severity string) {
 	}
 	oc.optimizationMetrics.sourceCounters[source].created++
 	oc.optimizationMetrics.sourceCounters[source].totalCount++
-	
+
 	// Track low severity
 	if strings.ToUpper(severity) == "LOW" || strings.ToUpper(severity) == "INFO" {
 		oc.optimizationMetrics.sourceCounters[source].lowSeverity++
 	}
-	
+
 	// Update severity distribution
 	if oc.optimizationMetrics.SeverityDistribution != nil {
 		oc.optimizationMetrics.SeverityDistribution.WithLabelValues(source, strings.ToUpper(severity)).Inc()
@@ -910,21 +928,21 @@ func (oc *ObservationCreator) updateOptimizationMetrics(source string) {
 	if oc.optimizationMetrics == nil {
 		return
 	}
-	
+
 	oc.optimizationMetrics.countersMu.RLock()
 	counters, exists := oc.optimizationMetrics.sourceCounters[source]
 	oc.optimizationMetrics.countersMu.RUnlock()
-	
+
 	if !exists || counters.attempted == 0 {
 		return
 	}
-	
+
 	// Calculate filter pass rate: (created + deduped) / attempted
 	filterPassRate := float64(counters.created+counters.deduped) / float64(counters.attempted)
 	if oc.optimizationMetrics.FilterPassRate != nil {
 		oc.optimizationMetrics.FilterPassRate.WithLabelValues(source).Set(filterPassRate)
 	}
-	
+
 	// Calculate dedup effectiveness: deduped / (created + deduped)
 	totalProcessed := counters.created + counters.deduped
 	dedupEffectiveness := 0.0
@@ -934,7 +952,7 @@ func (oc *ObservationCreator) updateOptimizationMetrics(source string) {
 	if oc.optimizationMetrics.DedupEffectiveness != nil {
 		oc.optimizationMetrics.DedupEffectiveness.WithLabelValues(source).Set(dedupEffectiveness)
 	}
-	
+
 	// Calculate low severity percent
 	lowSeverityPercent := 0.0
 	if counters.totalCount > 0 {
@@ -943,7 +961,7 @@ func (oc *ObservationCreator) updateOptimizationMetrics(source string) {
 	if oc.optimizationMetrics.LowSeverityPercent != nil {
 		oc.optimizationMetrics.LowSeverityPercent.WithLabelValues(source).Set(lowSeverityPercent)
 	}
-	
+
 	// Calculate observations per minute (simplified - uses time window)
 	now := time.Now()
 	timeWindow := now.Sub(counters.lastUpdate)

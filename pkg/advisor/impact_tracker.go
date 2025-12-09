@@ -128,4 +128,3 @@ func (it *ImpactTracker) GetAllImpacts() map[string]*ImpactMetrics {
 	}
 	return result
 }
-

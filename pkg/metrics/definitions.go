@@ -63,31 +63,31 @@ type Metrics struct {
 	EventProcessingDuration *prometheus.HistogramVec
 
 	// Optimization metrics (NEW)
-	FilterPassRate          *prometheus.GaugeVec // Filter pass rate (0.0-1.0)
-	DedupEffectiveness      *prometheus.GaugeVec // Dedup effectiveness (0.0-1.0)
-	LowSeverityPercent      *prometheus.GaugeVec // Low severity percentage (0.0-1.0)
-	ObservationsPerMinute   *prometheus.GaugeVec // Observations per minute
-	ObservationsPerHour     *prometheus.GaugeVec // Observations per hour
-	SeverityDistribution    *prometheus.CounterVec // Severity distribution counter
-	SuggestionsGenerated    *prometheus.CounterVec // Suggestions generated
-	SuggestionsApplied      *prometheus.CounterVec // Suggestions applied
-	OptimizationImpact      *prometheus.GaugeVec // Optimization impact (% improvement)
-	ThresholdExceeded       *prometheus.CounterVec // Threshold exceeded counter
-	
+	FilterPassRate        *prometheus.GaugeVec   // Filter pass rate (0.0-1.0)
+	DedupEffectiveness    *prometheus.GaugeVec   // Dedup effectiveness (0.0-1.0)
+	LowSeverityPercent    *prometheus.GaugeVec   // Low severity percentage (0.0-1.0)
+	ObservationsPerMinute *prometheus.GaugeVec   // Observations per minute
+	ObservationsPerHour   *prometheus.GaugeVec   // Observations per hour
+	SeverityDistribution  *prometheus.CounterVec // Severity distribution counter
+	SuggestionsGenerated  *prometheus.CounterVec // Suggestions generated
+	SuggestionsApplied    *prometheus.CounterVec // Suggestions applied
+	OptimizationImpact    *prometheus.GaugeVec   // Optimization impact (% improvement)
+	ThresholdExceeded     *prometheus.CounterVec // Threshold exceeded counter
+
 	// Per-source optimization metrics (from PerSourceMetricsCollector)
-	SourceEventsProcessed   *prometheus.CounterVec // Events processed per source
-	SourceEventsFiltered    *prometheus.CounterVec // Events filtered per source
-	SourceEventsDeduped     *prometheus.CounterVec // Events deduplicated per source
-	SourceProcessingLatency *prometheus.HistogramVec // Processing latency per source
-	SourceFilterEffectiveness *prometheus.GaugeVec // Filter effectiveness per source
-	SourceDedupRate         *prometheus.GaugeVec // Deduplication rate per source
-	SourceObservationsPerMinute *prometheus.GaugeVec // Observations per minute per source
-	
+	SourceEventsProcessed       *prometheus.CounterVec   // Events processed per source
+	SourceEventsFiltered        *prometheus.CounterVec   // Events filtered per source
+	SourceEventsDeduped         *prometheus.CounterVec   // Events deduplicated per source
+	SourceProcessingLatency     *prometheus.HistogramVec // Processing latency per source
+	SourceFilterEffectiveness   *prometheus.GaugeVec     // Filter effectiveness per source
+	SourceDedupRate             *prometheus.GaugeVec     // Deduplication rate per source
+	SourceObservationsPerMinute *prometheus.GaugeVec     // Observations per minute per source
+
 	// Optimization decision metrics
-	OptimizationDecisions   *prometheus.CounterVec // Optimization decisions made
-	StrategyChanges         *prometheus.CounterVec // Processing strategy changes
-	AdaptiveAdjustments     *prometheus.CounterVec // Adaptive adjustments applied
-	OptimizationConfidence  *prometheus.GaugeVec // Confidence level of optimizations
+	OptimizationDecisions  *prometheus.CounterVec // Optimization decisions made
+	StrategyChanges        *prometheus.CounterVec // Processing strategy changes
+	AdaptiveAdjustments    *prometheus.CounterVec // Adaptive adjustments applied
+	OptimizationConfidence *prometheus.GaugeVec   // Confidence level of optimizations
 }
 
 // NewMetrics creates and registers all Prometheus metrics
@@ -519,7 +519,7 @@ func NewMetrics() *Metrics {
 	prometheus.MustRegister(suggestionsApplied)
 	prometheus.MustRegister(optimizationImpact)
 	prometheus.MustRegister(thresholdExceeded)
-	
+
 	// Register per-source optimization metrics
 	prometheus.MustRegister(sourceEventsProcessed)
 	prometheus.MustRegister(sourceEventsFiltered)
@@ -528,7 +528,7 @@ func NewMetrics() *Metrics {
 	prometheus.MustRegister(sourceFilterEffectiveness)
 	prometheus.MustRegister(sourceDedupRate)
 	prometheus.MustRegister(sourceObservationsPerMinute)
-	
+
 	// Register optimization decision metrics
 	prometheus.MustRegister(optimizationDecisions)
 	prometheus.MustRegister(strategyChanges)
@@ -589,16 +589,16 @@ func NewMetrics() *Metrics {
 		SuggestionsApplied:    suggestionsApplied,
 		OptimizationImpact:    optimizationImpact,
 		ThresholdExceeded:     thresholdExceeded,
-		
+
 		// Per-source optimization metrics
-		SourceEventsProcessed:     sourceEventsProcessed,
-		SourceEventsFiltered:      sourceEventsFiltered,
-		SourceEventsDeduped:       sourceEventsDeduped,
-		SourceProcessingLatency:   sourceProcessingLatency,
-		SourceFilterEffectiveness: sourceFilterEffectiveness,
-		SourceDedupRate:           sourceDedupRate,
+		SourceEventsProcessed:       sourceEventsProcessed,
+		SourceEventsFiltered:        sourceEventsFiltered,
+		SourceEventsDeduped:         sourceEventsDeduped,
+		SourceProcessingLatency:     sourceProcessingLatency,
+		SourceFilterEffectiveness:   sourceFilterEffectiveness,
+		SourceDedupRate:             sourceDedupRate,
 		SourceObservationsPerMinute: sourceObservationsPerMinute,
-		
+
 		// Optimization decision metrics
 		OptimizationDecisions:  optimizationDecisions,
 		StrategyChanges:        strategyChanges,

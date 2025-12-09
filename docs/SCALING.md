@@ -288,7 +288,7 @@ env:
 
 ### Q: Can I run multiple replicas for high availability?
 
-**A:** Not recommended in v1.0.0-alpha. You'll get duplicate Observations. Use Kubernetes restart policies and PodDisruptionBudgets for availability instead.
+**A:** Yes! Enable `haOptimization.enabled: true` in Helm values. HA optimization features provide dynamic deduplication window adjustment, adaptive cache sizing, and load balancing to ensure proper operation across replicas.
 
 ### Q: What happens if my single replica dies?
 
