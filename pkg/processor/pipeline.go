@@ -19,6 +19,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/dedup"
@@ -105,7 +106,8 @@ func (p *Processor) ProcessEvent(ctx context.Context, raw *generic.RawEvent, con
 	if order == "dedup_first" {
 		// Dedup first, then filter
 		dedupKey := p.extractDedupKey(observation, raw)
-		if !p.deduper.ShouldCreateWithContent(dedupKey, observation.Object) {
+		shouldCreate := p.shouldCreateWithStrategy(dedupKey, observation.Object, config)
+		if !shouldCreate {
 			logger.Debug("Event deduplicated",
 				logger.Fields{
 					Component: "processor",
@@ -148,7 +150,8 @@ func (p *Processor) ProcessEvent(ctx context.Context, raw *generic.RawEvent, con
 		// Then dedup (even if filtered, we still check dedup for metrics)
 		if !filtered {
 			dedupKey := p.extractDedupKey(observation, raw)
-			if !p.deduper.ShouldCreateWithContent(dedupKey, observation.Object) {
+			shouldCreate := p.shouldCreateWithStrategy(dedupKey, observation.Object, config)
+			if !shouldCreate {
 				logger.Debug("Event deduplicated",
 					logger.Fields{
 						Component: "processor",
