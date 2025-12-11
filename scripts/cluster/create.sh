@@ -105,6 +105,11 @@ case "$PLATFORM" in
         fi
         ;;
     kind)
+        if [ "$USE_EXISTING" = true ] && cluster_exists "kind" "$CLUSTER_NAME"; then
+            log_info "Using existing kind cluster '${CLUSTER_NAME}'"
+            exit 0
+        fi
+        
         if cluster_exists "kind" "$CLUSTER_NAME"; then
             log_error "Cluster '${CLUSTER_NAME}' already exists"
             exit 1
@@ -130,6 +135,11 @@ EOF
         fi
         ;;
     minikube)
+        if [ "$USE_EXISTING" = true ] && cluster_exists "minikube" "$CLUSTER_NAME"; then
+            log_info "Using existing minikube profile '${CLUSTER_NAME}'"
+            exit 0
+        fi
+        
         if cluster_exists "minikube" "$CLUSTER_NAME"; then
             log_error "Profile '${CLUSTER_NAME}' already exists"
             exit 1

@@ -14,6 +14,7 @@
 {{ $skipMonitoring := env "SKIP_MONITORING" | default "false" }}
 {{ $ingressPort := env "INGRESS_HTTP_PORT" | default "8080" }}
 {{ $grafanaPassword := env "GRAFANA_PASSWORD" | default (randAlphaNum 16) }}
+{{ $demoMinimal := env "ZEN_DEMO_MINIMAL" | default "false" }}
 
 releases:
   # VictoriaMetrics Operator CRDs (must be installed first for VMServiceScrape)
@@ -64,11 +65,11 @@ releases:
           replicaCount: 1
           resources:
             requests:
-              memory: 256Mi
-              cpu: 100m
+              memory: {{ if eq $demoMinimal "true" }}128Mi{{ else }}256Mi{{ end }}
+              cpu: {{ if eq $demoMinimal "true" }}50m{{ else }}100m{{ end }}
             limits:
-              memory: 1Gi
-              cpu: 1000m
+              memory: {{ if eq $demoMinimal "true" }}512Mi{{ else }}1Gi{{ end }}
+              cpu: {{ if eq $demoMinimal "true" }}500m{{ else }}1000m{{ end }}
           service:
             type: ClusterIP
             servicePort: 8428
@@ -196,11 +197,11 @@ releases:
           port: 3000
       - resources:
           requests:
-            memory: 128Mi
-            cpu: 100m
+            memory: {{ if eq $demoMinimal "true" }}64Mi{{ else }}128Mi{{ end }}
+            cpu: {{ if eq $demoMinimal "true" }}50m{{ else }}100m{{ end }}
           limits:
-            memory: 512Mi
-            cpu: 500m
+            memory: {{ if eq $demoMinimal "true" }}256Mi{{ else }}512Mi{{ end }}
+            cpu: {{ if eq $demoMinimal "true" }}250m{{ else }}500m{{ end }}
 
   # Zen Watcher (from helm-charts repo)
   - name: zen-watcher

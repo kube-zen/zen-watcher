@@ -6,16 +6,75 @@ Get Zen Watcher up and running in 5 minutes!
 
 ## Prerequisites
 
-- Kubernetes cluster (1.26+)
-- `kubectl` configured
-- (Optional) Helm 3.8+
-- (Optional) Security tools (Trivy, Falco, Kyverno, etc.)
+### Required Tools
+
+- **k3d, kind, or minikube**: One local Kubernetes cluster tool
+  - k3d: `curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash`
+  - kind: `curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64 && chmod +x ./kind && sudo mv ./kind /usr/local/bin/kind`
+  - minikube: `curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 && sudo install minikube-linux-amd64 /usr/local/bin/minikube`
+- **Docker**: Running and accessible (`docker ps` should work)
+- **kubectl**: Kubernetes CLI (`kubectl version --client`)
+- **helm**: Helm 3.8+ (`helm version`)
+- **Kubernetes cluster**: 1.26+ (created automatically by quick-demo.sh)
+
+### System Requirements
+
+- **RAM**: ~2GB free (4GB+ recommended, 1.5GB with `ZEN_DEMO_MINIMAL=1`)
+- **CPU**: 2+ cores recommended
+- **Disk**: ~5GB free space
+
+---
+
+## Quick Demo (Recommended for First-Time Users)
+
+**Fastest path to a working demo:**
+
+```bash
+# Clone the repo
+git clone https://github.com/kube-zen/zen-watcher
+cd zen-watcher
+
+# Run automated demo (k3d, kind, or minikube)
+./scripts/quick-demo.sh k3d --non-interactive --deploy-mock-data
+
+# For minimal resource usage:
+ZEN_DEMO_MINIMAL=1 ./scripts/quick-demo.sh k3d --non-interactive --deploy-mock-data
+
+# The script will:
+# 1. Create a local Kubernetes cluster
+# 2. Install zen-watcher and monitoring stack
+# 3. Deploy mock observations
+# 4. Print Grafana credentials and endpoints
+```
+
+**What you get:**
+- ✅ Complete demo environment with monitoring
+- ✅ Mock observations from all sources
+- ✅ Grafana dashboards pre-configured
+- ✅ ~4 minutes total setup time
+
+**View your demo:**
+```bash
+# Set kubeconfig
+export KUBECONFIG=~/.kube/zen-demo-kubeconfig
+
+# View observations
+kubectl get observations -n zen-system
+
+# Access Grafana (credentials shown at end of quick-demo.sh)
+# URL: http://localhost:8080/grafana
+```
+
+**Cleanup:**
+```bash
+./scripts/cluster/destroy.sh
+```
 
 ---
 
 ## Installation
 
-### Option 1: Helm (Recommended)
+### Option 1: Helm (Recommended for Production)
 
 **The official Helm chart for zen-watcher lives in a separate repository:**
 

@@ -69,20 +69,32 @@ git clone https://github.com/kube-zen/zen-watcher
 cd zen-watcher
 
 # Run automated demo (supports k3d, kind, or minikube - deploys everything, validates 9/9 sources)
-./scripts/quick-demo.sh --non-interactive --deploy-mock-data
-# Or specify platform: ./scripts/quick-demo.sh kind --non-interactive --deploy-mock-data
-# Or: ./scripts/quick-demo.sh minikube --non-interactive --deploy-mock-data
+./scripts/quick-demo.sh k3d --non-interactive --deploy-mock-data
+# Or with kind: ./scripts/quick-demo.sh kind --non-interactive --deploy-mock-data
+# Or with minikube: ./scripts/quick-demo.sh minikube --non-interactive --deploy-mock-data
+
+# For minimal resource usage (laptops with limited RAM):
+ZEN_DEMO_MINIMAL=1 ./scripts/quick-demo.sh k3d --non-interactive --deploy-mock-data
 
 # Demo will show credentials at the end, example:
-# Grafana:  http://localhost:8080/grafana/d/zen-watcher
-# Username: zen
+# Grafana:  http://localhost:8080/grafana
+# Username: admin
 # Password: <shown in output>
 ```
 
+**System Requirements:**
+- **k3d/kind/minikube**: One of these cluster tools installed
+- **Docker**: Running and accessible
+- **kubectl**: Kubernetes CLI tool
+- **helm**: Helm 3.8+ for package management
+- **RAM**: ~2GB free (4GB+ recommended, 1.5GB with `ZEN_DEMO_MINIMAL=1`)
+- **CPU**: 2+ cores recommended
+- **Disk**: ~5GB free space
+
 **What you get:**
-- ✅ Kubernetes cluster (k3d, kind, or minikube) with all 9 security sources (Trivy, Falco, Kyverno, Checkov, KubeBench, Audit, cert-manager, sealed-secrets, Kubernetes Events)
+- ✅ Kubernetes cluster (k3d, kind, or minikube) with unlimited sources/ingesters supported via easy YAML/CRD configuration (9+ validated examples: Trivy, Falco, Kyverno, Checkov, KubeBench, Audit, cert-manager, sealed-secrets, Kubernetes Events)
 - ✅ VictoriaMetrics + Grafana with 6 pre-built dashboards (Executive, Operations, Security, Main, Namespace Health, Explorer)
-- ✅ Mock observations from all 9 sources
+- ✅ Mock observations from all configured sources
 - ✅ ~4 minutes total time
 
 **View observations:**
@@ -109,7 +121,7 @@ kubectl get observations -A --watch
 
 ## 🎯 Features
 
-### Multi-Source Event Aggregation (9 Sources - All Working ✅)
+### Multi-Source Event Aggregation (Unlimited Sources via Ingester CRD ✅)
 
 Collects events from popular security and compliance tools:
 - 🛡️ **Trivy** - Container vulnerabilities (HIGH/CRITICAL) - CRD informer
@@ -124,19 +136,35 @@ Collects events from popular security and compliance tools:
 
 ### 🎯 Adding New Sources: Just YAML!
 
-**No code required!** Add any new source with a simple YAML configuration using `ObservationSourceConfig` CRD. Zen Watcher supports **four input methods**:
+**No code required!** Add any new source with a simple YAML configuration using the `Ingester` CRD. Zen Watcher supports **five input methods**:
 
 1. **🔍 Logs** - Monitor pod logs with regex patterns
 2. **📡 Webhooks** - Receive HTTP webhooks from external tools
-3. **🗂️ ConfigMaps** - Poll ConfigMaps for batch results
+3. **🗂️ ConfigMaps** - Watch ConfigMaps via informer (event-driven, recommended)
 4. **📋 CRDs (Informers)** - Watch Kubernetes Custom Resource Definitions
+5. **🎯 Kubernetes Events** - Native cluster events (security-focused)
+
+**Note**: ConfigMaps are watched using the `informer` ingester with `resource: configmaps` for event-driven updates. Example:
+
+```yaml
+spec:
+  source: kube-bench
+  ingester: informer
+  informer:
+    gvr:
+      group: ""              # Empty = core API group
+      version: v1
+      resource: configmaps
+    labelSelector: app=kube-bench
+```
 
 **Quick Example - Adding a Source from Logs:**
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: my-tool-source
+  namespace: zen-system
 spec:
   source: my-tool
   ingester: logs
@@ -146,6 +174,17 @@ spec:
       - regex: "ERROR: (?P<message>.*)"
         type: error
         priority: 0.8
+  filters:
+    minPriority: 0.5
+  deduplication:
+    enabled: true
+    window: "1h"
+  destinations:
+    - type: crd
+      value: observations
+      mapping:
+        domain: security
+        type: log_error
 ```
 
 That's it! Apply the YAML and zen-watcher will start collecting observations. See [docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md) for complete examples.
@@ -153,8 +192,7 @@ That's it! Apply the YAML and zen-watcher will start collecting observations. Se
 **✨ Features:**
 - Modular adapter architecture (SourceAdapter interface)
 - **YAML-only source configuration** - No code changes needed for new integrations
-- ObservationFilter CRD for dynamic, Kubernetes-native filtering
-- ObservationMapping CRD for generic CRD integration
+- Ingester CRD for dynamic, Kubernetes-native filtering, deduplication, and mapping
 - Infrastructure-blind design: avoids cluster-unique identifiers (e.g., AWS account ID, GKE project name) while preserving Kubernetes-native context (namespace, name, kind) for RBAC, auditing, and multi-tenancy
 - Filter merge semantics (ConfigMap + CRD with comprehensive tests)
 - Complete end-to-end automation (quick-demo.sh supports k3d/kind/minikube and validates all 9 sources in ~4 minutes)
@@ -185,7 +223,7 @@ See [docs/INTELLIGENT_EVENT_PIPELINE.md](docs/INTELLIGENT_EVENT_PIPELINE.md) for
 
 ### Comprehensive Observability
 - 📊 20+ Prometheus metrics on :9090
-- 🎨 3 pre-built Grafana dashboards (Executive, Operations, Security)
+- 🎨 6 pre-built Grafana dashboards (Executive, Operations, Security, Main, Namespace Health, Explorer)
 - 📝 Structured logging: `2025-11-08T16:30:00.000Z [INFO] zen-watcher: message`
 - 🏥 Health and readiness probes
 
@@ -226,7 +264,7 @@ See [docs/INTELLIGENT_EVENT_PIPELINE.md](docs/INTELLIGENT_EVENT_PIPELINE.md) for
 
 1. **🎯 True Aggregation** - Zen-watcher is the only tool that aggregates multiple security tools into a single, queryable format
 2. **🔒 Zero Trust** - No external dependencies, credentials, or egress traffic required
-3. **🧩 Extensibility** - ObservationMapping CRDs let you integrate ANY CRD without code changes
+3. **🧩 Extensibility** - Ingester CRDs let you integrate ANY CRD without code changes
 4. **📦 Kubernetes-Native** - First-class CRDs, not just a forwarder or exporter
 5. **🎨 Modular** - 8 adapters + 1 generic adapter for the "long tail"
 
@@ -541,9 +579,9 @@ kubectl create configmap zen-watcher-filter -n zen-system --from-file=filter.jso
 
 **Note:** If ConfigMap is not found, zen-watcher defaults to "allow all" (no filtering).
 
-### Advanced Configuration: ObservationSourceConfig CRD
+### Advanced Configuration: Ingester CRD
 
-For more advanced configuration per source, use the `ObservationSourceConfig` CRD. This enables:
+For more advanced configuration per source, use the `Ingester` CRD. This enables:
 
 - **Auto-Optimization**: Automatically optimize processing order and filters
 - **Threshold Monitoring**: Set warning and critical thresholds for alerts
@@ -554,7 +592,7 @@ For more advanced configuration per source, use the `ObservationSourceConfig` CR
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: trivy-config
   namespace: zen-system
@@ -616,7 +654,7 @@ zen-watcher-optimize --command=auto --enable
 zen-watcher-optimize --command=history --source=trivy
 ```
 
-➡️ See [docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md) for complete ObservationSourceConfig documentation and [docs/OPTIMIZATION_USAGE.md](docs/OPTIMIZATION_USAGE.md) for auto-optimization guide.
+➡️ See [docs/INGESTER_CRD.md](docs/INGESTER_CRD.md) for complete Ingester CRD documentation and [docs/OPTIMIZATION_USAGE.md](docs/OPTIMIZATION_USAGE.md) for auto-optimization guide.
 
 ---
 

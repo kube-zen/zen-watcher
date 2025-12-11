@@ -32,6 +32,7 @@ INSTALL_KYVERNO=false
 INSTALL_CHECKOV=false
 INSTALL_KUBE_BENCH=false
 NO_DOCKER_LOGIN=false
+USE_EXISTING_CLUSTER=false
 
 for arg in "$@"; do
     case "$arg" in
@@ -55,6 +56,9 @@ for arg in "$@"; do
             ;;
         --no-docker-login)
             NO_DOCKER_LOGIN=true
+            ;;
+        --use-existing|--use-existing-cluster)
+            USE_EXISTING_CLUSTER=true
             ;;
         k3d|kind|minikube)
             PLATFORM="$arg"
@@ -114,7 +118,14 @@ esac
 # Create cluster (if needed)
 if ! cluster_exists "$PLATFORM" "$CLUSTER_NAME"; then
     log_step "Creating cluster..."
-    "${SCRIPT_DIR}/cluster/create.sh" "$PLATFORM" "$CLUSTER_NAME" || {
+    CREATE_ARGS=()
+    if [ "$USE_EXISTING_CLUSTER" = true ]; then
+        CREATE_ARGS+=("--use-existing")
+    fi
+    if [ "$NO_DOCKER_LOGIN" = true ]; then
+        CREATE_ARGS+=("--no-docker-login")
+    fi
+    "${SCRIPT_DIR}/cluster/create.sh" "$PLATFORM" "$CLUSTER_NAME" "${CREATE_ARGS[@]}" || {
         log_error "Failed to create cluster"
         exit 1
     }
@@ -144,6 +155,7 @@ export INSTALL_KYVERNO=${INSTALL_KYVERNO}
 export INSTALL_KUBE_BENCH=${INSTALL_KUBE_BENCH}
 export SKIP_MONITORING=${SKIP_MONITORING}
 export IMAGE_PULL_POLICY=$([ "$NO_DOCKER_LOGIN" = true ] && echo "Always" || echo "IfNotPresent")
+export ZEN_DEMO_MINIMAL="${ZEN_DEMO_MINIMAL:-false}"
 
 # Get repo root
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$(cd "$(dirname "$0")/.." && pwd)")"

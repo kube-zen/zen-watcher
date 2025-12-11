@@ -40,28 +40,74 @@ kubectl port-forward -n grafana svc/grafana 3100:80 >/tmp/grafana-pf.log 2>&1 &
 PF_PID=$!
 sleep 5
 
+# Wait for Grafana to be ready
+GRAFANA_READY=false
+for i in {1..30}; do
+    if curl -s -u "admin:${GRAFANA_PASSWORD}" http://localhost:3100/api/health &>/dev/null; then
+        GRAFANA_READY=true
+        break
+    fi
+    sleep 1
+done
+
+if [ "$GRAFANA_READY" != true ]; then
+    log_warn "Grafana not ready after 30s, attempting import anyway..."
+fi
+
 # Import dashboards
+IMPORTED=0
+FAILED=0
 if [ -d "$DASHBOARD_DIR" ]; then
     for dashboard in "$DASHBOARD_DIR"/*.json; do
         if [ -f "$dashboard" ]; then
             dashboard_name=$(basename "$dashboard" .json)
             log_info "Importing dashboard: $dashboard_name"
             
-            # Use Grafana API to import dashboard
-            curl -s -X POST \
+            # Try new API endpoint first (Grafana 7+)
+            DASHBOARD_JSON=$(cat "$dashboard")
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
                 -H "Content-Type: application/json" \
                 -u "admin:${GRAFANA_PASSWORD}" \
-                -d @"$dashboard" \
-                http://localhost:3100/api/dashboards/db >/dev/null 2>&1 || {
-                log_warn "Failed to import dashboard: $dashboard_name"
-            }
+                -d "{\"dashboard\":${DASHBOARD_JSON},\"overwrite\":true}" \
+                http://localhost:3100/api/dashboards/db 2>/dev/null || echo -e "\n000")
+            
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            
+            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "201" ]; then
+                log_success "  ✓ Imported: $dashboard_name"
+                IMPORTED=$((IMPORTED + 1))
+            else
+                # Try alternative endpoint (older Grafana)
+                RESPONSE2=$(curl -s -w "\n%{http_code}" -X POST \
+                    -H "Content-Type: application/json" \
+                    -u "admin:${GRAFANA_PASSWORD}" \
+                    -d @"$dashboard" \
+                    http://localhost:3100/api/dashboards/db 2>/dev/null || echo -e "\n000")
+                
+                HTTP_CODE2=$(echo "$RESPONSE2" | tail -n1)
+                if [ "$HTTP_CODE2" = "200" ] || [ "$HTTP_CODE2" = "201" ]; then
+                    log_success "  ✓ Imported: $dashboard_name (legacy API)"
+                    IMPORTED=$((IMPORTED + 1))
+                else
+                    log_warn "  ✗ Failed to import: $dashboard_name (HTTP $HTTP_CODE/$HTTP_CODE2)"
+                    FAILED=$((FAILED + 1))
+                fi
+            fi
         fi
     done
-    log_success "Dashboards imported"
+    
+    echo ""
+    if [ $IMPORTED -gt 0 ]; then
+        log_success "Successfully imported $IMPORTED dashboard(s)"
+    fi
+    if [ $FAILED -gt 0 ]; then
+        log_warn "$FAILED dashboard(s) failed to import"
+    fi
 else
     log_warn "Dashboard directory not found: $DASHBOARD_DIR"
 fi
 
 # Cleanup port-forward
 kill $PF_PID 2>/dev/null || true
+wait $PF_PID 2>/dev/null || true
 
