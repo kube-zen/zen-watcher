@@ -205,7 +205,7 @@ func NewK8sEventsIngester(namespace, name string) *Ingester {
 				Window:   "5m",
 			},
 			Filters: &FilterConfig{
-				MinSeverity: "MEDIUM",
+				MinSeverity:       "MEDIUM",
 				ExcludeNamespaces: []string{"kube-system", "kube-public"},
 			},
 		},
@@ -215,4 +215,3 @@ func NewK8sEventsIngester(namespace, name string) *Ingester {
 func floatPtr(f float64) *float64 {
 	return &f
 }
-

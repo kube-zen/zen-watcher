@@ -120,10 +120,10 @@ func TestValidateObservation_InvalidTTL(t *testing.T) {
 		APIVersion: "zen.kube-zen.io/v1",
 		Kind:       "Observation",
 		Spec: ObservationSpec{
-			Source:                 "test",
-			Category:               "security",
-			Severity:               "high",
-			EventType:              "vulnerability",
+			Source:                  "test",
+			Category:                "security",
+			Severity:                "high",
+			EventType:               "vulnerability",
 			TTLSecondsAfterCreation: &ttl,
 		},
 	}
@@ -132,4 +132,3 @@ func TestValidateObservation_InvalidTTL(t *testing.T) {
 		t.Error("ValidateObservation should return error for TTL < 1")
 	}
 }
-

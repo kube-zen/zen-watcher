@@ -28,24 +28,24 @@ type Ingester struct {
 
 // IngesterSpec represents the spec section of an Ingester CRD
 type IngesterSpec struct {
-	Source        string                 `json:"source" yaml:"source"`
-	Ingester      string                 `json:"ingester" yaml:"ingester"`
-	Destinations  []Destination          `json:"destinations" yaml:"destinations"`
-	Deduplication *DeduplicationConfig   `json:"deduplication,omitempty" yaml:"deduplication,omitempty"`
-	Filters       *FilterConfig         `json:"filters,omitempty" yaml:"filters,omitempty"`
-	Optimization  *OptimizationConfig    `json:"optimization,omitempty" yaml:"optimization,omitempty"`
-	Processing    *ProcessingConfig     `json:"processing,omitempty" yaml:"processing,omitempty"`
-	Informer      *InformerConfig       `json:"informer,omitempty" yaml:"informer,omitempty"`
-	Webhook       *WebhookConfig        `json:"webhook,omitempty" yaml:"webhook,omitempty"`
-	Logs          *LogsConfig           `json:"logs,omitempty" yaml:"logs,omitempty"`
-	K8sEvents     *K8sEventsConfig      `json:"k8sEvents,omitempty" yaml:"k8sEvents,omitempty"`
+	Source        string               `json:"source" yaml:"source"`
+	Ingester      string               `json:"ingester" yaml:"ingester"`
+	Destinations  []Destination        `json:"destinations" yaml:"destinations"`
+	Deduplication *DeduplicationConfig `json:"deduplication,omitempty" yaml:"deduplication,omitempty"`
+	Filters       *FilterConfig        `json:"filters,omitempty" yaml:"filters,omitempty"`
+	Optimization  *OptimizationConfig  `json:"optimization,omitempty" yaml:"optimization,omitempty"`
+	Processing    *ProcessingConfig    `json:"processing,omitempty" yaml:"processing,omitempty"`
+	Informer      *InformerConfig      `json:"informer,omitempty" yaml:"informer,omitempty"`
+	Webhook       *WebhookConfig       `json:"webhook,omitempty" yaml:"webhook,omitempty"`
+	Logs          *LogsConfig          `json:"logs,omitempty" yaml:"logs,omitempty"`
+	K8sEvents     *K8sEventsConfig     `json:"k8sEvents,omitempty" yaml:"k8sEvents,omitempty"`
 }
 
 // Destination represents a destination configuration
 type Destination struct {
-	Type    string                 `json:"type" yaml:"type"`
-	Value   string                 `json:"value" yaml:"value"`
-	Mapping *NormalizationMapping  `json:"mapping,omitempty" yaml:"mapping,omitempty"`
+	Type    string                `json:"type" yaml:"type"`
+	Value   string                `json:"value" yaml:"value"`
+	Mapping *NormalizationMapping `json:"mapping,omitempty" yaml:"mapping,omitempty"`
 }
 
 // NormalizationMapping represents normalization configuration
@@ -68,31 +68,31 @@ type FieldMapping struct {
 
 // DeduplicationConfig represents deduplication configuration
 type DeduplicationConfig struct {
-	Adaptive     bool     `json:"adaptive,omitempty" yaml:"adaptive,omitempty"`
-	Enabled      *bool    `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-	Fields       []string `json:"fields,omitempty" yaml:"fields,omitempty"`
-	LearningRate *float64 `json:"learningRate,omitempty" yaml:"learningRate,omitempty"`
-	MinChange    *float64 `json:"minChange,omitempty" yaml:"minChange,omitempty"`
-	Strategy     string   `json:"strategy,omitempty" yaml:"strategy,omitempty"`
-	Window       string   `json:"window,omitempty" yaml:"window,omitempty"`
-	WindowSeconds *int    `json:"windowSeconds,omitempty" yaml:"windowSeconds,omitempty"`
+	Adaptive      bool     `json:"adaptive,omitempty" yaml:"adaptive,omitempty"`
+	Enabled       *bool    `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	Fields        []string `json:"fields,omitempty" yaml:"fields,omitempty"`
+	LearningRate  *float64 `json:"learningRate,omitempty" yaml:"learningRate,omitempty"`
+	MinChange     *float64 `json:"minChange,omitempty" yaml:"minChange,omitempty"`
+	Strategy      string   `json:"strategy,omitempty" yaml:"strategy,omitempty"`
+	Window        string   `json:"window,omitempty" yaml:"window,omitempty"`
+	WindowSeconds *int     `json:"windowSeconds,omitempty" yaml:"windowSeconds,omitempty"`
 }
 
 // FilterConfig represents filter configuration
 type FilterConfig struct {
-	MinPriority       *float64  `json:"minPriority,omitempty" yaml:"minPriority,omitempty"`
-	MinSeverity       string    `json:"minSeverity,omitempty" yaml:"minSeverity,omitempty"`
-	IncludeNamespaces []string  `json:"includeNamespaces,omitempty" yaml:"includeNamespaces,omitempty"`
-	ExcludeNamespaces []string  `json:"excludeNamespaces,omitempty" yaml:"excludeNamespaces,omitempty"`
+	MinPriority       *float64 `json:"minPriority,omitempty" yaml:"minPriority,omitempty"`
+	MinSeverity       string   `json:"minSeverity,omitempty" yaml:"minSeverity,omitempty"`
+	IncludeNamespaces []string `json:"includeNamespaces,omitempty" yaml:"includeNamespaces,omitempty"`
+	ExcludeNamespaces []string `json:"excludeNamespaces,omitempty" yaml:"excludeNamespaces,omitempty"`
 }
 
 // OptimizationConfig represents optimization configuration
 type OptimizationConfig struct {
-	Enabled             bool                 `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-	Order               string               `json:"order,omitempty" yaml:"order,omitempty"`
-	AutoOptimize        bool                 `json:"autoOptimize,omitempty" yaml:"autoOptimize,omitempty"`
-	AnalysisInterval    string               `json:"analysisInterval,omitempty" yaml:"analysisInterval,omitempty"`
-	ConfidenceThreshold *float64             `json:"confidenceThreshold,omitempty" yaml:"confidenceThreshold,omitempty"`
+	Enabled             bool                    `json:"enabled,omitempty" yaml:"enabled,omitempty"`
+	Order               string                  `json:"order,omitempty" yaml:"order,omitempty"`
+	AutoOptimize        bool                    `json:"autoOptimize,omitempty" yaml:"autoOptimize,omitempty"`
+	AnalysisInterval    string                  `json:"analysisInterval,omitempty" yaml:"analysisInterval,omitempty"`
+	ConfidenceThreshold *float64                `json:"confidenceThreshold,omitempty" yaml:"confidenceThreshold,omitempty"`
 	Thresholds          *OptimizationThresholds `json:"thresholds,omitempty" yaml:"thresholds,omitempty"`
 }
 
@@ -111,9 +111,9 @@ type ThresholdRange struct {
 
 // ProcessingConfig represents processing configuration
 type ProcessingConfig struct {
-	Order              string   `json:"order,omitempty" yaml:"order,omitempty"`
-	AutoOptimize       bool     `json:"autoOptimize,omitempty" yaml:"autoOptimize,omitempty"`
-	AnalysisInterval   string   `json:"analysisInterval,omitempty" yaml:"analysisInterval,omitempty"`
+	Order               string   `json:"order,omitempty" yaml:"order,omitempty"`
+	AutoOptimize        bool     `json:"autoOptimize,omitempty" yaml:"autoOptimize,omitempty"`
+	AnalysisInterval    string   `json:"analysisInterval,omitempty" yaml:"analysisInterval,omitempty"`
 	ConfidenceThreshold *float64 `json:"confidenceThreshold,omitempty" yaml:"confidenceThreshold,omitempty"`
 }
 
@@ -135,8 +135,8 @@ type GVRConfig struct {
 
 // WebhookConfig represents webhook-specific configuration
 type WebhookConfig struct {
-	Path      string         `json:"path,omitempty" yaml:"path,omitempty"`
-	Auth      *AuthConfig   `json:"auth,omitempty" yaml:"auth,omitempty"`
+	Path      string           `json:"path,omitempty" yaml:"path,omitempty"`
+	Auth      *AuthConfig      `json:"auth,omitempty" yaml:"auth,omitempty"`
 	RateLimit *RateLimitConfig `json:"rateLimit,omitempty" yaml:"rateLimit,omitempty"`
 }
 
@@ -160,4 +160,3 @@ type LogsConfig struct {
 type K8sEventsConfig struct {
 	InvolvedObjectKinds []string `json:"involvedObjectKinds,omitempty" yaml:"involvedObjectKinds,omitempty"`
 }
-

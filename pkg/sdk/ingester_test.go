@@ -18,7 +18,6 @@ import (
 	"testing"
 
 	"gopkg.in/yaml.v3"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestIngester_YAMLRoundTrip(t *testing.T) {
@@ -126,7 +125,7 @@ func TestNewKubeBenchIngester(t *testing.T) {
 func TestIngester_CRDCompatibility(t *testing.T) {
 	// Test that JSON tags match CRD field names
 	ingester := NewTrivyIngester("default", "test")
-	
+
 	// Verify required fields have correct JSON tags
 	// This is a structural test - actual CRD compatibility is tested via CRD conformance tests
 	if ingester.APIVersion != "zen.kube-zen.io/v1" {
@@ -136,4 +135,3 @@ func TestIngester_CRDCompatibility(t *testing.T) {
 		t.Errorf("Kind = %v, want Ingester", ingester.Kind)
 	}
 }
-

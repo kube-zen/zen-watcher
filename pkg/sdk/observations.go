@@ -20,23 +20,23 @@ import (
 
 // Observation represents an Observation CRD (v1)
 type Observation struct {
-	APIVersion string            `json:"apiVersion" yaml:"apiVersion"`
-	Kind       string            `json:"kind" yaml:"kind"`
-	Metadata   metav1.ObjectMeta `json:"metadata" yaml:"metadata"`
-	Spec       ObservationSpec   `json:"spec" yaml:"spec"`
+	APIVersion string             `json:"apiVersion" yaml:"apiVersion"`
+	Kind       string             `json:"kind" yaml:"kind"`
+	Metadata   metav1.ObjectMeta  `json:"metadata" yaml:"metadata"`
+	Spec       ObservationSpec    `json:"spec" yaml:"spec"`
 	Status     *ObservationStatus `json:"status,omitempty" yaml:"status,omitempty"`
 }
 
 // ObservationSpec represents the spec section of an Observation CRD
 type ObservationSpec struct {
-	Source                 string                 `json:"source" yaml:"source"`
-	Category               string                 `json:"category" yaml:"category"`
-	Severity               string                 `json:"severity" yaml:"severity"`
-	EventType              string                 `json:"eventType" yaml:"eventType"`
-	Resource               *ResourceRef           `json:"resource,omitempty" yaml:"resource,omitempty"`
-	Details                map[string]interface{} `json:"details,omitempty" yaml:"details,omitempty"`
-	DetectedAt             string                 `json:"detectedAt,omitempty" yaml:"detectedAt,omitempty"`
-	TTLSecondsAfterCreation *int64                `json:"ttlSecondsAfterCreation,omitempty" yaml:"ttlSecondsAfterCreation,omitempty"`
+	Source                  string                 `json:"source" yaml:"source"`
+	Category                string                 `json:"category" yaml:"category"`
+	Severity                string                 `json:"severity" yaml:"severity"`
+	EventType               string                 `json:"eventType" yaml:"eventType"`
+	Resource                *ResourceRef           `json:"resource,omitempty" yaml:"resource,omitempty"`
+	Details                 map[string]interface{} `json:"details,omitempty" yaml:"details,omitempty"`
+	DetectedAt              string                 `json:"detectedAt,omitempty" yaml:"detectedAt,omitempty"`
+	TTLSecondsAfterCreation *int64                 `json:"ttlSecondsAfterCreation,omitempty" yaml:"ttlSecondsAfterCreation,omitempty"`
 }
 
 // ResourceRef represents a Kubernetes resource reference
@@ -49,7 +49,6 @@ type ResourceRef struct {
 
 // ObservationStatus represents the status section of an Observation CRD
 type ObservationStatus struct {
-	Processed        bool   `json:"processed,omitempty" yaml:"processed,omitempty"`
+	Processed       bool   `json:"processed,omitempty" yaml:"processed,omitempty"`
 	LastProcessedAt string `json:"lastProcessedAt,omitempty" yaml:"lastProcessedAt,omitempty"`
 }
-

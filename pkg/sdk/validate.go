@@ -62,8 +62,8 @@ func ValidateIngester(ingester *Ingester) error {
 
 	validIngesterTypes := map[string]bool{
 		"informer":   true,
-		"webhook":     true,
-		"logs":        true,
+		"webhook":    true,
+		"logs":       true,
 		"k8s-events": true,
 	}
 	if !validIngesterTypes[spec.Ingester] {
@@ -259,4 +259,3 @@ func matchesPattern(s, pattern string) bool {
 	matched, err := regexp.MatchString(pattern, s)
 	return err == nil && matched
 }
-
