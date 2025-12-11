@@ -550,25 +550,13 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 		}
 	}
 	
-	// Extract dedup config
-	if dedup, ok := spec["dedup"].(map[string]interface{}); ok {
-		config.Dedup = &DedupConfig{}
-		if enabled, ok := dedup["enabled"].(bool); ok {
-			config.Dedup.Enabled = enabled
-		}
-		config.Dedup.Window = getString(dedup, "window")
-		config.Dedup.Strategy = getString(dedup, "strategy")
-		if fields, ok := dedup["fields"].([]interface{}); ok {
-			for _, f := range fields {
-				if fStr, ok := f.(string); ok {
-					config.Dedup.Fields = append(config.Dedup.Fields, fStr)
-				}
-			}
-		}
-	}
+	// Extract dedup config - support both canonical spec.processing.dedup (v1.1+) and legacy spec.deduplication
+	// Priority: spec.processing.dedup > spec.deduplication (legacy)
+	var dedupConfig *DedupConfig
 	
-	// Extract processing config
+	// First, try spec.processing.dedup (canonical v1.1+ location)
 	if processing, ok := spec["processing"].(map[string]interface{}); ok {
+		// Extract processing-level config (order, optimization settings)
 		config.Processing = &ProcessingConfig{
 			Order:        getString(processing, "order"),
 			AutoOptimize: getBool(processing, "autoOptimize"),
@@ -577,6 +565,85 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 		if threshold, ok := processing["confidenceThreshold"].(float64); ok {
 			config.Processing.ConfidenceThreshold = threshold
 		}
+		
+		// Extract dedup from processing.dedup (canonical location)
+		if dedup, ok := processing["dedup"].(map[string]interface{}); ok {
+			dedupConfig = &DedupConfig{
+				Enabled: true, // Default enabled
+			}
+			if enabled, ok := dedup["enabled"].(bool); ok {
+				dedupConfig.Enabled = enabled
+			}
+			dedupConfig.Window = getString(dedup, "window")
+			dedupConfig.Strategy = getString(dedup, "strategy")
+			if dedupConfig.Strategy == "" {
+				dedupConfig.Strategy = "fingerprint" // Default strategy
+			}
+			if fields, ok := dedup["fields"].([]interface{}); ok {
+				for _, f := range fields {
+					if fStr, ok := f.(string); ok {
+						dedupConfig.Fields = append(dedupConfig.Fields, fStr)
+					}
+				}
+			}
+			if maxEvents, ok := dedup["maxEventsPerWindow"].(float64); ok {
+				dedupConfig.MaxEventsPerWindow = int(maxEvents)
+			}
+		}
+	}
+	
+	// Fallback to legacy spec.deduplication if processing.dedup not found
+	if dedupConfig == nil {
+		if dedup, ok := spec["deduplication"].(map[string]interface{}); ok {
+			dedupConfig = &DedupConfig{
+				Enabled: true, // Default enabled
+			}
+			if enabled, ok := dedup["enabled"].(bool); ok {
+				dedupConfig.Enabled = enabled
+			}
+			dedupConfig.Window = getString(dedup, "window")
+			dedupConfig.Strategy = getString(dedup, "strategy")
+			if dedupConfig.Strategy == "" {
+				dedupConfig.Strategy = "fingerprint" // Default strategy
+			}
+			if fields, ok := dedup["fields"].([]interface{}); ok {
+				for _, f := range fields {
+					if fStr, ok := f.(string); ok {
+						dedupConfig.Fields = append(dedupConfig.Fields, fStr)
+					}
+				}
+			}
+			// Legacy deduplication doesn't have maxEventsPerWindow
+		}
+	}
+	
+	// Also support legacy spec.dedup (for backward compatibility with ObservationSourceConfig)
+	if dedupConfig == nil {
+		if dedup, ok := spec["dedup"].(map[string]interface{}); ok {
+			dedupConfig = &DedupConfig{
+				Enabled: true, // Default enabled
+			}
+			if enabled, ok := dedup["enabled"].(bool); ok {
+				dedupConfig.Enabled = enabled
+			}
+			dedupConfig.Window = getString(dedup, "window")
+			dedupConfig.Strategy = getString(dedup, "strategy")
+			if dedupConfig.Strategy == "" {
+				dedupConfig.Strategy = "fingerprint" // Default strategy
+			}
+			if fields, ok := dedup["fields"].([]interface{}); ok {
+				for _, f := range fields {
+					if fStr, ok := f.(string); ok {
+						dedupConfig.Fields = append(dedupConfig.Fields, fStr)
+					}
+				}
+			}
+		}
+	}
+	
+	// Set dedup config if found
+	if dedupConfig != nil {
+		config.Dedup = dedupConfig
 	}
 	
 	// Extract optimization config (canonical)
