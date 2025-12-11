@@ -1,0 +1,29 @@
+# Performance/Operations Event: Pod CrashLoopBackOff
+# Represents a pod that is repeatedly crashing
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  generateName: crashloop-
+  namespace: default
+  labels:
+    zen.io/source: "k8s-watcher"
+    zen.io/type: "pod_crashloop"
+    zen.io/priority: "high"
+spec:
+  source: "k8s-watcher"
+  category: "operations"
+  severity: "high"
+  eventType: "pod_crashloop"
+  resource:
+    apiVersion: "v1"
+    kind: "Pod"
+    name: "my-app-xyz789"
+    namespace: "production"
+  details:
+    restartCount: 15
+    lastExitCode: 1
+    lastError: "Container failed to start: connection refused"
+    firstSeen: "2025-12-10T11:00:00Z"
+    lastSeen: "2025-12-10T12:00:00Z"
+  detectedAt: "2025-12-10T12:00:00Z"
+  ttlSecondsAfterCreation: 3600  # 1 hour (short-lived, will be resolved or escalated)

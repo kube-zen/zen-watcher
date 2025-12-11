@@ -28,6 +28,29 @@ zen-hook is a future dynamic webhook gateway component that will receive webhook
 
 ## Integration Contract
 
+**This section defines the precise contract that zen-hook (and any webhook source) must implement.**
+
+### Contract Summary
+
+**zen-hook MUST**:
+1. Generate Observations that match zen-watcher's Observation CRD schema (v1)
+2. Use correct enum values for `category` and `severity`
+3. Include required labels (`zen.io/source`, `zen.io/webhook-source`, `zen.io/webhook-event`)
+4. Handle HTTP response codes per contract (200, 202, 400, 503)
+5. Implement retry logic with exponential backoff for 503 errors
+6. Validate payloads client-side before sending
+
+**zen-watcher WILL**:
+1. Validate Observation spec against CRD schema
+2. Return HTTP 400 for invalid payloads (no retry)
+3. Return HTTP 202 for filtered observations (success, no CRD created)
+4. Return HTTP 503 when under load (retry with backoff)
+5. Return HTTP 200 when Observation is created successfully
+
+**See**: `docs/OBSERVATION_API_PUBLIC_GUIDE.md` for complete Observation API contract.
+
+---
+
 ### Observation CRD Usage
 
 **zen-hook will generate Observations** using zen-watcher's standard Observation CRD:
@@ -43,10 +66,10 @@ metadata:
     zen.io/webhook-source: "github"
     zen.io/webhook-event: "push"
 spec:
-  source: "zen-hook"              # Identifies zen-hook as the source
-  category: "security"            # Or "operations", "compliance", etc.
-  severity: "medium"              # Normalized from webhook payload
-  eventType: "webhook-event"      # Or more specific: "github-push", "gitlab-merge", etc.
+  source: "zen-hook"              # REQUIRED: Must be "zen-hook" (matches label)
+  category: "security"            # REQUIRED: Must be enum value (security, compliance, performance, operations, cost)
+  severity: "medium"               # REQUIRED: Must be enum value (critical, high, medium, low, info) - lowercase
+  eventType: "webhook_event"       # REQUIRED: Must match pattern ^[a-z0-9_]+$ (e.g., "github_push", "gitlab_merge")
   resource:
     kind: "Repository"
     name: "my-repo"
@@ -61,20 +84,31 @@ spec:
 
 ### Expected Labels and Annotations
 
-**Standard Labels** (required):
-- `zen.io/source: "zen-hook"` - Identifies zen-hook as source
-- `zen.io/webhook-source: "<service>"` - Original webhook service (github, gitlab, etc.)
-- `zen.io/webhook-event: "<event-type>"` - Original webhook event type
+**Required Labels** (MUST be present):
+- `zen.io/source: "zen-hook"` - MUST match `spec.source`
+- `zen.io/webhook-source: "<service>"` - Original webhook service (github, gitlab, etc.) - lowercase, alphanumeric and hyphens
+- `zen.io/webhook-event: "<event-type>"` - Original webhook event type - lowercase, alphanumeric and underscores
 
-**Optional Labels** (recommended):
+**Optional Labels** (RECOMMENDED for deduplication):
 - `zen.io/webhook-id: "<delivery-id>"` - Webhook delivery ID for deduplication
 - `zen.io/webhook-registration: "<registration-name>"` - zen-hook registration name
 
-**Annotations** (optional):
-- `zen.io/webhook-received-at: "<timestamp>"` - When zen-hook received the webhook
-- `zen.io/webhook-delivery-attempt: "<number>"` - Delivery attempt number
+**Annotations** (OPTIONAL metadata):
+- `zen.io/webhook-received-at: "<timestamp>"` - RFC3339 timestamp when zen-hook received the webhook
+- `zen.io/webhook-delivery-attempt: "<number>"` - Delivery attempt number (for retry tracking)
+
+**Contract**: Labels MUST match CRD validation rules. Invalid labels will cause Observation creation to fail.
 
 ### Error and Backpressure Handling
+
+#### HTTP Response Codes Contract
+
+| Code | Meaning | zen-hook Action | Retry? |
+|------|---------|----------------|--------|
+| `200 OK` | Observation created successfully | Log success, update metrics | No |
+| `202 Accepted` | Observation received and filtered | Log filtered event, update metrics | No |
+| `400 Bad Request` | Invalid payload (validation error) | Log error, do not retry | No |
+| `503 Service Unavailable` | zen-watcher under load | Retry with exponential backoff | Yes (up to 3 times) |
 
 #### When zen-watcher is Under Load
 
@@ -87,10 +121,11 @@ spec:
    - `zen_watcher_webhook_dropped_total{source="zen-hook", reason="queue_full"}`
    - `zen_watcher_webhook_errors_total{source="zen-hook", status="503"}`
 
-**Contract**:
-- zen-hook should retry up to 3 times with exponential backoff (1s, 2s, 4s)
-- zen-hook should log retry attempts for observability
-- zen-watcher will process webhooks in order (FIFO queue)
+**Contract** (MUST implement):
+- zen-hook MUST retry up to 3 times with exponential backoff (1s, 2s, 4s)
+- zen-hook MUST log retry attempts for observability
+- zen-hook MUST NOT retry more than 3 times (to prevent thundering herd)
+- zen-watcher WILL process webhooks in order (FIFO queue)
 
 #### When zen-watcher Rejects Invalid Payloads
 
@@ -102,10 +137,11 @@ spec:
 3. **zen-watcher**: Logs validation errors, exposes metrics:
    - `zen_watcher_webhook_errors_total{source="zen-hook", status="400", reason="validation_failed"}`
 
-**Contract**:
-- zen-hook should validate payload before sending (client-side validation)
-- zen-watcher will return detailed error messages for debugging
-- Invalid payloads are not retried
+**Contract** (MUST implement):
+- zen-hook MUST validate payload before sending (client-side validation)
+- zen-hook MUST NOT retry on 400 errors (invalid payload won't succeed on retry)
+- zen-watcher WILL return detailed error messages for debugging (JSON error body)
+- Invalid payloads are not retried (permanent failure)
 
 #### When zen-watcher Filters Observations
 
@@ -116,10 +152,10 @@ spec:
 2. **zen-watcher**: Filters observation (no CRD created), logs filter reason
 3. **zen-hook**: Treats as success (202 Accepted)
 
-**Contract**:
-- Filtering is not an error - it's expected behavior
-- zen-hook should not retry filtered observations
-- zen-watcher exposes metrics: `zen_watcher_observations_filtered_total{source="zen-hook", reason="<reason>"}`
+**Contract** (MUST implement):
+- Filtering is not an error - it's expected behavior (202 Accepted = success)
+- zen-hook MUST NOT retry filtered observations (202 = success, no CRD created)
+- zen-watcher WILL expose metrics: `zen_watcher_observations_filtered_total{source="zen-hook", reason="<reason>"}`
 
 ---
 
@@ -193,16 +229,24 @@ zen-hook lies **between zen-watcher and SaaS** in terms of quality bar:
 
 ### Contract Stability
 
-**Stable Contracts** (must not change without deprecation):
-- Observation CRD schema (v1)
-- Webhook adapter HTTP API
-- Error response formats
-- Label and annotation conventions
+**Stable Contracts** (MUST NOT change without deprecation):
+- Observation CRD schema (v1) - See `docs/OBSERVATION_API_PUBLIC_GUIDE.md` for compatibility guarantees
+- Webhook adapter HTTP API (response codes, error formats)
+- Label and annotation conventions (`zen.io/*` prefixes)
+- Enum values (`category`, `severity`) - existing values won't be removed
 
-**Evolving Contracts** (can change with versioning):
+**Evolving Contracts** (CAN change with versioning):
 - ObservationSourceConfig schema (v1alpha1, can evolve)
 - Internal webhook processing logic
 - Metrics names (with deprecation period)
+- New enum values (can be added, but existing values won't be removed)
+
+**Versioning**: Contract changes will be versioned via:
+- CRD versions (v1 → v1beta1 → v2)
+- Annotation versioning (e.g., `zen.io/contract-version: "v1"`)
+- Release notes (deprecation notices)
+
+**See**: `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` for versioning strategy.
 
 ---
 
@@ -269,7 +313,10 @@ zen-hook lies **between zen-watcher and SaaS** in terms of quality bar:
 ## Related Documentation
 
 **Current (Canonical)**:
+- `docs/OBSERVATION_API_PUBLIC_GUIDE.md` - **Observation API contract** (MUST align with this)
+- `examples/observations/08-webhook-originated.yaml` - **Golden example** of webhook-originated Observation
 - `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md` - KEP pre-draft (references dynamic webhooks)
+- `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` - Versioning strategy and compatibility policy
 - `docs/PM_AI_ROADMAP.md` - Roadmap (mid-term backlog includes dynamic webhooks)
 - `docs/ARCHITECTURE.md` - Architecture (webhook adapter details)
 - `docs/SOURCE_ADAPTERS.md` - Source adapter extensibility guide

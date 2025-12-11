@@ -18,12 +18,10 @@ import (
 	"context"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 )
 
@@ -111,8 +109,8 @@ func TestObservationCreator_ValidTTLRange(t *testing.T) {
 
 	// Test valid TTL values
 	testCases := []struct {
-		name string
-		ttl  int64
+		name  string
+		ttl   int64
 		valid bool
 	}{
 		{"ttl-minimum", 1, true},
@@ -134,10 +132,10 @@ func TestObservationCreator_ValidTTLRange(t *testing.T) {
 						"namespace":    "default",
 					},
 					"spec": map[string]interface{}{
-						"source":                "test",
-						"category":              "security",
-						"severity":              "high",
-						"eventType":             "test-event",
+						"source":                  "test",
+						"category":                "security",
+						"severity":                "high",
+						"eventType":               "test-event",
 						"ttlSecondsAfterCreation": tc.ttl,
 					},
 				},
@@ -184,7 +182,7 @@ func TestObservationCreator_CanonicalSample(t *testing.T) {
 			"spec": map[string]interface{}{
 				"source":    "test",
 				"category":  "security",
-				"severity":  "high",  // lowercase (will be normalized to HIGH by code)
+				"severity":  "high", // lowercase (will be normalized to HIGH by code)
 				"eventType": "vulnerability",
 			},
 		},

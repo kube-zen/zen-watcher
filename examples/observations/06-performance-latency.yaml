@@ -1,0 +1,31 @@
+# Performance Event: High Latency
+# Represents a latency spike or performance degradation
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  generateName: latency-spike-
+  namespace: default
+  labels:
+    zen.io/source: "prometheus"
+    zen.io/type: "latency_spike"
+    zen.io/priority: "medium"
+spec:
+  source: "prometheus"
+  category: "performance"
+  severity: "medium"
+  eventType: "latency_spike"
+  resource:
+    apiVersion: "apps/v1"
+    kind: "Deployment"
+    name: "api-server"
+    namespace: "production"
+  details:
+    metric: "http_request_duration_seconds"
+    p50: 0.5
+    p95: 2.5
+    p99: 5.0
+    threshold: 1.0
+    duration: "5m"
+    description: "P95 latency exceeded threshold for 5 minutes"
+  detectedAt: "2025-12-10T12:00:00Z"
+  ttlSecondsAfterCreation: 86400  # 24 hours

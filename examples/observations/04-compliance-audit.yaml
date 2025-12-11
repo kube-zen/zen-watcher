@@ -1,0 +1,29 @@
+# Compliance Event: Audit Finding
+# Represents a compliance audit finding (e.g., CIS Benchmark, SOC 2)
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  generateName: compliance-audit-
+  namespace: default
+  labels:
+    zen.io/source: "kube-bench"
+    zen.io/type: "compliance_finding"
+    zen.io/priority: "medium"
+spec:
+  source: "kube-bench"
+  category: "compliance"
+  severity: "medium"
+  eventType: "compliance_finding"
+  resource:
+    apiVersion: "v1"
+    kind: "Node"
+    name: "worker-node-1"
+    namespace: ""  # Nodes are cluster-scoped
+  details:
+    benchmark: "CIS Kubernetes Benchmark"
+    check: "1.2.1"
+    description: "Ensure that the --anonymous-auth argument is set to false"
+    remediation: "Set --anonymous-auth=false in kubelet configuration"
+    status: "FAIL"
+  detectedAt: "2025-12-10T12:00:00Z"
+  ttlSecondsAfterCreation: 2592000  # 30 days

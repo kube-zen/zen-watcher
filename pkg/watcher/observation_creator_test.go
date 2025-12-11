@@ -18,14 +18,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/kube-zen/zen-watcher/pkg/dedup"
-	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 )
 
@@ -64,7 +61,7 @@ func TestObservationCreator_CreateObservation(t *testing.T) {
 			"spec": map[string]interface{}{
 				"source":    "test",
 				"category":  "security",
-				"severity":  "high",  // lowercase (matches CRD enum, code normalizes to uppercase internally)
+				"severity":  "high", // lowercase (matches CRD enum, code normalizes to uppercase internally)
 				"eventType": "vulnerability",
 			},
 		},
@@ -128,7 +125,7 @@ func TestObservationCreator_CreateObservation_AlreadyExists(t *testing.T) {
 			"spec": map[string]interface{}{
 				"source":    "test",
 				"category":  "security",
-				"severity":  "high",  // lowercase (matches CRD enum, code normalizes to uppercase internally)
+				"severity":  "high", // lowercase (matches CRD enum, code normalizes to uppercase internally)
 				"eventType": "vulnerability",
 			},
 		},
@@ -181,7 +178,7 @@ func TestObservationCreator_CreateObservation_WithDedup(t *testing.T) {
 			"spec": map[string]interface{}{
 				"source":    "test",
 				"category":  "security",
-				"severity":  "high",  // lowercase (matches CRD enum, code normalizes to uppercase internally)
+				"severity":  "high", // lowercase (matches CRD enum, code normalizes to uppercase internally)
 				"eventType": "vulnerability",
 			},
 		},

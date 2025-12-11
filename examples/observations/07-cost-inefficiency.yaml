@@ -1,0 +1,30 @@
+# Cost Event: Resource Inefficiency
+# Represents wasted resources or cost optimization opportunities
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  generateName: cost-inefficiency-
+  namespace: default
+  labels:
+    zen.io/source: "kube-cost"
+    zen.io/type: "resource_waste"
+    zen.io/priority: "low"
+spec:
+  source: "kube-cost"
+  category: "cost"
+  severity: "low"
+  eventType: "resource_waste"
+  resource:
+    apiVersion: "apps/v1"
+    kind: "Deployment"
+    name: "idle-service"
+    namespace: "development"
+  details:
+    metric: "cpu_utilization"
+    currentUsage: 0.05  # 5% CPU usage
+    requested: 2.0      # 2 CPU cores requested
+    waste: 1.9          # 1.9 CPU cores wasted
+    estimatedCost: 50.0  # $50/month wasted
+    recommendation: "Reduce CPU requests to 0.1 cores"
+  detectedAt: "2025-12-10T12:00:00Z"
+  ttlSecondsAfterCreation: 604800  # 7 days

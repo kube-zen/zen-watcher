@@ -201,6 +201,10 @@ That's it! Apply the YAML and zen-watcher will start collecting observations. Se
 - Complete end-to-end automation (quick-demo.sh supports k3d/kind/minikube and validates all 9 sources in ~4 minutes)
 
 ### CRD-Based Storage
+
+**API Contract**: See [Observation API Public Guide](docs/OBSERVATION_API_PUBLIC_GUIDE.md) for the stable, external-facing API contract.
+
+**Examples**: See [examples/observations/](examples/observations/) for canonical Observation examples.
 - All events stored as **Observation** Custom Resources
 - Kubernetes-native (stored in etcd)
 - kubectl access: `kubectl get observations`

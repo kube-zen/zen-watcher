@@ -1,0 +1,28 @@
+# Security Event: Policy Violation (Kyverno-style)
+# Represents a Kubernetes policy violation
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  generateName: kyverno-policy-
+  namespace: default
+  labels:
+    zen.io/source: "kyverno"
+    zen.io/type: "policy_violation"
+    zen.io/priority: "medium"
+spec:
+  source: "kyverno"
+  category: "security"
+  severity: "medium"
+  eventType: "policy_violation"
+  resource:
+    apiVersion: "apps/v1"
+    kind: "Deployment"
+    name: "my-deployment"
+    namespace: "default"
+  details:
+    policy: "require-resource-limits"
+    rule: "resources.requests.memory"
+    message: "Deployment missing memory resource requests"
+    violation: "Deployment 'my-deployment' does not specify memory requests"
+  detectedAt: "2025-12-10T12:00:00Z"
+  ttlSecondsAfterCreation: 604800  # 7 days

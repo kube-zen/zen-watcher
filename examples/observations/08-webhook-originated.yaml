@@ -1,0 +1,42 @@
+# Webhook-Originated Event (zen-hook style)
+# Represents an event from an external webhook (GitHub, GitLab, etc.)
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  generateName: webhook-github-
+  namespace: default
+  labels:
+    zen.io/source: "zen-hook"
+    zen.io/type: "webhook_event"
+    zen.io/priority: "medium"
+    zen.io/webhook-source: "github"
+    zen.io/webhook-event: "push"
+    zen.io/webhook-id: "abc123"
+  annotations:
+    zen.io/webhook-received-at: "2025-12-10T12:00:00Z"
+    zen.io/webhook-delivery-attempt: "1"
+spec:
+  source: "zen-hook"
+  category: "security"
+  severity: "medium"
+  eventType: "webhook_event"
+  resource:
+    apiVersion: "v1"
+    kind: "Repository"
+    name: "my-repo"
+    namespace: "default"
+  details:
+    webhookSource: "github"
+    webhookEvent: "push"
+    webhookId: "abc123"
+    repository: "my-org/my-repo"
+    branch: "main"
+    commit: "abc123def456"
+    author: "user@example.com"
+    payload:
+      ref: "refs/heads/main"
+      commits:
+        - id: "abc123def456"
+          message: "Fix security vulnerability"
+  detectedAt: "2025-12-10T12:00:00Z"
+  ttlSecondsAfterCreation: 2592000  # 30 days

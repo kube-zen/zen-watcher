@@ -1,0 +1,16 @@
+# Minimal "Hello World" Observation
+# This is the simplest valid Observation - only required fields
+apiVersion: zen.kube-zen.io/v1
+kind: Observation
+metadata:
+  generateName: hello-world-
+  namespace: default
+  labels:
+    zen.io/source: "example"
+    zen.io/type: "hello_world"
+    zen.io/priority: "info"
+spec:
+  source: "example"
+  category: "operations"
+  severity: "info"
+  eventType: "hello_world"

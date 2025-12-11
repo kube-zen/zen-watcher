@@ -55,6 +55,38 @@ None in this release.
 
 ## CRD/API Changes
 
+### Observation API Public Guide
+
+- **Public API Contract**: Created `docs/OBSERVATION_API_PUBLIC_GUIDE.md`
+  - External-facing contract guide for Observation CRD API
+  - Defines stable API surface that external users can depend on
+  - Compatibility guarantees (what's stable vs what can change)
+  - Validation guarantees (enums, patterns, TTL behavior)
+  - Versioning strategy summary
+  - **Reference**: `docs/OBSERVATION_API_PUBLIC_GUIDE.md`
+
+### Golden Observation Examples
+
+- **Canonical Examples**: Created `examples/observations/` directory
+  - 8 golden examples covering all categories (security, compliance, performance, operations, cost)
+  - Minimal "hello world" example
+  - Webhook-originated example (zen-hook style)
+  - All examples validate against current CRD schema
+  - Used as test fixtures for schema validation
+  - **Reference**: `examples/observations/README.md`
+
+### Dynamic Webhooks Contract
+
+- **Webhook Integration Contract**: Tightened `docs/DYNAMIC_WEBHOOKS_WATCHER_INTEGRATION.md`
+  - Precise contract-level spec for zen-hook and webhook sources
+  - HTTP response codes contract (200, 202, 400, 503)
+  - Retry/backpressure semantics (exponential backoff, max 3 retries)
+  - Payload shape and validation requirements
+  - Label and annotation conventions (required vs optional)
+  - Contract stability guarantees
+  - **Reference**: `docs/DYNAMIC_WEBHOOKS_WATCHER_INTEGRATION.md`
+  - **Example**: `examples/observations/08-webhook-originated.yaml`
+
 ### Observation CRD Validation Hardening (v1alpha2 - Non-Breaking)
 
 - **Enum Validation for Severity**: Added enum: `[critical, high, medium, low, info]`
@@ -158,12 +190,15 @@ No upgrade required. All changes are backward-compatible.
 
 ## References
 
-- **Versioning Plan**: `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md`
-- **KEP Draft**: `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md`
-- **API Audit**: `docs/OBSERVATION_CRD_API_AUDIT.md`
-- **Informer Convergence**: `docs/INFORMERS_CONVERGENCE_NOTES.md`
-- **Roadmap**: `docs/PM_AI_ROADMAP.md`
-- **Release Notes Template**: `docs/RELEASE_NOTES_TEMPLATE.md`
+- **Observation API Guide**: `docs/OBSERVATION_API_PUBLIC_GUIDE.md` - External-facing API contract
+- **Observation Examples**: `examples/observations/` - Canonical Observation examples
+- **Webhook Integration Contract**: `docs/DYNAMIC_WEBHOOKS_WATCHER_INTEGRATION.md` - zen-hook contract
+- **Versioning Plan**: `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` - Versioning strategy
+- **KEP Draft**: `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md` - KEP pre-draft
+- **API Audit**: `docs/OBSERVATION_CRD_API_AUDIT.md` - Detailed API analysis
+- **Informer Convergence**: `docs/INFORMERS_CONVERGENCE_NOTES.md` - Informer architecture
+- **Roadmap**: `docs/PM_AI_ROADMAP.md` - Roadmap and priorities
+- **Release Notes Template**: `docs/RELEASE_NOTES_TEMPLATE.md` - Release notes structure
 
 ---
 
