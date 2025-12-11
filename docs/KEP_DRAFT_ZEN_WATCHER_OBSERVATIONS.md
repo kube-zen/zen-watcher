@@ -176,7 +176,9 @@ status:
 - `adapter` field (which adapter processed this observation)
 - `expiresAt` field (explicit expiration timestamp)
 
-**Migration Strategy**: v1 and v2 will be served simultaneously; v1 remains storage version for backward compatibility
+**Migration Strategy**: v1 and v1beta1 will be served simultaneously; v1 remains storage version for backward compatibility. v2 migration will be planned after v1beta1 stabilization.
+
+**Versioning Plan**: See `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` for detailed version progression (v1alpha2 → v1beta1 → v2) and compatibility policy.
 
 **See**: `docs/OBSERVATION_CRD_API_AUDIT.md` for detailed API analysis and future improvements
 

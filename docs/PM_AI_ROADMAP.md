@@ -260,6 +260,16 @@ For historical reference and deep background on design decisions:
 
 ---
 
+## Release Process
+
+**Release Notes**: All releases must follow `docs/RELEASE_NOTES_TEMPLATE.md` structure. CRD/API changes must reference:
+- `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` (versioning plan)
+- `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md` (if relevant)
+
+**Version History**: See `docs/releases/` for release notes.
+
+---
+
 ## How to Prioritize Workstreams
 
 When choosing the next workstream, consider:
