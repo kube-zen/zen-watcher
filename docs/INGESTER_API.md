@@ -157,6 +157,74 @@ source → (filter | dedup, both applied, order chosen dynamically) → normaliz
 ### Pipeline Stages
 
 **Stage 1: Filter and Dedup Block**
+
+#### Deduplication Configuration (W33 - v1.1)
+
+Deduplication can be configured per Ingester using `spec.processing.dedup`:
+
+```yaml
+spec:
+  processing:
+    dedup:
+      enabled: true
+      strategy: "fingerprint"  # fingerprint (default), event-stream, or key
+      window: "60s"           # Deduplication window duration
+      maxEventsPerWindow: 10  # For event-stream strategy only
+      fields:                  # For key strategy only
+        - "source"
+        - "kind"
+        - "name"
+```
+
+**Available Strategies:**
+
+1. **`fingerprint` (default)**
+   - Content-based fingerprinting using source, category, severity, eventType, resource, and critical details
+   - Best for: General-purpose deduplication, most event sources
+   - Example:
+     ```yaml
+     spec:
+       processing:
+         dedup:
+           enabled: true
+           strategy: "fingerprint"
+           window: "60s"
+     ```
+
+2. **`event-stream`**
+   - Strict window-based deduplication optimized for high-volume, noisy event streams
+   - Best for: Kubernetes events, log-based sources with repetitive patterns
+   - Example:
+     ```yaml
+     spec:
+       processing:
+         dedup:
+           enabled: true
+           strategy: "event-stream"
+           window: "5m"
+           maxEventsPerWindow: 10
+     ```
+
+3. **`key`**
+   - Field-based deduplication using explicit fields
+   - Best for: Custom deduplication logic based on specific resource fields
+   - Example:
+     ```yaml
+     spec:
+       processing:
+         dedup:
+           enabled: true
+           strategy: "key"
+           window: "60s"
+           fields:
+             - "source"
+             - "kind"
+             - "name"
+     ```
+
+**Backward Compatibility:**
+
+If `spec.processing.dedup.strategy` is not set, the default `fingerprint` strategy is used, preserving existing behavior.
 - Both filter and dedup are **always applied** to every event
 - The optimization engine chooses which runs first based on traffic patterns:
   - **`filter_first`**: Filter → Dedup → Normalize → Destinations

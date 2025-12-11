@@ -42,6 +42,21 @@ kubectl exec -n zen-system zen-watcher-0 -- curl -s http://localhost:8080/metric
   - Type: Counter
   - Labels: `source`
 
+#### Deduplication Strategy Metrics (W33 - v1.1)
+- **`zen_watcher_dedup_effectiveness_per_strategy{strategy="<strategy>",source="<source>"}`**
+  - Deduplication effectiveness per strategy (ratio of dropped to total events)
+  - Type: Gauge
+  - Labels: `strategy`, `source`
+  - Strategies: `fingerprint`, `event-stream`, `key`
+  - Example: `zen_watcher_dedup_effectiveness_per_strategy{strategy="fingerprint",source="trivy"}`
+
+- **`zen_watcher_dedup_decisions_total{strategy="<strategy>",source="<source>",decision="<decision>"}`**
+  - Total deduplication decisions (create or drop) by strategy and source
+  - Type: Counter
+  - Labels: `strategy`, `source`, `decision`
+  - Decision values: `create`, `drop`
+  - Example: `zen_watcher_dedup_decisions_total{strategy="event-stream",source="k8s-events",decision="drop"}`
+
 ### Auto-Optimization Metrics
 
 #### Current Strategy
@@ -210,6 +225,22 @@ zen_watcher_optimization_filter_effectiveness_ratio
 ### Deduplication Rate
 ```promql
 zen_watcher_optimization_deduplication_rate_ratio
+```
+
+### Deduplication Strategy Effectiveness (W33 - v1.1)
+```promql
+# Effectiveness per strategy
+zen_watcher_dedup_effectiveness_per_strategy
+
+# Compare strategies for a specific source
+zen_watcher_dedup_effectiveness_per_strategy{source="trivy"}
+
+# Total decisions per strategy
+sum by (strategy) (zen_watcher_dedup_decisions_total)
+
+# Drop rate per strategy
+sum by (strategy) (zen_watcher_dedup_decisions_total{decision="drop"}) / 
+sum by (strategy) (zen_watcher_dedup_decisions_total)
 ```
 
 ### Pipeline Error Rate

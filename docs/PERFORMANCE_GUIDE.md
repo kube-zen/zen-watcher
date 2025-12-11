@@ -146,6 +146,106 @@ resources:
 - Or use multi-replica with HA optimization
 - Per-replica: 500m CPU, 512Mi memory
 
+### Deduplication Strategy Selection (W33 - v1.1)
+
+zen-watcher supports multiple deduplication strategies, each optimized for different event patterns:
+
+#### Available Strategies
+
+1. **`fingerprint` (default)**
+   - Content-based fingerprinting using source, category, severity, eventType, resource, and critical details
+   - Best for: General-purpose deduplication, most event sources
+   - Window: Configurable (default: 60s)
+   - Use when: You need accurate deduplication based on event content
+
+2. **`event-stream`**
+   - Strict window-based deduplication optimized for high-volume, noisy event streams
+   - Best for: Kubernetes events, log-based sources with repetitive patterns
+   - Window: Shorter effective window (5 minutes or configurable)
+   - Use when: You have high-volume sources with many duplicate events in short time windows
+
+3. **`key`**
+   - Field-based deduplication using explicit fields
+   - Best for: Custom deduplication logic based on specific resource fields
+   - Window: Configurable
+   - Use when: You need fine-grained control over which fields determine duplicates
+
+#### Strategy Selection Guidelines
+
+**Choose `fingerprint` (default) when:**
+- You want accurate content-based deduplication
+- Events have varying content but may be semantically similar
+- You need to deduplicate based on vulnerability IDs, rule names, or other critical details
+- Most use cases fall into this category
+
+**Choose `event-stream` when:**
+- You have high-volume sources (e.g., k8s-events, log streams)
+- Events are highly repetitive within short time windows
+- You want stricter deduplication with shorter windows
+- You observe high dedup effectiveness (>60%) with the default strategy
+
+**Choose `key` when:**
+- You need custom deduplication logic based on specific resource fields
+- You want to deduplicate based on a subset of fields (e.g., only source + kind + name)
+- You have specific requirements that don't fit fingerprint or event-stream patterns
+
+#### Example Configurations
+
+**Fingerprint (default):**
+```yaml
+spec:
+  processing:
+    dedup:
+      enabled: true
+      strategy: "fingerprint"  # or omit for default
+      window: "60s"
+```
+
+**Event-stream for noisy sources:**
+```yaml
+spec:
+  processing:
+    dedup:
+      enabled: true
+      strategy: "event-stream"
+      window: "5m"
+      maxEventsPerWindow: 10
+```
+
+**Key-based for custom logic:**
+```yaml
+spec:
+  processing:
+    dedup:
+      enabled: true
+      strategy: "key"
+      window: "60s"
+      fields:
+        - "source"
+        - "kind"
+        - "name"
+```
+
+#### Monitoring Strategy Effectiveness
+
+Use the following metrics to evaluate strategy performance:
+
+```promql
+# Effectiveness per strategy
+zen_watcher_dedup_effectiveness_per_strategy{strategy="fingerprint",source="trivy"}
+
+# Compare strategies
+zen_watcher_dedup_effectiveness_per_strategy
+
+# Decision breakdown
+zen_watcher_dedup_decisions_total{strategy="event-stream",decision="drop"}
+```
+
+**When to switch strategies:**
+- If `fingerprint` effectiveness is <30% for a source, consider `event-stream`
+- If `event-stream` is dropping too many unique events, switch back to `fingerprint`
+- Monitor `zen_watcher_dedup_decisions_total` to understand drop vs create patterns
+
 ### When to Tune Optimization Thresholds
 
 **Default thresholds work well for most cases**. Consider tuning if:
