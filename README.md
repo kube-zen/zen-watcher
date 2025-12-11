@@ -11,6 +11,42 @@ Zen Watcher is an **open-source** Kubernetes operator that aggregates structured
 
 **OSS Scope:** zen-watcher is a pure OSS component that writes only to `Observation` CRDs. It has zero egress traffic, zero secrets, and zero external dependencies. For external integrations (webhooks, SaaS, Slack), use external controllers that watch Observation CRDs, or use zen-bridge (platform component) for SaaS integration.
 
+## 🚀 Quick Start
+
+### Install via Helm
+
+```bash
+# Install zen-watcher
+helm install zen-watcher ./deployments/helm/zen-watcher \
+  --namespace zen-system \
+  --create-namespace
+
+# Verify installation
+kubectl get pods -n zen-system
+```
+
+### Apply Example Ingester
+
+```bash
+# Apply Trivy Ingester
+kubectl apply -f examples/ingesters/trivy-informer.yaml
+
+# Check Ingesters
+kubectl get ingesters
+```
+
+### Query Observations
+
+```bash
+# Using obsctl CLI
+obsctl list --namespace zen-system
+
+# Or using kubectl
+kubectl get observations
+```
+
+**See [DEPLOYMENT_HELM.md](docs/DEPLOYMENT_HELM.md) for complete installation guide.**
+
 > 📋 **For PM AIs and Maintainers**: See [docs/PM_AI_ROADMAP.md](docs/PM_AI_ROADMAP.md) for the canonical roadmap and priorities.  
 > 📝 **Release Notes**: See [docs/releases/](docs/releases/) for version history and [docs/RELEASE_NOTES_TEMPLATE.md](docs/RELEASE_NOTES_TEMPLATE.md) for release notes structure.
 

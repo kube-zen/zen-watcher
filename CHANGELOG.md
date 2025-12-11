@@ -5,7 +5,7 @@ All notable changes to zen-watcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0-alpha] - 2025-12-06
+## [1.0.0-alpha] - 2025-12-11
 
 ### 🎉 Initial Alpha Release
 
@@ -14,11 +14,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Added
 
 **Core Features:**
+- **Ingester v1**: Complete Ingester CRD with informer/webhook/logs/k8s-events support
+- **Canonical Pipeline**: Enforced pipeline order `source → (filter | dedup) → normalize → destinations[]`
+- **Auto-Optimization**: Dynamic filter_first/dedup_first strategy selection per source
+- **Filter Expressions (v1.1)**: Expression-based filtering with AND/OR/NOT, comparisons, macros
+- **Plugin Hooks**: Compile-time hooks for extending pipeline (post-normalization, pre-CRD write)
 - Multi-source event aggregation (Trivy, Falco, Kyverno, Checkov, Kube-bench, Audit logs)
 - Kubernetes-native CRD storage (Observation CRDs)
 - Intelligent noise reduction (SHA-256 fingerprinting, rate limiting, deduplication)
-- Source-level filtering (ConfigMap and CRD-based)
+- Source-level filtering (ConfigMap, CRD-based, and expression-based)
 - Comprehensive observability (Prometheus metrics, Grafana dashboards, structured logging)
+
+**Tooling Suite:**
+- **ingester-migrate**: CLI tool for migrating v1alpha1 → v1 Ingester specs
+- **ingester-lint**: Safety validator for Ingester specs (dangerous settings, misconfigurations)
+- **obsctl**: CLI for querying Observations (list, stats, get commands)
+- **schema-doc-gen**: Automated schema documentation generator from CRDs
 
 **Architecture:**
 - Pure core, extensible ecosystem model (zero secrets, zero egress)
@@ -26,16 +37,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Kubernetes-native event consumption via CRDs
 - Infrastructure-blind design (preserves namespace/name/kind for RBAC)
 
+**Deployment:**
+- **Helm Chart**: Production-ready Helm chart with dev/staging/prod profiles
+- **Container Images**: Minimal distroless-based images
+- **E2E Validation**: Cluster-agnostic validation harness
+
 **Documentation:**
-- Complete architecture documentation
+- Complete API documentation (Ingester API, Observation API)
 - Quick start guide with automated demo
 - Integration guides (kubewatch, Robusta, custom controllers)
-- Scaling and operational excellence guides
+- Ecosystem playbooks (Kubewatch, Robusta, Prometheus, SIEM)
+- Multi-team RBAC patterns
+- Troubleshooting guide
+- Performance and scaling guides
 
 **CI/CD:**
 - Automated testing and build pipeline
 - Docker image builds and publishing
 - Security scanning and SBOM generation
+- Fuzz testing for pipeline robustness
+
+#### Known Limitations / Not in This Release
+
+- **Dedup Strategy v1.1**: Pluggable dedup strategies (deferred to post-alpha)
+- **Auto-Optimization v1.1**: Adaptive optimization beyond static thresholds (deferred to post-alpha)
+- **Observations Taxonomy**: Standardized field mappings for common tools (deferred to post-alpha)
+- **Advanced Tooling Polish**: Unified CLI suite (deferred to post-alpha)
 
 ---
 
