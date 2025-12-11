@@ -1,0 +1,72 @@
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: pure-webhook-ingester
+  namespace: zen-system
+spec:
+  source: github-webhooks
+  ingester: webhook
+  
+  webhook:
+    path: "/ingest/github"
+    methods: ["POST"]
+    auth:
+      type: hmac
+      secretRef: github-webhook-secret
+    tls:
+      enabled: true
+      certSecretRef: github-tls-cert
+      minVersion: "1.3"
+    rateLimit:
+      requestsPerSecond: 100
+      burst: 200
+    bufferSize: 1000
+  
+  processing:
+    normalization:
+      domain: operations
+      type: github_event
+      priority:
+        push: 0.5
+        pull_request: 0.7
+        issue: 0.6
+        release: 0.8
+      fieldMapping:
+        - from: "$.repository.full_name"
+          to: "repository"
+        - from: "$.action"
+          to: "action"
+        - from: "$.sender.login"
+          to: "actor"
+    
+    filter:
+      enabled: true
+      minPriority: 0.4
+    
+    dedup:
+      enabled: true
+      window: "1h"
+      strategy: fingerprint
+    
+    optimization:
+      enabled: true
+      order: filter_first
+      autoOptimize: false
+  
+  destinations:
+    # Pure webhook: no CRDs, only external webhooks
+    - type: webhook
+      name: primary-sink
+      url: "https://api.example.com/webhooks/github"
+      retryPolicy:
+        maxRetries: 5
+        backoff: exponential
+        timeout: "10s"
+    
+    - type: webhook
+      name: backup-sink
+      url: "https://backup.example.com/events/github"
+      retryPolicy:
+        maxRetries: 3
+        backoff: linear
+        timeout: "5s"
