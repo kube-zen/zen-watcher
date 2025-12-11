@@ -249,6 +249,15 @@
 - **Stress Tests**: `docs/STRESS_TEST_RESULTS.md`
 - **Dashboards**: `config/dashboards/README.md`
 
+## Historical Context
+
+For historical reference and deep background on design decisions:
+
+- **Expert Package Archive**: `docs/archive/EXPERT_PACKAGE/EXPERT_PACKAGE_SUMMARY.md` - Comprehensive expert analysis from late 2024/early 2025
+- **Archive Overview**: `docs/archive/README.md` - Guidelines for using historical archives
+
+**Note**: Archive documents are non-canonical and may be partially obsolete. Always check current documentation (`docs/PM_AI_ROADMAP.md`, `CONTRIBUTING.md`) for authoritative direction.
+
 ---
 
 ## How to Prioritize Workstreams
