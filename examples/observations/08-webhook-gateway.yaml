@@ -1,15 +1,15 @@
-# Webhook-Originated Event (zen-hook Example)
-# Represents an event from an external webhook (GitHub, GitLab, etc.) via zen-hook
+# Webhook-Originated Event (Generic Webhook Gateway)
+# Represents an event from an external webhook (GitHub, GitLab, etc.) via a webhook gateway
 # 
-# Note: This is a kube-zen ecosystem example. zen-hook is one concrete webhook gateway implementation.
-# For generic webhook gateway examples, see 08-webhook-gateway.yaml
+# Note: This is a generic example. zen-hook (kube-zen ecosystem) is one concrete implementation
+# that uses source: "zen-hook" and similar patterns. Other webhook gateways can use their own identifiers.
 apiVersion: zen.kube-zen.io/v1
 kind: Observation
 metadata:
   generateName: webhook-github-
   namespace: default
   labels:
-    zen.io/source: "zen-hook"              # zen-hook (kube-zen ecosystem) uses this identifier
+    zen.io/source: "webhook-gateway"        # Generic webhook gateway identifier (zen-hook uses "zen-hook")
     zen.io/type: "webhook_event"
     zen.io/priority: "medium"
     zen.io/webhook-source: "github"
@@ -19,7 +19,7 @@ metadata:
     zen.io/webhook-received-at: "2025-12-10T12:00:00Z"
     zen.io/webhook-delivery-attempt: "1"
 spec:
-  source: "zen-hook"                       # zen-hook (kube-zen ecosystem) identifier
+  source: "webhook-gateway"                 # Generic identifier (zen-hook uses "zen-hook" as one example)
   category: "security"
   severity: "medium"
   eventType: "webhook_event"

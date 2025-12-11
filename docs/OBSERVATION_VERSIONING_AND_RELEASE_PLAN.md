@@ -131,20 +131,30 @@
 
 **Timeline**: 12+ months (after v1beta1 stabilization)
 
-**Goal**: Major API redesign with breaking changes (if needed).
+**Goal**: Major API redesign with breaking changes (if needed), including vendor-neutral naming migration.
 
 **Potential Changes** (all breaking):
+- **CRD Group Migration**: `zen.kube-zen.io` → neutral group (e.g., `observations.kubernetes.io` or `observations.watcher.io`)
+  - **Rationale**: Remove hard-coded branding from API surface (see `docs/BRANDING_DECOUPLING_AUDIT.md`)
+  - **Migration**: New CRD group with conversion webhook or migration tooling
+  - **Deprecation**: `zen.kube-zen.io` served alongside new group for 2+ release cycles
+  - **Old → New Mapping**: `zen.kube-zen.io/v1` → `observations.kubernetes.io/v2` (or similar)
 - Change required fields (e.g., `category/severity/eventType` → `type/priority/title/description`)
 - Remove deprecated fields from v1beta1
 - Restructure resource model (single `resource` → `resources` array)
+- **Label Prefix Migration**: `zen.io/*` → neutral prefix (e.g., `observations.io/*` or `watcher.io/*`)
+  - **Rationale**: Remove branding from label conventions (see `docs/BRANDING_DECOUPLING_AUDIT.md`)
+  - **Migration**: Support both prefixes during transition, update examples and docs
+  - **Deprecation**: `zen.io/*` labels remain valid but new labels use neutral prefix
 
 **Migration Strategy**:
-- v1 and v2 served simultaneously
+- v1 (`zen.kube-zen.io`) and v2 (new group) served simultaneously
 - v1 remains storage version for backward compatibility
-- Migration tooling provided for v1 → v2 conversion
+- Migration tooling provided for v1 → v2 conversion (CRD group change, label prefix update)
 - Clear deprecation timeline (minimum 2 release cycles)
+- Conversion webhook (optional) to auto-convert v1 → v2 on read
 
-**Note**: v2 schema is already defined in CRD but not used. Final v2 design will be determined based on community feedback and v1beta1 experience.
+**Note**: v2 schema is already defined in CRD but not used. Final v2 design will be determined based on community feedback and v1beta1 experience. CRD group migration is explicitly planned to address vendor-neutrality requirements (see `docs/BRANDING_DECOUPLING_AUDIT.md`).
 
 ---
 
@@ -215,12 +225,28 @@
 6. **Add ObservedGeneration** - Requires controller changes
 7. **Add Phase/State Field to Status** - Optional, additive
 
+### v2 (Breaking Changes - Vendor Neutrality Migration)
+
+8. **CRD Group Migration**: `zen.kube-zen.io` → neutral group (e.g., `observations.kubernetes.io`)
+   - **Rationale**: Remove hard-coded branding from API surface (see `docs/BRANDING_DECOUPLING_AUDIT.md`)
+   - **Old → New**: `zen.kube-zen.io/v1` → `observations.kubernetes.io/v2`
+   - **Deprecation**: `zen.kube-zen.io` served alongside new group for 2+ release cycles
+   - **Migration Notes**: Conversion webhook or migration tooling required
+   - **Timeline**: 12+ months (after v1beta1 stabilization)
+
+9. **Label Prefix Migration**: `zen.io/*` → neutral prefix (e.g., `observations.io/*`)
+   - **Rationale**: Remove branding from label conventions (see `docs/BRANDING_DECOUPLING_AUDIT.md`)
+   - **Old → New**: `zen.io/source` → `observations.io/source` (or `watcher.io/source`)
+   - **Deprecation**: Both prefixes supported during transition
+   - **Migration Notes**: Update examples, docs, and client libraries
+   - **Timeline**: Aligned with v2 CRD group migration
+
 ### Deferred / Needs More Research
 
-8. **Create v1beta1 Intermediate Version** - Depends on v1alpha2 validation
-9. **Document v1 → v1beta1 → v2 Migration Path** - Depends on v1beta1 design
-10. **Validate Template Syntax in ObservationTypeConfig** - Separate CRD, lower priority
-11. **Add Resource Version Tracking** - Already in metadata, just needs documentation
+10. **Create v1beta1 Intermediate Version** - Depends on v1alpha2 validation
+11. **Document v1 → v1beta1 → v2 Migration Path** - Depends on v1beta1 design
+12. **Validate Template Syntax in ObservationTypeConfig** - Separate CRD, lower priority
+13. **Add Resource Version Tracking** - Already in metadata, just needs documentation
 
 ---
 

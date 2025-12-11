@@ -165,6 +165,9 @@ status:
 - ✅ **Validation Hardening (v1alpha2)**: Enum validation for `severity` and `category`, maximum TTL validation, pattern validation improvements
   - **Status**: Implemented (non-breaking, backward-compatible)
   - **Reference**: `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md`
+- ⚠️ **Branded API Surface**: CRD group `zen.kube-zen.io` contains hard-coded branding
+  - **Status**: Managed tech debt (see `docs/BRANDING_DECOUPLING_AUDIT.md`)
+  - **Migration Plan**: Planned for v2 (neutral group migration, e.g., `observations.kubernetes.io`)
 
 **Future State (v1beta1)** - **Planned**:
 - Conditions pattern for status (replacing `processed` boolean)
@@ -178,10 +181,20 @@ status:
 - `fingerprint` field (content-based hash for deduplication)
 - `adapter` field (which adapter processed this observation)
 - `expiresAt` field (explicit expiration timestamp)
+- **CRD Group Migration**: `zen.kube-zen.io` → neutral group (e.g., `observations.kubernetes.io` or `observations.watcher.io`)
+  - **Rationale**: Remove hard-coded branding from API surface for vendor-neutrality (see `docs/BRANDING_DECOUPLING_AUDIT.md`)
+  - **Migration**: New CRD group with conversion webhook or migration tooling
+  - **Deprecation**: `zen.kube-zen.io` served alongside new group for 2+ release cycles
+  - **Old → New Mapping**: `zen.kube-zen.io/v1` → `observations.kubernetes.io/v2` (or similar)
+- **Label Prefix Migration**: `zen.io/*` → neutral prefix (e.g., `observations.io/*` or `watcher.io/*`)
+  - **Rationale**: Remove branding from label conventions
+  - **Migration**: Support both prefixes during transition
 
-**Migration Strategy**: v1 and v1beta1 will be served simultaneously; v1 remains storage version for backward compatibility. v2 migration will be planned after v1beta1 stabilization.
+**Migration Strategy**: v1 and v1beta1 will be served simultaneously; v1 remains storage version for backward compatibility. v2 migration will include CRD group migration to achieve vendor-neutrality. See `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` for detailed migration plans.
 
 **Versioning Plan**: See `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` for detailed version progression (v1alpha2 → v1beta1 → v2) and compatibility policy.
+
+**Branding & Vendor Neutrality**: See `docs/BRANDING_DECOUPLING_AUDIT.md` for complete audit of branded elements and migration plans. Hard-coded branding in CRD group (`zen.kube-zen.io`) is treated as managed tech debt with explicit migration path in v2.
 
 **See**: `docs/OBSERVATION_CRD_API_AUDIT.md` for detailed API analysis and future improvements
 
@@ -244,9 +257,12 @@ status:
 ### Extensibility
 
 **Dynamic Webhooks Integration** (Future):
-- zen-hook (dynamic webhook gateway) will generate Observations via webhook adapter
-- Observations will include `source: "zen-hook"` and webhook-specific metadata
+- Webhook gateways (generic) can generate Observations via webhook adapter
+- zen-hook (kube-zen ecosystem) is one concrete implementation example
+- Observations include `source: "<gateway-identifier>"` and webhook-specific metadata
 - Integration contract defined in `docs/DYNAMIC_WEBHOOKS_WATCHER_INTEGRATION.md`
+
+**Vendor Neutrality**: zen-watcher is designed to work with any webhook gateway or integration. Components like zen-hook, zen-agent, and zen-alpha (in the kube-zen ecosystem) are example producers/consumers, not required dependencies.
 
 **See**: `docs/DYNAMIC_WEBHOOKS_WATCHER_INTEGRATION.md` for complete integration details, including:
 - Observation CRD usage and labeling conventions

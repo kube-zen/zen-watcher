@@ -1,23 +1,26 @@
-# Dynamic Webhooks / zen-hook Integration (Watcher Perspective)
+# Dynamic Webhooks Integration (Watcher Perspective)
 
-**Purpose**: Document how zen-hook (dynamic webhook gateway) will integrate with zen-watcher's Observation pipeline and CRDs.
+**Purpose**: Document how webhook gateways (dynamic webhook producers) integrate with zen-watcher's Observation pipeline and CRDs.
 
 **Last Updated**: 2025-12-10
 
-**Status**: Design phase - zen-hook not yet implemented
+**Status**: Design phase - webhook gateway implementations in progress
 
 ---
 
 ## Overview
 
-zen-hook is a future dynamic webhook gateway component that will receive webhooks from external services and generate Observations via zen-watcher's webhook adapter. This document captures the integration contract from zen-watcher's perspective.
+zen-watcher supports webhook-based event sources through its webhook adapter. Any webhook gateway (cluster-local or external) can receive webhooks from external services and generate Observations via zen-watcher's webhook adapter. This document captures the integration contract from zen-watcher's perspective.
+
+**Note**: zen-hook is one concrete implementation of a webhook gateway in the kube-zen ecosystem. This document describes the generic contract that any webhook gateway must implement.
 
 ### Roles
 
-- **zen-hook**: Dynamic webhook gateway (cluster-local or external)
+- **Webhook Gateway** (generic): Dynamic webhook gateway (cluster-local or external)
   - Receives webhooks from external services (GitHub, GitLab, CI/CD tools, etc.)
   - Routes webhooks to zen-watcher's webhook adapter
   - Handles authentication, rate limiting, and webhook registration
+  - **Example implementations**: zen-hook (kube-zen ecosystem), custom webhook gateways, third-party integrations
 
 - **zen-watcher**: Normalization and aggregation pipeline
   - Receives webhook events via webhook adapter
@@ -28,11 +31,11 @@ zen-hook is a future dynamic webhook gateway component that will receive webhook
 
 ## Integration Contract
 
-**This section defines the precise contract that zen-hook (and any webhook source) must implement.**
+**This section defines the precise contract that webhook gateways (and any webhook source) must implement.**
 
 ### Contract Summary
 
-**zen-hook MUST**:
+**Webhook Gateways MUST**:
 1. Generate Observations that match zen-watcher's Observation CRD schema (v1)
 2. Use correct enum values for `category` and `severity`
 3. Include required labels (`zen.io/source`, `zen.io/webhook-source`, `zen.io/webhook-event`)
@@ -53,7 +56,7 @@ zen-hook is a future dynamic webhook gateway component that will receive webhook
 
 ### Observation CRD Usage
 
-**zen-hook will generate Observations** using zen-watcher's standard Observation CRD:
+**Webhook gateways generate Observations** using zen-watcher's standard Observation CRD. The following example shows a generic webhook gateway implementation (zen-hook is one concrete example):
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1
@@ -103,8 +106,8 @@ spec:
 
 #### HTTP Response Codes Contract
 
-| Code | Meaning | zen-hook Action | Retry? |
-|------|---------|----------------|--------|
+| Code | Meaning | Webhook Gateway Action | Retry? |
+|------|---------|------------------------|--------|
 | `200 OK` | Observation created successfully | Log success, update metrics | No |
 | `202 Accepted` | Observation received and filtered | Log filtered event, update metrics | No |
 | `400 Bad Request` | Invalid payload (validation error) | Log error, do not retry | No |
@@ -115,31 +118,31 @@ spec:
 **Scenario**: zen-watcher is processing at capacity (queue full, high CPU)
 
 **Expected Behavior**:
-1. **Webhook Adapter**: Returns HTTP 503 (Service Unavailable) to zen-hook
-2. **zen-hook**: Retries with exponential backoff (standard webhook retry pattern)
+1. **Webhook Adapter**: Returns HTTP 503 (Service Unavailable) to webhook gateway
+2. **Webhook Gateway**: Retries with exponential backoff (standard webhook retry pattern)
 3. **zen-watcher**: Logs backpressure events, exposes metrics:
-   - `zen_watcher_webhook_dropped_total{source="zen-hook", reason="queue_full"}`
-   - `zen_watcher_webhook_errors_total{source="zen-hook", status="503"}`
+   - `zen_watcher_webhook_dropped_total{source="<gateway-id>", reason="queue_full"}`
+   - `zen_watcher_webhook_errors_total{source="<gateway-id>", status="503"}`
 
 **Contract** (MUST implement):
-- zen-hook MUST retry up to 3 times with exponential backoff (1s, 2s, 4s)
-- zen-hook MUST log retry attempts for observability
-- zen-hook MUST NOT retry more than 3 times (to prevent thundering herd)
+- Webhook gateways MUST retry up to 3 times with exponential backoff (1s, 2s, 4s)
+- Webhook gateways MUST log retry attempts for observability
+- Webhook gateways MUST NOT retry more than 3 times (to prevent thundering herd)
 - zen-watcher WILL process webhooks in order (FIFO queue)
 
 #### When zen-watcher Rejects Invalid Payloads
 
-**Scenario**: zen-hook sends malformed Observation spec
+**Scenario**: Webhook gateway sends malformed Observation spec
 
 **Expected Behavior**:
 1. **Webhook Adapter**: Returns HTTP 400 (Bad Request) with error details
-2. **zen-hook**: Logs error, does not retry (invalid payload won't succeed on retry)
+2. **Webhook Gateway**: Logs error, does not retry (invalid payload won't succeed on retry)
 3. **zen-watcher**: Logs validation errors, exposes metrics:
-   - `zen_watcher_webhook_errors_total{source="zen-hook", status="400", reason="validation_failed"}`
+   - `zen_watcher_webhook_errors_total{source="<gateway-id>", status="400", reason="validation_failed"}`
 
 **Contract** (MUST implement):
-- zen-hook MUST validate payload before sending (client-side validation)
-- zen-hook MUST NOT retry on 400 errors (invalid payload won't succeed on retry)
+- Webhook gateways MUST validate payload before sending (client-side validation)
+- Webhook gateways MUST NOT retry on 400 errors (invalid payload won't succeed on retry)
 - zen-watcher WILL return detailed error messages for debugging (JSON error body)
 - Invalid payloads are not retried (permanent failure)
 
@@ -150,39 +153,39 @@ spec:
 **Expected Behavior**:
 1. **Webhook Adapter**: Returns HTTP 202 (Accepted) - webhook received and processed
 2. **zen-watcher**: Filters observation (no CRD created), logs filter reason
-3. **zen-hook**: Treats as success (202 Accepted)
+3. **Webhook Gateway**: Treats as success (202 Accepted)
 
 **Contract** (MUST implement):
 - Filtering is not an error - it's expected behavior (202 Accepted = success)
-- zen-hook MUST NOT retry filtered observations (202 = success, no CRD created)
-- zen-watcher WILL expose metrics: `zen_watcher_observations_filtered_total{source="zen-hook", reason="<reason>"}`
+- Webhook gateways MUST NOT retry filtered observations (202 = success, no CRD created)
+- zen-watcher WILL expose metrics: `zen_watcher_observations_filtered_total{source="<gateway-id>", reason="<reason>"}`
 
 ---
 
 ## Webhook Adapter Configuration
 
-### ObservationSourceConfig for zen-hook
+### ObservationSourceConfig for Webhook Gateways
 
-zen-hook will create an `ObservationSourceConfig` CRD to register with zen-watcher:
+Webhook gateways create an `ObservationSourceConfig` CRD to register with zen-watcher. The following example shows a generic webhook gateway configuration (zen-hook is one concrete implementation):
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
 kind: ObservationSourceConfig
 metadata:
-  name: zen-hook-webhooks
+  name: webhook-gateway-config
   namespace: zen-system
 spec:
-  source: "zen-hook"
+  source: "webhook-gateway"              # Identifies this webhook gateway (e.g., "webhook-gateway", "zen-hook", or custom identifier)
   ingester: "webhook"
   webhook:
-    path: "/webhooks/zen-hook"
+    path: "/webhooks/webhook-gateway"    # Configurable path (e.g., "/webhooks/zen-hook" for zen-hook implementation)
     port: 8080
     bufferSize: 1000
     auth:
       type: "bearer"
-      secretName: "zen-hook-webhook-token"
+      secretName: "webhook-gateway-token"
   filter:
-    minPriority: 0.0  # Accept all priorities (filtering handled by zen-hook)
+    minPriority: 0.0  # Accept all priorities (filtering can be handled by gateway or zen-watcher)
   dedup:
     window: "1h"
     strategy: "fingerprint"
@@ -190,9 +193,11 @@ spec:
     default: "7d"
 ```
 
+**Note**: zen-hook (kube-zen ecosystem) uses `source: "zen-hook"` and path `/webhooks/zen-hook` as one concrete example. Other webhook gateway implementations can use their own identifiers.
+
 ### Webhook Endpoint
 
-**Path**: `/webhooks/zen-hook` (configurable via ObservationSourceConfig)
+**Path**: `/webhooks/<gateway-identifier>` (configurable via ObservationSourceConfig, e.g., `/webhooks/webhook-gateway`, `/webhooks/zen-hook`)
 
 **Method**: `POST`
 
@@ -255,16 +260,18 @@ zen-hook lies **between zen-watcher and SaaS** in terms of quality bar:
 ### Normal Flow
 
 ```
-1. External Service → zen-hook (webhook delivery)
-2. zen-hook → Validates payload, normalizes to Observation spec
-3. zen-hook → POST /webhooks/zen-hook (zen-watcher webhook adapter)
+1. External Service → Webhook Gateway (webhook delivery)
+2. Webhook Gateway → Validates payload, normalizes to Observation spec
+3. Webhook Gateway → POST /webhooks/<gateway-id> (zen-watcher webhook adapter)
 4. zen-watcher → Validates Observation spec
 5. zen-watcher → Applies filters (if configured)
 6. zen-watcher → Deduplicates (if duplicate)
 7. zen-watcher → Creates Observation CRD
 8. zen-watcher → Returns 200 OK
-9. zen-hook → Logs success, updates metrics
+9. Webhook Gateway → Logs success, updates metrics
 ```
+
+**Example**: zen-hook (kube-zen ecosystem) follows this flow with `source: "zen-hook"` and path `/webhooks/zen-hook`.
 
 ### Filtered Flow
 
@@ -272,7 +279,7 @@ zen-hook lies **between zen-watcher and SaaS** in terms of quality bar:
 1-4. Same as normal flow
 5. zen-watcher → Applies filters → Observation filtered
 6. zen-watcher → Returns 202 Accepted (no CRD created)
-7. zen-hook → Logs filtered event, updates metrics
+7. Webhook Gateway → Logs filtered event, updates metrics
 ```
 
 ### Backpressure Flow
@@ -280,10 +287,10 @@ zen-hook lies **between zen-watcher and SaaS** in terms of quality bar:
 ```
 1-3. Same as normal flow
 4. zen-watcher → Queue full, returns 503 Service Unavailable
-5. zen-hook → Retries with exponential backoff (1s, 2s, 4s)
+5. Webhook Gateway → Retries with exponential backoff (1s, 2s, 4s)
 6. zen-watcher → Queue has capacity, processes webhook
 7. zen-watcher → Returns 200 OK
-8. zen-hook → Logs success (with retry count)
+8. Webhook Gateway → Logs success (with retry count)
 ```
 
 ---
@@ -342,4 +349,4 @@ zen-hook lies **between zen-watcher and SaaS** in terms of quality bar:
 
 ---
 
-**This document captures the integration contract from zen-watcher's perspective. zen-hook implementation will need to align with these contracts.**
+**This document captures the integration contract from zen-watcher's perspective. Webhook gateway implementations (including zen-hook in the kube-zen ecosystem) must align with these contracts.**

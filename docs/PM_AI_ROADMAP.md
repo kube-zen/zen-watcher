@@ -131,14 +131,29 @@
 
 ### Dynamic Webhook Integration
 
-**Goal**: Prepare for zen-hook (dynamic webhook gateway) integration
+**Goal**: Prepare for webhook gateway (dynamic webhook producer) integration
 
-- **Observation Export**: Design API for zen-hook to consume Observations
+- **Observation Export**: Design API for webhook gateways to consume Observations
 - **Webhook Registration**: CRD-based webhook endpoint registration
 - **Multi-Tenancy**: Support multiple webhook consumers with isolation
-- **Documentation**: Integration guide for zen-hook developers
+- **Documentation**: Integration guide for webhook gateway developers
+- **Note**: zen-hook (kube-zen ecosystem) is one concrete implementation example
 
 **Related**: See `zen-alpha/docs/OBSERVATIONS_PHASE1_BACKLOG.md` for SaaS-side ingestion API work
+
+### Observation API Neutral Naming Migration
+
+**Goal**: Migrate hard-coded branding from API surface to achieve vendor-neutrality
+
+**Scope**:
+- **CRD Group Migration**: `zen.kube-zen.io` → neutral group (e.g., `observations.kubernetes.io` or `observations.watcher.io`)
+- **Label Prefix Migration**: `zen.io/*` → neutral prefix (e.g., `observations.io/*` or `watcher.io/*`)
+- **Timeline**: v2 (12+ months, after v1beta1 stabilization)
+- **Migration Strategy**: New CRD group with conversion webhook or migration tooling, dual support during transition
+
+**Rationale**: Remove hard-coded branding from API surface to ensure zen-watcher remains vendor-neutral and usable without kube-zen dependencies.
+
+**See**: `docs/BRANDING_DECOUPLING_AUDIT.md` for complete audit and `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` for migration plan.
 
 ### KEP-Prep Work
 

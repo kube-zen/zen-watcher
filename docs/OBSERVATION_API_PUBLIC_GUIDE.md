@@ -12,7 +12,9 @@
 
 ## Overview
 
-The `Observation` CRD is zen-watcher's core data model. It represents a structured signal from security, compliance, performance, or infrastructure tools, normalized into a unified format.
+The `Observation` CRD is zen-watcher's core data model. zen-watcher is a generic Kubernetes Observation operator that aggregates signals from security, compliance, performance, or infrastructure tools, normalized into a unified format.
+
+**Vendor Neutrality**: zen-watcher is designed to work with any tool or integration. Components like zen-hook, zen-agent, and zen-alpha (in the kube-zen ecosystem) are example producers/consumers, not required dependencies.
 
 ### When to Use Observations
 
@@ -73,7 +75,7 @@ status:
 
 **Pattern**: `^[a-z0-9-]+$` (lowercase alphanumeric and hyphens only)
 
-**Examples**: `trivy`, `falco`, `kyverno`, `cert-manager`, `zen-hook`
+**Examples**: `trivy`, `falco`, `kyverno`, `cert-manager`, `webhook-gateway` (or custom identifiers like `zen-hook` for specific implementations)
 
 **Validation**: Must match pattern. Invalid values are rejected by CRD validation.
 

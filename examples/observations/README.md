@@ -98,10 +98,10 @@
 
 ---
 
-### 08-webhook-originated.yaml
-**Webhook-Originated Event** - zen-hook style webhook event.
+### 08-webhook-gateway.yaml
+**Webhook-Originated Event (Generic)** - Generic webhook gateway event.
 
-**Use Case**: Dynamic webhook gateway (zen-hook) receiving webhooks from external services (GitHub, GitLab, CI/CD).
+**Use Case**: Webhook gateways receiving webhooks from external services (GitHub, GitLab, CI/CD tools).
 
 **Fields**:
 - Required: All required fields
@@ -110,8 +110,22 @@
 - Annotations: Webhook metadata (`zen.io/webhook-received-at`, `zen.io/webhook-delivery-attempt`)
 - Category: `security` (or `operations`, `compliance`, etc. depending on webhook type)
 - Severity: `medium`
+- Source: `webhook-gateway` (generic identifier - implementations can use custom identifiers)
 
 **See**: `docs/DYNAMIC_WEBHOOKS_WATCHER_INTEGRATION.md` for webhook integration contract.
+
+---
+
+### 08-webhook-originated.yaml
+**Webhook-Originated Event (zen-hook Example)** - zen-hook (kube-zen ecosystem) webhook event example.
+
+**Use Case**: Example showing how zen-hook (one concrete webhook gateway implementation in the kube-zen ecosystem) generates Observations.
+
+**Fields**:
+- Same as 08-webhook-gateway.yaml, but uses `source: "zen-hook"` as the identifier
+- Demonstrates kube-zen ecosystem integration pattern
+
+**Note**: This is an example of one concrete implementation. For generic webhook gateway patterns, see 08-webhook-gateway.yaml.
 
 ---
 

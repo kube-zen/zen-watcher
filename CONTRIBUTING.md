@@ -395,6 +395,38 @@ Zen Watcher is licensed under Apache 2.0. All contributions must:
 
 ---
 
+## Vendor Neutrality
+
+**Upstream zen-watcher MUST remain usable without kube-zen.**
+
+zen-watcher is designed as a vendor-neutral, generic Kubernetes Observation operator. It must work with any tool, integration, or ecosystem.
+
+### Vendor Neutrality Rules
+
+1. **CRDs, Required Fields, and Contracts**:
+   - MUST NOT hard-code product/brand names (e.g., `zen-hook`, `kube-zen`, `zen-agent`) in required fields
+   - Field names must be generic (e.g., `source`, `category`, `severity` - not `zenSource`, `kubeZenCategory`)
+   - CRD group names may contain branding (e.g., `zen.kube-zen.io`) but this is treated as managed tech debt with future migration plans
+
+2. **kube-zen/zen-hook References**:
+   - Belong in example sections (e.g., `examples/observations/08-webhook-originated.yaml`)
+   - Belong in historical/archive docs (if applicable)
+   - Belong in optional annotations (not required fields)
+   - MUST be clearly marked as "one example implementation" or "kube-zen ecosystem example"
+
+3. **Documentation**:
+   - Public API docs must describe zen-watcher as "a generic Kubernetes Observation operator"
+   - kube-zen components (zen-hook, zen-agent, zen-alpha) must be framed as example producers/consumers, not required dependencies
+   - Integration docs must use generic language (e.g., "webhook gateway" not "zen-hook") as the primary concept
+
+4. **Examples**:
+   - Must include at least one purely generic example per category (e.g., `08-webhook-gateway.yaml` for webhooks)
+   - kube-zen-specific examples (e.g., `08-webhook-originated.yaml` for zen-hook) must be explicitly marked as ecosystem examples
+
+**See**: `docs/BRANDING_DECOUPLING_AUDIT.md` for complete audit of branded elements and migration plans.
+
+---
+
 ## Quality Bar & API Stability
 
 **Zen Watcher is treated as a future KEP (Kubernetes Enhancement Proposal) candidate.** This means APIs and behaviors must be designed for long-term stability and external users.
