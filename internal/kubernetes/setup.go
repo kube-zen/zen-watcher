@@ -17,6 +17,7 @@ package kubernetes
 import (
 	"time"
 
+	"github.com/kube-zen/zen-watcher/internal/informers"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -27,9 +28,10 @@ import (
 
 // Clients holds Kubernetes client interfaces
 type Clients struct {
-	Dynamic  dynamic.Interface
-	Standard kubernetes.Interface
-	Config   *rest.Config
+	Dynamic       dynamic.Interface
+	Standard      kubernetes.Interface
+	Config        *rest.Config
+	InformerManager *informers.Manager
 }
 
 // GVRs holds GroupVersionResource definitions for security tools
@@ -91,8 +93,15 @@ func NewGVRs() *GVRs {
 }
 
 // NewInformerFactory creates a dynamic informer factory with default resync period
+// Deprecated: Use Clients.InformerManager instead
 func NewInformerFactory(dynClient dynamic.Interface) dynamicinformer.DynamicSharedInformerFactory {
+	logger.Warn("NewInformerFactory is deprecated, use Clients.InformerManager instead",
+		logger.Fields{
+			Component: "kubernetes",
+			Operation: "new_informer_factory",
+		})
 	// Resync period: 30 minutes (periodic full resync for deduplication)
+	// Note: New code should use InformerManager with per-GVR resync configuration
 	resyncPeriod := 30 * time.Minute
 	return dynamicinformer.NewDynamicSharedInformerFactory(dynClient, resyncPeriod)
 }
