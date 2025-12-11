@@ -146,55 +146,87 @@ spec:
 
 ## Processing Pipeline
 
-Each Ingester defines a processing pipeline:
+Each Ingester defines a canonical processing pipeline that is enforced at runtime.
 
-1. **Normalization**: Map raw events to standard Observation format
-2. **Filter**: Apply filtering rules (minPriority, namespaces, etc.)
-3. **Deduplication**: Remove duplicates based on window and strategy
-4. **Optimization**: Auto-optimize processing order (filter-first vs dedup-first)
+### Runtime Pipeline (v1, for all Ingester-driven flows)
 
-The order of filter vs dedup can be:
-- **`filter_first`**: Filter → Dedup → Create
-- **`dedup_first`**: Dedup → Filter → Create
-- **`auto`**: Automatically choose based on metrics
+```
+source → (filter | dedup, both applied, order chosen dynamically) → normalize → destinations[]
+```
+
+### Pipeline Stages
+
+**Stage 1: Filter and Dedup Block**
+- Both filter and dedup are **always applied** to every event
+- The optimization engine chooses which runs first based on traffic patterns:
+  - **`filter_first`**: Filter → Dedup → Normalize → Destinations
+  - **`dedup_first`**: Dedup → Filter → Normalize → Destinations
+  - **`auto`**: Automatically choose based on metrics (default)
+- Optimization scope: per source
+- Order can change at runtime without config changes (pure runtime behavior)
+
+**Stage 2: Normalize**
+- Single normalization function
+- Always runs after filter/dedup block and before any destination
+- No destination sees un-normalized payloads
+
+**Stage 3: Destinations**
+- Fan-out to destinations[] from the normalized event
+- Each destination receives fully normalized data
+
+### Optimization Engine
+
+The optimization engine automatically chooses the optimal order (filter_first vs dedup_first) based on:
+- Traffic statistics per source
+- Filter effectiveness (how many events are filtered out)
+- Dedup effectiveness (how many duplicates are removed)
+- Low severity percentage
+- Observations per minute
+
+**Key properties:**
+- Operates per source
+- Can flip between filter → dedup and dedup → filter at runtime without config changes
+- Driven only by traffic/metrics in zen-watcher; **no SaaS dependency**
+- Pure runtime behavior; no config changes required
 
 ## Destination Types
 
-### `type: crd`
+### `type: crd` (Official OSS Destination - zen-watcher 1.0.0-alpha)
 
-Write Observation CRDs (default OSS behavior).
-
-**Required:**
-- `value`: CRD resource name (e.g., "observations")
-
-### `type: webhook`
-
-HTTP POST to external URL.
+Write Observation CRDs. This is the **only official destination** supported in zen-watcher OSS 1.0.0-alpha.
 
 **Required:**
-- `url`: HTTP URL to POST events to
+- `value`: CRD resource name (must be "observations")
 
-**Optional:**
-- `name`: Reference name
-- `retryPolicy`: Retry configuration
+**Example:**
+```yaml
+destinations:
+  - type: crd
+    value: observations
+```
 
-### `type: saas`
+**OSS Policy (zen-watcher 1.0.0-alpha):**
+- zen-watcher is a core engine only; no external egress
+- Only `type: crd, value: observations` is officially supported
+- Community is free to build sinks, but they are out-of-tree
+- Recommended: Use kubewatch, robusta, or external agents to sync Observations to external systems
+- External sync is out of scope for zen-watcher; users should rely on:
+  - ZenHooks SaaS (via zen-bridge), or
+  - External tools (kubewatch, robusta, etc.) to export Observations
 
-External HTTP/queue sink managed by another system (generic description).
+### Other Destination Types (Not Supported in OSS)
 
-**Required:**
-- `tenant`: Tenant identifier
-- `endpoint`: Endpoint path
+The following destination types are **not supported** in zen-watcher OSS 1.0.0-alpha:
+- `type: webhook` - Use external agents to watch Observations CRDs and forward to webhooks
+- `type: saas` - Use zen-bridge (platform component) for SaaS ingestion
+- `type: queue` - Use external agents to watch Observations CRDs and forward to queues
 
-**Note**: Platform-specific semantics are documented in platform docs, not OSS docs.
+**Integration Pattern:**
+1. Configure Ingester with `type: crd, value: observations`
+2. Deploy an external agent (kubewatch, robusta, custom controller) that watches Observations CRDs
+3. The external agent forwards Observations to webhooks, queues, or SaaS platforms
 
-### `type: queue`
-
-Message queue destination.
-
-**Required:**
-- `queueName`: Queue name or topic
-- `queueType`: Queue type (kafka, sqs, rabbitmq, etc.)
+This keeps zen-watcher pure OSS with zero egress and zero blast radius.
 
 ## Examples
 

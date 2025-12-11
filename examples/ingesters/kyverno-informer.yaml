@@ -1,0 +1,40 @@
+apiVersion: zen.kube-zen.io/v1
+kind: Ingester
+metadata:
+  name: kyverno-policy-violations
+  namespace: default
+spec:
+  source: kyverno
+  ingester: informer
+  informer:
+    gvr:
+      group: kyverno.io
+      version: v1
+      resource: policyreports
+    resyncPeriod: "30m"
+  filters:
+    enabled: true
+    minPriority: 0.5
+    excludeNamespaces:
+      - kube-system
+  deduplication:
+    enabled: true
+    window: "2h"
+    strategy: fingerprint
+  optimization:
+    enabled: true
+    order: filter_first
+    autoOptimize: true
+  destinations:
+    - type: crd
+      value: observations
+      mapping:
+        domain: security
+        type: policy_violation
+        priority:
+          fail: 0.9
+          warn: 0.5
+        severityMap:
+          fail: HIGH
+          warn: MEDIUM
+

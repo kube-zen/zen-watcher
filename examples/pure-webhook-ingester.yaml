@@ -22,42 +22,26 @@ spec:
       burst: 200
     bufferSize: 1000
   
-  processing:
-    normalization:
-      domain: operations
-      type: github_event
-      priority:
-        push: 0.5
-        pull_request: 0.7
-        issue: 0.6
-        release: 0.8
-      fieldMapping:
-        - from: "$.repository.full_name"
-          to: "repository"
-        - from: "$.action"
-          to: "action"
-        - from: "$.sender.login"
-          to: "actor"
-    
-    filter:
-      enabled: true
-      minPriority: 0.4
-    
-    dedup:
-      enabled: true
-      window: "1h"
-      strategy: fingerprint
-    
-    optimization:
-      enabled: true
-      order: filter_first
-      autoOptimize: false
-  
+  # Normalization via destination mapping
   destinations:
-    # Pure webhook: no CRDs, only external webhooks
     - type: webhook
       name: primary-sink
       url: "https://api.example.com/webhooks/github"
+      mapping:
+        domain: operations
+        type: github_event
+        priority:
+          push: 0.5
+          pull_request: 0.7
+          issue: 0.6
+          release: 0.8
+        fieldMapping:
+          - from: "$.repository.full_name"
+            to: "repository"
+          - from: "$.action"
+            to: "action"
+          - from: "$.sender.login"
+            to: "actor"
       retryPolicy:
         maxRetries: 5
         backoff: exponential
@@ -70,3 +54,20 @@ spec:
         maxRetries: 3
         backoff: linear
         timeout: "5s"
+  
+  # Filtering
+  filters:
+    enabled: true
+    minPriority: 0.4
+  
+  # Deduplication
+  deduplication:
+    enabled: true
+    window: "1h"
+    strategy: fingerprint
+  
+  # Optimization
+  optimization:
+    enabled: true
+    order: filter_first
+    autoOptimize: false

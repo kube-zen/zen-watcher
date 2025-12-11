@@ -55,19 +55,21 @@ All events flow into the same centralized processing pipeline.
 
 ## Stage 2: Dynamic Processing Order Selection
 
-**This is where the intelligence begins.** The system analyzes real-time metrics to determine the optimal processing order.
+**This is where the intelligence begins.** The system analyzes real-time metrics to determine the optimal processing order **BEFORE any processing steps execute**. This decision happens in `Processor.ProcessEvent` at the very start, ensuring the chosen order is applied consistently throughout the pipeline.
 
 ### Processing Order Options
 
-1. **`filter_first`**: Filter → Normalize → Dedup → Create
+1. **`filter_first`**: Filter → Dedup → Normalize → Create
    - **When**: LOW severity events > 70% of traffic
    - **Why**: Filter out noise early, reduce dedup cache pressure
    - **Benefit**: Lower memory usage, faster processing for high-noise sources
+   - **Note**: Normalization happens AFTER both filter and dedup
 
 2. **`dedup_first`**: Dedup → Filter → Normalize → Create
    - **When**: Dedup effectiveness > 50% (many duplicates)
    - **Why**: Remove duplicates early, reduce filter processing load
    - **Benefit**: Lower CPU usage for sources with retry patterns
+   - **Note**: Normalization happens AFTER both filter and dedup
 
 3. **`auto`** (Default): System automatically selects based on metrics
    - **Logic**: Analyzes `zen_watcher_low_severity_percent` and `zen_watcher_dedup_effectiveness`

@@ -1,0 +1,51 @@
+apiVersion: zen.kube-zen.io/v1
+kind: Ingester
+metadata:
+  name: high-rate-k8s-events
+  namespace: default
+spec:
+  source: kubernetes-events
+  ingester: k8s-events
+  filters:
+    enabled: true
+    minPriority: 0.6
+    includeKinds:
+      - Pod
+      - Deployment
+      - StatefulSet
+    excludeNamespaces:
+      - kube-system
+      - kube-public
+  deduplication:
+    enabled: true
+    window: "30s"
+    strategy: fingerprint
+  optimization:
+    enabled: true
+    order: auto
+    autoOptimize: true
+    analysisInterval: "5m"
+    confidenceThreshold: 0.8
+    thresholds:
+      observationsPerMinute:
+        warning: 100
+        critical: 500
+      dedupEffectiveness:
+        warning: 0.5
+        critical: 0.3
+  rateLimit:
+    enabled: true
+    requestsPerSecond: 1000
+    burst: 2000
+  destinations:
+    - type: crd
+      value: observations
+      mapping:
+        domain: operations
+        type: k8s_event
+        fieldMapping:
+          - from: reason
+            to: event_reason
+          - from: message
+            to: event_message
+

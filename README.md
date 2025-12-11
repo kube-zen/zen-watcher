@@ -5,7 +5,11 @@
 
 > **Kubernetes Observation Collector: Turn Any Signal into a CRD**
 
-Zen Watcher is an open-source Kubernetes operator that aggregates structured signals from security, compliance, and infrastructure tools into unified `Observation` CRDs. Lightweight, standalone, and useful on its own.
+Zen Watcher is an **open-source** Kubernetes operator that aggregates structured signals from security, compliance, and infrastructure tools into unified `Observation` CRDs. Lightweight, standalone, and useful on its own.
+
+**Version:** 1.0.0-alpha (OSS release)
+
+**OSS Scope:** zen-watcher is a pure OSS component that writes only to `Observation` CRDs. It has zero egress traffic, zero secrets, and zero external dependencies. For external integrations (webhooks, SaaS, Slack), use external controllers that watch Observation CRDs, or use zen-bridge (platform component) for SaaS integration.
 
 > 📋 **For PM AIs and Maintainers**: See [docs/PM_AI_ROADMAP.md](docs/PM_AI_ROADMAP.md) for the canonical roadmap and priorities.  
 > 📝 **Release Notes**: See [docs/releases/](docs/releases/) for version history and [docs/RELEASE_NOTES_TEMPLATE.md](docs/RELEASE_NOTES_TEMPLATE.md) for release notes structure.
@@ -361,25 +365,35 @@ graph TB
 
 **Processing Pipeline:**
 
-All events flow through the same centralized pipeline:
+All events flow through the same centralized pipeline with dynamic optimization:
+
+```
+source → (filter | dedup, order chosen dynamically by optimization) → normalize → Observations[]
+```
+
+The optimization engine automatically selects the optimal processing order (`filter_first` or `dedup_first`) based on real-time metrics per source. Normalization always happens after both filter and dedup stages.
 
 ```mermaid
 graph LR
-    A[Event Source] --> B[FILTER]
-    B -->|if allowed| C[NORMALIZE]
-    C --> D[DEDUP]
-    D -->|if not duplicate| E[CREATE CRD]
-    E --> F[METRICS & LOG]
+    A[Event Source] --> B{Optimization<br/>Decision}
+    B -->|filter_first| C[FILTER]
+    B -->|dedup_first| D[DEDUP]
+    C --> E[DEDUP]
+    D --> F[FILTER]
+    E --> G[NORMALIZE]
+    F --> G
+    G --> H[CREATE CRD<br/>Observation]
     
     style B fill:#fff3e0
     style C fill:#e8f5e9
     style D fill:#e3f2fd
-    style E fill:#f3e5f5
+    style G fill:#f3e5f5
+    style H fill:#fce4ec
 ```
 
-**Flow:** `filter() → normalize() → dedup() → create Observation CRD → update metrics & log`
+**Flow:** The optimization engine determines order before processing. Both filter and dedup always run (in the chosen order), then normalization, then Observation CRD creation.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#2-event-processing-pipeline) for detailed pipeline documentation.
+See [docs/INTELLIGENT_EVENT_PIPELINE.md](docs/INTELLIGENT_EVENT_PIPELINE.md) for detailed pipeline documentation and [docs/INGESTER_API.md](docs/INGESTER_API.md) for Ingester CRD configuration.
 
 ---
 
@@ -928,6 +942,20 @@ pkg/sink/
    - Follows the Prometheus Alertmanager / Flux / Crossplane pattern: core is minimal; ecosystem extends it
 
 **See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on building sink controllers.**
+
+---
+
+## 🌐 ZenHooks and Kube-Zen Integration
+
+zen-watcher is the core OSS component of the larger **ZenHooks** and **Kube-Zen** platform. While zen-watcher focuses purely on cluster-side event aggregation to Observation CRDs, the platform extends this with:
+
+- **zen-bridge**: Cluster-side gateway for dynamic webhooks and SaaS forwarding (platform component)
+- **zen-saas**: SaaS backend for AI routing, policy, and integrations (platform component)
+- **zen-integrations**: Integration handlers for Slack, webhooks, and other destinations (platform component)
+
+zen-watcher's OSS design ensures it can be used standalone, while platform components provide advanced features like AI-powered routing, dynamic webhook provisioning, and managed integrations. For more context on the overall architecture, see [zen-admin/docs/ZENHOOKS_V1_ARCHITECTURE_VISION.md](../zen-admin/docs/ZENHOOKS_V1_ARCHITECTURE_VISION.md).
+
+**Example Ingester configurations:** See [examples/ingesters/](examples/ingesters/) for canonical examples of Ingester CRDs.
 
 ---
 

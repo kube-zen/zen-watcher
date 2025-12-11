@@ -18,48 +18,50 @@ spec:
     requestsPerSecond: 2000
     burst: 4000
   
-  processing:
-    normalization:
-      domain: operations
-      type: kubernetes_event
-      priority:
-        Warning: 0.7
-        Normal: 0.3
-        Error: 0.9
-    
-    filter:
-      enabled: true
-      minPriority: 0.3
-      excludeNamespaces:
-        - kube-system
-        - kube-public
-    
-    dedup:
-      enabled: true
-      window: "5m"
-      strategy: fingerprint
-    
-    optimization:
-      enabled: true
-      order: auto
-      autoOptimize: true
-      analysisInterval: "15m"
-      confidenceThreshold: 0.7
-      thresholds:
-        dedupEffectiveness:
-          warning: 0.5
-          critical: 0.3
-        lowSeverityPercent:
-          warning: 0.7
-          critical: 0.9
-        observationsPerMinute:
-          warning: 100
-          critical: 500
+  # Filtering rules
+  filters:
+    enabled: true
+    minPriority: 0.3
+    excludeNamespaces:
+      - kube-system
+      - kube-public
   
+  # Deduplication
+  deduplication:
+    enabled: true
+    window: "5m"
+    strategy: fingerprint
+  
+  # Optimization
+  optimization:
+    enabled: true
+    order: auto
+    autoOptimize: true
+    analysisInterval: "15m"
+    confidenceThreshold: 0.7
+    thresholds:
+      dedupEffectiveness:
+        warning: 0.5
+        critical: 0.3
+      lowSeverityPercent:
+        warning: 0.7
+        critical: 0.9
+      observationsPerMinute:
+        warning: 100
+        critical: 500
+  
+  # Destinations: where events go
   destinations:
     # Classic zen-watcher OSS behavior: write Observation CRDs
     - type: crd
       value: observations
+      mapping:
+        domain: operations
+        type: kubernetes_event
+        priority:
+          Warning: 0.7
+          Normal: 0.3
+          Error: 0.9
     
     # Optional: send to external webhook with retry policy
     - type: webhook

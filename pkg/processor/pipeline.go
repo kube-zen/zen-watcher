@@ -29,12 +29,18 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// OptimizationStrategyProvider provides the current processing strategy for a source
+type OptimizationStrategyProvider interface {
+	GetCurrentStrategy(source string) string // Returns "filter_first", "dedup_first", or "auto"
+}
+
 // Processor processes RawEvents through the pipeline
 type Processor struct {
 	genericThresholdMonitor *monitoring.GenericThresholdMonitor
 	filter                  *filter.Filter
 	deduper                 *dedup.Deduper
 	observationCreator      *watcher.ObservationCreator
+	optimizationProvider    OptimizationStrategyProvider // Optional: provides current optimization strategy
 }
 
 // NewProcessor creates a new event processor
@@ -48,15 +54,24 @@ func NewProcessor(
 		filter:                  filter,
 		deduper:                 deduper,
 		observationCreator:      observationCreator,
+		optimizationProvider:    nil, // Can be set via SetOptimizationProvider
 	}
 }
 
-// ProcessEvent processes a RawEvent through the pipeline:
+// SetOptimizationProvider sets the optimization strategy provider
+func (p *Processor) SetOptimizationProvider(provider OptimizationStrategyProvider) {
+	p.optimizationProvider = provider
+}
+
+// ProcessEvent processes a RawEvent through the canonical pipeline:
+// source → (filter | dedup, ordered dynamically by optimization) → normalize → destinations[]
+//
+// The canonical order is:
 // 1. Threshold check (rate limits, warnings)
-// 2. Filtering
-// 3. Normalization
-// 4. Deduplication
-// 5. Create Observation
+// 2. Determine processing order (filter_first or dedup_first) - BEFORE any processing
+// 3. Filter and Dedup (order chosen by optimization engine: filter_first or dedup_first)
+// 4. Normalization (after filter/dedup, prepares data for destinations)
+// 5. Create Observation (write to destinations)
 func (p *Processor) ProcessEvent(ctx context.Context, raw *generic.RawEvent, config *generic.SourceConfig) error {
 	// Step 1: Check thresholds (rate limits, warnings)
 	// Note: Thresholds are warnings only - they log but don't block events
@@ -69,47 +84,197 @@ func (p *Processor) ProcessEvent(ctx context.Context, raw *generic.RawEvent, con
 		}
 	}
 
-	// Step 2: Normalize raw event to Event
-	event := p.normalize(raw, config)
-	if event == nil {
-		return nil // Filtered out during normalization
+	// Step 2: Determine processing order (filter_first or dedup_first) - BEFORE any processing
+	// This decision must happen before any filter/dedup/normalization steps
+	order := p.determineProcessingOrder(raw, config)
+
+	// Step 3: Create minimal Observation structure for filter/dedup (no normalization yet)
+	// We need a basic structure to run filter/dedup, but full normalization happens after
+	observation := p.createMinimalObservation(raw, config)
+	if observation == nil {
+		return nil // Could not create observation
 	}
 
-	// Step 3: Convert Event to Observation
-	observation := watcher.EventToObservation(event)
+	// Step 4: Apply filter and dedup in the order determined by optimization
+	// Both filter and dedup are always applied; optimization chooses which runs first.
+	// IMPORTANT: Normalization has NOT happened yet - we're working with minimal observation structure
+	var filtered bool
+	var deduped bool
 
-	// Step 4: Apply filters
-	if p.filter != nil {
-		allowed, reason := p.filter.AllowWithReason(observation)
-		if !allowed {
-			logger.Debug("Event filtered",
+	if order == "dedup_first" {
+		// Dedup first, then filter
+		dedupKey := p.extractDedupKey(observation, raw)
+		if !p.deduper.ShouldCreateWithContent(dedupKey, observation.Object) {
+			logger.Debug("Event deduplicated",
 				logger.Fields{
 					Component: "processor",
-					Operation: "filter",
+					Operation: "dedup",
 					Source:    raw.Source,
-					Reason:    reason,
 				})
-			return nil
+			deduped = true
+		}
+
+		// Then filter (even if deduped, we still check filter for metrics)
+		if !deduped && p.filter != nil {
+			allowed, reason := p.filter.AllowWithReason(observation)
+			if !allowed {
+				logger.Debug("Event filtered",
+					logger.Fields{
+						Component: "processor",
+						Operation: "filter",
+						Source:    raw.Source,
+						Reason:    reason,
+					})
+				filtered = true
+			}
+		}
+	} else {
+		// Filter first (default), then dedup
+		if p.filter != nil {
+			allowed, reason := p.filter.AllowWithReason(observation)
+			if !allowed {
+				logger.Debug("Event filtered",
+					logger.Fields{
+						Component: "processor",
+						Operation: "filter",
+						Source:    raw.Source,
+						Reason:    reason,
+					})
+				filtered = true
+			}
+		}
+
+		// Then dedup (even if filtered, we still check dedup for metrics)
+		if !filtered {
+			dedupKey := p.extractDedupKey(observation, raw)
+			if !p.deduper.ShouldCreateWithContent(dedupKey, observation.Object) {
+				logger.Debug("Event deduplicated",
+					logger.Fields{
+						Component: "processor",
+						Operation: "dedup",
+						Source:    raw.Source,
+					})
+				deduped = true
+			}
 		}
 	}
 
-	// Step 5: Check deduplication
-	dedupKey := p.extractDedupKey(observation, raw)
-	if !p.deduper.ShouldCreateWithContent(dedupKey, observation.Object) {
-		logger.Debug("Event deduplicated",
-			logger.Fields{
-				Component: "processor",
-				Operation: "dedup",
-				Source:    raw.Source,
-			})
+	// If filtered or deduped, stop here (no normalization needed)
+	if filtered || deduped {
 		return nil
 	}
 
-	// Step 6: Create Observation
+	// Step 5: Normalization (AFTER filter/dedup, before destinations)
+	// This is the first and only place where full normalization happens
+	observation = p.normalizeObservation(observation, raw, config)
+
+	// Step 6: Create Observation (write to destinations)
+	// ObservationCreator should NOT decide order - it receives already-processed events
 	return p.observationCreator.CreateObservation(ctx, observation)
 }
 
-// normalize converts RawEvent to Event using normalization config
+// determineProcessingOrder determines the processing order based on config and optimization
+// Returns "filter_first" or "dedup_first" based on:
+// 1. Explicit config order (if set and not "auto")
+// 2. Current optimization strategy (if optimization provider is available)
+// 3. Default to "filter_first"
+func (p *Processor) determineProcessingOrder(raw *generic.RawEvent, config *generic.SourceConfig) string {
+	// Step 1: Check if order is explicitly set in config (non-auto)
+	if config != nil && config.Processing != nil && config.Processing.Order != "" && config.Processing.Order != "auto" {
+		return config.Processing.Order
+	}
+
+	// Step 2: If auto-optimization, get current strategy from optimization provider
+	if config != nil && config.Processing != nil && config.Processing.AutoOptimize && p.optimizationProvider != nil {
+		currentStrategy := p.optimizationProvider.GetCurrentStrategy(raw.Source)
+		if currentStrategy != "" && currentStrategy != "auto" {
+			return currentStrategy
+		}
+	}
+
+	// Step 3: Default to filter_first
+	return "filter_first"
+}
+
+// createMinimalObservation creates a minimal Observation structure for filter/dedup
+// This does NOT perform normalization - that happens after filter/dedup
+func (p *Processor) createMinimalObservation(raw *generic.RawEvent, config *generic.SourceConfig) *unstructured.Unstructured {
+	// Create a minimal event structure with just source and raw data
+	// This is sufficient for filter/dedup operations
+	event := &watcher.Event{
+		Source:   raw.Source,
+		Category: "security",  // Default, will be normalized later
+		Severity: "MEDIUM",    // Default, will be normalized later
+		Details:  raw.RawData, // Preserve all raw data
+	}
+
+	// Convert to Observation (minimal structure)
+	return watcher.EventToObservation(event)
+}
+
+// normalizeObservation performs full normalization after filter/dedup, before destinations
+// This is the ONLY place where normalization happens
+func (p *Processor) normalizeObservation(observation *unstructured.Unstructured, raw *generic.RawEvent, config *generic.SourceConfig) *unstructured.Unstructured {
+	// Convert observation back to Event for normalization
+	event := p.observationToEvent(observation, raw, config)
+
+	// Apply normalization config
+	if config != nil && config.Normalization != nil {
+		event.Category = config.Normalization.Domain
+		event.EventType = config.Normalization.Type
+
+		// Extract priority and map to severity
+		priority := p.extractPriority(raw, config)
+		event.Severity = p.priorityToSeverity(priority)
+
+		// Apply field mappings
+		if config.Normalization.FieldMapping != nil {
+			for _, mapping := range config.Normalization.FieldMapping {
+				value := p.extractField(raw.RawData, mapping.From)
+				if value != nil {
+					if event.Details == nil {
+						event.Details = make(map[string]interface{})
+					}
+					event.Details[mapping.To] = value
+				}
+			}
+		}
+	} else {
+		// Default normalization
+		priority := p.extractPriority(raw, config)
+		event.Severity = p.priorityToSeverity(priority)
+		event.Category = "security"
+		event.EventType = "custom-event"
+	}
+
+	// Convert back to Observation
+	return watcher.EventToObservation(event)
+}
+
+// observationToEvent converts an Observation back to Event for normalization
+func (p *Processor) observationToEvent(observation *unstructured.Unstructured, raw *generic.RawEvent, config *generic.SourceConfig) *watcher.Event {
+	// Extract fields from observation
+	event := &watcher.Event{
+		Source:  raw.Source,
+		Details: raw.RawData, // Always preserve raw data
+	}
+
+	// Try to extract from observation if available
+	if category, ok, _ := unstructured.NestedString(observation.Object, "spec", "category"); ok {
+		event.Category = category
+	}
+	if severity, ok, _ := unstructured.NestedString(observation.Object, "spec", "severity"); ok {
+		event.Severity = severity
+	}
+	if eventType, ok, _ := unstructured.NestedString(observation.Object, "spec", "eventType"); ok {
+		event.EventType = eventType
+	}
+
+	return event
+}
+
+// normalize converts RawEvent to Event using normalization config (DEPRECATED - use normalizeObservation)
+// This method is kept for backward compatibility but should not be used in the main pipeline
 func (p *Processor) normalize(raw *generic.RawEvent, config *generic.SourceConfig) *watcher.Event {
 	if config.Normalization == nil {
 		// Default normalization

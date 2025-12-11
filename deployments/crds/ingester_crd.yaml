@@ -831,6 +831,635 @@ spec:
             type: object
         type: object
     served: true
+    storage: false
+    subresources:
+      status: {}
+  - additionalPrinterColumns:
+    - jsonPath: .spec.source
+      name: Source
+      type: string
+    - jsonPath: .spec.ingester
+      name: Ingester
+      type: string
+    - jsonPath: .spec.deduplication.window
+      name: Dedup Window
+      priority: 1
+      type: string
+    - format: double
+      jsonPath: .spec.filters.minPriority
+      name: Min Priority
+      priority: 1
+      type: number
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1
+    schema:
+      openAPIV3Schema:
+        properties:
+          spec:
+            properties:
+              deduplication:
+                description: Deduplication configuration for this ingester
+                properties:
+                  adaptive:
+                    default: false
+                    description: Enable adaptive deduplication that adjusts based
+                      on patterns
+                    type: boolean
+                  enabled:
+                    default: true
+                    description: 'Controls whether deduplication is enabled (default:
+                      true)'
+                    type: boolean
+                  fields:
+                    description: Fields to use for deduplication key (only used if
+                      strategy=key or hybrid)
+                    items:
+                      type: string
+                    type: array
+                  learningRate:
+                    default: 0.1
+                    description: Learning rate for adaptive deduplication (0.0-1.0)
+                    maximum: 1
+                    minimum: 0
+                    type: number
+                  minChange:
+                    default: 0.05
+                    description: Minimum change threshold (0.0-1.0) to trigger adaptation
+                    maximum: 1
+                    minimum: 0
+                    type: number
+                  strategy:
+                    default: fingerprint
+                    description: 'Deduplication strategy: fingerprint (content-based),
+                      key (field-based), hybrid, or adaptive'
+                    enum:
+                    - fingerprint
+                    - key
+                    - hybrid
+                    - adaptive
+                    type: string
+                  window:
+                    description: Deduplication window as duration string (e.g., '24h',
+                      '1h30m')
+                    pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                    type: string
+                  windowSeconds:
+                    description: Deduplication window in seconds (alternative to window)
+                    maximum: 31536000
+                    minimum: 1
+                    type: integer
+                type: object
+              destinations:
+                description: List of destinations for observations from this ingester
+                items:
+                  properties:
+                    type:
+                      description: 'Destination type: crd (write Observation CRDs)'
+                      enum:
+                      - crd
+                      type: string
+                    value:
+                      description: 'For type ''crd'': CRD resource name (e.g., ''observations'')'
+                      pattern: ^[a-z0-9-]+$
+                      type: string
+                    mapping:
+                      description: Normalization and mapping configuration (optional)
+                      properties:
+                        domain:
+                          description: 'Domain: security, operations, cost, compliance,
+                            custom'
+                          enum:
+                          - security
+                          - operations
+                          - cost
+                          - compliance
+                          - custom
+                          type: string
+                        fieldMapping:
+                          description: Field mappings from raw data to labels
+                          items:
+                            properties:
+                              from:
+                                description: JSONPath in raw data
+                                type: string
+                              to:
+                                description: Label or field name
+                                type: string
+                              transform:
+                                description: 'Optional transform function: lower,
+                                  upper, truncate:50, etc.'
+                                type: string
+                            required:
+                            - from
+                            - to
+                            type: object
+                          type: array
+                        priority:
+                          additionalProperties:
+                            maximum: 1
+                            minimum: 0
+                            type: number
+                          description: 'Priority mapping: source value -> 0.0-1.0'
+                          type: object
+                        resource:
+                          description: Resource reference mappings
+                          properties:
+                            apiVersion:
+                              type: string
+                            kind:
+                              type: string
+                            name:
+                              type: string
+                            namespace:
+                              type: string
+                          type: object
+                        resourceExtraction:
+                          description: How to extract Kubernetes resources from raw
+                            data
+                          properties:
+                            jsonpath:
+                              type: string
+                            k8sOwner:
+                              properties:
+                                apiVersionField:
+                                  type: string
+                                kindField:
+                                  type: string
+                                nameField:
+                                  type: string
+                                namespaceField:
+                                  type: string
+                              type: object
+                            manual:
+                              items:
+                                properties:
+                                  apiVersion:
+                                    type: string
+                                  kind:
+                                    type: string
+                                  name:
+                                    type: string
+                                  namespace:
+                                    type: string
+                                type: object
+                              type: array
+                            strategy:
+                              enum:
+                              - jsonpath
+                              - k8s_owner
+                              - manual
+                              type: string
+                          type: object
+                        severityMap:
+                          additionalProperties:
+                            enum:
+                            - CRITICAL
+                            - HIGH
+                            - MEDIUM
+                            - LOW
+                            - UNKNOWN
+                            type: string
+                          description: Map source severity values to standard severity
+                            levels
+                          type: object
+                        templates:
+                          description: Go template strings for title and description
+                            generation
+                          properties:
+                            description:
+                              type: string
+                            title:
+                              type: string
+                          type: object
+                        type:
+                          description: Event type (e.g., vulnerability, policy_violation,
+                            certificate_expiring)
+                          pattern: ^[a-z0-9_]+$
+                          type: string
+                      type: object
+                  required:
+                  - type
+                  - value
+                  type: object
+                minItems: 1
+                type: array
+              filters:
+                description: Filter configuration for this ingester
+                properties:
+                  enabled:
+                    default: true
+                    description: 'Controls whether filtering is enabled (default:
+                      true)'
+                    type: boolean
+                  excludeCategories:
+                    description: List of categories to exclude
+                    items:
+                      type: string
+                    type: array
+                  excludeEventTypes:
+                    description: List of event types to exclude
+                    items:
+                      type: string
+                    type: array
+                  excludeKinds:
+                    description: List of resource kinds to exclude (e.g., Pod, Deployment)
+                    items:
+                      type: string
+                    type: array
+                  excludeNamespaces:
+                    description: List of namespaces to exclude
+                    items:
+                      type: string
+                    type: array
+                  excludeRules:
+                    description: List of rule names to exclude (e.g., disallow-latest-tag)
+                    items:
+                      type: string
+                    type: array
+                  ignoreKinds:
+                    description: Alias for excludeKinds (convenience for kubernetes-events
+                      source)
+                    items:
+                      type: string
+                    type: array
+                  includeCategories:
+                    description: List of categories to include (if set, only these
+                      are allowed)
+                    items:
+                      type: string
+                    type: array
+                  includeEventTypes:
+                    description: List of event types to include (if set, only these
+                      are allowed)
+                    items:
+                      type: string
+                    type: array
+                  includeKinds:
+                    description: List of resource kinds to include (if set, only these
+                      are allowed)
+                    items:
+                      type: string
+                    type: array
+                  includeNamespaces:
+                    description: List of namespaces to include (if set, only these
+                      are allowed)
+                    items:
+                      type: string
+                    type: array
+                  includeSeverity:
+                    description: List of severity levels to include (if set, only
+                      these are allowed)
+                    items:
+                      enum:
+                      - CRITICAL
+                      - HIGH
+                      - MEDIUM
+                      - LOW
+                      - UNKNOWN
+                      type: string
+                    type: array
+                  minPriority:
+                    description: Minimum priority (0.0-1.0) to allow. Observations
+                      below this are filtered out.
+                    maximum: 1
+                    minimum: 0
+                    type: number
+                  minSeverity:
+                    description: Minimum severity level to allow (CRITICAL > HIGH
+                      > MEDIUM > LOW > UNKNOWN)
+                    enum:
+                    - CRITICAL
+                    - HIGH
+                    - MEDIUM
+                    - LOW
+                    - UNKNOWN
+                    type: string
+                type: object
+              informer:
+                description: Informer adapter configuration
+                properties:
+                  fieldSelector:
+                    description: Optional field selector
+                    type: string
+                  gvr:
+                    properties:
+                      group:
+                        description: API group (e.g., aquasecurity.github.io)
+                        type: string
+                      resource:
+                        description: Resource name (e.g., vulnerabilityreports)
+                        type: string
+                      version:
+                        description: API version (e.g., v1alpha1)
+                        type: string
+                    required:
+                    - group
+                    - version
+                    - resource
+                    type: object
+                  labelSelector:
+                    description: Optional label selector
+                    type: string
+                  namespace:
+                    description: Namespace to watch (empty = all namespaces)
+                    type: string
+                  resyncPeriod:
+                    default: '0'
+                    description: Resync period (e.g., '30m')
+                    type: string
+                type: object
+              ingester:
+                description: 'Ingester type: informer, webhook, logs, or k8s-events'
+                enum:
+                - informer
+                - webhook
+                - logs
+                - k8s-events
+                type: string
+              logs:
+                description: Logs adapter configuration
+                properties:
+                  container:
+                    description: Container name to tail logs from
+                    type: string
+                  patterns:
+                    description: Regex patterns to match in logs
+                    items:
+                      properties:
+                        priority:
+                          description: Priority (0.0-1.0) for matched events
+                          maximum: 1
+                          minimum: 0
+                          type: number
+                        regex:
+                          description: Regex pattern with named groups
+                          type: string
+                        type:
+                          description: Event type for matched lines
+                          type: string
+                      required:
+                      - regex
+                      type: object
+                    type: array
+                  podSelector:
+                    description: Pod selector (e.g., app=sealed-secrets)
+                    type: string
+                  pollInterval:
+                    default: 1s
+                    description: Poll interval for checking new pods
+                    type: string
+                  sinceSeconds:
+                    default: 300
+                    description: How far back to read logs (seconds)
+                    type: integer
+                type: object
+              optimization:
+                description: Auto-optimization configuration
+                properties:
+                  analysisInterval:
+                    default: 15m
+                    description: How often to analyze performance and adjust optimization
+                      (e.g., '15m', '30m')
+                    pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                    type: string
+                  autoOptimize:
+                    default: true
+                    description: Allow Zen Watcher to automatically optimize processing
+                      order based on metrics
+                    type: boolean
+                  confidenceThreshold:
+                    default: 0.7
+                    description: Minimum confidence (0.0-1.0) required for auto-optimization
+                      decisions
+                    maximum: 1
+                    minimum: 0
+                    type: number
+                  enabled:
+                    default: true
+                    description: Enable auto-optimization for this ingester
+                    type: boolean
+                  order:
+                    default: auto
+                    description: 'Processing order: auto (learn and optimize), filter_first,
+                      dedup_first, hybrid, or adaptive'
+                    enum:
+                    - auto
+                    - filter_first
+                    - dedup_first
+                    - hybrid
+                    - adaptive
+                    type: string
+                  processing:
+                    additionalProperties:
+                      properties:
+                        action:
+                          description: 'Action to take when threshold is exceeded:
+                            warn, alert, optimize'
+                          enum:
+                          - warn
+                          - alert
+                          - optimize
+                          type: string
+                        critical:
+                          description: Critical threshold value
+                          type: number
+                        description:
+                          description: Human-readable description of this threshold
+                          type: string
+                        warning:
+                          description: Warning threshold value
+                          type: number
+                      type: object
+                    description: Per-metric thresholds for optimization triggers
+                    type: object
+                  thresholds:
+                    description: Optimization thresholds for monitoring and alerts
+                    properties:
+                      custom:
+                        description: Custom thresholds against raw data
+                        items:
+                          properties:
+                            field:
+                              description: JSONPath in raw data
+                              type: string
+                            message:
+                              type: string
+                            name:
+                              type: string
+                            operator:
+                              enum:
+                              - '>'
+                              - <
+                              - ==
+                              - '!='
+                              - contains
+                              type: string
+                            value:
+                              description: Value to compare against
+                              type: string
+                          type: object
+                        type: array
+                      dedupEffectiveness:
+                        description: Deduplication effectiveness thresholds
+                        properties:
+                          critical:
+                            description: Critical threshold for dedup effectiveness
+                              (0.0-1.0, lower = worse)
+                            maximum: 1
+                            minimum: 0
+                            type: number
+                          warning:
+                            description: Warning threshold for dedup effectiveness
+                              (0.0-1.0, lower = worse)
+                            maximum: 1
+                            minimum: 0
+                            type: number
+                        type: object
+                      lowSeverityPercent:
+                        description: Low severity ratio thresholds
+                        properties:
+                          critical:
+                            description: Critical threshold for low severity percentage
+                              (0.0-1.0)
+                            maximum: 1
+                            minimum: 0
+                            type: number
+                          warning:
+                            description: Warning threshold for low severity percentage
+                              (0.0-1.0)
+                            maximum: 1
+                            minimum: 0
+                            type: number
+                        type: object
+                      observationsPerMinute:
+                        description: Observation rate thresholds
+                        properties:
+                          critical:
+                            description: Critical threshold for observations per minute
+                            minimum: 1
+                            type: integer
+                          warning:
+                            description: Warning threshold for observations per minute
+                            minimum: 1
+                            type: integer
+                        type: object
+                    type: object
+                type: object
+              rateLimit:
+                description: Rate limiting configuration
+                properties:
+                  burst:
+                    description: Burst size
+                    minimum: 1
+                    type: integer
+                  enabled:
+                    default: false
+                    description: Enable rate limiting
+                    type: boolean
+                  requestsPerSecond:
+                    description: Maximum requests per second
+                    minimum: 0.1
+                    type: number
+                type: object
+              source:
+                description: Tool name (trivy, kyverno, falco, checkov, kube-bench,
+                  audit, cert-manager, sealed-secrets, kubernetes-events, etc.)
+                pattern: ^[a-z0-9-]+$
+                type: string
+              ttl:
+                description: TTL configuration for observations from this ingester
+                properties:
+                  default:
+                    description: Default TTL as duration string (e.g., '30d', '7d')
+                    pattern: ^[0-9]+(ns|us|µs|ms|s|m|h|d)$
+                    type: string
+                  max:
+                    description: Maximum allowed TTL as duration string
+                    pattern: ^[0-9]+(ns|us|µs|ms|s|m|h|d)$
+                    type: string
+                  min:
+                    description: Minimum allowed TTL as duration string
+                    pattern: ^[0-9]+(ns|us|µs|ms|s|m|h|d)$
+                    type: string
+                type: object
+              webhook:
+                description: Webhook adapter configuration
+                properties:
+                  auth:
+                    description: Authentication configuration
+                    properties:
+                      secretName:
+                        description: Secret name containing auth credentials
+                        type: string
+                      type:
+                        default: none
+                        enum:
+                        - none
+                        - bearer
+                        - basic
+                        type: string
+                    type: object
+                  bufferSize:
+                    default: 100
+                    description: Event buffer size
+                    type: integer
+                  path:
+                    description: HTTP path for webhook endpoint
+                    type: string
+                  port:
+                    description: Port to listen on
+                    maximum: 65535
+                    minimum: 1
+                    type: integer
+                  methods:
+                    description: 'HTTP methods to accept (default: POST)'
+                    items:
+                      enum:
+                      - GET
+                      - POST
+                      - PUT
+                      - PATCH
+                      type: string
+                    type: array
+                  tls:
+                    description: TLS configuration for webhook endpoint
+                    properties:
+                      enabled:
+                        default: true
+                        description: 'Enable TLS (default: true)'
+                        type: boolean
+                      certSecretRef:
+                        description: Secret name containing TLS certificate and key
+                        type: string
+                      minVersion:
+                        description: Minimum TLS version (1.2, 1.3)
+                        enum:
+                        - '1.2'
+                        - '1.3'
+                        type: string
+                    type: object
+                  rateLimit:
+                    description: Rate limiting configuration
+                    properties:
+                      requestsPerSecond:
+                        description: Maximum requests per second
+                        minimum: 0.1
+                        type: number
+                      burst:
+                        description: Burst size
+                        minimum: 1
+                        type: integer
+                    type: object
+                type: object
+            required:
+            - source
+            - ingester
+            - destinations
+            type: object
+        type: object
+    served: true
     storage: true
     subresources:
       status: {}
@@ -855,4 +1484,4 @@ status:
     status: 'True'
     type: Established
   storedVersions:
-  - v1alpha1
+  - v1

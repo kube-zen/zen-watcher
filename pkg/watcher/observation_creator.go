@@ -195,9 +195,10 @@ func (oc *ObservationCreator) GetSmartProcessor() *optimization.SmartProcessor {
 }
 
 // CreateObservation creates an Observation CRD and increments metrics
-// This is the centralized place where all Observations are created
-// Flow: filter() → normalize() → dedup() → create Observation CRD + update metrics + log
-// First event always creates an observation; duplicates within window are skipped
+// IMPORTANT: This method assumes the event has already been processed (filtered and deduplicated)
+// by the Processor. It does NOT re-run filter or dedup logic.
+// The canonical pipeline order is enforced in Processor.ProcessEvent:
+// source → (filter | dedup, order chosen by optimization) → normalize → CreateObservation
 func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation *unstructured.Unstructured) error {
 	// Extract source early for metrics
 	sourceVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
@@ -214,223 +215,36 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 		oc.recordEventAttempted(source)
 	}
 
-	// Determine processing order (dynamic or static)
-	processingOrder := oc.determineProcessingOrder(source)
-
-	// Execute processing steps based on determined order
-	switch processingOrder {
-	case ProcessingOrderFilterFirst:
-		// Filter → Dedup → Create
-		return oc.processFilterFirst(ctx, observation, source)
-	case ProcessingOrderDedupFirst:
-		// Dedup → Filter → Create
-		return oc.processDedupFirst(ctx, observation, source)
-	default:
-		// Default: Filter → Dedup → Create (backward compatible)
-		return oc.processFilterFirst(ctx, observation, source)
-	}
-}
-
-// processFilterFirst processes with filter-first order: Filter → Dedup → Create
-func (oc *ObservationCreator) processFilterFirst(ctx context.Context, observation *unstructured.Unstructured, source string) error {
-	startTime := time.Now()
-
 	// Get SmartProcessor metrics collector if available
+	startTime := time.Now()
 	var collector *optimization.PerSourceMetricsCollector
 	if oc.smartProcessor != nil {
 		collector = oc.smartProcessor.GetOrCreateMetricsCollector(source)
 	}
 
-	// STEP 1: FILTER
-	if oc.filter != nil {
-		allowed, reason := oc.filter.AllowWithReason(observation)
-		if !allowed {
-			if oc.observationsFiltered != nil {
-				oc.observationsFiltered.WithLabelValues(source, reason).Inc()
-			}
-			if oc.optimizationMetrics != nil {
-				oc.recordEventFiltered(source, reason)
-			}
-			// Record in SmartProcessor metrics if available
-			if collector != nil {
-				collector.RecordFiltered(reason)
-				collector.RecordProcessing(time.Since(startTime), nil)
-			}
-			return nil
-		}
-	}
-
-	// STEP 2: DEDUP
-	dedupKey := oc.extractDedupKey(observation)
-	if !oc.deduper.ShouldCreateWithContent(dedupKey, observation.Object) {
-		logger.Debug("Skipping duplicate observation within window",
-			logger.Fields{
-				Component: "watcher",
-				Operation: "observation_dedup",
-				Source:    source,
-				Reason:    "duplicate_within_window",
-			})
-		if oc.observationsDeduped != nil {
-			oc.observationsDeduped.Inc()
-		}
-		if oc.optimizationMetrics != nil {
-			oc.recordEventDeduped(source)
-		}
-		// Record in SmartProcessor metrics if available
-		if collector != nil {
-			collector.RecordDeduped()
-			collector.RecordProcessing(time.Since(startTime), nil)
-		}
-		return nil
-	}
-
-	// STEP 3: CREATE
+	// Create the observation (filter and dedup were already handled by Processor)
 	err := oc.createObservation(ctx, observation, source)
+
 	// Record processing time in SmartProcessor metrics if available
 	if collector != nil {
 		collector.RecordProcessing(time.Since(startTime), err)
 	}
+
 	return err
 }
 
-// processDedupFirst processes with dedup-first order: Dedup → Filter → Create
-func (oc *ObservationCreator) processDedupFirst(ctx context.Context, observation *unstructured.Unstructured, source string) error {
-	startTime := time.Now()
+// DEPRECATED: processFilterFirst and processDedupFirst are no longer used
+// Filter and dedup are now handled in Processor.ProcessEvent before CreateObservation is called.
+// These methods are kept for backward compatibility but should not be called.
+// They will be removed in a future version.
 
-	// Get SmartProcessor metrics collector if available
-	var collector *optimization.PerSourceMetricsCollector
-	if oc.smartProcessor != nil {
-		collector = oc.smartProcessor.GetOrCreateMetricsCollector(source)
-	}
-
-	// STEP 1: DEDUP
-	dedupKey := oc.extractDedupKey(observation)
-	if !oc.deduper.ShouldCreateWithContent(dedupKey, observation.Object) {
-		logger.Debug("Skipping duplicate observation within window",
-			logger.Fields{
-				Component: "watcher",
-				Operation: "observation_dedup",
-				Source:    source,
-				Reason:    "duplicate_within_window",
-			})
-		if oc.observationsDeduped != nil {
-			oc.observationsDeduped.Inc()
-		}
-		if oc.optimizationMetrics != nil {
-			oc.recordEventDeduped(source)
-		}
-		// Record in SmartProcessor metrics if available
-		if collector != nil {
-			collector.RecordDeduped()
-			collector.RecordProcessing(time.Since(startTime), nil)
-		}
-		return nil
-	}
-
-	// STEP 2: FILTER
-	if oc.filter != nil {
-		allowed, reason := oc.filter.AllowWithReason(observation)
-		if !allowed {
-			if oc.observationsFiltered != nil {
-				oc.observationsFiltered.WithLabelValues(source, reason).Inc()
-			}
-			if oc.optimizationMetrics != nil {
-				oc.recordEventFiltered(source, reason)
-			}
-			// Record in SmartProcessor metrics if available
-			if collector != nil {
-				collector.RecordFiltered(reason)
-				collector.RecordProcessing(time.Since(startTime), nil)
-			}
-			return nil
-		}
-	}
-
-	// STEP 3: CREATE
-	err := oc.createObservation(ctx, observation, source)
-	// Record processing time in SmartProcessor metrics if available
-	if collector != nil {
-		collector.RecordProcessing(time.Since(startTime), err)
-	}
-	return err
-}
-
-// determineProcessingOrder determines the processing order for a source
+// determineProcessingOrder is DEPRECATED and no longer used
+// Processing order is now determined in Processor.ProcessEvent before any processing steps.
+// This method is kept for backward compatibility but returns a no-op value.
 func (oc *ObservationCreator) determineProcessingOrder(source string) ProcessingOrder {
-	var sourceConfig *config.SourceConfig
-	if oc.sourceConfigLoader != nil {
-		sourceConfig = oc.sourceConfigLoader.GetSourceConfig(source)
-	}
-
-	// Use SmartProcessor if available for enhanced optimization
-	if oc.smartProcessor != nil && sourceConfig != nil && sourceConfig.Processing.AutoOptimize {
-		// Get metrics from SmartProcessor's PerSourceMetricsCollector
-		optMetrics := oc.smartProcessor.GetSourceMetrics(source)
-		if optMetrics != nil {
-			// Use StrategyDecider from SmartProcessor
-			strategy := oc.smartProcessor.DetermineOptimalStrategy(
-				&optimization.RawEvent{Source: source},
-				sourceConfig,
-			)
-			// Convert strategy to ProcessingOrder
-			optimalOrder := ProcessingOrder(strategy.String())
-
-			// Check if order changed and log it
-			oc.orderMu.Lock()
-			oldOrder, exists := oc.currentOrder[source]
-			if !exists || oldOrder != optimalOrder {
-				if exists {
-					logger.Info("Processing order changed via SmartProcessor",
-						logger.Fields{
-							Component: "watcher",
-							Operation: "order_change",
-							Source:    source,
-							Additional: map[string]interface{}{
-								"old_order": string(oldOrder),
-								"new_order": string(optimalOrder),
-								"reason":    "smart_processor_optimization",
-							},
-						})
-				}
-				oc.currentOrder[source] = optimalOrder
-			}
-			oc.orderMu.Unlock()
-
-			return optimalOrder
-		}
-	}
-
-	// Fallback to existing logic if SmartProcessor not available or not enabled
-	var sourceMetrics *SourceMetrics
-	if oc.optimizationMetrics != nil {
-		sourceMetrics = oc.getSourceMetrics(source)
-	}
-
-	// Determine optimal order
-	optimalOrder := DetermineOptimalOrder(source, sourceConfig, sourceMetrics)
-
-	// Check if order changed and log it
-	oc.orderMu.Lock()
-	oldOrder, exists := oc.currentOrder[source]
-	if !exists || oldOrder != optimalOrder {
-		if exists {
-			logger.Info("Processing order changed",
-				logger.Fields{
-					Component: "watcher",
-					Operation: "order_change",
-					Source:    source,
-					Additional: map[string]interface{}{
-						"old_order": string(oldOrder),
-						"new_order": string(optimalOrder),
-						"reason":    "auto_optimization",
-					},
-				})
-		}
-		oc.currentOrder[source] = optimalOrder
-	}
-	oc.orderMu.Unlock()
-
-	return optimalOrder
+	// No-op: order is determined upstream in Processor
+	// Return default to maintain backward compatibility
+	return ProcessingOrderFilterFirst
 }
 
 // getSourceMetrics gets current metrics for a source from optimization metrics

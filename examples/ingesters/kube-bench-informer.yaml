@@ -1,0 +1,37 @@
+apiVersion: zen.kube-zen.io/v1
+kind: Ingester
+metadata:
+  name: kube-bench-reports
+  namespace: default
+spec:
+  source: kube-bench
+  ingester: informer
+  informer:
+    gvr:
+      group: ""
+      version: v1
+      resource: configmaps
+    labelSelector: "app=kube-bench"
+    resyncPeriod: "30m"
+  filters:
+    enabled: true
+    minPriority: 0.4
+  deduplication:
+    enabled: true
+    window: "24h"
+    strategy: fingerprint
+  optimization:
+    enabled: true
+    order: auto
+    autoOptimize: true
+  destinations:
+    - type: crd
+      value: observations
+      mapping:
+        domain: compliance
+        type: benchmark_finding
+        priority:
+          FAIL: 0.8
+          WARN: 0.5
+          INFO: 0.2
+
