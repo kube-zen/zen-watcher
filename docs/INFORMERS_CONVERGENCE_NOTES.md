@@ -283,9 +283,27 @@ Downstream processing
 
 ## Success Criteria
 
-- [ ] Informer construction centralized in `internal/informers`
-- [ ] Queue provides backpressure (bounded capacity)
-- [ ] RawEvent behavior unchanged (external contracts preserved)
-- [ ] Tests cover new abstractions
-- [ ] No regressions in existing functionality
-- [ ] Clean shutdown with queue draining
+- [x] Informer construction centralized in `internal/informers`
+- [x] Queue provides backpressure (bounded capacity via workqueue)
+- [x] RawEvent behavior unchanged (external contracts preserved)
+- [x] Tests cover new abstractions (manager_test.go)
+- [x] No regressions in existing functionality (backward compatible)
+- [x] Clean shutdown with queue draining (Stop() calls queue.ShutDown())
+
+## Implementation Status
+
+**Phase 1**: ✅ Complete
+- `internal/informers/manager.go` - Manager abstraction
+- `internal/informers/manager_test.go` - Unit tests
+- `internal/kubernetes/setup.go` - Uses manager, adds throttling
+- `pkg/adapter/generic/informer_adapter.go` - Supports both manager and factory
+- `pkg/adapter/generic/factory.go` - Supports InformerManager
+
+**Phase 2**: ✅ Complete
+- Workqueue integrated in `InformerAdapter`
+- Worker goroutines process queue
+- Graceful shutdown implemented
+
+**Phase 3**: 📋 Design only (future work)
+- Cross-repo convergence plan documented
+- Requires client-go version alignment

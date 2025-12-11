@@ -17,6 +17,7 @@ package generic
 import (
 	"fmt"
 
+	"github.com/kube-zen/zen-watcher/internal/informers"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/kubernetes"
@@ -24,13 +25,15 @@ import (
 
 // Factory creates generic adapters based on adapter type
 type Factory struct {
-	dynClient    dynamic.Interface
-	dynFactory   dynamicinformer.DynamicSharedInformerFactory
-	clientSet    kubernetes.Interface
-	webhookPorts map[string]int // Track used ports
+	dynClient      dynamic.Interface
+	dynFactory     dynamicinformer.DynamicSharedInformerFactory // Deprecated: use informerManager
+	informerManager *informers.Manager                          // Preferred: use manager
+	clientSet      kubernetes.Interface
+	webhookPorts   map[string]int // Track used ports
 }
 
 // NewFactory creates a new adapter factory
+// Deprecated: Use NewFactoryWithManager for new code
 func NewFactory(
 	dynClient dynamic.Interface,
 	dynFactory dynamicinformer.DynamicSharedInformerFactory,
@@ -44,10 +47,28 @@ func NewFactory(
 	}
 }
 
+// NewFactoryWithManager creates a new adapter factory using InformerManager
+func NewFactoryWithManager(
+	dynClient dynamic.Interface,
+	informerManager *informers.Manager,
+	clientSet kubernetes.Interface,
+) *Factory {
+	return &Factory{
+		dynClient:       dynClient,
+		informerManager: informerManager,
+		clientSet:       clientSet,
+		webhookPorts:    make(map[string]int),
+	}
+}
+
 // NewAdapter creates a new generic adapter based on ingester type
 func (f *Factory) NewAdapter(ingester string) (GenericAdapter, error) {
 	switch ingester {
 	case "informer":
+		// Prefer manager, fallback to factory for backward compatibility
+		if f.informerManager != nil {
+			return NewInformerAdapterWithManager(f.informerManager), nil
+		}
 		return NewInformerAdapter(f.dynFactory), nil
 	case "webhook":
 		return NewWebhookAdapter(), nil

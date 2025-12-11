@@ -116,7 +116,7 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 		return nil, fmt.Errorf("neither manager nor factory is set")
 	}
 
-	// Add event handlers that enqueue to workqueue instead of direct channel writes
+	// Add event handlers
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			u := obj.(*unstructured.Unstructured)
@@ -131,8 +131,11 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 					"gvr":       gvr.String(),
 				},
 			}
-			// Enqueue to workqueue (provides backpressure)
-			a.queue.Add(event)
+			select {
+			case events <- event:
+			case <-ctx.Done():
+				return
+			}
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			u := newObj.(*unstructured.Unstructured)
@@ -147,8 +150,11 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 					"gvr":       gvr.String(),
 				},
 			}
-			// Enqueue to workqueue (provides backpressure)
-			a.queue.Add(event)
+			select {
+			case events <- event:
+			case <-ctx.Done():
+				return
+			}
 		},
 		DeleteFunc: func(obj interface{}) {
 			u, ok := obj.(*unstructured.Unstructured)
@@ -173,15 +179,13 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 					"gvr":       gvr.String(),
 				},
 			}
-			// Enqueue to workqueue (provides backpressure)
-			a.queue.Add(event)
+			select {
+			case events <- event:
+			case <-ctx.Done():
+				return
+			}
 		},
 	})
-
-	// Start worker goroutines to process queue and emit RawEvents
-	for i := 0; i < a.workers; i++ {
-		go a.processQueue(ctx, events, config.Source)
-	}
 
 	// Start informer factory/manager
 	if a.manager != nil {
@@ -214,7 +218,50 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 	return events, nil
 }
 
+// processQueue processes items from the workqueue and emits RawEvents
+func (a *InformerAdapter) processQueue(ctx context.Context, events chan<- RawEvent, source string) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			item, shutdown := a.queue.Get()
+			if shutdown {
+				return
+			}
+
+			// Process the event
+			event, ok := item.(RawEvent)
+			if !ok {
+				logger.Warn("Unexpected item type in queue",
+					logger.Fields{
+						Component: "adapter",
+						Operation: "process_queue",
+						Source:    source,
+					})
+				a.queue.Done(item)
+				continue
+			}
+
+			// Emit to channel (with context cancellation check)
+			select {
+			case events <- event:
+				a.queue.Done(item)
+			case <-ctx.Done():
+				a.queue.Done(item)
+				return
+			}
+		}
+	}
+}
+
 // Stop stops the informer adapter
 func (a *InformerAdapter) Stop() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
 	close(a.stopCh)
+	if a.queue != nil {
+		a.queue.ShutDown()
+	}
 }

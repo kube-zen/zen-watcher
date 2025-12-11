@@ -106,5 +106,35 @@ When updating dashboards:
 
 ---
 
-**Last Updated**: 2025-12-08
+## Canonical Dashboards for Launch
+
+**Primary Dashboards** (validated and ready):
+1. **Executive Overview** (`zen-watcher-executive.json`) - Strategic KPIs, health overview
+2. **Operations** (`zen-watcher-operations.json`) - SRE monitoring, performance metrics
+3. **Security Analytics** (`zen-watcher-security.json`) - Threat analysis, compliance reporting
+
+**Secondary Dashboards** (available but not required for launch):
+4. **Main** (`zen-watcher-dashboard.json`) - Navigation hub with links
+5. **Namespace Health** (`zen-watcher-namespace-health.json`) - Per-namespace metrics
+6. **Explorer** (`zen-watcher-explorer.json`) - Query builder and data exploration
+
+## Validation Checklist
+
+After running `./scripts/quick-demo.sh k3d --non-interactive --deploy-mock-data`:
+
+- [ ] **Pod running**: `kubectl get pods -n zen-system -l app.kubernetes.io/name=zen-watcher` shows Running
+- [ ] **Metrics endpoint**: `curl http://localhost:8080/metrics | grep "^zen_watcher"` returns metrics
+- [ ] **Key metrics present**:
+  - `zen_watcher_events_total` with labels: source, category, severity, eventType, namespace, kind
+  - `zen_watcher_observations_created_total{source}`
+  - `zen_watcher_tools_active{tool}`
+  - `zen_watcher_observations_filtered_total{source,reason}`
+  - `zen_watcher_observations_deduped_total`
+- [ ] **Dashboards import successfully**: `scripts/observability/dashboards.sh` completes without errors
+- [ ] **At least one panel shows data**: Executive dashboard shows "UP" status and Tools Monitored > 0
+- [ ] **PromQL queries work**: Test query `sum(rate(zen_watcher_events_total[5m]))` returns values in Grafana
+
+---
+
+**Last Updated**: 2025-12-10
 
