@@ -146,7 +146,7 @@ func (p *expressionParser) parseComparison() (*ASTNode, error) {
 	if p.peekToken("is_") {
 		macroName := p.parseIdentifier()
 		return &ASTNode{
-			Type: NodeTypeMacro,
+			Type:  NodeTypeMacro,
 			Field: macroName,
 		}, nil
 	}
@@ -467,4 +467,3 @@ func (p *expressionParser) skipWhitespace() {
 		p.pos++
 	}
 }
-

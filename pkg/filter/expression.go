@@ -19,7 +19,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -117,7 +116,7 @@ func (ef *ExpressionFilter) evaluateNode(node *ASTNode, obs *unstructured.Unstru
 func (ef *ExpressionFilter) getFieldValue(fieldPath string, obs *unstructured.Unstructured) (interface{}, error) {
 	// Support simple dot notation: spec.severity, spec.details.vulnerabilityID
 	parts := strings.Split(fieldPath, ".")
-	
+
 	var current interface{} = obs.Object
 	for _, part := range parts {
 		if currentMap, ok := current.(map[string]interface{}); ok {
@@ -382,4 +381,3 @@ func (ef *ExpressionFilter) compareSeverity(left, right interface{}) int {
 
 	return leftLevel - rightLevel
 }
-
