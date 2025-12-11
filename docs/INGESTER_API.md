@@ -236,6 +236,10 @@ This keeps zen-watcher pure OSS with zero egress and zero blast radius.
 
 **Using Go?** See [GO_SDK_OVERVIEW.md](GO_SDK_OVERVIEW.md) for the Go SDK with strongly-typed structs and validation helpers.
 
+## Schema Reference
+
+**Complete field reference**: See [generated/INGESTER_SCHEMA_REFERENCE.md](generated/INGESTER_SCHEMA_REFERENCE.md) for auto-generated schema documentation.
+
 ## Examples
 
 See canonical examples:

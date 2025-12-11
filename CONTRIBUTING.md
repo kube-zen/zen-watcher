@@ -563,6 +563,20 @@ All archive documents include banners explaining their non-canonical status.
    kubectl apply -f deployments/crds/
    ```
 
+## Schema Documentation Generation
+
+After modifying CRDs or SDK types, regenerate the schema documentation:
+
+```bash
+go run ./cmd/schema-doc-gen
+```
+
+This generates:
+- `docs/generated/INGESTER_SCHEMA_REFERENCE.md`
+- `docs/generated/OBSERVATIONS_SCHEMA_REFERENCE.md`
+
+**Note**: These files are auto-generated. Do not edit them manually.
+
 ## How to Run Tests Locally
 
 ### Prerequisites
