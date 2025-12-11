@@ -107,10 +107,11 @@ type FilterConfig struct {
 
 // DedupConfig holds deduplication configuration
 type DedupConfig struct {
-	Enabled  bool
-	Window   string
-	Strategy string // fingerprint, key, hybrid, adaptive
-	Fields   []string
+	Enabled           bool
+	Window            string
+	Strategy          string   // fingerprint, key, event-stream (strict-window renamed)
+	Fields            []string // For key-based strategy
+	MaxEventsPerWindow int     // For event-stream strategy
 }
 
 // ProcessingConfig holds processing order and optimization settings
