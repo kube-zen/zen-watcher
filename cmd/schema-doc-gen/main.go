@@ -245,4 +245,3 @@ func getConstraints(prop map[string]interface{}) string {
 
 	return strings.Join(constraints, "; ")
 }
-
