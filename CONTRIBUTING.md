@@ -647,6 +647,19 @@ golangci-lint run
 
 All linters run automatically in CI on every PR. Ensure your code passes before requesting review.
 
+## Release Notes
+
+When preparing a release:
+
+1. **Use the template**: Follow `docs/RELEASE_NOTES_TEMPLATE.md` for structure
+2. **Document CRD/API changes**: All CRD/API changes must link to:
+   - `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` (versioning plan)
+   - `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md` (if relevant to KEP)
+3. **Create release notes**: Add to `docs/releases/` directory
+4. **Update version**: Update version in code and documentation
+
+**See**: `docs/releases/` for version history and `docs/RELEASE_NOTES_TEMPLATE.md` for the standard structure.
+
 ## Questions?
 
 Open an issue or check existing documentation in `docs/` for more details.

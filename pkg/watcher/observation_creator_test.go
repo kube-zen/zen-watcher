@@ -64,7 +64,7 @@ func TestObservationCreator_CreateObservation(t *testing.T) {
 			"spec": map[string]interface{}{
 				"source":    "test",
 				"category":  "security",
-				"severity":  "HIGH",
+				"severity":  "high",  // lowercase (matches CRD enum, code normalizes to uppercase internally)
 				"eventType": "vulnerability",
 			},
 		},
@@ -128,7 +128,7 @@ func TestObservationCreator_CreateObservation_AlreadyExists(t *testing.T) {
 			"spec": map[string]interface{}{
 				"source":    "test",
 				"category":  "security",
-				"severity":  "HIGH",
+				"severity":  "high",  // lowercase (matches CRD enum, code normalizes to uppercase internally)
 				"eventType": "vulnerability",
 			},
 		},
@@ -181,7 +181,7 @@ func TestObservationCreator_CreateObservation_WithDedup(t *testing.T) {
 			"spec": map[string]interface{}{
 				"source":    "test",
 				"category":  "security",
-				"severity":  "HIGH",
+				"severity":  "high",  // lowercase (matches CRD enum, code normalizes to uppercase internally)
 				"eventType": "vulnerability",
 			},
 		},

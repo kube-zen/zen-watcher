@@ -159,6 +159,15 @@ status:
 - ✅ Required fields: `source`, `category`, `severity`, `eventType`
 - ✅ Optional fields: `resource`, `details`, `detectedAt`, `ttlSecondsAfterCreation`
 - ✅ Status: `processed`, `lastProcessedAt`
+- ✅ **Validation Hardening (v1alpha2)**: Enum validation for `severity` and `category`, maximum TTL validation, pattern validation improvements
+  - **Status**: Implemented (non-breaking, backward-compatible)
+  - **Reference**: `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md`
+
+**Future State (v1beta1)** - **Planned**:
+- Conditions pattern for status (replacing `processed` boolean)
+- `observedGeneration` field for reconciliation tracking
+- `phase` field for lifecycle tracking
+- **Reference**: `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` (v1beta1 section)
 
 **Future State (v2)** - **Not Yet Implemented**:
 - Enhanced `priority` field (0.0-1.0 numeric score) for more granular severity

@@ -135,16 +135,30 @@ spec:
               properties:
                 source:
                   type: string
-                  description: "Tool that detected this event (trivy, falco, kyverno, etc)"
+                  description: "Tool that detected this event (trivy, falco, kyverno, etc). Must match pattern: lowercase alphanumeric and hyphens only."
+                  pattern: "^[a-z0-9-]+$"
                 category:
                   type: string
-                  description: "Event category (security, compliance, performance)"
+                  description: "Event category (security, compliance, performance, operations, cost)"
+                  enum:
+                    - security
+                    - compliance
+                    - performance
+                    - operations
+                    - cost
                 severity:
                   type: string
-                  description: "Severity level (critical, high, medium, low, info)"
+                  description: "Severity level (critical, high, medium, low, info). Values are normalized to uppercase by the controller before storage."
+                  enum:
+                    - critical
+                    - high
+                    - medium
+                    - low
+                    - info
                 eventType:
                   type: string
-                  description: "Type of event (vulnerability, runtime-threat, policy-violation)"
+                  description: "Type of event (vulnerability, runtime-threat, policy-violation, etc.). Must match pattern: lowercase alphanumeric and underscores only."
+                  pattern: "^[a-z0-9_]+$"
                 resource:
                   type: object
                   description: "Affected Kubernetes resource"
