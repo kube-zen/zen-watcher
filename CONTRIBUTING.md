@@ -11,6 +11,8 @@ Thank you for your interest in contributing to Zen Watcher! This document outlin
 
 All tasks are sourced from the roadmap and KEP, ensuring your contributions align with project priorities.
 
+**What Good Looks Like**: See [docs/OPERATIONAL_INVARIANTS_AND_SLOS.md](docs/OPERATIONAL_INVARIANTS_AND_SLOS.md) for operational invariants and SLO-like targets that all changes must preserve.
+
 ## Architecture Principles
 
 Zen Watcher follows **Kubernetes controller best practices** and uses a **modular, scalable architecture**. This design makes contributions easy:

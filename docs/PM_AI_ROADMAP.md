@@ -17,6 +17,8 @@
   - `main` is pushed to `origin` (`git log origin/main..HEAD` shows no unpushed commits)
 - Executor AI reports must be short (header + a few bullets), no "ready for commit/push" phrasing
 
+**Operational Invariants**: See [docs/OPERATIONAL_INVARIANTS_AND_SLOS.md](docs/OPERATIONAL_INVARIANTS_AND_SLOS.md) for SLO-like invariants that all changes must preserve.
+
 ---
 
 ## Vision & Role of Zen Watcher
