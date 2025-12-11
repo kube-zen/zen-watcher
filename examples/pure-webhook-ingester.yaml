@@ -60,7 +60,16 @@ spec:
     enabled: true
     minPriority: 0.4
   
-  # Deduplication
+  # Deduplication (v1.1+ canonical location)
+  processing:
+    dedup:
+      enabled: true
+      window: "1h"
+      strategy: fingerprint  # Default strategy (can be omitted)
+    order: filter_first
+    autoOptimize: false
+  
+  # Legacy deduplication (backward compatibility - maps to processing.dedup)
   deduplication:
     enabled: true
     window: "1h"

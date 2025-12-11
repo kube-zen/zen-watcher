@@ -26,7 +26,17 @@ spec:
       - kube-system
       - kube-public
   
-  # Deduplication
+  # Deduplication (v1.1+ canonical location)
+  processing:
+    dedup:
+      enabled: true
+      window: "5m"
+      strategy: event-stream  # event-stream for high-volume, noisy sources
+      maxEventsPerWindow: 1000  # Optional: strict limit for event-stream
+    order: auto
+    autoOptimize: true
+  
+  # Legacy deduplication (backward compatibility - maps to processing.dedup)
   deduplication:
     enabled: true
     window: "5m"
