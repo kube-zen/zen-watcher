@@ -228,6 +228,10 @@ The following destination types are **not supported** in zen-watcher OSS 1.0.0-a
 
 This keeps zen-watcher pure OSS with zero egress and zero blast radius.
 
+## Version Migration
+
+**Migrating from v1alpha1 to v1?** See [INGESTER_MIGRATION_GUIDE.md](INGESTER_MIGRATION_GUIDE.md) for step-by-step instructions and the migration tool.
+
 ## Examples
 
 See canonical examples:
