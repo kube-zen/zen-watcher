@@ -473,6 +473,20 @@ All PRs are reviewed against KEP-level standards:
 
 **Questions about quality bar?** See `docs/PM_AI_ROADMAP.md` for vision and priorities, or open an issue for discussion.
 
+### Historical Reference & Archive Documentation
+
+**Archive documents are non-canonical** - they provide historical context but should not be used as current guidance.
+
+- **Expert Package Archive**: `docs/archive/EXPERT_PACKAGE/` - Comprehensive expert analysis (late 2024/early 2025)
+- **Archive Summary**: `docs/archive/EXPERT_PACKAGE/EXPERT_PACKAGE_SUMMARY.md` - Curated summary and usage guidelines
+- **Archive Overview**: `docs/archive/README.md` - Archive directory structure and guidelines
+
+**Use archive docs for**: Historical context, rationale, and inspiration
+
+**Do NOT use archive docs for**: Current task lists, exact performance numbers, or as replacement for `docs/PM_AI_ROADMAP.md`, `CONTRIBUTING.md`, or other current documentation
+
+All archive documents include banners explaining their non-canonical status.
+
 ## How to Run Tests Locally
 
 ### Prerequisites
