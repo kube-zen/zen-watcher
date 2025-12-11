@@ -1,11 +1,20 @@
 #!/bin/bash
 # Stress test: Multi-phase testing with progressive load increase
 #
-# Usage: ./stress-test.sh [--phases N] [--phase-duration M] [--max-observations N] [--non-interactive]
-#   --phases: Number of phases (default: 3)
-#   --phase-duration: Duration per phase in seconds (default: 5)
-#   --max-observations: Maximum total observations (default: 2000)
+# ⚠️  USAGE WARNING:
+#   This script is intended for dedicated or beefier environments (2-3 nodes, 4+ vCPUs, 8GB+ RAM).
+#   On a 32GB / 14 vcore laptop shared with browsers, Cursor, etc., full stress runs may cause
+#   resource contention. Use minimal parameters for local validation.
+#
+# Usage: ./stress-test.sh [--phases N] [--phase-duration M] [--max-observations N] [--non-interactive] [--i-know-this-is-heavy]
+#   --phases: Number of phases (default: 3, reduced to 1 if ZEN_STRESS_ALLOW_LOCAL not set)
+#   --phase-duration: Duration per phase in seconds (default: 5, reduced to 2 if ZEN_STRESS_ALLOW_LOCAL not set)
+#   --max-observations: Maximum total observations (default: 2000, reduced to 50 if ZEN_STRESS_ALLOW_LOCAL not set)
 #   --non-interactive: Skip cleanup prompt
+#   --i-know-this-is-heavy: Explicitly allow heavier runs (equivalent to ZEN_STRESS_ALLOW_LOCAL=1)
+#
+# Environment Variables:
+#   ZEN_STRESS_ALLOW_LOCAL: Set to 1 to allow heavier runs on local machines (default: unset)
 
 set -euo pipefail
 
@@ -45,12 +54,30 @@ while [[ $# -gt 0 ]]; do
             NON_INTERACTIVE=true
             shift
             ;;
+        --i-know-this-is-heavy)
+            ALLOW_HEAVY=true
+            shift
+            ;;
         *)
             log_error "Unknown option: $1"
             exit 1
             ;;
     esac
 done
+
+# Apply safety limits if heavy runs not explicitly allowed
+if [ "${ZEN_STRESS_ALLOW_LOCAL:-0}" != "1" ] && [ "$ALLOW_HEAVY" != true ]; then
+    if [ "$PHASES" -gt 2 ]; then
+        log_warn "Heavy run detected (phases=$PHASES). Limiting to 2 phases for safety."
+        log_info "To allow heavier runs, set ZEN_STRESS_ALLOW_LOCAL=1 or use --i-know-this-is-heavy"
+        PHASES=2
+    fi
+    if [ "$MAX_OBSERVATIONS" -gt 100 ]; then
+        log_warn "Heavy run detected (max-observations=$MAX_OBSERVATIONS). Limiting to 100 for safety."
+        log_info "To allow heavier runs, set ZEN_STRESS_ALLOW_LOCAL=1 or use --i-know-this-is-heavy"
+        MAX_OBSERVATIONS=100
+    fi
+fi
 
 echo "=== Stress Test Configuration ==="
 echo "Phases: $PHASES"

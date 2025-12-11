@@ -1,11 +1,19 @@
 #!/bin/bash
 # Quick benchmark: Create 100 observations and measure performance
 #
-# Usage: ./quick-bench.sh [--count N] [--namespace NAMESPACE]
+# ⚠️  USAGE WARNING:
+#   This script is intended for dedicated or beefier environments.
+#   For lightweight local dev runs, use minimal parameters or set ZEN_STRESS_ALLOW_LOCAL=1
+#
+# Usage: ./quick-bench.sh [--count N] [--namespace NAMESPACE] [--i-know-this-is-heavy]
 #
 # Environment Variables:
-#   COUNT: Number of observations to create (default: 100)
+#   COUNT: Number of observations to create (default: 100, reduced to 10 if ZEN_STRESS_ALLOW_LOCAL not set)
 #   NAMESPACE: Target namespace (default: zen-system)
+#   ZEN_STRESS_ALLOW_LOCAL: Set to 1 to allow heavier runs on local machines (default: unset)
+#
+# Flags:
+#   --i-know-this-is-heavy: Explicitly allow heavier runs (equivalent to ZEN_STRESS_ALLOW_LOCAL=1)
 
 set -euo pipefail
 
@@ -14,17 +22,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../utils/common.sh" 2>/dev/null || true
 
 NAMESPACE="${NAMESPACE:-zen-system}"
-COUNT="${COUNT:-100}"
+ALLOW_HEAVY=false
+DEFAULT_COUNT=100
 
 # Parse arguments
 for arg in "$@"; do
     case "$arg" in
+        --i-know-this-is-heavy)
+            ALLOW_HEAVY=true
+            ;;
         --count=*)
-            COUNT="${arg#*=}"
+            DEFAULT_COUNT="${arg#*=}"
             ;;
         --count)
             shift
-            COUNT="$1"
+            DEFAULT_COUNT="$1"
             ;;
         --namespace=*)
             NAMESPACE="${arg#*=}"
@@ -35,6 +47,19 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+# Check if heavy runs are allowed
+if [ "${ZEN_STRESS_ALLOW_LOCAL:-0}" = "1" ] || [ "$ALLOW_HEAVY" = true ]; then
+    COUNT="${COUNT:-${DEFAULT_COUNT}}"
+else
+    # Default to safe, minimal run
+    COUNT="${COUNT:-10}"
+    if [ "${COUNT:-10}" -gt 50 ]; then
+        log_warn "Heavy run detected (count=$COUNT). For safety, limiting to 50 observations."
+        log_info "To allow heavier runs, set ZEN_STRESS_ALLOW_LOCAL=1 or use --i-know-this-is-heavy"
+        COUNT=50
+    fi
+fi
 
 log_step "Quick Benchmark: $COUNT Observations"
 log_info "Namespace: $NAMESPACE"

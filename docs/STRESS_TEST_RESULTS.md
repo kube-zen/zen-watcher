@@ -107,5 +107,36 @@ Zen Watcher demonstrates **stable performance** under sustained and burst loads.
 
 ---
 
-**Note**: This document should be updated with actual test results when stress testing is performed. The values shown are expected ranges based on the test scripts and KEP analysis.
+## Environment Requirements and Current Status
+
+### Current Status
+
+**Stress scripts are implemented and ready for use.** Full, representative stress test runs are currently parked until a dedicated environment is available (e.g., cloud cluster with more CPU/RAM).
+
+### Recommended Environment Baseline
+
+For full, representative stress test runs:
+- **Cluster:** 2-3 nodes minimum
+- **CPU:** 4+ vCPUs per node
+- **RAM:** 8GB+ per node
+- **Dedicated:** Not shared with browsers, IDEs, or other resource-intensive applications
+
+### Local Development Constraints
+
+**On a 32GB / 14 vcore laptop shared with browsers, Cursor, etc.:**
+- Full stress runs may cause resource contention
+- Use minimal parameters for validation only:
+  - `--phases 1 --phase-duration 2 --max-observations 50 --non-interactive`
+- Or set `ZEN_STRESS_ALLOW_LOCAL=1` to allow heavier runs (use with caution)
+
+### Script Safety Guards
+
+Both `quick-bench.sh` and `stress-test.sh` include safety guards:
+- Default to minimal runs when `ZEN_STRESS_ALLOW_LOCAL` is not set
+- Require explicit `--i-know-this-is-heavy` flag or `ZEN_STRESS_ALLOW_LOCAL=1` for heavier runs
+- Automatically limit parameters if heavy runs are detected without explicit permission
+
+---
+
+**Note**: This document should be updated with actual test results when stress testing is performed in a dedicated environment. The values shown are expected ranges based on the test scripts and KEP analysis.
 

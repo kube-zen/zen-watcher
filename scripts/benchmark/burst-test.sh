@@ -1,4 +1,7 @@
 #!/bin/bash
+# DEPRECATED: Use scripts/benchmark/stress-test.sh instead.
+# This script is kept temporarily for reference but is no longer maintained.
+#
 # Burst test: Test peak capacity and recovery behavior
 #
 # Usage: ./burst-test.sh [--burst-size N] [--burst-duration S] [--recovery-time S]
