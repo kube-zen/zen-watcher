@@ -19,8 +19,8 @@ spec:
     burst: 4000
   
   # Processing pipeline configuration (canonical format)
-  # Bridge-compatible: This example uses common semantics valid for both zen-watcher and zen-bridge
   # Canonical pipeline: source → (filter | dedup) → normalize → destinations[]
+  # Conforms to common Ingester semantics (see zen-admin/docs/common/COMMON_INGESTER_CRD_AND_PIPELINE_SEMANTICS_V1.md)
   processing:
     filter:
       enabled: true

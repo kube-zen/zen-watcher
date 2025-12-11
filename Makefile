@@ -60,7 +60,7 @@ fuzz:
 	@echo "$(GREEN)✅ Fuzz tests complete$(NC)"
 
 ## lint: Run all linters
-lint: fmt vet staticcheck check-schema-docs
+lint: fmt vet staticcheck check-schema-docs check-branding
 
 ## fmt: Run go fmt
 fmt:
@@ -292,6 +292,12 @@ sync-crd-to-chart:
 	@cat deployments/crds/observation_crd.yaml >> $(CHARTS_REPO)/charts/zen-watcher/templates/observation_crd.yaml
 	@echo "$(GREEN)✅ CRD synced to $(CHARTS_REPO)/charts/zen-watcher/templates/observation_crd.yaml$(NC)"
 	@echo "$(YELLOW)⚠️  Remember to commit the change in the helm-charts repository$(NC)"
+
+## check-branding: Check for forbidden executor-specific compatibility labels
+check-branding:
+	@echo "$(GREEN)Checking for executor-specific compatibility labels...$(NC)"
+	@./hack/check-branding.sh
+	@echo "$(GREEN)✅ Branding check passed$(NC)"
 
 ## check-schema-docs: Verify schema documentation is up to date
 check-schema-docs:
