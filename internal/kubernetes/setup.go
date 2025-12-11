@@ -28,9 +28,9 @@ import (
 
 // Clients holds Kubernetes client interfaces
 type Clients struct {
-	Dynamic       dynamic.Interface
-	Standard      kubernetes.Interface
-	Config        *rest.Config
+	Dynamic         dynamic.Interface
+	Standard        kubernetes.Interface
+	Config          *rest.Config
 	InformerManager *informers.Manager
 }
 

@@ -35,7 +35,7 @@ type InformerAdapter struct {
 	factory dynamicinformer.DynamicSharedInformerFactory // Deprecated: kept for backward compatibility
 	stopCh  chan struct{}
 	queue   workqueue.RateLimitingInterface // Internal queue for backpressure
-	workers int                              // Number of worker goroutines
+	workers int                             // Number of worker goroutines
 	mu      sync.Mutex
 }
 

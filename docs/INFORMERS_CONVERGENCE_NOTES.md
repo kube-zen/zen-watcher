@@ -2,9 +2,11 @@
 
 **Purpose**: Design document for converging zen-watcher's informer stack toward zen-agent's architectural strengths, while preserving watcher's config-driven flexibility.
 
-**Status**: Design phase - No code changes yet
+**Status**: Phases 1-2 Complete - Implementation ongoing
 
 **Last Updated**: 2025-12-10
+
+**Related**: See [PM AI Roadmap](PM_AI_ROADMAP.md) for informer convergence in context of overall zen-watcher priorities.
 
 ---
 
@@ -307,3 +309,8 @@ Downstream processing
 **Phase 3**: 📋 Design only (future work)
 - Cross-repo convergence plan documented
 - Requires client-go version alignment
+- See [PM AI Roadmap](PM_AI_ROADMAP.md) for timeline and priorities
+
+**Phase 4**: 📋 Future work (not yet designed)
+- Hard alignment or shared platform library
+- Depends on Phase 3 outcomes
