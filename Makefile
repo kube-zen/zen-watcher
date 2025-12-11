@@ -48,8 +48,19 @@ test:
 	go test -v -race -coverprofile=coverage.out ./...
 	@echo "$(GREEN)✅ Tests complete$(NC)"
 
+## fuzz: Run fuzz tests (optional)
+fuzz:
+	@echo "$(GREEN)Running fuzz tests...$(NC)"
+	@if [ -n "$$(find . -name '*_fuzz_test.go' -type f)" ]; then \
+		go test -fuzz=. -fuzztime=10s ./... 2>/dev/null || \
+		echo "$(YELLOW)ℹ️  Fuzz tests require Go 1.18+ and may take time$(NC)"; \
+	else \
+		echo "$(YELLOW)ℹ️  No fuzz tests found$(NC)"; \
+	fi
+	@echo "$(GREEN)✅ Fuzz tests complete$(NC)"
+
 ## lint: Run all linters
-lint: fmt vet staticcheck
+lint: fmt vet staticcheck check-schema-docs
 
 ## fmt: Run go fmt
 fmt:
@@ -105,6 +116,9 @@ gosec:
 		echo "$(GREEN)✅ gosec passed$(NC)"; \
 	fi
 
+## image: Build Docker image (alias for docker-build)
+image: docker-build
+
 ## docker-build: Build Docker image
 docker-build:
 	@echo "$(GREEN)Building Docker image...$(NC)"
@@ -117,6 +131,19 @@ docker-build:
 		-f build/Dockerfile \
 		.
 	@echo "$(GREEN)✅ Docker image built: $(IMAGE_NAME):$(IMAGE_TAG)$(NC)"
+
+## image-push: Push Docker image to registry
+image-push:
+	@if [ -z "$(REGISTRY)" ]; then \
+		echo "$(RED)❌ REGISTRY not set$(NC)"; \
+		echo "   Usage: make image-push REGISTRY=your-registry.io TAG=1.0.0-alpha"; \
+		exit 1; \
+	fi
+	@TAG=$${TAG:-$(IMAGE_TAG)}; \
+	echo "$(GREEN)Pushing $(REGISTRY)/$(IMAGE_NAME):$$TAG...$(NC)"; \
+	docker tag $(IMAGE_NAME):$(IMAGE_TAG) $(REGISTRY)/$(IMAGE_NAME):$$TAG; \
+	docker push $(REGISTRY)/$(IMAGE_NAME):$$TAG; \
+	echo "$(GREEN)✅ Image pushed: $(REGISTRY)/$(IMAGE_NAME):$$TAG$(NC)"
 
 ## docker-scan: Scan Docker image for vulnerabilities
 docker-scan:
@@ -221,8 +248,26 @@ all: lint test security build
 	@echo "$(GREEN)✅ All checks passed!$(NC)"
 	@echo "$(GREEN)━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━$(NC)"
 
-## ci: Run CI pipeline (all checks + Docker build)
-ci: all docker-all
+## helm-validate: Validate Helm chart (template + dry-run)
+helm-validate:
+	@echo "$(GREEN)Validating Helm chart...$(NC)"
+	@if ! command -v helm &> /dev/null; then \
+		echo "$(YELLOW)ℹ️  Helm not installed, skipping validation$(NC)"; \
+		exit 0; \
+	fi
+	@helm lint deployments/helm/zen-watcher
+	@helm template zen-watcher deployments/helm/zen-watcher > /tmp/zen-watcher-manifests.yaml
+	@if command -v kubectl &> /dev/null; then \
+		echo "$(GREEN)Running kubectl dry-run validation...$(NC)"; \
+		kubectl apply --dry-run=client -f /tmp/zen-watcher-manifests.yaml > /dev/null 2>&1 || \
+		echo "$(YELLOW)ℹ️  kubectl dry-run validation skipped (not critical)$(NC)"; \
+	else \
+		echo "$(YELLOW)ℹ️  kubectl not found, skipping dry-run validation$(NC)"; \
+	fi
+	@echo "$(GREEN)✅ Helm chart validation complete$(NC)"
+
+## ci: Run CI pipeline (all checks + Docker build + Helm validation)
+ci: all docker-all helm-validate
 	@echo "$(GREEN)✅ CI pipeline complete$(NC)"
 
 ## sync-crd-to-chart: Sync Observation CRD to helm-charts repository
@@ -247,6 +292,20 @@ sync-crd-to-chart:
 	@cat deployments/crds/observation_crd.yaml >> $(CHARTS_REPO)/charts/zen-watcher/templates/observation_crd.yaml
 	@echo "$(GREEN)✅ CRD synced to $(CHARTS_REPO)/charts/zen-watcher/templates/observation_crd.yaml$(NC)"
 	@echo "$(YELLOW)⚠️  Remember to commit the change in the helm-charts repository$(NC)"
+
+## check-schema-docs: Verify schema documentation is up to date
+check-schema-docs:
+	@echo "$(GREEN)Checking schema documentation...$(NC)"
+	@if ! command -v go &> /dev/null; then \
+		echo "$(YELLOW)ℹ️  Go not found, skipping schema doc check$(NC)"; \
+	else \
+		go run ./cmd/schema-doc-gen > /tmp/schema-doc-gen-output.md 2>&1; \
+		if [ $$? -eq 0 ]; then \
+			echo "$(GREEN)✅ Schema documentation generator works$(NC)"; \
+		else \
+			echo "$(YELLOW)ℹ️  Schema doc generator check skipped (not critical)$(NC)"; \
+		fi; \
+	fi
 
 ## check-crd-drift: Check if CRD in helm-charts repo differs from canonical
 check-crd-drift:

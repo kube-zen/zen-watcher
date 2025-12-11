@@ -482,6 +482,33 @@ zen-watcher is designed as a vendor-neutral, generic Kubernetes Observation oper
 - Backward compatibility preserved during refactoring
 - Test coverage for all abstractions
 
+## Release Preparation
+
+**Before tagging a release or opening a release PR, run:**
+
+```bash
+# Run all checks (lint, test, security, build)
+make all
+
+# Validate Helm chart
+make helm-validate
+
+# Build and validate Docker image
+make docker-build
+
+# Optional: Run fuzz tests
+make fuzz
+```
+
+**For CI/CD pipelines**, use:
+
+```bash
+# Full CI pipeline (all checks + Docker + Helm)
+make ci
+```
+
+**See [ZW_1_0_0_ALPHA_RELEASE_CHECKLIST.md](docs/ZW_1_0_0_ALPHA_RELEASE_CHECKLIST.md) for complete release checklist.**
+
 **Performance & Observability**: See `docs/STRESS_TEST_RESULTS.md` and dashboard docs as examples:
 - Performance characteristics documented with real numbers
 - Observability dashboards validated against actual metrics
