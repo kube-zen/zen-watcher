@@ -232,6 +232,10 @@ This keeps zen-watcher pure OSS with zero egress and zero blast radius.
 
 **Migrating from v1alpha1 to v1?** See [INGESTER_MIGRATION_GUIDE.md](INGESTER_MIGRATION_GUIDE.md) for step-by-step instructions and the migration tool.
 
+## Go SDK
+
+**Using Go?** See [GO_SDK_OVERVIEW.md](GO_SDK_OVERVIEW.md) for the Go SDK with strongly-typed structs and validation helpers.
+
 ## Examples
 
 See canonical examples:

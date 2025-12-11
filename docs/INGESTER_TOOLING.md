@@ -134,5 +134,6 @@ lint-ingesters:
 
 - [INGESTER_API.md](INGESTER_API.md) - Complete Ingester CRD API reference
 - [INGESTER_MIGRATION_GUIDE.md](INGESTER_MIGRATION_GUIDE.md) - Migration from v1alpha1 to v1
+- [GO_SDK_OVERVIEW.md](GO_SDK_OVERVIEW.md) - Go SDK for programmatic Ingester creation
 - [CRD_CONFORMANCE.md](CRD_CONFORMANCE.md) - CRD validation and conformance
 

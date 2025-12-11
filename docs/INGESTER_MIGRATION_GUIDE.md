@@ -168,5 +168,6 @@ The Ingester CRD defines:
 
 - [INGESTER_API.md](INGESTER_API.md) - Complete Ingester CRD API reference
 - [CRD_CONFORMANCE.md](CRD_CONFORMANCE.md) - CRD validation and conformance
+- [GO_SDK_OVERVIEW.md](GO_SDK_OVERVIEW.md) - Go SDK for programmatic Ingester creation
 - [zen-admin/docs/pm/analysis/WATCHER_ANALYSIS_INGESTER_V1ALPHA1_TO_V1_MIGRATION.md](../../zen-admin/docs/pm/analysis/WATCHER_ANALYSIS_INGESTER_V1ALPHA1_TO_V1_MIGRATION.md) - Detailed migration analysis
 
