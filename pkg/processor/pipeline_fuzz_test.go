@@ -27,7 +27,6 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
-	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 )
@@ -90,8 +89,8 @@ func FuzzProcessEvent(f *testing.F) {
 
 // FuzzProcessEvent_ExtremeSizes fuzzes with extreme payload sizes
 func FuzzProcessEvent_ExtremeSizes(f *testing.F) {
-	f.Add(1)   // Small
-	f.Add(100) // Medium
+	f.Add(1)     // Small
+	f.Add(100)   // Medium
 	f.Add(10000) // Large
 
 	f.Fuzz(func(t *testing.T, size int) {
@@ -174,4 +173,3 @@ func FuzzProcessEvent_HighCardinalityLabels(f *testing.F) {
 		_ = proc.ProcessEvent(ctx, rawEvent, sourceConfig)
 	})
 }
-

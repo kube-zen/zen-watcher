@@ -23,10 +23,8 @@ import (
 
 	"gopkg.in/yaml.v3"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
 	dynamicinformer "k8s.io/client-go/dynamic/dynamicinformer"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -87,4 +85,3 @@ func FuzzLoadIngesterConfig_MalformedYAML(f *testing.F) {
 		_, _ = LoadIngesterConfig(unstructuredObj)
 	})
 }
-
