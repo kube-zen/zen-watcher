@@ -531,6 +531,38 @@ All PRs are reviewed against KEP-level standards:
 
 All archive documents include banners explaining their non-canonical status.
 
+## Development Environment Setup
+
+### Prerequisites
+
+- **Go 1.23+** (zen-watcher requires Go 1.23, never upgrade to 1.24)
+- **Kubernetes cluster** (k3d, kind, or minikube) for integration tests
+- **kubectl** configured to access your cluster
+- **helm** (optional, for deployment)
+
+### Setup Steps
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/kube-zen/zen-watcher
+   cd zen-watcher
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   go mod download
+   ```
+
+3. **Build the binary**:
+   ```bash
+   go build -o zen-watcher ./cmd/zen-watcher
+   ```
+
+4. **Install CRDs** (if testing locally):
+   ```bash
+   kubectl apply -f deployments/crds/
+   ```
+
 ## How to Run Tests Locally
 
 ### Prerequisites

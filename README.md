@@ -102,6 +102,26 @@ ZEN_DEMO_MINIMAL=1 ./scripts/quick-demo.sh k3d --non-interactive --deploy-mock-d
 - ✅ Kubernetes cluster (k3d, kind, or minikube) with unlimited sources/ingesters supported via easy YAML/CRD configuration (9+ validated examples: Trivy, Falco, Kyverno, Checkov, KubeBench, Audit, cert-manager, sealed-secrets, Kubernetes Events)
 - ✅ VictoriaMetrics + Grafana with 6 pre-built dashboards (Executive, Operations, Security, Main, Namespace Health, Explorer)
 - ✅ Mock observations from all configured sources
+
+**Quickstart (Minimal Steps)**:
+```bash
+# 1. Install CRDs
+kubectl apply -f deployments/crds/
+
+# 2. Deploy zen-watcher (via Helm or manifests)
+helm install zen-watcher ./deployments/helm/zen-watcher
+
+# 3. Apply example Ingester
+kubectl apply -f examples/ingesters/trivy-informer.yaml
+
+# 4. Check Observations are being created
+kubectl get observations -A
+
+# 5. View a specific Observation
+kubectl get observation <name> -n <namespace> -o yaml
+```
+
+See [examples/ingesters/TESTING.md](examples/ingesters/TESTING.md) for detailed testing instructions.
 - ✅ ~4 minutes total time
 
 **View observations:**

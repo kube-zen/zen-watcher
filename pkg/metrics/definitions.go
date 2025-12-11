@@ -88,6 +88,8 @@ type Metrics struct {
 	StrategyChanges        *prometheus.CounterVec // Processing strategy changes
 	AdaptiveAdjustments    *prometheus.CounterVec // Adaptive adjustments applied
 	OptimizationConfidence *prometheus.GaugeVec   // Confidence level of optimizations
+	CurrentStrategy        *prometheus.GaugeVec   // Current strategy per source (1=filter_first, 2=dedup_first)
+	PipelineErrors         *prometheus.CounterVec // Pipeline errors by stage
 }
 
 // NewMetrics creates and registers all Prometheus metrics
@@ -512,6 +514,24 @@ func NewMetrics() *Metrics {
 		[]string{"source"},
 	)
 
+	// Current strategy per source (gauge: 1=filter_first, 2=dedup_first)
+	currentStrategy := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_optimization_current_strategy",
+			Help: "Current processing strategy per source (1=filter_first, 2=dedup_first)",
+		},
+		[]string{"source"},
+	)
+
+	// Pipeline errors by stage
+	pipelineErrors := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_pipeline_errors_total",
+			Help: "Total number of pipeline errors by stage",
+		},
+		[]string{"source", "stage", "error_type"},
+	)
+
 	// Register optimization metrics
 	prometheus.MustRegister(filterPassRate)
 	prometheus.MustRegister(dedupEffectiveness)
@@ -538,6 +558,8 @@ func NewMetrics() *Metrics {
 	prometheus.MustRegister(strategyChanges)
 	prometheus.MustRegister(adaptiveAdjustments)
 	prometheus.MustRegister(optimizationConfidence)
+	prometheus.MustRegister(currentStrategy)
+	prometheus.MustRegister(pipelineErrors)
 
 	return &Metrics{
 		// Core event metrics
@@ -608,5 +630,7 @@ func NewMetrics() *Metrics {
 		StrategyChanges:        strategyChanges,
 		AdaptiveAdjustments:    adaptiveAdjustments,
 		OptimizationConfidence: optimizationConfidence,
+		CurrentStrategy:        currentStrategy,
+		PipelineErrors:         pipelineErrors,
 	}
 }
