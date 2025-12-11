@@ -1,0 +1,43 @@
+# Example: Kube-Bench CIS benchmark reports
+# Uses informer to watch Kube-Bench scan results stored in ConfigMaps
+# NOTE: This replaces the deprecated 'cm' ingester type
+apiVersion: zen.kube-zen.io/v1
+kind: Ingester
+metadata:
+  name: kube-bench-reports
+  namespace: default
+spec:
+  source: kube-bench
+  ingester: informer
+  informer:
+    gvr:
+      group: ""
+      version: "v1"
+      resource: "configmaps"
+    namespace: ""
+    labelSelector: "app=kube-bench"
+    resyncPeriod: "15m"
+  normalization:
+    domain: compliance
+    type: cis_benchmark_finding
+    priority:
+      FAIL: 0.8
+      WARN: 0.5
+      PASS: 0.1
+    fieldMapping:
+      - from: "$.extracted.test_id"
+        to: "test_id"
+      - from: "$.extracted.status"
+        to: "status"
+  filter:
+    minPriority: 0.4
+  dedup:
+    enabled: true
+    window: "1h"
+    strategy: fingerprint
+    fields:
+      - "spec.source"
+      - "test_id"
+  processing:
+    order: auto
+    autoOptimize: true

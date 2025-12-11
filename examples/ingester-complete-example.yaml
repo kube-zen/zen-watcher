@@ -95,7 +95,7 @@ metadata:
   namespace: zen-system
 spec:
   source: checkov
-  ingester: cm  # Note: 'cm' is the new short form (configmap is also supported for backward compatibility)
+  ingester: informer  # NOTE: ConfigMap ingester type removed. Use informer with GVR.
   configmap:
     namespace: ""
     labelSelector: app=checkov

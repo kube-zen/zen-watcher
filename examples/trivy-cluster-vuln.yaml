@@ -1,13 +1,12 @@
-# Example: Checkov via ConfigMap (using informer ingester)
-# NOTE: This replaces the deprecated 'cm' ingester type
-# ConfigMaps are now handled via ingester: informer with GVR
+# Example: Trivy cluster vulnerability scanner
+# Uses informer to watch Trivy scan results stored in ConfigMaps
 apiVersion: zen.kube-zen.io/v1
 kind: Ingester
 metadata:
-  name: checkov-ingester
+  name: trivy-cluster-vuln
   namespace: default
 spec:
-  source: checkov
+  source: trivy-cluster
   ingester: informer
   informer:
     gvr:
@@ -15,27 +14,34 @@ spec:
       version: "v1"
       resource: "configmaps"
     namespace: ""
-    labelSelector: "app=checkov"
+    labelSelector: "app=trivy,type=cluster-scan"
     resyncPeriod: "30m"
   normalization:
     domain: security
-    type: iac_vulnerability
+    type: vulnerability
     priority:
       CRITICAL: 0.9
       HIGH: 0.7
       MEDIUM: 0.5
       LOW: 0.3
     fieldMapping:
-      - from: "$.extracted.check_id"
-        to: "check_id"
-      - from: "$.extracted.severity"
+      - from: "$.vulnerability.id"
+        to: "vuln-id"
+      - from: "$.vulnerability.severity"
         to: "severity"
+      - from: "$.vulnerability.package"
+        to: "package"
   filter:
     minPriority: 0.3
+    excludeNamespaces:
+      - "kube-system"
   dedup:
     enabled: true
     window: "2h"
     strategy: fingerprint
+    fields:
+      - "spec.source"
+      - "vuln-id"
   processing:
     order: auto
     autoOptimize: true

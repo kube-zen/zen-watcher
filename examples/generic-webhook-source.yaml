@@ -1,0 +1,42 @@
+# Example: Generic webhook source
+# External systems can POST events to zen-watcher webhook endpoint
+apiVersion: zen.kube-zen.io/v1
+kind: Ingester
+metadata:
+  name: generic-webhook-source
+  namespace: default
+spec:
+  source: external-scanner
+  ingester: webhook
+  webhook:
+    path: "/ingest/external-scanner"
+    auth:
+      type: hmac
+      secretRef: "webhook-hmac-secret"
+    rateLimit:
+      requestsPerMinute: 1000
+  normalization:
+    domain: security
+    type: custom_event
+    priority:
+      CRITICAL: 0.9
+      HIGH: 0.7
+      MEDIUM: 0.5
+      LOW: 0.3
+    fieldMapping:
+      - from: "$.event.severity"
+        to: "severity"
+      - from: "$.event.message"
+        to: "message"
+  filter:
+    minPriority: 0.3
+  dedup:
+    enabled: true
+    window: "1h"
+    strategy: fingerprint
+    fields:
+      - "spec.source"
+      - "message"
+  processing:
+    order: auto
+    autoOptimize: true

@@ -146,12 +146,54 @@ EOF
     return 0
 }
 
-# Function to cleanup observations
+# Function to cleanup observations in parallel batches
 cleanup_observations() {
     echo "=== Cleanup ==="
     echo "Deleting observations in ${NAMESPACE}..."
-    DELETED=$(kubectl --context="$KUBECTL_CONTEXT" delete observations -n "$NAMESPACE" --all --timeout=60s 2>&1 | grep -c "deleted" || echo "0")
-    echo "Deleted observations: ${DELETED}"
+    
+    # Get all observation names
+    OBS_NAMES=$(kubectl --context="$KUBECTL_CONTEXT" get observations -n "$NAMESPACE" -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+    
+    if [ -z "$OBS_NAMES" ]; then
+        echo "No observations to delete"
+        echo ""
+        return 0
+    fi
+    
+    # Count total
+    TOTAL=$(echo "$OBS_NAMES" | wc -w)
+    echo "Found ${TOTAL} observations. Deleting in parallel batches of 20..."
+    
+    # Delete in parallel batches
+    BATCH_SIZE=20
+    BATCH_NUM=0
+    DELETED=0
+    PIDS=()
+    
+    for obs_name in $OBS_NAMES; do
+        if [ -n "$obs_name" ]; then
+            kubectl --context="$KUBECTL_CONTEXT" delete observation "$obs_name" -n "$NAMESPACE" --timeout=5s >/dev/null 2>&1 &
+            PIDS+=($!)
+            
+            DELETED=$((DELETED + 1))
+            if [ $((DELETED % BATCH_SIZE)) -eq 0 ]; then
+                # Wait for current batch to complete
+                for pid in "${PIDS[@]}"; do
+                    wait "$pid" 2>/dev/null || true
+                done
+                PIDS=()
+                BATCH_NUM=$((BATCH_NUM + 1))
+                echo "[${DELETED}/${TOTAL}] Deleted batch ${BATCH_NUM}..."
+            fi
+        fi
+    done
+    
+    # Wait for remaining deletions
+    for pid in "${PIDS[@]}"; do
+        wait "$pid" 2>/dev/null || true
+    done
+    
+    echo "Completed: ${DELETED} observations deleted"
     echo ""
 }
 

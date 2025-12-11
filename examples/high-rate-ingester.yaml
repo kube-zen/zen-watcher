@@ -1,0 +1,71 @@
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: high-rate-ingester
+  namespace: zen-system
+spec:
+  source: kubernetes-events
+  ingester: k8s-events
+  
+  k8sEvents:
+    involvedObjectKinds:
+      - Pod
+      - Deployment
+      - Service
+  
+  rateLimit:
+    enabled: true
+    requestsPerSecond: 2000
+    burst: 4000
+  
+  processing:
+    normalization:
+      domain: operations
+      type: kubernetes_event
+      priority:
+        Warning: 0.7
+        Normal: 0.3
+        Error: 0.9
+    
+    filter:
+      enabled: true
+      minPriority: 0.3
+      excludeNamespaces:
+        - kube-system
+        - kube-public
+    
+    dedup:
+      enabled: true
+      window: "5m"
+      strategy: fingerprint
+    
+    optimization:
+      enabled: true
+      order: auto
+      autoOptimize: true
+      analysisInterval: "15m"
+      confidenceThreshold: 0.7
+      thresholds:
+        dedupEffectiveness:
+          warning: 0.5
+          critical: 0.3
+        lowSeverityPercent:
+          warning: 0.7
+          critical: 0.9
+        observationsPerMinute:
+          warning: 100
+          critical: 500
+  
+  destinations:
+    # Classic zen-watcher OSS behavior: write Observation CRDs
+    - type: crd
+      value: observations
+    
+    # Optional: send to external webhook with retry policy
+    - type: webhook
+      name: eu-mirror
+      url: "https://eu-hooks.example.com/t/k8s-events"
+      retryPolicy:
+        maxRetries: 10
+        backoff: exponential
+        timeout: "30s"

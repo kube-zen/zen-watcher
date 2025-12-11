@@ -30,13 +30,13 @@ type RawEvent struct {
 // SourceConfig represents the adapter configuration from ObservationSourceConfig CRD
 type SourceConfig struct {
 	Source   string
-	Ingester string // informer, webhook, logs, cm, k8s-events
+	Ingester string // informer, webhook, logs, k8s-events (cm/configmap is NOT supported)
 
 	// Adapter-specific configs (only one should be set based on ingester)
 	Informer  *InformerConfig
 	Webhook   *WebhookConfig
 	Logs      *LogsConfig
-	ConfigMap *ConfigMapConfig
+	// ConfigMap removed: use Informer with GVR for configmaps
 
 	// Normalization
 	Normalization *NormalizationConfig
@@ -94,7 +94,9 @@ type LogPattern struct {
 	Priority float64
 }
 
-// ConfigMapConfig configuration for configmap adapter
+// ConfigMapConfig is deprecated.
+// Use InformerConfig with GVR { group: "", version: "v1", resource: "configmaps" } instead.
+// This type is kept for backward compatibility during migration but should not be used in new code.
 type ConfigMapConfig struct {
 	Namespace     string
 	LabelSelector string

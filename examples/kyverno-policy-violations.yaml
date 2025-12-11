@@ -1,0 +1,43 @@
+# Example: Kyverno policy violations
+# Uses informer to watch Kyverno PolicyReport CRDs
+apiVersion: zen.kube-zen.io/v1
+kind: Ingester
+metadata:
+  name: kyverno-policy-violations
+  namespace: default
+spec:
+  source: kyverno
+  ingester: informer
+  informer:
+    gvr:
+      group: "wgpolicyk8s.io"
+      version: "v1alpha2"
+      resource: "policyreports"
+    namespace: ""
+    labelSelector: ""
+    resyncPeriod: "10m"
+  normalization:
+    domain: compliance
+    type: policy_violation
+    priority:
+      fail: 0.8
+      warn: 0.5
+      pass: 0.1
+    fieldMapping:
+      - from: "$.results[?(@.result=='fail')].policy"
+        to: "policy-name"
+      - from: "$.results[?(@.result=='fail')].rule"
+        to: "rule-name"
+  filter:
+    minPriority: 0.4
+  dedup:
+    enabled: true
+    window: "1h"
+    strategy: fingerprint
+    fields:
+      - "spec.source"
+      - "policy-name"
+      - "rule-name"
+  processing:
+    order: filter_first
+    autoOptimize: true
