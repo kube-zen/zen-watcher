@@ -50,6 +50,10 @@ type Metrics struct {
 	// Dedup metrics (enhanced - NEW)
 	DedupCacheUsage *prometheus.GaugeVec
 	DedupEvictions  *prometheus.CounterVec
+	
+	// Dedup strategy metrics (W33 - v1.1)
+	DedupEffectivenessPerStrategy *prometheus.GaugeVec   // Dedup effectiveness by strategy
+	DedupDecisionsTotal           *prometheus.CounterVec // Dedup decisions by strategy and decision type
 
 	// GC metrics
 	GCRunsTotal      prometheus.Counter
@@ -337,6 +341,8 @@ func NewMetrics() *Metrics {
 	prometheus.MustRegister(dedupCacheUsage)
 	prometheus.MustRegister(dedupEvictions)
 	prometheus.MustRegister(observationsLive)
+	prometheus.MustRegister(dedupEffectivenessPerStrategy)
+	prometheus.MustRegister(dedupDecisionsTotal)
 
 	// Register optimization decision metrics
 	// Note: This uses the optimization package's decision metrics
@@ -592,6 +598,10 @@ func NewMetrics() *Metrics {
 		// Dedup metrics (NEW)
 		DedupCacheUsage: dedupCacheUsage,
 		DedupEvictions:  dedupEvictions,
+		
+		// Dedup strategy metrics (W33)
+		DedupEffectivenessPerStrategy: dedupEffectivenessPerStrategy,
+		DedupDecisionsTotal:           dedupDecisionsTotal,
 
 		// GC metrics
 		GCRunsTotal:      gcRunsTotal,
