@@ -430,27 +430,32 @@ See [docs/INTELLIGENT_EVENT_PIPELINE.md](docs/INTELLIGENT_EVENT_PIPELINE.md) for
 
 ### Installation via Helm (Recommended)
 
-**The official Helm chart for zen-watcher lives in a separate repository:**
-
-🔗 **[kube-zen/helm-charts](https://github.com/kube-zen/helm-charts)**
-
-See that repository for:
-- Chart values and configuration
-- Upgrade paths and version notes
-- Version compatibility matrix
-
-**Quick Install:**
+**Install from local chart:**
 
 ```bash
-# Add Helm repository
-helm repo add kube-zen https://kube-zen.github.io/helm-charts
-helm repo update
-
 # Install zen-watcher
-helm install zen-watcher kube-zen/zen-watcher \
+helm install zen-watcher ./deployments/helm/zen-watcher \
   --namespace zen-system \
   --create-namespace
 ```
+
+**Or use a profile (dev/staging/prod):**
+
+```bash
+# Development profile (minimal resources)
+helm install zen-watcher ./deployments/helm/zen-watcher \
+  --namespace zen-system \
+  --create-namespace \
+  -f deployments/helm/zen-watcher/values-dev.yaml
+
+# Production profile (HA, autoscaling)
+helm install zen-watcher ./deployments/helm/zen-watcher \
+  --namespace zen-system \
+  --create-namespace \
+  -f deployments/helm/zen-watcher/values-prod.yaml
+```
+
+See [docs/DEPLOYMENT_HELM.md](docs/DEPLOYMENT_HELM.md) for complete Helm deployment guide.
 
 **Next: Deploy a sync controller to forward Observations to your tools (Slack, SIEM, etc.)**
 
