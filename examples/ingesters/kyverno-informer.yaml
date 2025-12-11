@@ -12,6 +12,23 @@ spec:
       version: v1
       resource: policyreports
     resyncPeriod: "30m"
+  # Processing pipeline configuration (canonical format)
+  processing:
+    filter:
+      enabled: true
+      minPriority: 0.5
+      excludeNamespaces:
+        - kube-system
+    dedup:
+      enabled: true
+      window: "2h"
+      strategy: fingerprint  # Default strategy
+    optimization:
+      enabled: true
+      order: filter_first
+      autoOptimize: true
+  
+  # Legacy fields (backward compatibility - maps to processing.*)
   filters:
     enabled: true
     minPriority: 0.5

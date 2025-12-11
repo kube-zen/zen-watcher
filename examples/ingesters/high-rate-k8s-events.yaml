@@ -6,6 +6,38 @@ metadata:
 spec:
   source: kubernetes-events
   ingester: k8s-events
+  # Processing pipeline configuration (canonical format)
+  # Bridge-compatible: This example uses common semantics valid for both zen-watcher and zen-bridge
+  processing:
+    filter:
+      enabled: true
+      minPriority: 0.6
+      includeKinds:
+        - Pod
+        - Deployment
+        - StatefulSet
+      excludeNamespaces:
+        - kube-system
+        - kube-public
+    dedup:
+      enabled: true
+      window: "30s"
+      strategy: event-stream  # event-stream for high-volume, noisy sources
+    optimization:
+      enabled: true
+      order: auto
+      autoOptimize: true
+      analysisInterval: "5m"
+      confidenceThreshold: 0.8
+      thresholds:
+        observationsPerMinute:
+          warning: 100
+          critical: 500
+        dedupEffectiveness:
+          warning: 0.5
+          critical: 0.3
+  
+  # Legacy fields (backward compatibility - maps to processing.*)
   filters:
     enabled: true
     minPriority: 0.6

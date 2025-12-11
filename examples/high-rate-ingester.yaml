@@ -18,47 +18,52 @@ spec:
     requestsPerSecond: 2000
     burst: 4000
   
-  # Filtering rules
+  # Processing pipeline configuration (canonical format)
+  # Bridge-compatible: This example uses common semantics valid for both zen-watcher and zen-bridge
+  # Canonical pipeline: source → (filter | dedup) → normalize → destinations[]
+  processing:
+    filter:
+      enabled: true
+      minPriority: 0.3
+      excludeNamespaces:
+        - kube-system
+        - kube-public
+    dedup:
+      enabled: true
+      window: "5m"
+      strategy: event-stream  # event-stream for high-volume, noisy sources
+      maxEventsPerWindow: 1000  # Optional: strict limit for event-stream
+    optimization:
+      enabled: true
+      order: auto
+      autoOptimize: true
+      analysisInterval: "15m"
+      confidenceThreshold: 0.7
+      thresholds:
+        dedupEffectiveness:
+          warning: 0.5
+          critical: 0.3
+        lowSeverityPercent:
+          warning: 0.7
+          critical: 0.9
+        observationsPerMinute:
+          warning: 100
+          critical: 500
+  
+  # Legacy fields (backward compatibility - maps to processing.*)
+  # Compatibility note: Legacy fields (filters, deduplication, optimization) are still supported
+  # but new examples should use spec.processing.* as the primary form
   filters:
     enabled: true
     minPriority: 0.3
     excludeNamespaces:
       - kube-system
       - kube-public
-  
-  # Deduplication (v1.1+ canonical location)
-  processing:
-    dedup:
-      enabled: true
-      window: "5m"
-      strategy: event-stream  # event-stream for high-volume, noisy sources
-      maxEventsPerWindow: 1000  # Optional: strict limit for event-stream
-    order: auto
-    autoOptimize: true
-  
-  # Legacy deduplication (backward compatibility - maps to processing.dedup)
   deduplication:
     enabled: true
     window: "5m"
     strategy: fingerprint
   
-  # Optimization
-  optimization:
-    enabled: true
-    order: auto
-    autoOptimize: true
-    analysisInterval: "15m"
-    confidenceThreshold: 0.7
-    thresholds:
-      dedupEffectiveness:
-        warning: 0.5
-        critical: 0.3
-      lowSeverityPercent:
-        warning: 0.7
-        critical: 0.9
-      observationsPerMinute:
-        warning: 100
-        critical: 500
   
   # Destinations: where events go
   destinations:

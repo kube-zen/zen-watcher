@@ -55,27 +55,32 @@ spec:
         backoff: linear
         timeout: "5s"
   
-  # Filtering
-  filters:
-    enabled: true
-    minPriority: 0.4
-  
-  # Deduplication (v1.1+ canonical location)
+  # Processing pipeline configuration (canonical format)
+  # Bridge-compatible: This example uses common semantics valid for both zen-watcher and zen-bridge
+  # Canonical pipeline: source → (filter | dedup) → normalize → destinations[]
   processing:
+    filter:
+      enabled: true
+      minPriority: 0.4
     dedup:
       enabled: true
       window: "1h"
       strategy: fingerprint  # Default strategy (can be omitted)
-    order: filter_first
-    autoOptimize: false
+    optimization:
+      enabled: true
+      order: filter_first
+      autoOptimize: false
   
-  # Legacy deduplication (backward compatibility - maps to processing.dedup)
+  # Legacy fields (backward compatibility - maps to processing.*)
+  # Compatibility note: Legacy fields (filters, deduplication, optimization) are still supported
+  # but new examples should use spec.processing.* as the primary form
+  filters:
+    enabled: true
+    minPriority: 0.4
   deduplication:
     enabled: true
     window: "1h"
     strategy: fingerprint
-  
-  # Optimization
   optimization:
     enabled: true
     order: filter_first

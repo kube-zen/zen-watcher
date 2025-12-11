@@ -12,6 +12,26 @@ spec:
       version: v1alpha1
       resource: vulnerabilityreports
     resyncPeriod: "30m"
+  # Processing pipeline configuration (canonical format)
+  processing:
+    filter:
+      enabled: true
+      minPriority: 0.3
+      excludeNamespaces:
+        - kube-system
+        - kube-public
+    dedup:
+      enabled: true
+      window: "1h"
+      strategy: fingerprint  # Default strategy (can be omitted)
+    optimization:
+      enabled: true
+      order: auto
+      autoOptimize: true
+      analysisInterval: "15m"
+      confidenceThreshold: 0.7
+  
+  # Legacy fields (backward compatibility - maps to processing.*)
   filters:
     enabled: true
     minPriority: 0.3
