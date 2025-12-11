@@ -46,6 +46,12 @@ type SourceConfig struct {
 
 	// Rate limiting
 	RateLimit *RateLimitConfig
+
+	// Deduplication (W33 - v1.1)
+	Dedup *DedupConfig
+
+	// Processing order and optimization (W33 - v1.1)
+	Processing *ProcessingConfig
 }
 
 // InformerConfig configuration for informer adapter
@@ -143,4 +149,22 @@ type CustomThreshold struct {
 type RateLimitConfig struct {
 	ObservationsPerMinute int
 	Burst                 int
+}
+
+// DedupConfig holds deduplication configuration (W33 - v1.1)
+type DedupConfig struct {
+	Enabled           bool
+	Window            string
+	Strategy          string   // fingerprint, key, event-stream
+	Fields            []string // For key-based strategy
+	MaxEventsPerWindow int     // For event-stream strategy
+	Config            map[string]interface{} // Strategy-specific configuration
+}
+
+// ProcessingConfig holds processing order and optimization settings (W33 - v1.1)
+type ProcessingConfig struct {
+	Order              string // filter_first, dedup_first, auto
+	AutoOptimize       bool
+	AnalysisInterval   string
+	ConfidenceThreshold float64
 }

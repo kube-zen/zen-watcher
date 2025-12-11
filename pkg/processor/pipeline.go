@@ -404,3 +404,33 @@ func (p *Processor) extractDedupKey(observation *unstructured.Unstructured, raw 
 		MessageHash: fmt.Sprintf("%x", hash[:16]),
 	}
 }
+
+// shouldCreateWithStrategy determines if an observation should be created using the configured dedup strategy
+func (p *Processor) shouldCreateWithStrategy(key dedup.DedupKey, content map[string]interface{}, config *generic.SourceConfig) bool {
+	// Get strategy from config, default to "fingerprint" if not set
+	strategyName := "fingerprint"
+	if config != nil && config.Dedup != nil {
+		if config.Dedup.Strategy != "" {
+			strategyName = config.Dedup.Strategy
+		}
+	}
+
+	// Build strategy config from generic config
+	strategyConfig := dedup.StrategyConfig{
+		Strategy:          strategyName,
+		Window:            "",
+		Fields:            nil,
+		MaxEventsPerWindow: 0,
+	}
+	if config != nil && config.Dedup != nil {
+		strategyConfig.Window = config.Dedup.Window
+		strategyConfig.Fields = config.Dedup.Fields
+		strategyConfig.MaxEventsPerWindow = config.Dedup.MaxEventsPerWindow
+	}
+
+	// Get strategy from registry
+	strategy := dedup.GetStrategy(strategyConfig)
+
+	// Use strategy to determine if we should create
+	return strategy.ShouldCreate(p.deduper, key, content)
+}
