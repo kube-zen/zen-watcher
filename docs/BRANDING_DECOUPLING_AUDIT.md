@@ -285,7 +285,44 @@ All code-level references are:
 
 ---
 
+## OSS-Facing Documentation Neutrality (2025-12-10 Update)
+
+**Status**: ✅ **Complete** - OSS-facing docs and examples are now vendor-neutral by default.
+
+### Documentation Updates
+
+1. **GETTING_STARTED_GENERIC.md**: Created vendor-neutral installation guide with two paths:
+   - Path A (Quick Demo): Optional, clearly marked as experimental
+   - Path B (Generic Install): Production-ready, no vendor assumptions
+   - Both paths use generic terminology (no kube-zen/zen-hook assumptions)
+
+2. **QUICK_START.md**: Updated to reference GETTING_STARTED_GENERIC.md and clarify it's optional for experimentation
+
+3. **README.md**: Added "For OSS Users" section pointing to generic installation guide
+
+4. **examples/observations/README.md**: Contains both:
+   - Generic example (08-webhook-gateway.yaml) - vendor-neutral
+   - kube-zen example (08-webhook-originated.yaml) - clearly marked as ecosystem integration example
+
+### Neutrality Guarantees
+
+- **Core install and usage paths**: Vendor-neutral by default
+- **kube-zen/zen-hook references**: Appear only as explicitly marked "ecosystem integration examples"
+- **Generic terminology**: Uses "webhook gateway", "security scanner", "external control-plane" instead of vendor-specific names
+- **Examples**: Both generic and ecosystem-specific examples provided, clearly differentiated
+
+### Remaining Intentional References
+
+- **CRD Group**: `zen.kube-zen.io` (API surface, requires future versioning)
+- **Repository URLs**: `github.com/kube-zen/zen-watcher` (actual repository location)
+- **Helm Chart Repository**: `kube-zen/helm-charts` (actual chart location)
+- **Ecosystem Examples**: zen-hook mentioned as one concrete implementation example (not requirement)
+
+**Conclusion**: OSS-facing surfaces are vendor-neutral. kube-zen ecosystem references are confined to clearly labeled examples and integration documentation.
+
+---
+
 ## Next Steps
 
-1. **Workstream 2**: Neutralize docs/examples (non-breaking)
-2. **Workstream 3**: Plan future versioning for hard-coded branding (CRD group migration)
+1. **Future Versioning**: Plan CRD group migration (v1beta1 or v2) to achieve full API surface neutrality
+2. **Community Feedback**: Monitor community feedback on vendor-neutrality and adjust as needed

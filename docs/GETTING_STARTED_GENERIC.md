@@ -304,6 +304,7 @@ curl http://localhost:8080/ready
 - **Full Documentation**: [README.md](../README.md)
 - **Architecture Guide**: [docs/ARCHITECTURE.md](ARCHITECTURE.md)
 - **API Reference**: [docs/OBSERVATION_API_PUBLIC_GUIDE.md](OBSERVATION_API_PUBLIC_GUIDE.md)
+- **Source Configuration Guide**: [docs/OBSERVATION_SOURCES_CONFIG_GUIDE.md](OBSERVATION_SOURCES_CONFIG_GUIDE.md) - How to configure sources (security scanners, webhooks, etc.)
 - **Integration Examples**: [docs/INTEGRATIONS.md](INTEGRATIONS.md)
 - **Configuration Guide**: See README.md "Configuration" section
 
