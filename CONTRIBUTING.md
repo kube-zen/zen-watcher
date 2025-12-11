@@ -2,6 +2,15 @@
 
 Thank you for your interest in contributing to Zen Watcher! This document outlines best practices and guidelines for adding new watchers or improving the codebase.
 
+## Where to Start
+
+**New to zen-watcher?** Check out [docs/CONTRIBUTOR_TASKS.md](docs/CONTRIBUTOR_TASKS.md) for a curated list of tasks organized by difficulty:
+- **Good First Tasks**: Documentation, examples, simple tests
+- **Intermediate**: Example sources, dashboard improvements, code contributions
+- **Advanced**: CRD evolution, informer changes, KEP-driven work
+
+All tasks are sourced from the roadmap and KEP, ensuring your contributions align with project priorities.
+
 ## Architecture Principles
 
 Zen Watcher follows **Kubernetes controller best practices** and uses a **modular, scalable architecture**. This design makes contributions easy:

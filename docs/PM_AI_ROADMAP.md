@@ -11,6 +11,12 @@
 4. Prioritize workstreams based on: community value, quality bar (KEP-level), and trunk hygiene
 5. Keep commits small, scoped, and pushed to `main` frequently
 
+**Trunk Hygiene & Reporting Rules**:
+- Workstreams are only **COMPLETE** when:
+  - The repo has a clean working tree (`git status` shows no changes)
+  - `main` is pushed to `origin` (`git log origin/main..HEAD` shows no unpushed commits)
+- Executor AI reports must be short (header + a few bullets), no "ready for commit/push" phrasing
+
 ---
 
 ## Vision & Role of Zen Watcher

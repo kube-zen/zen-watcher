@@ -6,7 +6,39 @@ This guide assumes you want to use zen-watcher independently, without any specif
 
 ---
 
-## Prerequisites
+## Two Installation Paths
+
+### Path A – Quick Demo (Fast, Opinionated, Ephemeral Cluster)
+
+**Best for**: First-time users, experimentation, learning
+
+- Creates a local Kubernetes cluster (k3d, kind, or minikube)
+- Installs zen-watcher with monitoring stack (VictoriaMetrics, Grafana)
+- Deploys mock observations from all configured sources
+- Includes 6 pre-built Grafana dashboards
+- **Cluster is ephemeral** - intended for experimentation, not production
+
+**Quick start**: See [QUICK_START.md](../QUICK_START.md) or run:
+```bash
+./scripts/quick-demo.sh k3d --non-interactive --deploy-mock-data
+```
+
+**Note**: This path is optional and intended for quick experimentation. For production deployments, use Path B below.
+
+### Path B – Generic Install (Existing Cluster, Production-Like)
+
+**Best for**: Production deployments, existing clusters, vendor-neutral setup
+
+- Works with any Kubernetes cluster (1.26+)
+- Minimal dependencies (just CRDs and controller)
+- No assumptions about vendor integrations
+- Production-ready configuration
+
+**Continue below** for Path B installation steps.
+
+---
+
+## Prerequisites (Path B)
 
 ### Kubernetes Cluster
 

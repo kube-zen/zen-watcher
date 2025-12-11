@@ -1,6 +1,8 @@
 # Zen Watcher - Quick Start Guide
 
-Get Zen Watcher up and running in 5 minutes!
+**Quick Demo Path** - Get Zen Watcher up and running in 5 minutes with an ephemeral cluster!
+
+> **Note**: This is an optional quick demo path for experimentation. For production deployments on existing clusters, see [docs/GETTING_STARTED_GENERIC.md](docs/GETTING_STARTED_GENERIC.md) (Path B).
 
 ---
 
@@ -72,50 +74,11 @@ kubectl get observations -n zen-system
 
 ---
 
-## Installation
+## Installation on Existing Clusters
 
-### Option 1: Helm (Recommended for Production)
+> **For production deployments on existing clusters**, see [docs/GETTING_STARTED_GENERIC.md](docs/GETTING_STARTED_GENERIC.md) (Path B) for complete installation instructions.
 
-**The official Helm chart for zen-watcher lives in a separate repository:**
-
-🔗 **[kube-zen/helm-charts](https://github.com/kube-zen/helm-charts)**
-
-```bash
-# Add Helm repository
-helm repo add kube-zen https://kube-zen.github.io/helm-charts
-helm repo update
-
-# Install zen-watcher
-helm install zen-watcher kube-zen/zen-watcher \
-  --namespace zen-system \
-  --create-namespace
-
-# Verify
-kubectl get pods -n zen-system
-kubectl get observations -n zen-system
-```
-
-See the [helm-charts repository](https://github.com/kube-zen/helm-charts) for chart values, configuration, and upgrade paths.
-
-### Option 2: Manual Installation (Advanced)
-
-For development or custom deployments:
-
-```bash
-# Create namespace
-kubectl create namespace zen-system
-
-# Install CRD
-kubectl apply -f deployments/crds/observation_crd.yaml
-
-# Deploy zen-watcher (see README.md for deployment manifest)
-# Note: Full deployment requires additional manifests (RBAC, Service, etc.)
-# Recommended: Use Helm chart for production deployments
-
-# Verify
-kubectl get pods -n zen-system
-kubectl get observations -n zen-system
-```
+The quick demo script (`./scripts/quick-demo.sh`) handles installation automatically. For manual installation on existing clusters, refer to the generic installation guide linked above.
 
 ---
 
