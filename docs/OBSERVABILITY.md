@@ -256,6 +256,10 @@ zen_watcher_optimization_current_strategy
     summary: "Low confidence in optimization decisions"
 ```
 
+## CLI Tools
+
+**Query Observations**: Use `obsctl` CLI for querying Observations without external tools. See [OBSCTL_CLI_GUIDE.md](OBSCTL_CLI_GUIDE.md) for details.
+
 ## Related Documentation
 
 - [PERFORMANCE_GUIDE.md](PERFORMANCE_GUIDE.md) - Performance characteristics and tuning

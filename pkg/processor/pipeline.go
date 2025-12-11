@@ -23,6 +23,7 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
+	"github.com/kube-zen/zen-watcher/pkg/hooks"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"github.com/kube-zen/zen-watcher/pkg/monitoring"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
@@ -167,6 +168,12 @@ func (p *Processor) ProcessEvent(ctx context.Context, raw *generic.RawEvent, con
 	// Step 5: Normalization (AFTER filter/dedup, before destinations)
 	// This is the first and only place where full normalization happens
 	observation = p.normalizeObservation(observation, raw, config)
+
+	// Step 5.5: Execute hooks (post-normalization, pre-CRD write)
+	if err := hooks.Processor(ctx, observation); err != nil {
+		// Hook errors prevent Observation from being written
+		return err
+	}
 
 	// Step 6: Create Observation (write to destinations)
 	// ObservationCreator should NOT decide order - it receives already-processed events

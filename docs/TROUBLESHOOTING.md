@@ -163,6 +163,10 @@ zen-watcher logs include:
 5. **Check RBAC**: `kubectl auth can-i create observations --namespace <namespace>`
 6. **Check CRD installation**: `kubectl get crd observations.zen.kube-zen.io`
 
+## CLI Tools
+
+**Query Observations**: Use `obsctl` CLI for querying Observations. See [OBSCTL_CLI_GUIDE.md](OBSCTL_CLI_GUIDE.md) for details.
+
 ## Related Documentation
 
 - [INGESTER_API.md](INGESTER_API.md) - Complete Ingester CRD API reference
