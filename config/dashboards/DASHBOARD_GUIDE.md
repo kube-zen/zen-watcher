@@ -16,7 +16,7 @@ The Zen Watcher dashboard provides comprehensive visibility into your security a
 
 #### 1. Health Status
 **Type**: Stat with background color  
-**Metric**: `zen_watcher_health_status`  
+**Metric**: `up{job="zen-watcher"}`  
 **Colors**: 
 - 🟢 Green = Healthy (1)
 - 🔴 Red = Unhealthy (0)
@@ -35,7 +35,7 @@ The Zen Watcher dashboard provides comprehensive visibility into your security a
 
 #### 3. Active Events
 **Type**: Stat with sparkline  
-**Metric**: `sum(zen_watcher_active_events)`  
+**Metric**: `sum(zen_watcher_observations_live)` or `sum(zen_watcher_events_total)`  
 **Thresholds**:
 - 🟢 < 100 = Normal
 - 🟡 100-500 = Review needed
@@ -45,7 +45,7 @@ The Zen Watcher dashboard provides comprehensive visibility into your security a
 
 #### 4. Critical Events
 **Type**: Stat with sparkline  
-**Metric**: `sum(zen_watcher_active_events{severity="CRITICAL"})`  
+**Metric**: `sum(rate(zen_watcher_events_total{severity="CRITICAL"}[5m])) * 60`  
 **Thresholds**:
 - 🟢 < 10 = Normal
 - 🟡 10-50 = Review urgently
@@ -74,7 +74,7 @@ The Zen Watcher dashboard provides comprehensive visibility into your security a
 
 #### 6. Active Events by Category
 **Type**: Donut chart  
-**Metric**: `sum by(category)(zen_watcher_active_events)`  
+**Metric**: `sum by(category)(rate(zen_watcher_events_total[5m]))`  
 
 **Segments**:
 - 🛡️ Security events (blue)
@@ -86,7 +86,7 @@ The Zen Watcher dashboard provides comprehensive visibility into your security a
 
 #### 7. Events by Severity
 **Type**: Donut chart  
-**Metric**: `sum by(severity)(zen_watcher_active_events)`  
+**Metric**: `sum by(severity)(rate(zen_watcher_events_total[5m]))`  
 
 **Segments**:
 - 🔴 CRITICAL (red)
@@ -103,7 +103,7 @@ The Zen Watcher dashboard provides comprehensive visibility into your security a
 
 #### 8. Watcher Status
 **Type**: Gauge (multiple)  
-**Metric**: `zen_watcher_watcher_status`  
+**Metric**: `zen_watcher_tools_active{tool}`  
 
 **Watchers**:
 - Trivy

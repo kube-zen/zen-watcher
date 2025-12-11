@@ -1,31 +1,33 @@
 # Zen Watcher Grafana Dashboards
 
-Zen Watcher includes 3 pre-built Grafana dashboards for monitoring and analysis.
+Zen Watcher includes 6 pre-built Grafana dashboards for monitoring and analysis.
 
 ---
 
-## Dashboard Suite
+## Canonical Dashboards (Launch-Ready)
 
-### 1. Executive Overview (`zen-watcher-executive.json`)
+### 1. Executive Overview (`zen-watcher-executive.json`) ⭐ **PRIMARY**
 
 **Use cases**: High-level monitoring, status overview, quick health checks  
 **Refresh**: 10s  
 **Time Range**: Last 1 hour
 
 **Panels**:
-- System Status (UP/DOWN indicator)
-- Tools Monitored (count of active tools)
-- Observations (24h total)
-- Critical Events (1h count with threshold indicators)
+- System Status (UP/DOWN indicator using `up{job="zen-watcher"}`)
+- Tools Monitored (count of active tools using `zen_watcher_tools_active`)
+- Observations (24h total using `zen_watcher_observations_created_total`)
+- Critical Events (1h count using `zen_watcher_events_total{severity="CRITICAL"}`)
 - Success Rate (processing efficiency)
 - Live Event Stream (stacked area chart by severity)
 - Events by Source (donut chart)
 - Events by Category (donut chart)
 - Tool Status Matrix (table with status and event counts)
 
+**Key Metrics**: `zen_watcher_events_total`, `zen_watcher_observations_created_total`, `zen_watcher_tools_active`
+
 ---
 
-### 2. Operations Dashboard (`zen-watcher-operations.json`)
+### 2. Operations Dashboard (`zen-watcher-operations.json`) ⭐ **PRIMARY**
 
 **Use cases**: Performance monitoring, troubleshooting, SRE operations  
 **Refresh**: 10s  
@@ -33,29 +35,28 @@ Zen Watcher includes 3 pre-built Grafana dashboards for monitoring and analysis.
 
 **Sections**:
 1. **Health & Availability**
-   - Service Status, Success Rate, Error Rate
+   - Service Status (`up{job="zen-watcher"}`), Success Rate, Error Rate
    - Processing Latency (p95), Throughput
-   - Dedup Cache Usage, Webhook Queue Usage
+   - Dedup Cache Usage (`zen_watcher_dedup_cache_usage_ratio`), Webhook Queue Usage (`zen_watcher_webhook_queue_usage_ratio`)
 
 2. **Performance Metrics**
-   - Observation Creation Rate (by source)
-   - Event Processing Latency (p50, p95, p99 percentiles)
+   - Observation Creation Rate (by source using `zen_watcher_observations_created_total`)
+   - Event Processing Latency (p50, p95, p99 using `zen_watcher_event_processing_duration_seconds_bucket`)
 
 3. **Adapter & Filter Status**
-   - Adapter Run Rate (by adapter and outcome)
-   - Filter Decisions (allow vs drop)
+   - Adapter Run Rate (`zen_watcher_adapter_runs_total`), Filter Decisions (`zen_watcher_filter_decisions_total`)
 
 4. **Garbage Collection & Resource Management**
-   - Live Observations in etcd (by source)
-   - GC Duration (p95 by operation)
+   - Live Observations (`zen_watcher_observations_live`), GC Duration (`zen_watcher_gc_duration_seconds_bucket`)
 
 5. **Webhook & Integration Health**
-   - Webhook Request Rate (by status code)
-   - Webhook Events Dropped (backpressure indicator)
+   - Webhook Request Rate (`zen_watcher_webhook_requests_total`), Events Dropped (`zen_watcher_webhook_events_dropped_total`)
+
+**Key Metrics**: `zen_watcher_observations_created_total`, `zen_watcher_event_processing_duration_seconds_bucket`, `zen_watcher_webhook_requests_total`, `zen_watcher_dedup_cache_usage_ratio`
 
 ---
 
-### 3. Security Analytics (`zen-watcher-security.json`)
+### 3. Security Analytics (`zen-watcher-security.json`) ⭐ **PRIMARY**
 
 **Use cases**: Security analysis, threat detection, compliance reporting  
 **Refresh**: 10s  
@@ -63,15 +64,13 @@ Zen Watcher includes 3 pre-built Grafana dashboards for monitoring and analysis.
 
 **Sections**:
 1. **Security Posture Overview**
-   - Critical Events (1h)
-   - High Severity (1h)
-   - Medium Severity (1h)
+   - Critical Events (1h using `zen_watcher_events_total{severity="CRITICAL"}`)
+   - High/Medium Severity events
    - Total Events (24h)
-   - Active Tools
+   - Active Tools (`zen_watcher_tools_active`)
 
 2. **Security Trends & Analysis**
-   - Security Event Rate (by severity over time)
-   - Line chart with severity-coded colors
+   - Security Event Rate (by severity over time using `zen_watcher_events_total`)
 
 3. **Source Analysis**
    - Event Rate by Source Tool (time series)
@@ -83,7 +82,38 @@ Zen Watcher includes 3 pre-built Grafana dashboards for monitoring and analysis.
 
 5. **Heat Maps & Correlation**
    - Security Event Heat Map (Source × Severity matrix)
-   - Color-coded cells showing event intensity
+
+**Key Metrics**: `zen_watcher_events_total` (with severity/category/source labels), `zen_watcher_tools_active`
+
+---
+
+### 4. Main Dashboard (`zen-watcher-dashboard.json`)
+
+**Use cases**: Unified overview with navigation links to other dashboards  
+**Refresh**: 10s  
+**Time Range**: Last 1 hour
+
+**Key Metrics**: `zen_watcher_events_total`, `zen_watcher_observations_created_total`, `zen_watcher_observations_filtered_total`, `zen_watcher_observations_deduped_total`
+
+---
+
+### 5. Namespace Health (`zen-watcher-namespace-health.json`)
+
+**Use cases**: Per-namespace health metrics and event distribution  
+**Refresh**: 10s  
+**Time Range**: Last 1 hour
+
+**Key Metrics**: `zen_watcher_events_total` (with namespace label)
+
+---
+
+### 6. Explorer (`zen-watcher-explorer.json`)
+
+**Use cases**: Data exploration and query builder  
+**Refresh**: 10s  
+**Time Range**: Last 1 hour
+
+**Key Metrics**: `zen_watcher_events_total`, `zen_watcher_observations_created_total`, `zen_watcher_observations_filtered_total`, `zen_watcher_observations_deduped_total`
 
 ---
 
@@ -136,55 +166,90 @@ After running `./scripts/quick-demo.sh`, the dashboards are automatically availa
 
 ## Metrics Reference
 
+All metrics are defined in `pkg/metrics/definitions.go` and exposed at `/metrics` endpoint.
+
 ### Core Event Metrics
 ```promql
 # Events created (after filtering and dedup)
-zen_watcher_events_total{source, category, severity}
+# Labels: source, category, severity, eventType, namespace, kind
+zen_watcher_events_total{source="trivy", category="security", severity="CRITICAL"}
 
 # Observations created successfully
-zen_watcher_observations_created_total{source}
+# Labels: source
+zen_watcher_observations_created_total{source="trivy"}
 
 # Observations filtered out
-zen_watcher_observations_filtered_total{source, reason}
+# Labels: source, reason
+zen_watcher_observations_filtered_total{source="trivy", reason="severity_filter"}
 
-# Observations deduplicated
+# Observations deduplicated (no labels)
 zen_watcher_observations_deduped_total
 ```
 
 ### Performance Metrics
 ```promql
 # Processing latency histogram
-zen_watcher_event_processing_duration_seconds{source, processor_type}
+# Labels: source, processor_type
+histogram_quantile(0.95, rate(zen_watcher_event_processing_duration_seconds_bucket[5m]))
 
 # Throughput calculation
 rate(zen_watcher_observations_created_total[1m]) * 60  # events/min
 
 # Success rate
-100 * (1 - (errors / (created + errors)))
+100 * (1 - (sum(rate(zen_watcher_observations_create_errors_total[5m])) / 
+  (sum(rate(zen_watcher_observations_created_total[5m])) + 
+   sum(rate(zen_watcher_observations_create_errors_total[5m])) + 0.001)))
 ```
 
 ### Health Metrics
 ```promql
-# Service up/down
+# Service up/down (Prometheus standard)
 up{job="zen-watcher"}
 
 # Tools active
-zen_watcher_tools_active{tool}
+# Labels: tool
+zen_watcher_tools_active{tool="trivy"}
 
 # Informer cache synced
-zen_watcher_informer_cache_synced{resource}
+# Labels: resource
+zen_watcher_informer_cache_synced{resource="vulnerabilityreports"}
 ```
 
 ### Resource Metrics
 ```promql
 # Cache usage
-zen_watcher_dedup_cache_usage_ratio{source}
+# Labels: source
+zen_watcher_dedup_cache_usage_ratio{source="trivy"}
 
 # Queue usage
-zen_watcher_webhook_queue_usage_ratio{endpoint}
+# Labels: endpoint
+zen_watcher_webhook_queue_usage_ratio{endpoint="/webhook/falco"}
 
 # Live observations in etcd
-zen_watcher_observations_live{source}
+# Labels: source
+zen_watcher_observations_live{source="trivy"}
+```
+
+### Webhook Metrics
+```promql
+# Webhook requests
+# Labels: endpoint, status
+zen_watcher_webhook_requests_total{endpoint="/webhook/falco", status="200"}
+
+# Webhook events dropped (backpressure)
+# Labels: endpoint
+zen_watcher_webhook_events_dropped_total{endpoint="/webhook/falco"}
+```
+
+### GC Metrics
+```promql
+# GC duration histogram
+# Labels: operation
+histogram_quantile(0.95, rate(zen_watcher_gc_duration_seconds_bucket[5m]))
+
+# GC errors
+# Labels: operation, error_type
+zen_watcher_gc_errors_total{operation="delete", error_type="timeout"}
 ```
 
 ---
