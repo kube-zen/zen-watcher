@@ -266,4 +266,3 @@ func getAge(creationTime interface{}) string {
 	// Simplified - would use proper time calculation
 	return "<unknown>"
 }
-

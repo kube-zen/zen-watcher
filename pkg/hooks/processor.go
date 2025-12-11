@@ -32,4 +32,3 @@ func Processor(ctx context.Context, obs *unstructured.Unstructured) error {
 	}
 	return nil
 }
-

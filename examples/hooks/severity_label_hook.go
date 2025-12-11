@@ -42,4 +42,3 @@ func (h *SeverityLabelHook) Process(ctx context.Context, obs *unstructured.Unstr
 func init() {
 	hooks.RegisterHook(&SeverityLabelHook{})
 }
-

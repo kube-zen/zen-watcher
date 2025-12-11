@@ -50,4 +50,3 @@ func ClearHooks() {
 	defer mu.Unlock()
 	registeredHooks = nil
 }
-

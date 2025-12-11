@@ -30,4 +30,3 @@ type ObservationHook interface {
 	// Returns an error if processing should fail (Observation will not be written).
 	Process(ctx context.Context, obs *unstructured.Unstructured) error
 }
-

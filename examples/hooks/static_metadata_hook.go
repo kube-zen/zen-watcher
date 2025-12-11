@@ -58,4 +58,3 @@ func getEnvOrDefault(key, defaultValue string) string {
 func init() {
 	hooks.RegisterHook(NewStaticMetadataHook())
 }
-

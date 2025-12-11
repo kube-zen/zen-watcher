@@ -86,6 +86,42 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 		return true, ""
 	}
 
+	// Check if expression-based filtering is enabled
+	if config.Expression != "" {
+		exprFilter, err := NewExpressionFilter(config.Expression)
+		if err != nil {
+			logger.Debug("Failed to parse filter expression, falling back to legacy filters",
+				logger.Fields{
+					Component: "filter",
+					Operation: "filter_check",
+					Reason:    "expression_parse_error",
+					Additional: map[string]interface{}{
+						"error": err.Error(),
+					},
+				})
+			// Fall through to legacy filtering
+		} else {
+			result, err := exprFilter.Evaluate(observation)
+			if err != nil {
+				logger.Debug("Failed to evaluate filter expression, falling back to legacy filters",
+					logger.Fields{
+						Component: "filter",
+						Operation: "filter_check",
+						Reason:    "expression_eval_error",
+						Additional: map[string]interface{}{
+							"error": err.Error(),
+						},
+					})
+				// Fall through to legacy filtering
+			} else {
+				if !result {
+					return false, "expression_filtered"
+				}
+				return true, ""
+			}
+		}
+	}
+
 	// Extract source from observation
 	sourceVal, sourceFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
 	if !sourceFound || sourceVal == nil {
