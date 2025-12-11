@@ -135,7 +135,10 @@ status:
   lastProcessedAt: string # RFC3339 timestamp
 ```
 
-**See**: `deployments/crds/observation_crd.yaml` for complete schema
+**See**: 
+- `deployments/crds/observation_crd.yaml` for complete schema
+- `docs/OBSERVATION_API_PUBLIC_GUIDE.md` for external-facing API contract
+- `examples/observations/` for canonical examples
 
 ### Processing Pipeline
 

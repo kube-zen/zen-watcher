@@ -152,6 +152,7 @@ func TestObservationCreator_ValidTTLRange(t *testing.T) {
 }
 
 // TestObservationCreator_CanonicalSample validates that canonical sample Observations still work
+// This test ensures that examples/observations/*.yaml files remain valid against the CRD schema
 func TestObservationCreator_CanonicalSample(t *testing.T) {
 	scheme := runtime.NewScheme()
 	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme)
