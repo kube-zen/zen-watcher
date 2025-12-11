@@ -385,6 +385,10 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#2-event-processing-pipeline) for
 
 ## 📦 Installation
 
+### For OSS Users (Generic Installation)
+
+**New to zen-watcher?** See [docs/GETTING_STARTED_GENERIC.md](docs/GETTING_STARTED_GENERIC.md) for a complete standalone installation guide that doesn't assume any vendor-specific integrations.
+
 ### Prerequisites
 - Kubernetes 1.26+ (tested on 1.26+)
 - kubectl configured

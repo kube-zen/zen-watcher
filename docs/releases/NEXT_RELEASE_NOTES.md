@@ -199,7 +199,10 @@ No upgrade required. All changes are backward-compatible.
 - **Informer Convergence**: `docs/INFORMERS_CONVERGENCE_NOTES.md` - Informer architecture
 - **Roadmap**: `docs/PM_AI_ROADMAP.md` - Roadmap and priorities
 - **Release Notes Template**: `docs/RELEASE_NOTES_TEMPLATE.md` - Release notes structure
+- **OSS Release Checklist**: `docs/OSS_RELEASE_CHECKLIST_ZEN_WATCHER.md` - For OSS releases, see this checklist
 
 ---
 
 **This is a draft. Finalize when release is cut.**
+
+**For OSS releases, see [OSS_RELEASE_CHECKLIST_ZEN_WATCHER.md](../OSS_RELEASE_CHECKLIST_ZEN_WATCHER.md).**

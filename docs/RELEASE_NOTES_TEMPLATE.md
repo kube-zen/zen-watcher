@@ -108,7 +108,10 @@
 - **KEP Draft**: `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md`
 - **API Audit**: `docs/OBSERVATION_CRD_API_AUDIT.md`
 - **Roadmap**: `docs/PM_AI_ROADMAP.md`
+- **OSS Release Checklist**: `docs/OSS_RELEASE_CHECKLIST_ZEN_WATCHER.md` - For OSS releases, see this checklist
 
 ---
 
 **For contributors**: When adding release notes, follow this template and ensure all CRD/API changes reference the versioning plan and KEP draft.
+
+**For OSS releases**: See [OSS_RELEASE_CHECKLIST_ZEN_WATCHER.md](OSS_RELEASE_CHECKLIST_ZEN_WATCHER.md) for the complete release process.

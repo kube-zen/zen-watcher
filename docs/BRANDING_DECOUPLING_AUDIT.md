@@ -246,6 +246,45 @@ Branded elements are classified as:
 
 ---
 
+## Code-Level Branding Scan (Runtime-Facing Strings)
+
+**Date**: 2025-12-10  
+**Scope**: Runtime-facing log messages, error messages, CLI help text, and user-visible strings in Go code
+
+### Scan Results
+
+**Runtime-Facing Strings**: ✅ **Clean** - No hard-coded kube-zen/zen-hook branding found in:
+- Log messages (`logger.Info`, `logger.Error`, etc.)
+- Error messages (`fmt.Errorf`, `errors.New`)
+- CLI help text and flags
+- User-facing error responses
+
+**Code References Found** (All Intentional):
+- **CRD Group**: `zen.kube-zen.io` (hard-coded in config loaders) - **Intentional** (API surface, documented above)
+- **Go Module Path**: `github.com/kube-zen/zen-watcher` (import paths) - **Intentional** (standard Go module naming)
+- **GitHub URLs**: References to `github.com/kube-zen/zen-watcher` in docs - **Intentional** (repository location)
+
+### Classification
+
+All code-level references are:
+1. **API Surface (Hard)**: CRD group `zen.kube-zen.io` - requires future versioning (see "API Surface" section above)
+2. **Module/Repository Paths**: Go module and GitHub URLs - standard practice, not user-facing
+3. **Comments/Internal**: No user-facing branding in code comments or internal tooling
+
+### Remaining Intentional References
+
+- **CRD Group**: `zen.kube-zen.io` (all 6 CRDs) - documented in "API Surface" section, requires future versioning
+- **Go Module**: `github.com/kube-zen/zen-watcher` - standard Go module naming
+- **GitHub Repository**: `github.com/kube-zen/zen-watcher` - actual repository location
+- **Email Addresses**: `zen@kube-zen.io` in issue templates - maintainer contact
+
+**Conclusion**: Code-level branding is clean. All remaining references are either:
+- API surface elements (CRD group) requiring future versioning
+- Standard repository/module naming conventions
+- Maintainer contact information
+
+---
+
 ## Next Steps
 
 1. **Workstream 2**: Neutralize docs/examples (non-breaking)

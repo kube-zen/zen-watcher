@@ -99,6 +99,11 @@
    - **Tasks**: Version CRDs (v1alpha1 → v1beta1), deprecation policies, compatibility guarantees
    - **Documentation**: API stability contract
 
+6. **Cut v0.x OSS Release**
+   - **Goal**: Follow OSS release checklist to cut first public release
+   - **Tasks**: Complete preconditions in `docs/OSS_RELEASE_CHECKLIST_ZEN_WATCHER.md`, validate examples, tag and push
+   - **Reference**: `docs/OSS_RELEASE_CHECKLIST_ZEN_WATCHER.md`
+
 ### Medium-Priority Tasks
 
 6. **Performance Optimization**
