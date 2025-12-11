@@ -523,8 +523,13 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 	}
 	
 	// Extract filter config
-	if filter, ok := spec["filter"].(map[string]interface{}); ok {
+	if filter, ok := spec["filters"].(map[string]interface{}); ok {
 		config.Filter = &FilterConfig{}
+		// Check for expression (v1.1 feature)
+		if expression, ok := filter["expression"].(string); ok && expression != "" {
+			config.Filter.Expression = expression
+		}
+		// Legacy fields (only used if expression is not set)
 		if minPriority, ok := filter["minPriority"].(float64); ok {
 			config.Filter.MinPriority = minPriority
 		}

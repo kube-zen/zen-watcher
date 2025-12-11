@@ -28,6 +28,14 @@ import (
 
 // FilterConfig represents the filter configuration loaded from ConfigMap
 type FilterConfig struct {
+	// Expression is an optional filter expression (v1.1 feature)
+	// If set, this expression is evaluated instead of legacy list-based filters
+	// Example: "(severity >= HIGH) AND (category IN [security, compliance])"
+	Expression string `json:"expression,omitempty"`
+
+	// Sources is a map of source name to SourceFilter
+	// If a source is not in this map, it is allowed by default
+	// Note: Sources are ignored when Expression is set
 	Sources map[string]SourceFilter `json:"sources"`
 }
 
