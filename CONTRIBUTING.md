@@ -407,6 +407,7 @@ Zen Watcher is licensed under Apache 2.0. All contributions must:
    - Be backward-compatible when possible, or
    - Be clearly versioned with deprecation paths (e.g., v1alpha1 → v1beta1 → v1)
    - Include migration guides for breaking changes
+   - **Observation API Contract**: See `docs/OBSERVATION_API_PUBLIC_GUIDE.md` for the stable, external-facing API contract
 
 2. **Documentation**: Tests and docs are not optional for new features:
    - **Unit tests** required for all new behavior
