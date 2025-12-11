@@ -105,7 +105,7 @@ Downstream processing
 
 ## Convergence Targets (Watcher-Local)
 
-### Target 1: Internal Informer Abstractions
+### Target 1: Internal Informer Abstraction
 **Goal**: Centralize informer construction in a testable abstraction
 
 **Approach**:
@@ -213,17 +213,19 @@ Downstream processing
 
 ## Implementation Phases
 
-### Phase 1: Internal Informer Abstractions (This Batch)
-- Create `internal/informers` package
-- Refactor factory creation to use abstraction
-- Add unit tests
+### Phase 1: Internal Informer Abstractions ✅ COMPLETE
+- Created `internal/informers` package with Manager abstraction
+- Refactored factory creation to use abstraction
+- Added unit tests
+- Added client-side throttling (QPS=5, Burst=10)
 - **No behavior changes**, just structure
 
-### Phase 2: Queue/Backpressure (This Batch)
-- Add workqueue to `InformerAdapter`
-- Implement bounded queue with workers
-- Add queue metrics
-- **Preserve RawEvent semantics**
+### Phase 2: Queue/Backpressure ✅ COMPLETE
+- Added workqueue to `InformerAdapter`
+- Implemented bounded queue with worker goroutines
+- Queue processes events and emits RawEvents downstream
+- Graceful shutdown with queue draining
+- **Preserve RawEvent semantics** - no external API changes
 
 ### Phase 3: Future Cross-Repo Convergence (Design Only)
 - Shared informer interfaces/types (if client-go versions align)
