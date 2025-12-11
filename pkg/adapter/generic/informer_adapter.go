@@ -17,6 +17,7 @@ package generic
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/kube-zen/zen-watcher/internal/informers"
@@ -25,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 )
 
 // InformerAdapter handles ALL CRD-based sources via dynamic informers
@@ -32,6 +34,9 @@ type InformerAdapter struct {
 	manager *informers.Manager
 	factory dynamicinformer.DynamicSharedInformerFactory // Deprecated: kept for backward compatibility
 	stopCh  chan struct{}
+	queue   workqueue.RateLimitingInterface // Internal queue for backpressure
+	workers int                              // Number of worker goroutines
+	mu      sync.Mutex
 }
 
 // NewInformerAdapter creates a new generic informer adapter
@@ -73,6 +78,7 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 		return nil, err
 	}
 
+	// Bounded output channel (smaller than queue to provide backpressure signal)
 	events := make(chan RawEvent, 100)
 
 	// Parse GVR
@@ -110,7 +116,7 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 		return nil, fmt.Errorf("neither manager nor factory is set")
 	}
 
-	// Add event handlers
+	// Add event handlers that enqueue to workqueue instead of direct channel writes
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			u := obj.(*unstructured.Unstructured)
@@ -125,11 +131,8 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 					"gvr":       gvr.String(),
 				},
 			}
-			select {
-			case events <- event:
-			case <-ctx.Done():
-				return
-			}
+			// Enqueue to workqueue (provides backpressure)
+			a.queue.Add(event)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			u := newObj.(*unstructured.Unstructured)
@@ -144,11 +147,8 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 					"gvr":       gvr.String(),
 				},
 			}
-			select {
-			case events <- event:
-			case <-ctx.Done():
-				return
-			}
+			// Enqueue to workqueue (provides backpressure)
+			a.queue.Add(event)
 		},
 		DeleteFunc: func(obj interface{}) {
 			u, ok := obj.(*unstructured.Unstructured)
@@ -173,13 +173,15 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 					"gvr":       gvr.String(),
 				},
 			}
-			select {
-			case events <- event:
-			case <-ctx.Done():
-				return
-			}
+			// Enqueue to workqueue (provides backpressure)
+			a.queue.Add(event)
 		},
 	})
+
+	// Start worker goroutines to process queue and emit RawEvents
+	for i := 0; i < a.workers; i++ {
+		go a.processQueue(ctx, events, config.Source)
+	}
 
 	// Start informer factory/manager
 	if a.manager != nil {
