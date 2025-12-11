@@ -7,6 +7,8 @@
 
 Zen Watcher is an open-source Kubernetes operator that aggregates structured signals from security, compliance, and infrastructure tools into unified `Observation` CRDs. Lightweight, standalone, and useful on its own.
 
+> 📋 **For PM AIs and Maintainers**: See [docs/PM_AI_ROADMAP.md](docs/PM_AI_ROADMAP.md) for the canonical roadmap and priorities.
+
 ---
 
 ## 🔒 Zero Blast Radius Security: The Core Promise

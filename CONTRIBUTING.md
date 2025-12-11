@@ -393,6 +393,86 @@ Zen Watcher is licensed under Apache 2.0. All contributions must:
 - Include appropriate license headers
 - Follow the project's coding standards
 
+---
+
+## Quality Bar & API Stability
+
+**Zen Watcher is treated as a future KEP (Kubernetes Enhancement Proposal) candidate.** This means APIs and behaviors must be designed for long-term stability and external users.
+
+### KEP-Level Quality Requirements
+
+**This codebase targets community-grade, KEP-level standards.** Unlike SaaS or internal control-plane components, zen-watcher must:
+
+1. **API Stability**: Changes to CRDs, metrics, or observable behavior must:
+   - Be backward-compatible when possible, or
+   - Be clearly versioned with deprecation paths (e.g., v1alpha1 → v1beta1 → v1)
+   - Include migration guides for breaking changes
+
+2. **Documentation**: Tests and docs are not optional for new features:
+   - **Unit tests** required for all new behavior
+   - **Documentation updates** required for any new CRD fields, metrics, or dashboards
+   - **Examples** required for new features (see `examples/` directory)
+
+3. **Observability**: All features must be observable:
+   - **Metrics**: New behavior must expose Prometheus metrics
+   - **Logging**: Structured logging for all operations
+   - **Dashboards**: Dashboard updates for new metrics (if applicable)
+
+4. **Backward Compatibility**: Breaking changes require:
+   - **Deprecation period**: Minimum 2 release cycles
+   - **Migration path**: Clear upgrade instructions
+   - **Versioning**: Proper API versioning (v1alpha1, v1beta1, v1)
+
+### Quality Bar Positioning
+
+**zen-watcher = community-grade, KEP-level target**
+
+- **zen-watcher**: Highest quality bar - designed for long-term stability, external users, potential KEP submission
+- **SaaS components**: Can tolerate more tech debt as long as it's tracked (internal use, faster iteration)
+- **zen-hook (future)**: Should target a bar closer to zen-watcher than SaaS (installed in user clusters, needs stability)
+
+### Design & Evolution Standards
+
+**Informer Architecture**: See `docs/INFORMERS_CONVERGENCE_NOTES.md` for how we carefully design and evolve informers:
+- Multi-phase convergence with zen-agent (design-level alignment)
+- Backward compatibility preserved during refactoring
+- Test coverage for all abstractions
+
+**Performance & Observability**: See `docs/STRESS_TEST_RESULTS.md` and dashboard docs as examples:
+- Performance characteristics documented with real numbers
+- Observability dashboards validated against actual metrics
+- Quality bar demonstrated through comprehensive documentation
+
+### Implementation Guidelines
+
+When implementing new features:
+
+1. **Design First**: Consider API stability, backward compatibility, and versioning
+2. **Test Coverage**: Aim for 80%+ unit test coverage for new code
+3. **Documentation**: Update relevant docs (README, architecture, examples)
+4. **Metrics**: Add Prometheus metrics for new behavior
+5. **Examples**: Provide working examples in `examples/` directory
+
+When refactoring:
+
+1. **Preserve Contracts**: Maintain external APIs (CRDs, metrics, observable behavior)
+2. **Incremental**: Small, scoped changes with tests at each step
+3. **Documentation**: Update architecture docs if patterns change
+4. **Validation**: Ensure existing examples and tests still pass
+
+### Review Criteria
+
+All PRs are reviewed against KEP-level standards:
+
+- ✅ **Backward Compatibility**: No breaking changes without deprecation path
+- ✅ **Test Coverage**: New features include unit tests
+- ✅ **Documentation**: Docs updated for all user-facing changes
+- ✅ **Metrics**: New behavior exposes metrics
+- ✅ **Examples**: New features include working examples
+- ✅ **API Design**: Changes follow Kubernetes API conventions
+
+**Questions about quality bar?** See `docs/PM_AI_ROADMAP.md` for vision and priorities, or open an issue for discussion.
+
 ## How to Run Tests Locally
 
 ### Prerequisites
