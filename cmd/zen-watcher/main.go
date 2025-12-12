@@ -32,6 +32,7 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/optimization"
 	"github.com/kube-zen/zen-watcher/pkg/scaling"
 	"github.com/kube-zen/zen-watcher/pkg/server"
+	"github.com/kube-zen/zen-watcher/pkg/webhook"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
 )
 
@@ -156,8 +157,19 @@ func main() {
 	falcoAlertsChan := make(chan map[string]interface{}, 100)
 	auditEventsChan := make(chan map[string]interface{}, 200)
 
-	// Create HTTP server (handles Falco and Audit webhooks)
-	httpServer := server.NewServer(falcoAlertsChan, auditEventsChan, m.WebhookRequests, m.WebhookDropped)
+	// Create Ingester store and informer for Ingester CRD support
+	ingesterStore := config.NewIngesterStore()
+	ingesterInformer := config.NewIngesterInformer(ingesterStore, clients.Dynamic)
+
+	// Create HTTP server (handles Falco, Audit, and dynamic webhooks)
+	httpServer := server.NewServerWithIngester(
+		falcoAlertsChan,
+		auditEventsChan,
+		m.WebhookRequests,
+		m.WebhookDropped,
+		ingesterStore,
+		observationCreator, // For creating observations from webhook payloads
+	)
 
 	// Create adapter factory - only creates K8sEventsAdapter (exception)
 	// All other sources are configured via ObservationSourceConfig CRDs
@@ -273,6 +285,39 @@ func main() {
 				logger.Fields{
 					Component: "main",
 					Operation: "typeconfig_loader",
+					Error:     err,
+				})
+		}
+	}()
+
+	// Start Ingester informer to populate the store
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := ingesterInformer.Start(ctx); err != nil {
+			log.Error("Ingester informer stopped",
+				logger.Fields{
+					Component: "main",
+					Operation: "ingester_informer",
+					Error:     err,
+				})
+		}
+	}()
+
+	// Create and start Ingester webhook controller for dynamic webhook endpoints
+	ingesterWebhookController := webhook.NewIngesterWebhookController(
+		httpServer, // Server implements EndpointRegistrar interface
+		ingesterStore,
+		clients.Dynamic,
+	)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := ingesterWebhookController.Start(ctx); err != nil {
+			log.Error("Ingester webhook controller stopped",
+				logger.Fields{
+					Component: "main",
+					Operation: "ingester_webhook_controller",
 					Error:     err,
 				})
 		}

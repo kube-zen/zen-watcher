@@ -944,7 +944,7 @@ spec:
                         type: integer
                     type: object
                   order:
-                    description: Processing order: auto (learn and optimize), filter_first, or dedup_first
+                    description: 'Processing order: auto (learn and optimize), filter_first, or dedup_first'
                     enum:
                     - auto
                     - filter_first
