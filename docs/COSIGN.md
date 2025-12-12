@@ -79,43 +79,21 @@ done
 
 #### CI Integration
 
-```yaml
-name: Sign Image
+Invoke image signing from your CI system or scheduled job:
 
-on:
-  push:
-    tags:
-      - 'v*'
+```bash
+# Sign with key
+echo "${COSIGN_KEY}" > cosign.key
+cosign sign --key cosign.key \
+  -a git-sha=${GIT_SHA} \
+  -a build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+  -a version=${IMAGE_TAG} \
+  zubezen/zen-watcher:${IMAGE_TAG}
 
-jobs:
-  sign:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      id-token: write  # For keyless signing
-    
-    steps:
-      - name: Install Cosign
-        uses: sigstore/cosign-installer@v3
-      
-      - name: Sign with key
-        env:
-          COSIGN_KEY: ${{ secrets.COSIGN_KEY }}
-          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
-        run: |
-          echo "$COSIGN_KEY" > cosign.key
-          cosign sign --key cosign.key \
-            -a git-sha=${{ github.sha }} \
-            -a build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
-            -a version=${{ github.ref_name }} \
-            zubezen/zen-watcher:${{ github.ref_name }}
-      
-      - name: Sign keyless (Sigstore)
-        run: |
-          cosign sign \
-            -a git-sha=${{ github.sha }} \
-            zubezen/zen-watcher:${{ github.ref_name }}
+# Sign keyless (no key required)
+cosign sign \
+  -a git-sha=${GIT_SHA} \
+  zubezen/zen-watcher:${IMAGE_TAG}
 ```
 
 #### GitLab CI
