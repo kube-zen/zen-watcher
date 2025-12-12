@@ -33,6 +33,7 @@ log_error() { echo -e "${RED}[ERROR]${NC} $@" >&2; }
 CLUSTER_NAME="${ZEN_DEMO_CLUSTER_NAME:-zen-demo}"
 NAMESPACE="${ZEN_DEMO_NAMESPACE:-zen-system}"
 ENABLE_LOAD_TEST="${ZEN_DEMO_LOAD_TEST:-0}"
+BACKEND="${ZEN_DEMO_BACKEND:-k3d}"
 
 # Parse arguments
 if [[ "${1:-}" == "--load-test" ]]; then
