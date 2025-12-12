@@ -39,8 +39,9 @@ var (
 	}
 )
 
-// FieldMapping represents a field mapping from raw data to labels
-type FieldMapping struct {
+// FieldMappingTypeConfig represents a field mapping from raw data to labels
+// (renamed to avoid conflict with FieldMapping in ingester_loader.go)
+type FieldMappingTypeConfig struct {
 	From      string // JSONPath in raw data
 	To        string // Label name
 	Transform string // Optional transform function
@@ -59,7 +60,7 @@ type TypeConfig struct {
 	Type               string
 	Domain             string
 	PriorityMap        map[string]float64 // Source value -> priority (0.0-1.0)
-	FieldMappings      []FieldMapping
+	FieldMappings      []FieldMappingTypeConfig
 	Templates          map[string]string // title, description go templates
 	ResourceExtraction ResourceExtractionConfig
 }
@@ -259,10 +260,10 @@ func (tcl *TypeConfigLoader) convertToTypeConfig(otc *unstructured.Unstructured)
 
 	// Parse field mappings
 	if fieldMappings, found, _ := unstructured.NestedSlice(otc.Object, "spec", "fieldMapping"); found {
-		config.FieldMappings = make([]FieldMapping, 0, len(fieldMappings))
+		config.FieldMappings = make([]FieldMappingTypeConfig, 0, len(fieldMappings))
 		for _, fm := range fieldMappings {
 			if fmMap, ok := fm.(map[string]interface{}); ok {
-				mapping := FieldMapping{}
+				mapping := FieldMappingTypeConfig{}
 				if from, ok := fmMap["from"].(string); ok {
 					mapping.From = from
 				}
@@ -360,7 +361,7 @@ func (tcl *TypeConfigLoader) GetTypeConfig(obsType string) *TypeConfig {
 		Type:               strings.ToLower(obsType),
 		Domain:             defaults.Domain,
 		PriorityMap:        make(map[string]float64),
-		FieldMappings:      []FieldMapping{},
+		FieldMappings:      []FieldMappingTypeConfig{},
 		Templates:          make(map[string]string),
 		ResourceExtraction: ResourceExtractionConfig{},
 	}

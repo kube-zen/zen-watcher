@@ -162,12 +162,10 @@ func (p *expressionParser) parseComparison() (*ASTNode, error) {
 	// Check for comparison operators
 	operators := []string{"NOT IN", "NOT EXISTS", ">=", "<=", "!=", "=", ">", "<", "IN", "EXISTS", "CONTAINS", "STARTS_WITH", "ENDS_WITH"}
 	var operator string
-	var operatorPos int
 
 	for _, op := range operators {
 		if p.peekToken(op) {
 			operator = op
-			operatorPos = p.pos
 			p.consumeToken(op)
 			break
 		}
@@ -320,7 +318,7 @@ func (p *expressionParser) parseStringLiteral() (*ASTNode, error) {
 			case '\\':
 				sb.WriteRune('\\')
 			case quote:
-				sb.WriteRune(quote)
+				sb.WriteRune(rune(quote))
 			default:
 				sb.WriteRune(rune(p.peekChar()))
 			}

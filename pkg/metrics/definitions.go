@@ -312,6 +312,23 @@ func NewMetrics() *Metrics {
 		[]string{"source"},
 	)
 
+	// Dedup strategy metrics (W33 - v1.1)
+	dedupEffectivenessPerStrategy := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_dedup_effectiveness_per_strategy",
+			Help: "Deduplication effectiveness by strategy (0.0-1.0)",
+		},
+		[]string{"source", "strategy"},
+	)
+
+	dedupDecisionsTotal := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_dedup_decisions_total",
+			Help: "Total deduplication decisions by strategy and decision type",
+		},
+		[]string{"source", "strategy", "decision"},
+	)
+
 	// Register all metrics
 	prometheus.MustRegister(eventsTotal)
 	prometheus.MustRegister(observationsCreated)

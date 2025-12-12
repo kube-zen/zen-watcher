@@ -67,7 +67,8 @@ type AuthConfig struct {
 	SecretRef string
 }
 
-// RateLimitConfig holds rate limiting configuration
+// RateLimitConfig holds rate limiting configuration (simple version for Ingester)
+// For advanced rate limiting, see RateLimitConfig in source_config_loader.go
 type RateLimitConfig struct {
 	RequestsPerMinute int
 }

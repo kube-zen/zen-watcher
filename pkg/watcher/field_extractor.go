@@ -124,4 +124,3 @@ func (fe *FieldExtractor) ExtractInt64(obj map[string]interface{}, path ...strin
 	val, found, _ := unstructured.NestedInt64(obj, cachedPath...)
 	return val, found
 }
-

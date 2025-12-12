@@ -89,8 +89,9 @@ type DeduplicationConfig struct {
 	LearningRate float64
 }
 
-// RateLimitConfig represents rate limiting and throttling configuration
-type RateLimitConfig struct {
+// RateLimitConfigAdvanced represents rate limiting and throttling configuration
+// (renamed to avoid conflict with simple RateLimitConfig in ingester_loader.go)
+type RateLimitConfigAdvanced struct {
 	MaxPerMinute   int
 	Burst          int
 	Adaptive       bool // Enable adaptive rate limiting
@@ -122,7 +123,7 @@ type SourceConfig struct {
 	Processing    ProcessingConfig
 	Filter        FilterConfig
 	Deduplication DeduplicationConfig
-	RateLimit     RateLimitConfig
+	RateLimit     RateLimitConfigAdvanced
 }
 
 // SourceConfigLoader watches ObservationSourceConfig CRDs and caches configuration

@@ -100,9 +100,8 @@ type LogPattern struct {
 	Priority float64
 }
 
-// ConfigMapConfig is deprecated.
+// ConfigMapConfig is not supported.
 // Use InformerConfig with GVR { group: "", version: "v1", resource: "configmaps" } instead.
-// This type is kept for backward compatibility during migration but should not be used in new code.
 type ConfigMapConfig struct {
 	Namespace     string
 	LabelSelector string
