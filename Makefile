@@ -362,7 +362,15 @@ zen-demo-validate:
 		echo "$(YELLOW)Run: make zen-demo-up$(NC)"; \
 		exit 1; \
 	fi
-	@if ! go test -v -timeout=10m ./test/e2e/... -run "TestClusterExists|TestCRDsExist|TestWatcherDeployment|TestWatcherPodRunning|TestIngesterCRExists|TestMetricsEndpoint|TestCoreMetrics|TestCanonicalSpecLocations|TestRequiredFieldValidation|TestMetricsMovement"; then \
+	@echo "$(YELLOW)━━━━ Contract Regression Tests ━━━━$(NC)"
+	@if ! go test -v -timeout=10m ./test/e2e/... -run "TestCanonicalSpecLocations|TestRequiredFieldValidation"; then \
+		echo "$(RED)❌ Contract regression tests failed$(NC)"; \
+		exit 1; \
+	fi
+	@echo "$(GREEN)✅ Contract regression tests passed$(NC)"
+	@echo ""
+	@echo "$(YELLOW)━━━━ Full E2E Validation ━━━━$(NC)"
+	@if ! go test -v -timeout=10m ./test/e2e/... -run "TestClusterExists|TestCRDsExist|TestWatcherDeployment|TestWatcherPodRunning|TestIngesterCRExists|TestMetricsEndpoint|TestCoreMetrics|TestMetricsMovement"; then \
 		echo "$(RED)❌ E2E validation failed$(NC)"; \
 		echo "$(YELLOW)To debug: go test -v -timeout=10m ./test/e2e/... -run <TestName>$(NC)"; \
 		exit 1; \

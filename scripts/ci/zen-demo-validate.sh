@@ -11,6 +11,7 @@
 #   ZEN_DEMO_CLUSTER_NAME=zen-demo    # Cluster name (default: zen-demo)
 #   ZEN_DEMO_NAMESPACE=zen-system     # Namespace (default: zen-system)
 #   ZEN_DEMO_LOAD_TEST=1              # Enable load test (default: disabled)
+#   ZEN_DEMO_BACKEND=k3d              # Backend: k3d, kind, or minikube (default: k3d)
 #
 set -euo pipefail
 
@@ -46,8 +47,8 @@ echo ""
 cd "${REPO_ROOT}"
 
 # Step 1: Create cluster (canonical script)
-log_info "Step 1: Creating zen-demo cluster..."
-if ! ./scripts/cluster/create.sh k3d "${CLUSTER_NAME}"; then
+log_info "Step 1: Creating zen-demo cluster (backend: ${BACKEND})..."
+if ! ./scripts/cluster/create.sh "${BACKEND}" "${CLUSTER_NAME}"; then
 	log_error "Cluster creation failed"
 	exit 1
 fi
@@ -90,16 +91,34 @@ ARTIFACTS_DIR="${ARTIFACTS_DIR:-/tmp/zen-demo-artifacts}"
 mkdir -p "${ARTIFACTS_DIR}"
 
 log_info "Step 5: Exporting validation artifacts..."
-KUBECONFIG="${HOME}/.config/k3d/kubeconfig-${CLUSTER_NAME}.yaml"
+# Determine kubeconfig path based on backend
+case "${BACKEND}" in
+	k3d)
+		KUBECONFIG="${HOME}/.config/k3d/kubeconfig-${CLUSTER_NAME}.yaml"
+		CONTEXT="k3d-${CLUSTER_NAME}"
+		;;
+	kind)
+		KUBECONFIG="${HOME}/.kube/config"
+		CONTEXT="kind-${CLUSTER_NAME}"
+		;;
+	minikube)
+		KUBECONFIG="${HOME}/.kube/config"
+		CONTEXT="${CLUSTER_NAME}"
+		;;
+esac
 
 # Export pod logs
-kubectl --kubeconfig="${KUBECONFIG}" --context="k3d-${CLUSTER_NAME}" logs -n "${NAMESPACE}" -l app.kubernetes.io/name=zen-watcher --tail=100 > "${ARTIFACTS_DIR}/watcher-logs.txt" 2>&1 || true
+kubectl --kubeconfig="${KUBECONFIG}" --context="${CONTEXT}" logs -n "${NAMESPACE}" -l app.kubernetes.io/name=zen-watcher --tail=100 > "${ARTIFACTS_DIR}/watcher-logs.txt" 2>&1 || true
+
+# Export pod status and events (debug bundle)
+kubectl --kubeconfig="${KUBECONFIG}" --context="${CONTEXT}" get pods -n "${NAMESPACE}" -o yaml > "${ARTIFACTS_DIR}/pods.yaml" 2>&1 || true
+kubectl --kubeconfig="${KUBECONFIG}" --context="${CONTEXT}" get events -n "${NAMESPACE}" --sort-by='.lastTimestamp' > "${ARTIFACTS_DIR}/events.txt" 2>&1 || true
 
 # Export Ingester CRs
-kubectl --kubeconfig="${KUBECONFIG}" --context="k3d-${CLUSTER_NAME}" get ingesters -A -o yaml > "${ARTIFACTS_DIR}/ingesters.yaml" 2>&1 || true
+kubectl --kubeconfig="${KUBECONFIG}" --context="${CONTEXT}" get ingesters -A -o yaml > "${ARTIFACTS_DIR}/ingesters.yaml" 2>&1 || true
 
 # Export Observations
-kubectl --kubeconfig="${KUBECONFIG}" --context="k3d-${CLUSTER_NAME}" get observations -A -o yaml > "${ARTIFACTS_DIR}/observations.yaml" 2>&1 || true
+kubectl --kubeconfig="${KUBECONFIG}" --context="${CONTEXT}" get observations -A -o yaml > "${ARTIFACTS_DIR}/observations.yaml" 2>&1 || true
 
 log_success "Artifacts exported to ${ARTIFACTS_DIR}"
 

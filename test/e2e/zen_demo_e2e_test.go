@@ -183,8 +183,8 @@ spec:
 		t.Fatalf("Failed to apply test Ingester: %v\nOutput: %s", err, output)
 	}
 
-	// Wait a moment for reconciliation
-	time.Sleep(2 * time.Second)
+	// Wait for reconciliation with bounded retry
+	waitForIngesterReady(t, "test-e2e-ingester", testNamespace, 10*time.Second)
 
 	// Verify the Ingester exists
 	output, err = runKubectl("get", "ingester", "test-e2e-ingester", "-n", testNamespace)
@@ -197,6 +197,7 @@ spec:
 }
 
 // TestCanonicalSpecLocations verifies that spec.processing.filter and spec.processing.dedup are respected (W58, W33)
+// Contract regression test: ensures canonical spec locations work correctly
 func TestCanonicalSpecLocations(t *testing.T) {
 	// Apply Ingester with canonical spec.processing.* locations
 	testIngester := `
@@ -231,8 +232,8 @@ spec:
 		t.Fatalf("Failed to apply Ingester with canonical spec: %v\nOutput: %s", err, output)
 	}
 
-	// Wait for reconciliation
-	time.Sleep(3 * time.Second)
+	// Wait for reconciliation with bounded retry
+	waitForIngesterReady(t, "test-canonical-spec", testNamespace, 10*time.Second)
 
 	// Verify Ingester exists and has correct spec
 	output, err = runKubectl("get", "ingester", "test-canonical-spec", "-n", testNamespace, "-o", "jsonpath={.spec.processing.filter.expression}")
@@ -259,11 +260,12 @@ spec:
 }
 
 // TestRequiredFieldValidation verifies that required fields (source, ingester, destinations) are validated (W59)
+// Contract regression test: ensures required field validation prevents invalid configs
 func TestRequiredFieldValidation(t *testing.T) {
 	tests := []struct {
-		name        string
+		name         string
 		ingesterYAML string
-		shouldFail  bool
+		shouldFail   bool
 	}{
 		{
 			name: "Missing source",
@@ -427,11 +429,11 @@ spec:
 	}
 	defer runKubectl("delete", "ingester", "test-metrics-ingester", "-n", testNamespace, "--ignore-not-found=true")
 
-	// Wait for Ingester to be processed
-	time.Sleep(5 * time.Second)
+	// Wait for Ingester to be processed (explicit timeout)
+	waitForIngesterReady(t, "test-metrics-ingester", testNamespace, 15*time.Second)
 
-	// Get metrics after processing
-	time.Sleep(2 * time.Second)
+	// Wait for metrics to be available (bounded retry)
+	waitForMetricsAvailable(port, 10*time.Second)
 	finalMetrics, err := fetchMetrics("http://localhost:" + port + "/metrics")
 	if err != nil {
 		t.Skipf("Could not fetch final metrics (non-critical): %v", err)
