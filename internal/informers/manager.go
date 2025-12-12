@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
