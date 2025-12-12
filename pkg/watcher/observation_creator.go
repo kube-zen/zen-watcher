@@ -176,6 +176,7 @@ func NewObservationCreatorWithOptimization(
 		optimizationMetrics:      optimizationMetrics,
 		currentOrder:             make(map[string]ProcessingOrder),
 		smartProcessor:           optimization.NewSmartProcessor(), // Created here, can be shared with optimizer
+		fieldExtractor:           NewFieldExtractor(),
 	}
 }
 
@@ -580,8 +581,8 @@ func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstruct
 // setTTLIfNotSet sets spec.ttlSecondsAfterCreation if not already set
 // Priority: 1) Already set in spec, 2) Environment variable, 3) Default (7 days)
 func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructured) {
-	// Check if TTL is already set in spec
-	if ttlVal, found, _ := unstructured.NestedInt64(observation.Object, "spec", "ttlSecondsAfterCreation"); found && ttlVal > 0 {
+	// Check if TTL is already set in spec (optimized)
+	if ttlVal, found := oc.fieldExtractor.ExtractInt64(observation.Object, "spec", "ttlSecondsAfterCreation"); found && ttlVal > 0 {
 		// Already set, don't override
 		return
 	}
@@ -635,8 +636,8 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 		defaultTTLSeconds = MaxTTLSeconds
 	}
 
-	// Ensure spec exists
-	spec, _, _ := unstructured.NestedMap(observation.Object, "spec")
+	// Ensure spec exists (optimized)
+	spec, _ := oc.fieldExtractor.ExtractMap(observation.Object, "spec")
 	if spec == nil {
 		spec = make(map[string]interface{})
 		unstructured.SetNestedMap(observation.Object, spec, "spec")
