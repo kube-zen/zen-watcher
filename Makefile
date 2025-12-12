@@ -299,6 +299,11 @@ check-branding:
 	@./hack/check-branding.sh
 	@echo "$(GREEN)✅ Branding check passed$(NC)"
 
+## check-no-github-actions: Guardrail to prevent GitHub Actions workflows
+check-no-github-actions:
+	@echo "$(GREEN)Checking for GitHub Actions workflows...$(NC)"
+	@./hack/check-no-github-actions.sh
+
 ## zen-demo-up: Create zen-demo k3d cluster for e2e validation
 zen-demo-up:
 	@echo "$(GREEN)Creating zen-demo k3d cluster...$(NC)"
