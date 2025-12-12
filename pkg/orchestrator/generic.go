@@ -33,12 +33,14 @@ type GenericOrchestrator struct {
 	adapterFactory     *generic.Factory
 	dynClient          dynamic.Interface
 	processor          *processor.Processor
+	batchProcessor     *processor.BatchProcessor // Optional: for batch processing
 	activeAdapters     map[string]generic.GenericAdapter  // source -> adapter
 	activeConfigs      map[string]*generic.SourceConfig   // source -> config
 	activeEventStreams map[string]<-chan generic.RawEvent // source -> event stream
 	mu                 sync.RWMutex
 	ctx                context.Context
 	cancel             context.CancelFunc
+	enableBatching     bool // Whether to use batch processing
 }
 
 // NewGenericOrchestrator creates a new generic adapter orchestrator
@@ -48,15 +50,29 @@ func NewGenericOrchestrator(
 	proc *processor.Processor,
 ) *GenericOrchestrator {
 	ctx, cancel := context.WithCancel(context.Background())
+	
+	// Enable batch processing by default for performance optimization
+	// Batch size: 15 events, max age: 100ms (balances throughput and latency)
+	enableBatching := true
+	maxBatchSize := 15
+	maxBatchAge := 100 * time.Millisecond
+	
+	var batchProcessor *processor.BatchProcessor
+	if enableBatching {
+		batchProcessor = processor.NewBatchProcessor(proc, maxBatchSize, maxBatchAge)
+	}
+	
 	return &GenericOrchestrator{
 		adapterFactory:     adapterFactory,
 		dynClient:          dynClient,
 		processor:          proc,
+		batchProcessor:     batchProcessor,
 		activeAdapters:     make(map[string]generic.GenericAdapter),
 		activeConfigs:      make(map[string]*generic.SourceConfig),
 		activeEventStreams: make(map[string]<-chan generic.RawEvent),
 		ctx:                ctx,
 		cancel:             cancel,
+		enableBatching:     enableBatching,
 	}
 }
 
@@ -221,15 +237,31 @@ func (o *GenericOrchestrator) reloadAdapters() {
 
 // processEvents processes RawEvents from an adapter
 func (o *GenericOrchestrator) processEvents(source string, config *generic.SourceConfig, events <-chan generic.RawEvent) {
-	for rawEvent := range events {
-		if err := o.processor.ProcessEvent(o.ctx, &rawEvent, config); err != nil {
-			logger.Error("Failed to process event",
-				logger.Fields{
-					Component: "orchestrator",
-					Operation: "process_event",
-					Source:    source,
-					Error:     err,
-				})
+	if o.enableBatching && o.batchProcessor != nil {
+		// Use batch processing for improved throughput
+		for rawEvent := range events {
+			if err := o.batchProcessor.AddEvent(o.ctx, &rawEvent, config); err != nil {
+				logger.Error("Failed to add event to batch",
+					logger.Fields{
+						Component: "orchestrator",
+						Operation: "batch_add_event",
+						Source:    source,
+						Error:     err,
+					})
+			}
+		}
+	} else {
+		// Process events one-by-one (original behavior)
+		for rawEvent := range events {
+			if err := o.processor.ProcessEvent(o.ctx, &rawEvent, config); err != nil {
+				logger.Error("Failed to process event",
+					logger.Fields{
+						Component: "orchestrator",
+						Operation: "process_event",
+						Source:    source,
+						Error:     err,
+					})
+			}
 		}
 	}
 }
@@ -247,6 +279,9 @@ func (o *GenericOrchestrator) configChanged(source string, newConfig *generic.So
 // Stop stops all adapters
 func (o *GenericOrchestrator) Stop() {
 	o.cancel()
+	if o.batchProcessor != nil {
+		o.batchProcessor.Stop()
+	}
 	o.mu.Lock()
 	defer o.mu.Unlock()
 	for source, adapter := range o.activeAdapters {
