@@ -302,13 +302,13 @@ check-branding:
 ## zen-demo-up: Create zen-demo k3d cluster for e2e validation
 zen-demo-up:
 	@echo "$(GREEN)Creating zen-demo k3d cluster...$(NC)"
-	@./hack/zen-demo-k3d-up.sh
+	@./scripts/cluster/create.sh k3d zen-demo
 	@echo "$(GREEN)✅ zen-demo cluster ready$(NC)"
 
 ## zen-demo-down: Delete zen-demo k3d cluster
 zen-demo-down:
 	@echo "$(GREEN)Deleting zen-demo k3d cluster...$(NC)"
-	@./hack/zen-demo-k3d-down.sh
+	@./scripts/cluster/destroy.sh k3d
 	@echo "$(GREEN)✅ zen-demo cluster deleted$(NC)"
 
 ## zen-demo-build-push: Build and push watcher image for zen-demo
@@ -329,7 +329,19 @@ zen-demo-build-push:
 ## zen-demo-deploy-watcher: Deploy watcher CRDs and deployment to zen-demo
 zen-demo-deploy-watcher:
 	@echo "$(GREEN)Deploying zen-watcher to zen-demo...$(NC)"
-	@./hack/zen-demo-deploy-watcher.sh
+	@./hack/zen-demo-deploy-watcher.sh || \
+		(echo "$(YELLOW)⚠️  Deploy script failed, trying direct Helm install...$(NC)"; \
+		 IMAGE_TAG=$$(git rev-parse --short HEAD 2>/dev/null || echo "latest"); \
+		 CLUSTER_NAME=$${ZEN_DEMO_CLUSTER_NAME:-zen-demo}; \
+		 NAMESPACE=$${ZEN_DEMO_NAMESPACE:-zen-system}; \
+		 KUBECONFIG=$${HOME}/.config/k3d/kubeconfig-$$CLUSTER_NAME.yaml; \
+		 helm --kubeconfig=$$KUBECONFIG --kube-context=k3d-$$CLUSTER_NAME upgrade --install zen-watcher deployments/helm/zen-watcher \
+		   --namespace $$NAMESPACE --create-namespace \
+		   --set image.repository=kubezen/zen-watcher \
+		   --set image.tag=zen-demo-$$IMAGE_TAG \
+		   --set image.pullPolicy=IfNotPresent \
+		   --set crd.install=true \
+		   --wait --timeout=5m)
 	@echo "$(GREEN)✅ zen-watcher deployed$(NC)"
 
 ## zen-demo-validate: Run e2e validation tests on zen-demo

@@ -267,4 +267,3 @@ func TestCoreMetrics(t *testing.T) {
 		}
 	}
 }
-
