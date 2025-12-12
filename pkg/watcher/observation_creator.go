@@ -63,6 +63,8 @@ type ObservationCreator struct {
 		RecordEvent()
 		SetQueueDepth(int)
 	}
+	// Field extractor for optimized field access (Phase 2 optimization)
+	fieldExtractor *FieldExtractor
 }
 
 // OptimizationMetrics holds optimization-related metrics
@@ -200,8 +202,8 @@ func (oc *ObservationCreator) GetSmartProcessor() *optimization.SmartProcessor {
 // The canonical pipeline order is enforced in Processor.ProcessEvent:
 // source → (filter | dedup, order chosen by optimization) → normalize → CreateObservation
 func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation *unstructured.Unstructured) error {
-	// Extract source early for metrics
-	sourceVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
+	// Extract source early for metrics (optimized with field extractor)
+	sourceVal, _ := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "source")
 	source := ""
 	if sourceVal != nil {
 		source = fmt.Sprintf("%v", sourceVal)
@@ -295,24 +297,23 @@ func (oc *ObservationCreator) getSourceMetrics(source string) *SourceMetrics {
 // createObservation creates the observation (extracted from original CreateObservation)
 func (oc *ObservationCreator) createObservation(ctx context.Context, observation *unstructured.Unstructured, source string) error {
 
-	// Extract namespace from observation
-	namespace, found, _ := unstructured.NestedString(observation.Object, "metadata", "namespace")
+	// Extract namespace from observation (optimized)
+	namespace, found := oc.fieldExtractor.ExtractString(observation.Object, "metadata", "namespace")
 	if !found || namespace == "" {
 		namespace = "default"
 	}
 
 	// Ensure metadata exists (for labels, annotations, etc. - not TTL specific)
-	metadata, _, _ := unstructured.NestedMap(observation.Object, "metadata")
+	metadata, _ := oc.fieldExtractor.ExtractMap(observation.Object, "metadata")
 	if metadata == nil {
 		metadata = make(map[string]interface{})
 		unstructured.SetNestedMap(observation.Object, metadata, "metadata")
 	}
 
-	// Extract category, severity, and eventType from spec for metrics BEFORE creation
-	// Use NestedFieldCopy to handle interface{} types, then convert to string
-	categoryVal, categoryFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "category")
-	severityVal, severityFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "severity")
-	eventTypeVal, eventTypeFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "eventType")
+	// Extract category, severity, and eventType from spec for metrics BEFORE creation (optimized)
+	categoryVal, categoryFound := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "category")
+	severityVal, severityFound := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "severity")
+	eventTypeVal, eventTypeFound := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "eventType")
 	category := ""
 	if categoryVal != nil {
 		category = fmt.Sprintf("%v", categoryVal)
@@ -406,10 +407,10 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 			eventType = "unknown"
 		}
 
-		// Extract namespace and kind from resource
+		// Extract namespace and kind from resource (optimized)
 		resourceNamespace := namespace // Use observation namespace as fallback
 		resourceKind := ""
-		resourceVal, _, _ := unstructured.NestedMap(observation.Object, "spec", "resource")
+		resourceVal, _ := oc.fieldExtractor.ExtractMap(observation.Object, "spec", "resource")
 		if resourceVal != nil {
 			if ns, ok := resourceVal["namespace"].(string); ok && ns != "" {
 				resourceNamespace = ns
@@ -473,15 +474,15 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 
 // extractDedupKey extracts minimal metadata for deduplication from observation
 func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstructured) dedup.DedupKey {
-	// Extract source
-	sourceVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
+	// Extract source (optimized)
+	sourceVal, _ := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "source")
 	source := ""
 	if sourceVal != nil {
 		source = fmt.Sprintf("%v", sourceVal)
 	}
 
-	// Extract resource info
-	resourceVal, _, _ := unstructured.NestedMap(observation.Object, "spec", "resource")
+	// Extract resource info (optimized)
+	resourceVal, _ := oc.fieldExtractor.ExtractMap(observation.Object, "spec", "resource")
 	namespace := ""
 	kind := ""
 	name := ""
@@ -502,17 +503,17 @@ func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstruct
 			name = fmt.Sprintf("%v", n)
 		}
 	}
-	// Fallback to metadata namespace if resource namespace is empty
+	// Fallback to metadata namespace if resource namespace is empty (optimized)
 	if namespace == "" {
-		namespace, _, _ = unstructured.NestedString(observation.Object, "metadata", "namespace")
+		namespace, _ = oc.fieldExtractor.ExtractString(observation.Object, "metadata", "namespace")
 		if namespace == "" {
 			namespace = "default"
 		}
 	}
 
-	// Extract reason from details or eventType
+	// Extract reason from details or eventType (optimized)
 	reason := ""
-	detailsVal, _, _ := unstructured.NestedMap(observation.Object, "spec", "details")
+	detailsVal, _ := oc.fieldExtractor.ExtractMap(observation.Object, "spec", "details")
 	if detailsVal != nil {
 		// Try common reason fields
 		if r, ok := detailsVal["reason"].(string); ok {
@@ -541,9 +542,9 @@ func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstruct
 			reason = fmt.Sprintf("%v", r)
 		}
 	}
-	// Fallback to eventType if no reason found
+	// Fallback to eventType if no reason found (optimized)
 	if reason == "" {
-		eventTypeVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "eventType")
+		eventTypeVal, _ := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "eventType")
 		if eventTypeVal != nil {
 			reason = fmt.Sprintf("%v", eventTypeVal)
 		}
