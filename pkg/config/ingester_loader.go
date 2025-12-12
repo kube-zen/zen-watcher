@@ -100,7 +100,8 @@ type FieldMapping struct {
 
 // FilterConfig holds filtering rules
 type FilterConfig struct {
-	MinPriority      float64
+	Expression        string   // Filter expression (v1.1)
+	MinPriority       float64
 	IncludeNamespaces []string
 	ExcludeNamespaces []string
 }
@@ -493,7 +494,6 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 				}
 			}
 		}
-		}
 	}
 	
 	// Extract normalization config
@@ -523,38 +523,12 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 		}
 	}
 	
-	// Extract filter config
-	if filter, ok := spec["filters"].(map[string]interface{}); ok {
-		config.Filter = &FilterConfig{}
-		// Check for expression (v1.1 feature)
-		if expression, ok := filter["expression"].(string); ok && expression != "" {
-			config.Filter.Expression = expression
-		}
-		// Legacy fields (only used if expression is not set)
-		if minPriority, ok := filter["minPriority"].(float64); ok {
-			config.Filter.MinPriority = minPriority
-		}
-		if includeNS, ok := filter["includeNamespaces"].([]interface{}); ok {
-			for _, ns := range includeNS {
-				if nsStr, ok := ns.(string); ok {
-					config.Filter.IncludeNamespaces = append(config.Filter.IncludeNamespaces, nsStr)
-				}
-			}
-		}
-		if excludeNS, ok := filter["excludeNamespaces"].([]interface{}); ok {
-			for _, ns := range excludeNS {
-				if nsStr, ok := ns.(string); ok {
-					config.Filter.ExcludeNamespaces = append(config.Filter.ExcludeNamespaces, nsStr)
-				}
-			}
-		}
-	}
-	
 	// Extract dedup config - support both canonical spec.processing.dedup (v1.1+) and legacy spec.deduplication
 	// Priority: spec.processing.dedup > spec.deduplication (legacy)
 	var dedupConfig *DedupConfig
+	var filterConfig *FilterConfig
 	
-	// First, try spec.processing.dedup (canonical v1.1+ location)
+	// First, try spec.processing (canonical v1.1+ location)
 	if processing, ok := spec["processing"].(map[string]interface{}); ok {
 		// Extract processing-level config (order, optimization settings)
 		config.Processing = &ProcessingConfig{
@@ -564,6 +538,33 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 		config.Processing.AnalysisInterval = getString(processing, "analysisInterval")
 		if threshold, ok := processing["confidenceThreshold"].(float64); ok {
 			config.Processing.ConfidenceThreshold = threshold
+		}
+		
+		// Extract filter from processing.filter (canonical location)
+		if filter, ok := processing["filter"].(map[string]interface{}); ok {
+			filterConfig = &FilterConfig{}
+			// Check for expression (v1.1 feature)
+			if expression, ok := filter["expression"].(string); ok && expression != "" {
+				filterConfig.Expression = expression
+			}
+			// Legacy fields (only used if expression is not set)
+			if minPriority, ok := filter["minPriority"].(float64); ok {
+				filterConfig.MinPriority = minPriority
+			}
+			if includeNS, ok := filter["includeNamespaces"].([]interface{}); ok {
+				for _, ns := range includeNS {
+					if nsStr, ok := ns.(string); ok {
+						filterConfig.IncludeNamespaces = append(filterConfig.IncludeNamespaces, nsStr)
+					}
+				}
+			}
+			if excludeNS, ok := filter["excludeNamespaces"].([]interface{}); ok {
+				for _, ns := range excludeNS {
+					if nsStr, ok := ns.(string); ok {
+						filterConfig.ExcludeNamespaces = append(filterConfig.ExcludeNamespaces, nsStr)
+					}
+				}
+			}
 		}
 		
 		// Extract dedup from processing.dedup (canonical location)
@@ -639,6 +640,40 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 				}
 			}
 		}
+	}
+	
+	// Fallback to legacy spec.filters if processing.filter not found
+	if filterConfig == nil {
+		if filter, ok := spec["filters"].(map[string]interface{}); ok {
+			filterConfig = &FilterConfig{}
+			// Check for expression (v1.1 feature)
+			if expression, ok := filter["expression"].(string); ok && expression != "" {
+				filterConfig.Expression = expression
+			}
+			// Legacy fields (only used if expression is not set)
+			if minPriority, ok := filter["minPriority"].(float64); ok {
+				filterConfig.MinPriority = minPriority
+			}
+			if includeNS, ok := filter["includeNamespaces"].([]interface{}); ok {
+				for _, ns := range includeNS {
+					if nsStr, ok := ns.(string); ok {
+						filterConfig.IncludeNamespaces = append(filterConfig.IncludeNamespaces, nsStr)
+					}
+				}
+			}
+			if excludeNS, ok := filter["excludeNamespaces"].([]interface{}); ok {
+				for _, ns := range excludeNS {
+					if nsStr, ok := ns.(string); ok {
+						filterConfig.ExcludeNamespaces = append(filterConfig.ExcludeNamespaces, nsStr)
+					}
+				}
+			}
+		}
+	}
+	
+	// Set filter config if found
+	if filterConfig != nil {
+		config.Filter = filterConfig
 	}
 	
 	// Set dedup config if found
