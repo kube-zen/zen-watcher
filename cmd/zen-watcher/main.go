@@ -32,7 +32,6 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/optimization"
 	"github.com/kube-zen/zen-watcher/pkg/scaling"
 	"github.com/kube-zen/zen-watcher/pkg/server"
-	"github.com/kube-zen/zen-watcher/pkg/webhook"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
 )
 
@@ -161,14 +160,14 @@ func main() {
 	ingesterStore := config.NewIngesterStore()
 	ingesterInformer := config.NewIngesterInformer(ingesterStore, clients.Dynamic)
 
-	// Create HTTP server (handles Falco, Audit, and dynamic webhooks)
+	// Create HTTP server (handles Falco and Audit webhooks)
 	httpServer := server.NewServerWithIngester(
 		falcoAlertsChan,
 		auditEventsChan,
 		m.WebhookRequests,
 		m.WebhookDropped,
 		ingesterStore,
-		observationCreator, // For creating observations from webhook payloads
+		observationCreator, // Parameters kept for API compatibility
 	)
 
 	// Create adapter factory - only creates K8sEventsAdapter (exception)
@@ -304,24 +303,6 @@ func main() {
 		}
 	}()
 
-	// Create and start Ingester webhook controller for dynamic webhook endpoints
-	ingesterWebhookController := webhook.NewIngesterWebhookController(
-		httpServer, // Server implements EndpointRegistrar interface
-		ingesterStore,
-		clients.Dynamic,
-	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := ingesterWebhookController.Start(ctx); err != nil {
-			log.Error("Ingester webhook controller stopped",
-				logger.Fields{
-					Component: "main",
-					Operation: "ingester_webhook_controller",
-					Error:     err,
-				})
-		}
-	}()
 
 	// Create and start optimization engine (for per-source auto-optimization)
 	// Share the SmartProcessor instance from ObservationCreator so metrics are unified

@@ -70,7 +70,7 @@ Add any new source with a simple YAML configuration using the `Ingester` CRD. No
 
 **Five input methods:**
 1. **🔍 Logs** - Monitor pod logs with regex patterns
-2. **📡 Webhooks** - Receive HTTP webhooks from external tools
+2. **📡 Webhooks** - Receive HTTP webhooks from external tools (Falco, Audit, etc.) via static nginx configuration
 3. **🗂️ ConfigMaps** - Watch ConfigMaps via informer (event-driven, recommended)
 4. **📋 CRDs (Informers)** - Watch Kubernetes Custom Resource Definitions
 5. **🎯 Kubernetes Events** - Native cluster events (security-focused)
@@ -172,6 +172,7 @@ kubectl get observations -n zen-system -o json | \
 
 - [Installation Guide](docs/DEPLOYMENT_HELM.md) - Complete deployment instructions
 - [Source Adapters](docs/SOURCE_ADAPTERS.md) - How to add new sources
+- [Manual Webhook Adapter](docs/manual-webhook-adapter.md) - Configure webhooks for Falco, Audit, and other tools
 - [Observation API](docs/OBSERVATION_API_PUBLIC_GUIDE.md) - API reference
 - [Integrations](docs/INTEGRATIONS.md) - How to consume Observations
 - [Intelligent Pipeline](docs/INTELLIGENT_EVENT_PIPELINE.md) - Noise reduction and optimization

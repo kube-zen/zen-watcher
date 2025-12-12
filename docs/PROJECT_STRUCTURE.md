@@ -64,9 +64,9 @@ zen-watcher/
 ├── hack/                         # Scripts and utilities
 │   └── (development scripts)     # Build, test, deploy scripts
 │
-├── .github/                      # GitHub specific
-│   └── workflows/                # GitHub Actions
-│       └── security-scan.yml     # Security scanning
+├── .github.disabled/             # Disabled GitHub workflows (per guardrails)
+│   └── workflows/                # Disabled GitHub Actions workflows
+│       └── security-scan.yml     # Security scanning (disabled)
 │
 ├── go.mod                        # Go module definition
 ├── go.sum                        # Go dependencies
