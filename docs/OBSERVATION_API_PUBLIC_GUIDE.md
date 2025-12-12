@@ -404,7 +404,7 @@ kubectl get observations -l zen.io/priority=high
 
 **KEP & Roadmap**:
 - `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md` - KEP pre-draft (design details)
-- `docs/PM_AI_ROADMAP.md` - Roadmap and priorities
+- `the project roadmap` - Roadmap and priorities
 
 **CRD Definition**:
 - `deployments/crds/observation_crd.yaml` - Complete CRD schema

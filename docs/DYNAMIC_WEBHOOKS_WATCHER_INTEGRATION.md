@@ -324,14 +324,14 @@ zen-hook lies **between zen-watcher and SaaS** in terms of quality bar:
 - `examples/observations/08-webhook-originated.yaml` - **Golden example** of webhook-originated Observation
 - `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md` - KEP pre-draft (references dynamic webhooks)
 - `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` - Versioning strategy and compatibility policy
-- `docs/PM_AI_ROADMAP.md` - Roadmap (mid-term backlog includes dynamic webhooks)
+- `the project roadmap` - Roadmap (mid-term backlog includes dynamic webhooks)
 - `docs/ARCHITECTURE.md` - Architecture (webhook adapter details)
 - `docs/SOURCE_ADAPTERS.md` - Source adapter extensibility guide
 
 **Historical Reference**:
-- `docs/archive/EXPERT_PACKAGE/docs/dynamic-webhooks-business-plan.md` - Business plan (historical)
-- `docs/archive/EXPERT_PACKAGE/docs/complete_dynamic_webhook_platform_architecture.md` - Architecture analysis (historical)
-- `docs/archive/EXPERT_PACKAGE/dynamic_webhook_consolidation_master_plan.md` - Consolidation plan (historical)
+- ` - Business plan (historical)
+- ` - Architecture analysis (historical)
+- ` - Consolidation plan (historical)
 
 **Code References**:
 - Webhook Adapter: `pkg/adapter/generic/webhook_adapter.go`

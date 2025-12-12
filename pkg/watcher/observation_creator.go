@@ -236,17 +236,7 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 	return err
 }
 
-// DEPRECATED: processFilterFirst and processDedupFirst are no longer used
-// Filter and dedup are now handled in Processor.ProcessEvent before CreateObservation is called.
-// These methods are kept for backward compatibility but should not be called.
-// They will be removed in a future version.
-
-// determineProcessingOrder is DEPRECATED and no longer used
-// Processing order is now determined in Processor.ProcessEvent before any processing steps.
-// This method is kept for backward compatibility but returns a no-op value.
 func (oc *ObservationCreator) determineProcessingOrder(source string) ProcessingOrder {
-	// No-op: order is determined upstream in Processor
-	// Return default to maintain backward compatibility
 	return ProcessingOrderFilterFirst
 }
 

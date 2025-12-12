@@ -32,7 +32,7 @@ import (
 // InformerAdapter handles ALL CRD-based sources via dynamic informers
 type InformerAdapter struct {
 	manager *informers.Manager
-	factory dynamicinformer.DynamicSharedInformerFactory // Deprecated: kept for backward compatibility
+	factory dynamicinformer.DynamicSharedInformerFactory
 	stopCh  chan struct{}
 	queue   workqueue.RateLimitingInterface // Internal queue for backpressure
 	workers int                             // Number of worker goroutines

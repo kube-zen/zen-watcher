@@ -93,13 +93,7 @@ func NewGVRs() *GVRs {
 }
 
 // NewInformerFactory creates a dynamic informer factory with default resync period
-// Deprecated: Use Clients.InformerManager instead
 func NewInformerFactory(dynClient dynamic.Interface) dynamicinformer.DynamicSharedInformerFactory {
-	logger.Warn("NewInformerFactory is deprecated, use Clients.InformerManager instead",
-		logger.Fields{
-			Component: "kubernetes",
-			Operation: "new_informer_factory",
-		})
 	// Resync period: 30 minutes (periodic full resync for deduplication)
 	// Note: New code should use InformerManager with per-GVR resync configuration
 	resyncPeriod := 30 * time.Minute

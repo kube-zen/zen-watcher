@@ -166,7 +166,7 @@ status:
   - **Status**: Implemented (non-breaking, backward-compatible)
   - **Reference**: `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md`
 - ⚠️ **Branded API Surface**: CRD group `zen.kube-zen.io` contains hard-coded branding
-  - **Status**: Managed tech debt (see `docs/BRANDING_DECOUPLING_AUDIT.md`)
+  - **Status**: Managed tech debt (see ``)
   - **Migration Plan**: Planned for v2 (neutral group migration, e.g., `observations.kubernetes.io`)
 
 **Future State (v1beta1)** - **Planned**:
@@ -182,7 +182,7 @@ status:
 - `adapter` field (which adapter processed this observation)
 - `expiresAt` field (explicit expiration timestamp)
 - **CRD Group Migration**: `zen.kube-zen.io` → neutral group (e.g., `observations.kubernetes.io` or `observations.watcher.io`)
-  - **Rationale**: Remove hard-coded branding from API surface for vendor-neutrality (see `docs/BRANDING_DECOUPLING_AUDIT.md`)
+  - **Rationale**: Remove hard-coded branding from API surface for vendor-neutrality (see ``)
   - **Migration**: New CRD group with conversion webhook or migration tooling
   - **Deprecation**: `zen.kube-zen.io` served alongside new group for 2+ release cycles
   - **Old → New Mapping**: `zen.kube-zen.io/v1` → `observations.kubernetes.io/v2` (or similar)
@@ -194,7 +194,7 @@ status:
 
 **Versioning Plan**: See `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` for detailed version progression (v1alpha2 → v1beta1 → v2) and compatibility policy.
 
-**Branding & Vendor Neutrality**: See `docs/BRANDING_DECOUPLING_AUDIT.md` for complete audit of branded elements and migration plans. Hard-coded branding in CRD group (`zen.kube-zen.io`) is treated as managed tech debt with explicit migration path in v2.
+**Branding & Vendor Neutrality**: See `` for complete audit of branded elements and migration plans. Hard-coded branding in CRD group (`zen.kube-zen.io`) is treated as managed tech debt with explicit migration path in v2.
 
 **See**: `docs/OBSERVATION_CRD_API_AUDIT.md` for detailed API analysis and future improvements
 
@@ -333,7 +333,7 @@ status:
 ### Related Documentation
 
 **Current (Canonical)**:
-- `docs/PM_AI_ROADMAP.md` - Roadmap and priorities
+- `the project roadmap` - Roadmap and priorities
 - `docs/ARCHITECTURE.md` - Complete architecture documentation
 - `docs/STRESS_TEST_RESULTS.md` - Performance baselines
 - `docs/INFORMERS_CONVERGENCE_NOTES.md` - Informer architecture evolution
@@ -342,8 +342,8 @@ status:
 - `CONTRIBUTING.md` - Quality bar and standards
 
 **Historical Reference**:
-- `docs/archive/EXPERT_PACKAGE/` - Expert analysis (late 2024/early 2025)
-- `docs/archive/EXPERT_PACKAGE/docs/KEP_STRESS_TESTING_COMPLETION_REPORT.md` - Stress testing analysis
+- ` - Expert analysis (late 2024/early 2025)
+- ` - Stress testing analysis
 
 ### Code References
 
@@ -374,4 +374,4 @@ status:
 
 ---
 
-**This is a pre-draft document. For current implementation status, see `docs/PM_AI_ROADMAP.md`.**
+**This is a pre-draft document. For current implementation status, see `the project roadmap`.**

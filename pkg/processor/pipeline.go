@@ -284,8 +284,7 @@ func (p *Processor) observationToEvent(observation *unstructured.Unstructured, r
 	return event
 }
 
-// normalize converts RawEvent to Event using normalization config (DEPRECATED - use normalizeObservation)
-// This method is kept for backward compatibility but should not be used in the main pipeline
+// normalize converts RawEvent to Event using normalization config
 func (p *Processor) normalize(raw *generic.RawEvent, config *generic.SourceConfig) *watcher.Event {
 	if config.Normalization == nil {
 		// Default normalization
@@ -417,9 +416,9 @@ func (p *Processor) shouldCreateWithStrategy(key dedup.DedupKey, content map[str
 
 	// Build strategy config from generic config
 	strategyConfig := dedup.StrategyConfig{
-		Strategy:          strategyName,
-		Window:            "",
-		Fields:            nil,
+		Strategy:           strategyName,
+		Window:             "",
+		Fields:             nil,
 		MaxEventsPerWindow: 0,
 	}
 	if config != nil && config.Dedup != nil {

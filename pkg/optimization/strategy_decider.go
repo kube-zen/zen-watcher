@@ -88,7 +88,7 @@ func NewStrategyDeciderWithConfig(config *OptimizationConfig) *StrategyDecider {
 	}
 }
 
-// NewStrategyDeciderWithThresholds creates a new StrategyDecider with custom thresholds (deprecated, use NewStrategyDeciderWithConfig)
+// NewStrategyDeciderWithThresholds creates a new StrategyDecider with custom thresholds
 func NewStrategyDeciderWithThresholds(
 	filterFirstThreshold, dedupFirstThreshold float64,
 	adaptiveThreshold int64,

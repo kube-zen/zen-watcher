@@ -107,8 +107,8 @@
 - **Versioning Plan**: `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md`
 - **KEP Draft**: `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md`
 - **API Audit**: `docs/OBSERVATION_CRD_API_AUDIT.md`
-- **Roadmap**: `docs/PM_AI_ROADMAP.md`
-- **OSS Release Checklist**: `docs/OSS_RELEASE_CHECKLIST_ZEN_WATCHER.md` - For OSS releases, see this checklist
+- **Roadmap**: `the project roadmap`
+- **OSS Release Checklist**: `` - For OSS releases, see this checklist
 
 ---
 

@@ -60,19 +60,19 @@ Code contributions that extend functionality without changing core CRDs or archi
 
 6. **Add Wiz integration example**
    - **Description**: Create example CRD configuration for Wiz security scanner in `examples/`
-   - **Design Doc**: `docs/PM_AI_ROADMAP.md` (Near-Term Backlog #4)
+   - **Design Doc**: `the project roadmap` (Near-Term Backlog #4)
    - **Blockers**: None (example only, no code changes)
    - **Difficulty**: Medium
 
 7. **Add Snyk integration example**
    - **Description**: Create example CRD configuration for Snyk security scanner in `examples/`
-   - **Design Doc**: `docs/PM_AI_ROADMAP.md` (Near-Term Backlog #4)
+   - **Design Doc**: `the project roadmap` (Near-Term Backlog #4)
    - **Blockers**: None (example only, no code changes)
    - **Difficulty**: Medium
 
 8. **Add Aqua integration example**
    - **Description**: Create example CRD configuration for Aqua security scanner in `examples/`
-   - **Design Doc**: `docs/PM_AI_ROADMAP.md` (Near-Term Backlog #4)
+   - **Design Doc**: `the project roadmap` (Near-Term Backlog #4)
    - **Blockers**: None (example only, no code changes)
    - **Difficulty**: Medium
 
@@ -94,19 +94,19 @@ Code contributions that extend functionality without changing core CRDs or archi
 
 11. **Improve error messages in CRD validation**
     - **Description**: Enhance validation error messages in `pkg/watcher/observation_creator.go` to be more actionable
-    - **Design Doc**: `docs/PM_AI_ROADMAP.md` (Near-Term Backlog #3)
+    - **Design Doc**: `the project roadmap` (Near-Term Backlog #3)
     - **Blockers**: None
     - **Difficulty**: Medium
 
 12. **Add regex support to filter rules**
     - **Description**: Extend `pkg/filter/rules.go` to support regex patterns in filter conditions
-    - **Design Doc**: `docs/PM_AI_ROADMAP.md` (Medium-Priority #7)
+    - **Design Doc**: `the project roadmap` (Medium-Priority #7)
     - **Blockers**: None
     - **Difficulty**: Medium
 
 13. **Implement time-based filter rules**
     - **Description**: Add time-based filtering (e.g., "only observations from last 24h") to `pkg/filter/rules.go`
-    - **Design Doc**: `docs/PM_AI_ROADMAP.md` (Medium-Priority #7)
+    - **Design Doc**: `the project roadmap` (Medium-Priority #7)
     - **Blockers**: None
     - **Difficulty**: Medium
 
@@ -134,13 +134,13 @@ Work that requires deep understanding of CRDs, informers, or KEP-driven architec
 
 16. **Optimize informer resync tuning**
     - **Description**: Analyze and optimize resync periods in `internal/informers/manager.go` based on metrics
-    - **Design Doc**: `docs/INFORMERS_CONVERGENCE_NOTES.md`, `docs/PM_AI_ROADMAP.md` (Medium-Priority #6)
+    - **Design Doc**: `docs/INFORMERS_CONVERGENCE_NOTES.md`, `the project roadmap` (Medium-Priority #6)
     - **Blockers**: Requires access to cluster with production-like load
     - **Difficulty**: High
 
 17. **Implement batch processing for high-volume sources**
     - **Description**: Add batch processing to `pkg/processor/pipeline.go` for sources with >1000 events/hour
-    - **Design Doc**: `docs/PM_AI_ROADMAP.md` (Medium-Priority #6)
+    - **Design Doc**: `the project roadmap` (Medium-Priority #6)
     - **Blockers**: Requires performance testing environment
     - **Difficulty**: High
 
@@ -148,13 +148,13 @@ Work that requires deep understanding of CRDs, informers, or KEP-driven architec
 
 18. **Design webhook registration CRD**
     - **Description**: Design CRD for dynamic webhook endpoint registration (for webhook gateway integration)
-    - **Design Doc**: `docs/PM_AI_ROADMAP.md` (Mid-Term Backlog - Dynamic Webhook Integration)
+    - **Design Doc**: `the project roadmap` (Mid-Term Backlog - Dynamic Webhook Integration)
     - **Blockers**: Requires coordination with maintainers, KEP alignment
     - **Difficulty**: High
 
 19. **Implement Observation export API for webhook gateways**
     - **Description**: Create API endpoint for webhook gateways to consume Observations
-    - **Design Doc**: `docs/PM_AI_ROADMAP.md` (Mid-Term Backlog - Dynamic Webhook Integration)
+    - **Design Doc**: `the project roadmap` (Mid-Term Backlog - Dynamic Webhook Integration)
     - **Blockers**: Requires coordination with maintainers
     - **Difficulty**: High
 
@@ -177,7 +177,7 @@ Work that requires deep understanding of CRDs, informers, or KEP-driven architec
 ## Task Sources
 
 All tasks are sourced from:
-- `docs/PM_AI_ROADMAP.md` - Near-term and mid-term backlog
+- `the project roadmap` - Near-term and mid-term backlog
 - `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` - Versioning and API evolution
 - `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md` - KEP-driven work
 
@@ -195,4 +195,4 @@ All tasks are sourced from:
 
 ---
 
-**Questions?** Open a GitHub Discussion or check `docs/PM_AI_ROADMAP.md` for current priorities.
+**Questions?** Open a GitHub Discussion or check `the project roadmap` for current priorities.

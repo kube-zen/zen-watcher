@@ -91,13 +91,7 @@ func (m *Manager) WaitForCacheSync(ctx context.Context) error {
 	return nil
 }
 
-// GetFactory returns the underlying factory (for backward compatibility during migration)
-// Deprecated: Use GetInformer instead
+// GetFactory returns the underlying factory
 func (m *Manager) GetFactory() dynamicinformer.DynamicSharedInformerFactory {
-	logger.Warn("GetFactory() is deprecated, use GetInformer() instead",
-		logger.Fields{
-			Component: "informers",
-			Operation: "get_factory",
-		})
 	return m.factory
 }

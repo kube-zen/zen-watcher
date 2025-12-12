@@ -47,7 +47,6 @@ kubectl get observations
 
 **See [DEPLOYMENT_HELM.md](docs/DEPLOYMENT_HELM.md) for complete installation guide.**
 
-> 📋 **For PM AIs and Maintainers**: See [docs/PM_AI_ROADMAP.md](docs/PM_AI_ROADMAP.md) for the canonical roadmap and priorities.  
 > 📝 **Release Notes**: See [docs/releases/](docs/releases/) for version history and [docs/RELEASE_NOTES_TEMPLATE.md](docs/RELEASE_NOTES_TEMPLATE.md) for release notes structure.
 
 ---

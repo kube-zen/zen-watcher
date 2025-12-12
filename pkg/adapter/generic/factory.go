@@ -26,14 +26,13 @@ import (
 // Factory creates generic adapters based on adapter type
 type Factory struct {
 	dynClient       dynamic.Interface
-	dynFactory      dynamicinformer.DynamicSharedInformerFactory // Deprecated: use informerManager
-	informerManager *informers.Manager                           // Preferred: use manager
+	dynFactory      dynamicinformer.DynamicSharedInformerFactory
+	informerManager *informers.Manager // Preferred: use manager
 	clientSet       kubernetes.Interface
 	webhookPorts    map[string]int // Track used ports
 }
 
 // NewFactory creates a new adapter factory
-// Deprecated: Use NewFactoryWithManager for new code
 func NewFactory(
 	dynClient dynamic.Interface,
 	dynFactory dynamicinformer.DynamicSharedInformerFactory,
