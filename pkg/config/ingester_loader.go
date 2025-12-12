@@ -1,13 +1,12 @@
 package config
 
 import (
-	"sync"
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/logger"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -57,8 +56,8 @@ type GVRConfig struct {
 
 // WebhookConfig holds webhook-specific configuration
 type WebhookConfig struct {
-	Path     string
-	Auth     *AuthConfig
+	Path      string
+	Auth      *AuthConfig
 	RateLimit *RateLimitConfig
 }
 
@@ -100,7 +99,7 @@ type FieldMapping struct {
 
 // FilterConfig holds filtering rules
 type FilterConfig struct {
-	Expression        string   // Filter expression (v1.1)
+	Expression        string // Filter expression (v1.1)
 	MinPriority       float64
 	IncludeNamespaces []string
 	ExcludeNamespaces []string
@@ -108,18 +107,18 @@ type FilterConfig struct {
 
 // DedupConfig holds deduplication configuration
 type DedupConfig struct {
-	Enabled           bool
-	Window            string
-	Strategy          string   // fingerprint, key, event-stream (strict-window renamed)
-	Fields            []string // For key-based strategy
-	MaxEventsPerWindow int     // For event-stream strategy
+	Enabled            bool
+	Window             string
+	Strategy           string   // fingerprint, key, event-stream (strict-window renamed)
+	Fields             []string // For key-based strategy
+	MaxEventsPerWindow int      // For event-stream strategy
 }
 
 // ProcessingConfig holds processing order and optimization settings
 type ProcessingConfig struct {
-	Order              string
-	AutoOptimize       bool
-	AnalysisInterval   string
+	Order               string
+	AutoOptimize        bool
+	AnalysisInterval    string
 	ConfidenceThreshold float64
 }
 
@@ -150,11 +149,11 @@ type ThresholdRange struct {
 
 // CustomThreshold holds custom threshold configuration
 type CustomThreshold struct {
-	Name      string
-	Field     string
-	Operator  string
-	Value     string
-	Message   string
+	Name     string
+	Field    string
+	Operator string
+	Value    string
+	Message  string
 }
 
 // ProcessingThreshold holds per-metric threshold configuration
@@ -165,13 +164,12 @@ type ProcessingThreshold struct {
 	Description string
 }
 
-
 // IngesterStore maintains a cached view of Ingester configurations
 type IngesterStore struct {
 	mu          sync.RWMutex
 	byName      map[types.NamespacedName]*IngesterConfig // namespace/name -> config
 	bySource    map[string]*IngesterConfig               // source -> config (assumes unique source)
-	byType      map[string][]*IngesterConfig               // ingester type -> configs
+	byType      map[string][]*IngesterConfig             // ingester type -> configs
 	byNamespace map[string]map[string]*IngesterConfig    // namespace -> name -> config
 }
 
@@ -224,14 +222,14 @@ func (s *IngesterStore) ListByType(ingesterType string) []*IngesterConfig {
 func (s *IngesterStore) AddOrUpdate(config *IngesterConfig) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	nn := types.NamespacedName{Namespace: config.Namespace, Name: config.Name}
 	s.byName[nn] = config
-	
+
 	if config.Source != "" {
 		s.bySource[config.Source] = config
 	}
-	
+
 	// Update byType index
 	if config.Ingester != "" {
 		// Remove from old type if it exists
@@ -246,7 +244,7 @@ func (s *IngesterStore) AddOrUpdate(config *IngesterConfig) {
 		// Add to new type
 		s.byType[config.Ingester] = append(s.byType[config.Ingester], config)
 	}
-	
+
 	// Update byNamespace index
 	if s.byNamespace[config.Namespace] == nil {
 		s.byNamespace[config.Namespace] = make(map[string]*IngesterConfig)
@@ -258,19 +256,19 @@ func (s *IngesterStore) AddOrUpdate(config *IngesterConfig) {
 func (s *IngesterStore) Delete(namespace, name string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	
+
 	nn := types.NamespacedName{Namespace: namespace, Name: name}
 	config, exists := s.byName[nn]
 	if !exists {
 		return
 	}
-	
+
 	delete(s.byName, nn)
-	
+
 	if config.Source != "" {
 		delete(s.bySource, config.Source)
 	}
-	
+
 	// Remove from byType index
 	if config.Ingester != "" {
 		configs := s.byType[config.Ingester]
@@ -281,7 +279,7 @@ func (s *IngesterStore) Delete(namespace, name string) {
 			}
 		}
 	}
-	
+
 	// Remove from byNamespace index
 	if nsMap := s.byNamespace[namespace]; nsMap != nil {
 		delete(nsMap, name)
@@ -293,17 +291,17 @@ func (s *IngesterStore) Delete(namespace, name string) {
 
 // IngesterInformer manages watching Ingester CRDs and updating the store
 type IngesterInformer struct {
-	store      *IngesterStore
-	dynClient  dynamic.Interface
-	factory    dynamicinformer.DynamicSharedInformerFactory
-	informer   cache.SharedInformer
-	stopper    chan struct{}
+	store     *IngesterStore
+	dynClient dynamic.Interface
+	factory   dynamicinformer.DynamicSharedInformerFactory
+	informer  cache.SharedInformer
+	stopper   chan struct{}
 }
 
 // NewIngesterInformer creates a new IngesterInformer
 func NewIngesterInformer(store *IngesterStore, dynClient dynamic.Interface) *IngesterInformer {
 	factory := dynamicinformer.NewDynamicSharedInformerFactory(dynClient, 10*time.Minute)
-	
+
 	return &IngesterInformer{
 		store:     store,
 		dynClient: dynClient,
@@ -316,30 +314,30 @@ func NewIngesterInformer(store *IngesterStore, dynClient dynamic.Interface) *Ing
 func (ii *IngesterInformer) Start(ctx context.Context) error {
 	// Get informer for Ingester CRDs
 	ii.informer = ii.factory.ForResource(IngesterGVR).Informer()
-	
+
 	// Set up event handlers
 	handlers := cache.ResourceEventHandlerFuncs{
 		AddFunc:    ii.onAdd,
 		UpdateFunc: ii.onUpdate,
 		DeleteFunc: ii.onDelete,
 	}
-	
+
 	ii.informer.AddEventHandler(handlers)
-	
+
 	// Start the informer factory
 	ii.factory.Start(ctx.Done())
-	
+
 	// Wait for cache sync
 	if !cache.WaitForCacheSync(ctx.Done(), ii.informer.HasSynced) {
 		return fmt.Errorf("failed to sync Ingester informer cache")
 	}
-	
+
 	logger.Info("Ingester informer started and synced",
 		logger.Fields{
-			Component:  "config",
-			Operation:  "ingester_informer_synced",
+			Component: "config",
+			Operation: "ingester_informer_synced",
 		})
-	
+
 	return nil
 }
 
@@ -359,18 +357,18 @@ func (ii *IngesterInformer) onAdd(obj interface{}) {
 			})
 		return
 	}
-	
+
 	config := ii.convertToIngesterConfig(u)
 	if config != nil {
 		ii.store.AddOrUpdate(config)
 		logger.Debug("Added Ingester config",
 			logger.Fields{
-				Component:  "config",
-				Operation:  "ingester_added",
-				Namespace:  config.Namespace,
-				Name:       config.Name,
-				Source:     config.Source,
-				Ingester:   config.Ingester,
+				Component: "config",
+				Operation: "ingester_added",
+				Namespace: config.Namespace,
+				Name:      config.Name,
+				Source:    config.Source,
+				Ingester:  config.Ingester,
 			})
 	}
 }
@@ -386,17 +384,17 @@ func (ii *IngesterInformer) onUpdate(oldObj, newObj interface{}) {
 			})
 		return
 	}
-	
+
 	config := ii.convertToIngesterConfig(u)
 	if config != nil {
 		ii.store.AddOrUpdate(config)
 		logger.Debug("Updated Ingester config",
 			logger.Fields{
-				Component:  "config",
-				Operation:  "ingester_updated",
-				Namespace:  config.Namespace,
-				Name:       config.Name,
-				Source:     config.Source,
+				Component: "config",
+				Operation: "ingester_updated",
+				Namespace: config.Namespace,
+				Name:      config.Name,
+				Source:    config.Source,
 			})
 	}
 }
@@ -418,11 +416,11 @@ func (ii *IngesterInformer) onDelete(obj interface{}) {
 			return
 		}
 	}
-	
+
 	namespace := u.GetNamespace()
 	name := u.GetName()
 	ii.store.Delete(namespace, name)
-	
+
 	logger.Debug("Deleted Ingester config",
 		logger.Fields{
 			Component: "config",
@@ -445,22 +443,56 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 			})
 		return nil
 	}
-	
+
 	config := &IngesterConfig{
 		Namespace: u.GetNamespace(),
 		Name:      u.GetName(),
 	}
-	
-	// Extract source
-	if source, ok := spec["source"].(string); ok {
-		config.Source = source
+
+	// Extract source (required field)
+	source, sourceOk := spec["source"].(string)
+	if !sourceOk || source == "" {
+		logger.Warn("Ingester CRD missing required field: source",
+			logger.Fields{
+				Component: "config",
+				Operation: "ingester_convert",
+				Namespace: u.GetNamespace(),
+				Name:      u.GetName(),
+			})
+		return nil
 	}
-	
-	// Extract ingester type
-	if ingester, ok := spec["ingester"].(string); ok {
-		config.Ingester = ingester
+	config.Source = source
+
+	// Extract ingester type (required field)
+	ingester, ingesterOk := spec["ingester"].(string)
+	if !ingesterOk || ingester == "" {
+		logger.Warn("Ingester CRD missing required field: ingester",
+			logger.Fields{
+				Component: "config",
+				Operation: "ingester_convert",
+				Namespace: u.GetNamespace(),
+				Name:      u.GetName(),
+				Source:    source,
+			})
+		return nil
 	}
-	
+	config.Ingester = ingester
+
+	// Validate destinations (required field)
+	destinations, destinationsOk := spec["destinations"].([]interface{})
+	if !destinationsOk || len(destinations) == 0 {
+		logger.Warn("Ingester CRD missing required field: destinations",
+			logger.Fields{
+				Component: "config",
+				Operation: "ingester_convert",
+				Namespace: u.GetNamespace(),
+				Name:      u.GetName(),
+				Source:    source,
+				Ingester:  ingester,
+			})
+		return nil
+	}
+
 	// Extract informer config
 	if informer, ok := spec["informer"].(map[string]interface{}); ok {
 		config.Informer = &InformerConfig{}
@@ -475,7 +507,7 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 		config.Informer.LabelSelector = getString(informer, "labelSelector")
 		config.Informer.ResyncPeriod = getString(informer, "resyncPeriod")
 	}
-	
+
 	// Extract webhook config
 	if webhook, ok := spec["webhook"].(map[string]interface{}); ok {
 		config.Webhook = &WebhookConfig{
@@ -495,7 +527,7 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 			}
 		}
 	}
-	
+
 	// Extract normalization config
 	if norm, ok := spec["normalization"].(map[string]interface{}); ok {
 		config.Normalization = &NormalizationConfig{
@@ -522,12 +554,12 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 			}
 		}
 	}
-	
+
 	// Extract dedup config - support both canonical spec.processing.dedup (v1.1+) and legacy spec.deduplication
 	// Priority: spec.processing.dedup > spec.deduplication (legacy)
 	var dedupConfig *DedupConfig
 	var filterConfig *FilterConfig
-	
+
 	// First, try spec.processing (canonical v1.1+ location)
 	if processing, ok := spec["processing"].(map[string]interface{}); ok {
 		// Extract processing-level config (order, optimization settings)
@@ -539,7 +571,7 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 		if threshold, ok := processing["confidenceThreshold"].(float64); ok {
 			config.Processing.ConfidenceThreshold = threshold
 		}
-		
+
 		// Extract filter from processing.filter (canonical location)
 		if filter, ok := processing["filter"].(map[string]interface{}); ok {
 			filterConfig = &FilterConfig{}
@@ -566,7 +598,7 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 				}
 			}
 		}
-		
+
 		// Extract dedup from processing.dedup (canonical location)
 		if dedup, ok := processing["dedup"].(map[string]interface{}); ok {
 			dedupConfig = &DedupConfig{
@@ -592,7 +624,7 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 			}
 		}
 	}
-	
+
 	// Fallback to legacy spec.deduplication if processing.dedup not found
 	if dedupConfig == nil {
 		if dedup, ok := spec["deduplication"].(map[string]interface{}); ok {
@@ -617,7 +649,7 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 			// Legacy deduplication doesn't have maxEventsPerWindow
 		}
 	}
-	
+
 	// Also support legacy spec.dedup (for backward compatibility with ObservationSourceConfig)
 	if dedupConfig == nil {
 		if dedup, ok := spec["dedup"].(map[string]interface{}); ok {
@@ -641,7 +673,7 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 			}
 		}
 	}
-	
+
 	// Fallback to legacy spec.filters if processing.filter not found
 	if filterConfig == nil {
 		if filter, ok := spec["filters"].(map[string]interface{}); ok {
@@ -670,17 +702,17 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 			}
 		}
 	}
-	
+
 	// Set filter config if found
 	if filterConfig != nil {
 		config.Filter = filterConfig
 	}
-	
+
 	// Set dedup config if found
 	if dedupConfig != nil {
 		config.Dedup = dedupConfig
 	}
-	
+
 	// Extract optimization config (canonical)
 	if optimization, ok := spec["optimization"].(map[string]interface{}); ok {
 		config.Optimization = &OptimizationConfig{
@@ -691,15 +723,15 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 			ConfidenceThreshold: 0.7, // default
 			Processing:          make(map[string]*ProcessingThreshold),
 		}
-		
+
 		if threshold, ok := optimization["confidenceThreshold"].(float64); ok {
 			config.Optimization.ConfidenceThreshold = threshold
 		}
-		
+
 		// Extract thresholds
 		if thresholds, ok := optimization["thresholds"].(map[string]interface{}); ok {
 			config.Optimization.Thresholds = &OptimizationThresholds{}
-			
+
 			if dedupEff, ok := thresholds["dedupEffectiveness"].(map[string]interface{}); ok {
 				config.Optimization.Thresholds.DedupEffectiveness = &ThresholdRange{}
 				if w, ok := dedupEff["warning"].(float64); ok {
@@ -709,7 +741,7 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 					config.Optimization.Thresholds.DedupEffectiveness.Critical = c
 				}
 			}
-			
+
 			if lowSev, ok := thresholds["lowSeverityPercent"].(map[string]interface{}); ok {
 				config.Optimization.Thresholds.LowSeverityPercent = &ThresholdRange{}
 				if w, ok := lowSev["warning"].(float64); ok {
@@ -719,7 +751,7 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 					config.Optimization.Thresholds.LowSeverityPercent.Critical = c
 				}
 			}
-			
+
 			if obsPerMin, ok := thresholds["observationsPerMinute"].(map[string]interface{}); ok {
 				config.Optimization.Thresholds.ObservationsPerMinute = &ThresholdRange{}
 				if w, ok := obsPerMin["warning"].(float64); ok {
@@ -729,7 +761,7 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 					config.Optimization.Thresholds.ObservationsPerMinute.Critical = c
 				}
 			}
-			
+
 			if custom, ok := thresholds["custom"].([]interface{}); ok {
 				for _, c := range custom {
 					if cMap, ok := c.(map[string]interface{}); ok {
@@ -745,7 +777,7 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 				}
 			}
 		}
-		
+
 		// Extract processing thresholds
 		if processing, ok := optimization["processing"].(map[string]interface{}); ok {
 			for key, val := range processing {
@@ -765,7 +797,7 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 			}
 		}
 	}
-	
+
 	return config
 }
 
