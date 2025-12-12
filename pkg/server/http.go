@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/pprof"
 	"os"
 	"strconv"
 	"sync"
@@ -117,6 +118,13 @@ func parseEnvInt(s string) (int, error) {
 	return strconv.Atoi(s)
 }
 
+// isPprofEnabled checks if pprof endpoints should be enabled
+// Controlled by ENABLE_PPROF environment variable (default: false for security)
+func (s *Server) isPprofEnabled() bool {
+	enablePprof := os.Getenv("ENABLE_PPROF")
+	return enablePprof == "true" || enablePprof == "1"
+}
+
 // registerHandlers registers all HTTP handlers
 func (s *Server) registerHandlers(mux *http.ServeMux) {
 	// Health check endpoint
@@ -142,6 +150,22 @@ func (s *Server) registerHandlers(mux *http.ServeMux) {
 
 	// Prometheus metrics endpoint
 	mux.Handle("/metrics", promhttp.Handler())
+
+	// pprof endpoints (for performance profiling)
+	// Security: Consider restricting /debug/pprof access via NetworkPolicy or authentication in production
+	if s.isPprofEnabled() {
+		mux.HandleFunc("/debug/pprof/", pprof.Index)
+		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		// Additional pprof endpoints
+		mux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
+		mux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+		mux.Handle("/debug/pprof/allocs", pprof.Handler("allocs"))
+		mux.Handle("/debug/pprof/block", pprof.Handler("block"))
+		mux.Handle("/debug/pprof/mutex", pprof.Handler("mutex"))
+	}
 
 	// HA-aware endpoints (only if HA is enabled)
 	if s.haConfig != nil && s.haConfig.IsHAEnabled() {
@@ -383,19 +407,30 @@ func (s *Server) Start(ctx context.Context, wg *sync.WaitGroup) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		endpoints := []string{
+			"/health",
+			"/ready",
+			"/metrics",
+			"/falco/webhook",
+			"/audit/webhook",
+		}
+		if s.isPprofEnabled() {
+			endpoints = append(endpoints,
+				"/debug/pprof/",
+				"/debug/pprof/profile",
+				"/debug/pprof/heap",
+				"/debug/pprof/allocs",
+			)
+		}
+
 		logger.Info("HTTP server starting",
 			logger.Fields{
 				Component: "server",
 				Operation: "http_start",
 				Additional: map[string]interface{}{
-					"address": s.server.Addr,
-					"endpoints": []string{
-						"/health",
-						"/ready",
-						"/metrics",
-						"/falco/webhook",
-						"/audit/webhook",
-					},
+					"address":   s.server.Addr,
+					"endpoints": endpoints,
+					"pprof":     s.isPprofEnabled(),
 				},
 			})
 

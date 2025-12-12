@@ -232,14 +232,15 @@ kubectl get observations --chunk-size=500
 
 **Collect CPU Profile:**
 ```bash
-# Port-forward metrics endpoint
-kubectl port-forward -n zen-system deployment/zen-watcher 9090:9090
+# First, enable pprof by setting ENABLE_PPROF=true in the deployment
+# Then port-forward the HTTP endpoint
+kubectl port-forward -n zen-system deployment/zen-watcher 8080:8080
 
 # Collect 30-second CPU profile
-go tool pprof http://localhost:9090/debug/pprof/profile?seconds=30
+go tool pprof http://localhost:8080/debug/pprof/profile?seconds=30
 
 # Or using curl
-curl http://localhost:9090/debug/pprof/profile?seconds=30 > cpu.prof
+curl http://localhost:8080/debug/pprof/profile?seconds=30 > cpu.prof
 go tool pprof cpu.prof
 ```
 
@@ -258,12 +259,16 @@ Showing nodes accounting for 80% of total CPU time
 
 **Collect Memory Profile:**
 ```bash
+# First, enable pprof by setting ENABLE_PPROF=true in the deployment
+# Then port-forward the HTTP endpoint
+kubectl port-forward -n zen-system deployment/zen-watcher 8080:8080
+
 # Get heap snapshot
-curl http://localhost:9090/debug/pprof/heap > heap.prof
+curl http://localhost:8080/debug/pprof/heap > heap.prof
 go tool pprof heap.prof
 
 # Get allocation profile
-curl http://localhost:9090/debug/pprof/allocs > allocs.prof
+curl http://localhost:8080/debug/pprof/allocs > allocs.prof
 go tool pprof allocs.prof
 ```
 
@@ -279,7 +284,8 @@ Showing nodes accounting for 85% of allocated memory
 
 ### Enable Profiling in Production
 
-Add to deployment:
+pprof endpoints are disabled by default for security. To enable them, set the `ENABLE_PPROF` environment variable:
+
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -290,16 +296,25 @@ spec:
     spec:
       containers:
       - name: zen-watcher
+        env:
+        - name: ENABLE_PPROF
+          value: "true"
         ports:
-        - containerPort: 9090
-          name: metrics
-        # pprof endpoints available on same port
+        - containerPort: 8080
+          name: http
+        # pprof endpoints available on same port when ENABLE_PPROF=true
         # /debug/pprof/profile - CPU profile
         # /debug/pprof/heap - Memory profile
         # /debug/pprof/allocs - Allocation profile
+        # /debug/pprof/goroutine - Goroutine profile
+        # /debug/pprof/block - Block profile
+        # /debug/pprof/mutex - Mutex profile
 ```
 
-**Security Note**: Consider restricting `/debug/pprof` access via NetworkPolicy or authentication in production.
+**Security Note**: 
+- pprof endpoints are **disabled by default** (set `ENABLE_PPROF=true` to enable)
+- Consider restricting `/debug/pprof` access via NetworkPolicy or authentication in production
+- For production profiling, use a separate port or restrict access via NetworkPolicy
 
 ---
 
