@@ -606,6 +606,29 @@ This generates:
 
 ## How to Run Tests Locally
 
+### End-to-End Testing with zen-demo
+
+For local end-to-end testing, use the zen-demo k3d cluster:
+
+```bash
+# Create zen-demo cluster
+make zen-demo-up
+
+# Build and load watcher image
+make zen-demo-build-push
+
+# Deploy watcher to zen-demo
+make zen-demo-deploy-watcher
+
+# Run e2e validation tests
+make zen-demo-validate
+
+# Cleanup
+make zen-demo-down
+```
+
+See `make zen-demo-up`, `make zen-demo-validate`, and `make zen-demo-down` for details.
+
 ### Prerequisites
 - Go 1.23+ (tested on 1.23 and 1.24)
 - Make (optional, but recommended)
