@@ -49,7 +49,7 @@ func NewSmartProcessor() *SmartProcessor {
 }
 
 // GetOrCreateAdaptiveFilter gets or creates an adaptive filter for a source
-func (sp *SmartProcessor) GetOrCreateAdaptiveFilter(source string, filterConfig config.FilterConfig) *AdaptiveFilter {
+func (sp *SmartProcessor) GetOrCreateAdaptiveFilter(source string, filterConfig config.FilterConfigAdvanced) *AdaptiveFilter {
 	sp.mu.RLock()
 	if filter, exists := sp.adaptiveFilters[source]; exists {
 		sp.mu.RUnlock()

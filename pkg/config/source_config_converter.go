@@ -45,8 +45,9 @@ func ConvertToGenericSourceConfig(u *unstructured.Unstructured) (*generic.Source
 		config.Webhook = parseWebhookConfig(spec)
 	case "logs":
 		config.Logs = parseLogsConfig(spec)
-	case "cm", "configmap": // Support both "cm" (new) and "configmap" (legacy) for backward compatibility
-		config.ConfigMap = parseConfigMapConfig(spec)
+	case "cm", "configmap": // ConfigMap adapter is not supported, use Informer adapter instead
+		// ConfigMap adapter is not supported - return error
+		return nil, fmt.Errorf("ConfigMap adapter is not supported. Use Informer adapter with GVR { group: \"\", version: \"v1\", resource: \"configmaps\" } instead")
 	case "k8s-events":
 		// k8s-events uses the native Kubernetes Events API, no additional config needed
 		// This is handled by the K8sEventsAdapter which is created separately
@@ -76,14 +77,14 @@ func parseInformerConfig(spec map[string]interface{}) *generic.InformerConfig {
 	gvrSpec, _ := informerSpec["gvr"].(map[string]interface{})
 	config := &generic.InformerConfig{
 		GVR: generic.GVRConfig{
-			Group:    getString(gvrSpec, "group"),
-			Version:  getString(gvrSpec, "version"),
-			Resource: getString(gvrSpec, "resource"),
+			Group:    getStringValue(gvrSpec, "group"),
+			Version:  getStringValue(gvrSpec, "version"),
+			Resource: getStringValue(gvrSpec, "resource"),
 		},
-		Namespace:     getString(informerSpec, "namespace"),
-		LabelSelector: getString(informerSpec, "labelSelector"),
-		FieldSelector: getString(informerSpec, "fieldSelector"),
-		ResyncPeriod:  getString(informerSpec, "resyncPeriod"),
+		Namespace:     getStringValue(informerSpec, "namespace"),
+		LabelSelector: getStringValue(informerSpec, "labelSelector"),
+		FieldSelector: getStringValue(informerSpec, "fieldSelector"),
+		ResyncPeriod:  getStringValue(informerSpec, "resyncPeriod"),
 	}
 
 	if config.ResyncPeriod == "" {
@@ -100,7 +101,7 @@ func parseWebhookConfig(spec map[string]interface{}) *generic.WebhookConfig {
 	}
 
 	config := &generic.WebhookConfig{
-		Path:       getString(webhookSpec, "path"),
+		Path:       getStringValue(webhookSpec, "path"),
 		Port:       getInt(webhookSpec, "port"),
 		BufferSize: getInt(webhookSpec, "bufferSize"),
 	}
@@ -112,8 +113,8 @@ func parseWebhookConfig(spec map[string]interface{}) *generic.WebhookConfig {
 	authSpec, ok := webhookSpec["auth"].(map[string]interface{})
 	if ok {
 		config.Auth = &generic.AuthConfig{
-			Type:       getString(authSpec, "type"),
-			SecretName: getString(authSpec, "secretName"),
+			Type:       getStringValue(authSpec, "type"),
+			SecretName: getStringValue(authSpec, "secretName"),
 		}
 		if config.Auth.Type == "" {
 			config.Auth.Type = "none"
@@ -130,10 +131,10 @@ func parseLogsConfig(spec map[string]interface{}) *generic.LogsConfig {
 	}
 
 	config := &generic.LogsConfig{
-		PodSelector:  getString(logsSpec, "podSelector"),
-		Container:    getString(logsSpec, "container"),
+		PodSelector:  getStringValue(logsSpec, "podSelector"),
+		Container:    getStringValue(logsSpec, "container"),
 		SinceSeconds: getInt(logsSpec, "sinceSeconds"),
-		PollInterval: getString(logsSpec, "pollInterval"),
+		PollInterval: getStringValue(logsSpec, "pollInterval"),
 	}
 
 	if config.SinceSeconds == 0 {
@@ -152,8 +153,8 @@ func parseLogsConfig(spec map[string]interface{}) *generic.LogsConfig {
 				continue
 			}
 			pattern := generic.LogPattern{
-				Regex:    getString(patternMap, "regex"),
-				Type:     getString(patternMap, "type"),
+				Regex:    getStringValue(patternMap, "regex"),
+				Type:     getStringValue(patternMap, "type"),
 				Priority: getFloat(patternMap, "priority"),
 			}
 			config.Patterns = append(config.Patterns, pattern)
@@ -170,10 +171,10 @@ func parseConfigMapConfig(spec map[string]interface{}) *generic.ConfigMapConfig 
 	}
 
 	config := &generic.ConfigMapConfig{
-		Namespace:     getString(cmSpec, "namespace"),
-		LabelSelector: getString(cmSpec, "labelSelector"),
-		PollInterval:  getString(cmSpec, "pollInterval"),
-		JSONPath:      getString(cmSpec, "jsonPath"),
+		Namespace:     getStringValue(cmSpec, "namespace"),
+		LabelSelector: getStringValue(cmSpec, "labelSelector"),
+		PollInterval:  getStringValue(cmSpec, "pollInterval"),
+		JSONPath:      getStringValue(cmSpec, "jsonPath"),
 	}
 
 	if config.PollInterval == "" {
@@ -190,8 +191,8 @@ func parseNormalizationConfig(spec map[string]interface{}) *generic.Normalizatio
 	}
 
 	config := &generic.NormalizationConfig{
-		Domain: getString(normSpec, "domain"),
-		Type:   getString(normSpec, "type"),
+		Domain: getStringValue(normSpec, "domain"),
+		Type:   getStringValue(normSpec, "type"),
 	}
 
 	priorityMap, ok := normSpec["priority"].(map[string]interface{})
@@ -213,8 +214,8 @@ func parseNormalizationConfig(spec map[string]interface{}) *generic.Normalizatio
 				continue
 			}
 			config.FieldMapping = append(config.FieldMapping, generic.FieldMapping{
-				From: getString(fmMap, "from"),
-				To:   getString(fmMap, "to"),
+				From: getStringValue(fmMap, "from"),
+				To:   getStringValue(fmMap, "to"),
 			})
 		}
 	}
@@ -247,11 +248,11 @@ func parseThresholdsConfig(spec map[string]interface{}) *generic.ThresholdsConfi
 				continue
 			}
 			config.Custom = append(config.Custom, generic.CustomThreshold{
-				Name:     getString(cMap, "name"),
-				Field:    getString(cMap, "field"),
-				Operator: getString(cMap, "operator"),
+				Name:     getStringValue(cMap, "name"),
+				Field:    getStringValue(cMap, "field"),
+				Operator: getStringValue(cMap, "operator"),
 				Value:    cMap["value"],
-				Message:  getString(cMap, "message"),
+				Message:  getStringValue(cMap, "message"),
 			})
 		}
 	}
@@ -278,7 +279,7 @@ func parseRateLimitConfig(spec map[string]interface{}) *generic.RateLimitConfig 
 }
 
 // Helper functions
-func getString(m map[string]interface{}, key string) string {
+func getStringValue(m map[string]interface{}, key string) string {
 	if val, ok := m[key]; ok {
 		if str, ok := val.(string); ok {
 			return str

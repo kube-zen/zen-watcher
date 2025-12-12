@@ -49,8 +49,9 @@ type ThresholdConfig struct {
 	Description string
 }
 
-// ProcessingConfig represents processing optimization configuration
-type ProcessingConfig struct {
+// ProcessingConfigAdvanced represents processing optimization configuration
+// (renamed to avoid conflict with ProcessingConfig in ingester_loader.go)
+type ProcessingConfigAdvanced struct {
 	Order               string                      // auto, filter_first, dedup_first
 	AutoOptimize        bool                        // Enable auto-optimization
 	Thresholds          map[string]*ThresholdConfig // Per-metric thresholds
@@ -58,8 +59,9 @@ type ProcessingConfig struct {
 	ConfidenceThreshold float64                     // Minimum confidence for auto-optimization (0.0-1.0)
 }
 
-// FilterConfig represents advanced filtering configuration
-type FilterConfig struct {
+// FilterConfigAdvanced represents advanced filtering configuration
+// (renamed to avoid conflict with FilterConfig in ingester_loader.go)
+type FilterConfigAdvanced struct {
 	MinPriority       float64
 	ExcludeNamespaces []string
 	IncludeTypes      []string
@@ -120,8 +122,8 @@ type SourceConfig struct {
 	AutoOptimize            bool
 
 	// Enhanced optimization configuration (backward compatible - flat fields remain)
-	Processing    ProcessingConfig
-	Filter        FilterConfig
+	Processing    ProcessingConfigAdvanced
+	Filter        FilterConfigAdvanced
 	Deduplication DeduplicationConfig
 	RateLimit     RateLimitConfigAdvanced
 }

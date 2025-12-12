@@ -53,7 +53,7 @@ type AdaptiveFilter struct {
 }
 
 // NewAdaptiveFilter creates a new AdaptiveFilter
-func NewAdaptiveFilter(source string, filterConfig config.FilterConfig) *AdaptiveFilter {
+func NewAdaptiveFilter(source string, filterConfig config.FilterConfigAdvanced) *AdaptiveFilter {
 	return &AdaptiveFilter{
 		source:          source,
 		rules:           filterConfig.DynamicRules,
@@ -126,7 +126,7 @@ func (f *AdaptiveFilter) GetMetrics() *FilterMetrics {
 }
 
 // UpdateConfig updates the filter configuration
-func (f *AdaptiveFilter) UpdateConfig(filterConfig config.FilterConfig) error {
+func (f *AdaptiveFilter) UpdateConfig(filterConfig config.FilterConfigAdvanced) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 

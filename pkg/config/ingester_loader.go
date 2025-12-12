@@ -367,9 +367,11 @@ func (ii *IngesterInformer) onAdd(obj interface{}) {
 				Component: "config",
 				Operation: "ingester_added",
 				Namespace: config.Namespace,
-				Name:      config.Name,
-				Source:    config.Source,
-				Ingester:  config.Ingester,
+				Additional: map[string]interface{}{
+					"name":     config.Name,
+					"source":   config.Source,
+					"ingester": config.Ingester,
+				},
 			})
 	}
 }
@@ -394,7 +396,11 @@ func (ii *IngesterInformer) onUpdate(oldObj, newObj interface{}) {
 				Component: "config",
 				Operation: "ingester_updated",
 				Namespace: config.Namespace,
-				Name:      config.Name,
+				Additional: map[string]interface{}{
+					"name":     config.Name,
+					"source":   config.Source,
+					"ingester": config.Ingester,
+				},
 				Source:    config.Source,
 			})
 	}
@@ -427,7 +433,9 @@ func (ii *IngesterInformer) onDelete(obj interface{}) {
 			Component: "config",
 			Operation: "ingester_deleted",
 			Namespace: namespace,
-			Name:      name,
+			Additional: map[string]interface{}{
+				"name": name,
+			},
 		})
 }
 
@@ -440,7 +448,9 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 				Component: "config",
 				Operation: "ingester_convert",
 				Namespace: u.GetNamespace(),
-				Name:      u.GetName(),
+				Additional: map[string]interface{}{
+					"name": u.GetName(),
+				},
 			})
 		return nil
 	}
@@ -458,7 +468,9 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 				Component: "config",
 				Operation: "ingester_convert",
 				Namespace: u.GetNamespace(),
-				Name:      u.GetName(),
+				Additional: map[string]interface{}{
+					"name": u.GetName(),
+				},
 			})
 		return nil
 	}
@@ -472,8 +484,10 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 				Component: "config",
 				Operation: "ingester_convert",
 				Namespace: u.GetNamespace(),
-				Name:      u.GetName(),
 				Source:    source,
+				Additional: map[string]interface{}{
+					"name": u.GetName(),
+				},
 			})
 		return nil
 	}
@@ -487,9 +501,11 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 				Component: "config",
 				Operation: "ingester_convert",
 				Namespace: u.GetNamespace(),
-				Name:      u.GetName(),
 				Source:    source,
-				Ingester:  ingester,
+				Additional: map[string]interface{}{
+					"name":     u.GetName(),
+					"ingester": ingester,
+				},
 			})
 		return nil
 	}
