@@ -302,13 +302,23 @@ check-branding:
 ## zen-demo-up: Create zen-demo k3d cluster for e2e validation
 zen-demo-up:
 	@echo "$(GREEN)Creating zen-demo k3d cluster...$(NC)"
-	@./scripts/cluster/create.sh k3d zen-demo
+	@echo "$(YELLOW)Using canonical script: scripts/cluster/create.sh$(NC)"
+	@if ! ./scripts/cluster/create.sh k3d zen-demo; then \
+		echo "$(RED)❌ Cluster creation failed$(NC)"; \
+		echo "$(YELLOW)To retry manually: ./scripts/cluster/create.sh k3d zen-demo$(NC)"; \
+		exit 1; \
+	fi
 	@echo "$(GREEN)✅ zen-demo cluster ready$(NC)"
 
 ## zen-demo-down: Delete zen-demo k3d cluster
 zen-demo-down:
 	@echo "$(GREEN)Deleting zen-demo k3d cluster...$(NC)"
-	@./scripts/cluster/destroy.sh k3d
+	@echo "$(YELLOW)Using canonical script: scripts/cluster/destroy.sh$(NC)"
+	@if ! ./scripts/cluster/destroy.sh k3d; then \
+		echo "$(RED)❌ Cluster deletion failed$(NC)"; \
+		echo "$(YELLOW)To retry manually: ./scripts/cluster/destroy.sh k3d$(NC)"; \
+		exit 1; \
+	fi
 	@echo "$(GREEN)✅ zen-demo cluster deleted$(NC)"
 
 ## zen-demo-build-push: Build and push watcher image for zen-demo
@@ -349,11 +359,14 @@ zen-demo-validate:
 	@echo "$(GREEN)Running e2e validation on zen-demo...$(NC)"
 	@if [ ! -f "$(HOME)/.config/k3d/kubeconfig-zen-demo.yaml" ]; then \
 		echo "$(RED)❌ zen-demo cluster not found$(NC)"; \
-		echo "   Run: make zen-demo-up"; \
+		echo "$(YELLOW)Run: make zen-demo-up$(NC)"; \
 		exit 1; \
 	fi
-	@go test -v -timeout=10m ./test/e2e/... -run "TestClusterExists|TestCRDsExist|TestWatcherDeployment|TestWatcherPodRunning|TestIngesterCRExists|TestMetricsEndpoint|TestCoreMetrics" || \
-		(echo "$(RED)❌ E2E validation failed$(NC)"; exit 1)
+	@if ! go test -v -timeout=10m ./test/e2e/... -run "TestClusterExists|TestCRDsExist|TestWatcherDeployment|TestWatcherPodRunning|TestIngesterCRExists|TestMetricsEndpoint|TestCoreMetrics|TestCanonicalSpecLocations|TestRequiredFieldValidation|TestMetricsMovement"; then \
+		echo "$(RED)❌ E2E validation failed$(NC)"; \
+		echo "$(YELLOW)To debug: go test -v -timeout=10m ./test/e2e/... -run <TestName>$(NC)"; \
+		exit 1; \
+	fi
 	@echo "$(GREEN)✅ E2E validation passed$(NC)"
 
 ## check-schema-docs: Verify schema documentation is up to date
