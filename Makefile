@@ -299,6 +299,51 @@ check-branding:
 	@./hack/check-branding.sh
 	@echo "$(GREEN)✅ Branding check passed$(NC)"
 
+## zen-demo-up: Create zen-demo k3d cluster for e2e validation
+zen-demo-up:
+	@echo "$(GREEN)Creating zen-demo k3d cluster...$(NC)"
+	@./hack/zen-demo-k3d-up.sh
+	@echo "$(GREEN)✅ zen-demo cluster ready$(NC)"
+
+## zen-demo-down: Delete zen-demo k3d cluster
+zen-demo-down:
+	@echo "$(GREEN)Deleting zen-demo k3d cluster...$(NC)"
+	@./hack/zen-demo-k3d-down.sh
+	@echo "$(GREEN)✅ zen-demo cluster deleted$(NC)"
+
+## zen-demo-build-push: Build and push watcher image for zen-demo
+zen-demo-build-push:
+	@echo "$(GREEN)Building and pushing watcher image for zen-demo...$(NC)"
+	@$(MAKE) docker-build IMAGE_TAG=zen-demo-$(shell git rev-parse --short HEAD)
+	@CLUSTER_NAME=$${ZEN_DEMO_CLUSTER_NAME:-zen-demo}; \
+	IMAGE_NAME=$(IMAGE_NAME); \
+	IMAGE_TAG=zen-demo-$$(git rev-parse --short HEAD); \
+	echo "$(GREEN)Loading image into k3d cluster...$(NC)"; \
+	k3d image import $$IMAGE_NAME:$$IMAGE_TAG -c $$CLUSTER_NAME || \
+		(echo "$(YELLOW)⚠️  Image import failed, trying alternative method...$(NC)"; \
+		 docker tag $$IMAGE_NAME:$$IMAGE_TAG localhost:5000/$$IMAGE_NAME:$$IMAGE_TAG 2>/dev/null || true; \
+		 k3d image import localhost:5000/$$IMAGE_NAME:$$IMAGE_TAG -c $$CLUSTER_NAME 2>/dev/null || true); \
+	echo "$(GREEN)✅ Image loaded: $$IMAGE_NAME:$$IMAGE_TAG$(NC)"; \
+	echo "$(YELLOW)Image tag for deployment: $$IMAGE_TAG$(NC)"
+
+## zen-demo-deploy-watcher: Deploy watcher CRDs and deployment to zen-demo
+zen-demo-deploy-watcher:
+	@echo "$(GREEN)Deploying zen-watcher to zen-demo...$(NC)"
+	@./hack/zen-demo-deploy-watcher.sh
+	@echo "$(GREEN)✅ zen-watcher deployed$(NC)"
+
+## zen-demo-validate: Run e2e validation tests on zen-demo
+zen-demo-validate:
+	@echo "$(GREEN)Running e2e validation on zen-demo...$(NC)"
+	@if [ ! -f "$(HOME)/.config/k3d/kubeconfig-zen-demo.yaml" ]; then \
+		echo "$(RED)❌ zen-demo cluster not found$(NC)"; \
+		echo "   Run: make zen-demo-up"; \
+		exit 1; \
+	fi
+	@go test -v -timeout=10m ./test/e2e/... -run "TestClusterExists|TestCRDsExist|TestWatcherDeployment|TestWatcherPodRunning|TestIngesterCRExists|TestMetricsEndpoint|TestCoreMetrics" || \
+		(echo "$(RED)❌ E2E validation failed$(NC)"; exit 1)
+	@echo "$(GREEN)✅ E2E validation passed$(NC)"
+
 ## check-schema-docs: Verify schema documentation is up to date
 check-schema-docs:
 	@echo "$(GREEN)Checking schema documentation...$(NC)"
