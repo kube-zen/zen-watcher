@@ -727,30 +727,36 @@ histogram_quantile(0.95, rate(zen_watcher_http_request_duration_seconds_bucket[5
 
 ### Deployment Pipeline
 
-```yaml
-# .github/workflows/deploy.yml
-- name: Deploy to Production
-  run: |
-    # Scan image
-    trivy image zubezen/zen-watcher:${{ github.sha }}
-    
-    # Verify signature
-    cosign verify --key cosign.pub zubezen/zen-watcher:${{ github.sha }}
-    
-    # Deploy
-    helm upgrade --install zen-watcher ./charts/zen-watcher \
-      --namespace zen-system \
-      --create-namespace \
-      --set image.tag=${{ github.sha }} \
-      --wait \
-      --timeout=5m
-    
-    # Verify deployment
-    kubectl rollout status deployment/zen-watcher -n zen-system
-    
-    # Smoke test
-    kubectl exec -n zen-system deployment/zen-watcher -- \
-      curl -f http://localhost:8080/health
+Invoke the CI entry point script from your CI system or scheduled job:
+
+```bash
+# CI-friendly entry point (invoked by CI / scheduled job outside GitHub Actions)
+./scripts/ci/zen-demo-validate.sh
+
+# Or use Make targets
+make zen-demo-validate
+
+# Example deployment steps (adapt to your CI system):
+# 1. Scan image
+trivy image zubezen/zen-watcher:${IMAGE_TAG}
+
+# 2. Verify signature
+cosign verify --key cosign.pub zubezen/zen-watcher:${IMAGE_TAG}
+
+# 3. Deploy
+helm upgrade --install zen-watcher ./charts/zen-watcher \
+  --namespace zen-system \
+  --create-namespace \
+  --set image.tag=${IMAGE_TAG} \
+  --wait \
+  --timeout=5m
+
+# 4. Verify deployment
+kubectl rollout status deployment/zen-watcher -n zen-system
+
+# 5. Smoke test
+kubectl exec -n zen-system deployment/zen-watcher -- \
+  curl -f http://localhost:8080/health
 ```
 
 ---

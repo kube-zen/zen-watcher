@@ -77,7 +77,7 @@ done
 
 ### Sign in CI/CD
 
-#### GitHub Actions
+#### CI Integration
 
 ```yaml
 name: Sign Image

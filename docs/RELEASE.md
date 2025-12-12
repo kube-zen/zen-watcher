@@ -91,7 +91,7 @@ If chart needs updates independent of app version:
 
 ## Automation (Future)
 
-Consider automating with GitHub Actions:
+Consider automating with your CI system (invoke scripts/ci/zen-demo-validate.sh):
 
 ```yaml
 # On tag in zen-watcher repo:

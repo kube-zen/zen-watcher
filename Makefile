@@ -60,7 +60,7 @@ fuzz:
 	@echo "$(GREEN)✅ Fuzz tests complete$(NC)"
 
 ## lint: Run all linters
-lint: fmt vet staticcheck check-schema-docs check-branding
+lint: fmt vet staticcheck check-schema-docs check-branding check-no-github-actions
 
 ## fmt: Run go fmt
 fmt:

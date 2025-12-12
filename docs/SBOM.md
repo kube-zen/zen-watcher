@@ -42,22 +42,15 @@ docker sbom zubezen/zen-watcher:1.0.0 > sbom.spdx.json
 
 ### During Build
 
-Include SBOM generation in your CI/CD:
+Include SBOM generation in your CI/CD (invoke from your CI system or scheduled job):
 
-```yaml
-# .github/workflows/build.yml
-- name: Generate SBOM
-  run: |
-    syft zubezen/zen-watcher:${{ github.sha }} -o spdx-json > sbom.spdx.json
-    syft zubezen/zen-watcher:${{ github.sha }} -o cyclonedx-json > sbom.cyclonedx.json
-    
-- name: Upload SBOM
-  uses: actions/upload-artifact@v3
-  with:
-    name: sbom
-    path: |
-      sbom.spdx.json
-      sbom.cyclonedx.json
+```bash
+# Generate SBOM during build
+syft zubezen/zen-watcher:${IMAGE_TAG} -o spdx-json > sbom.spdx.json
+syft zubezen/zen-watcher:${IMAGE_TAG} -o cyclonedx-json > sbom.cyclonedx.json
+
+# Upload SBOM (adapt to your CI system's artifact upload mechanism)
+# Example: Store in artifact repository, attach to release, or publish to OCI registry
 ```
 
 ## SBOM Formats
@@ -132,48 +125,24 @@ cosign verify-attestation \
 
 ## SBOM in CI/CD
 
-### GitHub Actions
+### CI Integration
 
-```yaml
-name: SBOM Generation
+Invoke SBOM generation from your CI system or scheduled job:
 
-on:
-  push:
-    tags:
-      - 'v*'
+```bash
+# Generate SBOM
+syft zubezen/zen-watcher:${IMAGE_TAG} -o spdx-json > sbom.spdx.json
+syft zubezen/zen-watcher:${IMAGE_TAG} -o cyclonedx-json > sbom.cyclonedx.json
 
-jobs:
-  sbom:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      
-      - name: Generate SBOM
-        uses: anchore/sbom-action@v0
-        with:
-          image: zubezen/zen-watcher:${{ github.ref_name }}
-          format: spdx-json
-          output-file: sbom.spdx.json
-      
-      - name: Scan for vulnerabilities
-        uses: anchore/scan-action@v3
-        with:
-          sbom: sbom.spdx.json
-          fail-build: true
-          severity-cutoff: critical
-      
-      - name: Attach SBOM attestation
-        run: |
-          cosign attest --predicate sbom.spdx.json \
-            --key ${{ secrets.COSIGN_KEY }} \
-            zubezen/zen-watcher:${{ github.ref_name }}
-      
-      - name: Upload SBOM
-        uses: actions/upload-artifact@v3
-        with:
-          name: sbom
-          path: sbom.spdx.json
+# Scan for vulnerabilities
+grype sbom:sbom.spdx.json --fail-on critical
+
+# Attach SBOM attestation
+cosign attest --predicate sbom.spdx.json \
+  --key ${COSIGN_KEY} \
+  zubezen/zen-watcher:${IMAGE_TAG}
+
+# Upload SBOM (adapt to your CI system's artifact upload mechanism)
 ```
 
 ### GitLab CI
