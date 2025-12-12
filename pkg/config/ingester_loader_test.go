@@ -162,3 +162,123 @@ func TestConvertToIngesterConfig_ProcessingFilterTakesPrecedence(t *testing.T) {
 	}
 }
 
+func TestConvertToIngesterConfig_RequiredFieldsValidation(t *testing.T) {
+	// Test W59: Required fields (source, ingester, destinations) must be present and non-empty
+	tests := []struct {
+		name          string
+		spec          map[string]interface{}
+		shouldReject  bool
+		missingField  string
+	}{
+		{
+			name: "Missing source field",
+			spec: map[string]interface{}{
+				"ingester": "informer",
+				"destinations": []interface{}{
+					map[string]interface{}{"type": "crd", "value": "observations"},
+				},
+			},
+			shouldReject: true,
+			missingField: "source",
+		},
+		{
+			name: "Empty source field",
+			spec: map[string]interface{}{
+				"source": "",
+				"ingester": "informer",
+				"destinations": []interface{}{
+					map[string]interface{}{"type": "crd", "value": "observations"},
+				},
+			},
+			shouldReject: true,
+			missingField: "source",
+		},
+		{
+			name: "Missing ingester field",
+			spec: map[string]interface{}{
+				"source": "test-source",
+				"destinations": []interface{}{
+					map[string]interface{}{"type": "crd", "value": "observations"},
+				},
+			},
+			shouldReject: true,
+			missingField: "ingester",
+		},
+		{
+			name: "Empty ingester field",
+			spec: map[string]interface{}{
+				"source":   "test-source",
+				"ingester": "",
+				"destinations": []interface{}{
+					map[string]interface{}{"type": "crd", "value": "observations"},
+				},
+			},
+			shouldReject: true,
+			missingField: "ingester",
+		},
+		{
+			name: "Missing destinations field",
+			spec: map[string]interface{}{
+				"source":   "test-source",
+				"ingester": "informer",
+			},
+			shouldReject: true,
+			missingField: "destinations",
+		},
+		{
+			name: "Empty destinations array",
+			spec: map[string]interface{}{
+				"source":      "test-source",
+				"ingester":    "informer",
+				"destinations": []interface{}{},
+			},
+			shouldReject: true,
+			missingField: "destinations",
+		},
+		{
+			name: "All required fields present",
+			spec: map[string]interface{}{
+				"source":   "test-source",
+				"ingester": "informer",
+				"destinations": []interface{}{
+					map[string]interface{}{"type": "crd", "value": "observations"},
+				},
+			},
+			shouldReject: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			u := &unstructured.Unstructured{
+				Object: map[string]interface{}{
+					"metadata": map[string]interface{}{
+						"name":      "test-ingester",
+						"namespace": "default",
+					},
+					"spec": tt.spec,
+				},
+			}
+
+			ii := &IngesterInformer{}
+			config := ii.convertToIngesterConfig(u)
+
+			if tt.shouldReject {
+				if config != nil {
+					t.Errorf("Expected config to be rejected (missing/empty %s), but got non-nil config", tt.missingField)
+				}
+			} else {
+				if config == nil {
+					t.Fatal("Expected non-nil config when all required fields are present")
+				}
+				if config.Source != "test-source" {
+					t.Errorf("Expected source 'test-source', got '%s'", config.Source)
+				}
+				if config.Ingester != "informer" {
+					t.Errorf("Expected ingester 'informer', got '%s'", config.Ingester)
+				}
+			}
+		})
+	}
+}
+
