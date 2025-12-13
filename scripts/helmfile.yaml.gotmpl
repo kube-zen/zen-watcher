@@ -173,6 +173,23 @@ releases:
             promscrape.dropOriginalLabels: false
           vmServiceScrape:
             enabled: true
+          ingress:
+            enabled: true
+            ingressClassName: nginx
+            annotations:
+              nginx.ingress.kubernetes.io/rewrite-target: /\$2
+              nginx.ingress.kubernetes.io/use-regex: "true"
+            hosts:
+              - host: localhost
+                paths:
+                  - path: /victoriametrics/api(/|$)(.*)
+                    pathType: ImplementationSpecific
+                  - path: /victoriametrics/targets(/|$)(.*)
+                    pathType: ImplementationSpecific
+                  - path: /victoriametrics/vmui(/|$)(.*)
+                    pathType: ImplementationSpecific
+                  - path: /victoriametrics/health(/|$)(.*)
+                    pathType: ImplementationSpecific
 
   # Grafana (depends on VictoriaMetrics for datasource)
   - name: grafana
