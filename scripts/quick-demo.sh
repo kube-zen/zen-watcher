@@ -379,11 +379,12 @@ EOF
     # Wait for ingress to be ready and Grafana API to respond via ingress
     log_info "Waiting for Grafana to be accessible via ingress..."
     GRAFANA_API_READY=false
-    for i in {1..60}; do
-        if curl -s http://localhost:${INGRESS_PORT}/grafana/api/health >/dev/null 2>&1; then
+    for i in {1..90}; do
+        # Test with curl -L to follow redirects
+        if curl -sL http://localhost:${INGRESS_PORT}/grafana/api/health 2>/dev/null | grep -q "database\|ok"; then
             # Also check if we can authenticate
             if [ -n "$GRAFANA_PASSWORD" ]; then
-                if curl -s -u "${GRAFANA_USER}:${GRAFANA_PASSWORD}" http://localhost:${INGRESS_PORT}/grafana/api/health >/dev/null 2>&1; then
+                if curl -sL -u "${GRAFANA_USER}:${GRAFANA_PASSWORD}" http://localhost:${INGRESS_PORT}/grafana/api/health 2>/dev/null | grep -q "database\|ok"; then
                     GRAFANA_API_READY=true
                     break
                 fi
@@ -392,13 +393,14 @@ EOF
                 break
             fi
         fi
-        sleep 1
+        sleep 2
     done
     
     if [ "$GRAFANA_API_READY" = true ]; then
         log_success "Grafana is accessible via ingress"
     else
         log_warn "Grafana may not be fully ready via ingress, continuing anyway..."
+        log_info "You can test manually: curl -sL http://localhost:${INGRESS_PORT}/grafana/api/health"
     fi
     
     # Import dashboards if password is available
