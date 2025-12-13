@@ -22,7 +22,6 @@ import (
 
 	"github.com/kube-zen/zen-watcher/internal/kubernetes"
 	"github.com/kube-zen/zen-watcher/pkg/cli"
-	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 )
 
@@ -49,11 +48,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Create source config loader
-	sourceConfigLoader := config.NewSourceConfigLoader(clients.Dynamic)
-
 	// Create CLI (advisor would be created if Prometheus client available)
-	optimizeCLI := cli.NewOptimizeCLI(clients.Dynamic, sourceConfigLoader, nil)
+	// Note: SourceConfigLoader removed - optimization now works with IngesterConfig directly
+	optimizeCLI := cli.NewOptimizeCLI(clients.Dynamic, nil)
 
 	ctx := context.Background()
 

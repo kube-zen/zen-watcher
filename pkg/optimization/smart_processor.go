@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/config"
 )
 
@@ -114,7 +115,7 @@ func (sp *SmartProcessor) GetOrCreatePerformanceTracker(source string) *Performa
 // DetermineOptimalStrategy determines the optimal processing strategy for a source
 func (sp *SmartProcessor) DetermineOptimalStrategy(
 	raw *RawEvent,
-	sourceConfig *config.SourceConfig,
+	sourceConfig *generic.SourceConfig,
 ) ProcessingStrategy {
 	// Get current metrics for this source
 	collector := sp.GetOrCreateMetricsCollector(raw.Source)
@@ -129,14 +130,17 @@ func (sp *SmartProcessor) DetermineOptimalStrategy(
 func (sp *SmartProcessor) ProcessEvent(
 	ctx context.Context,
 	raw *RawEvent,
-	sourceConfig *config.SourceConfig,
+	sourceConfig *generic.SourceConfig,
 ) error {
 	startTime := time.Now()
 
 	// Get components for this source
 	collector := sp.GetOrCreateMetricsCollector(raw.Source)
 	tracker := sp.GetOrCreatePerformanceTracker(raw.Source)
-	filter := sp.GetOrCreateAdaptiveFilter(raw.Source, sourceConfig.Filter)
+	// Note: Filter configuration is handled via Processing config, not a separate Filter field
+	// Create a default/empty filter config since SourceConfig doesn't have a Filter field
+	var filterConfig config.FilterConfigAdvanced
+	filter := sp.GetOrCreateAdaptiveFilter(raw.Source, filterConfig)
 
 	// Determine optimal strategy
 	strategy := sp.DetermineOptimalStrategy(raw, sourceConfig)

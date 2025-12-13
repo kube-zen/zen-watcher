@@ -21,24 +21,21 @@ import (
 	"text/tabwriter"
 
 	"github.com/kube-zen/zen-watcher/pkg/advisor"
-	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"k8s.io/client-go/dynamic"
 )
 
 // OptimizeCLI provides CLI commands for optimization
 type OptimizeCLI struct {
-	dynClient          dynamic.Interface
-	sourceConfigLoader *config.SourceConfigLoader
-	advisor            *advisor.Advisor
+	dynClient dynamic.Interface
+	advisor   *advisor.Advisor
 }
 
 // NewOptimizeCLI creates a new optimization CLI
-func NewOptimizeCLI(dynClient dynamic.Interface, sourceConfigLoader *config.SourceConfigLoader, advisor *advisor.Advisor) *OptimizeCLI {
+func NewOptimizeCLI(dynClient dynamic.Interface, advisor *advisor.Advisor) *OptimizeCLI {
 	return &OptimizeCLI{
-		dynClient:          dynClient,
-		sourceConfigLoader: sourceConfigLoader,
-		advisor:            advisor,
+		dynClient: dynClient,
+		advisor:   advisor,
 	}
 }
 
@@ -51,27 +48,12 @@ func (cli *OptimizeCLI) Analyze(ctx context.Context, source string) error {
 			Source:    source,
 		})
 
-	// Get source config
-	var sourceConfig *config.SourceConfig
-	if cli.sourceConfigLoader != nil {
-		sourceConfig = cli.sourceConfigLoader.GetSourceConfig(source)
-	}
-
 	// Get current metrics (simplified - would query Prometheus in production)
 	// For now, show config-based analysis
 
 	fmt.Printf("\n=== Optimization Analysis for Source: %s ===\n\n", source)
-
-	if sourceConfig == nil {
-		fmt.Printf("No configuration found for source '%s'. Using defaults.\n\n", source)
-	} else {
-		fmt.Printf("Current Configuration:\n")
-		fmt.Printf("  Processing Order: %s\n", sourceConfig.ProcessingOrder)
-		fmt.Printf("  Auto Optimize: %v\n", sourceConfig.AutoOptimize)
-		fmt.Printf("  Filter Min Priority: %.2f\n", sourceConfig.FilterMinPriority)
-		fmt.Printf("  Dedup Window: %v\n", sourceConfig.DedupWindow)
-		fmt.Printf("\n")
-	}
+	fmt.Printf("Configuration analysis would be loaded from Ingester CRDs.\n")
+	fmt.Printf("(Source config loader removed - use IngesterConfig instead)\n\n")
 
 	// Show suggestions (would come from advisor in production)
 	fmt.Printf("Optimization Suggestions:\n")
@@ -181,37 +163,7 @@ func (cli *OptimizeCLI) History(ctx context.Context, source string) error {
 // ListSources lists all sources with their optimization status
 func (cli *OptimizeCLI) ListSources(ctx context.Context) error {
 	fmt.Printf("\n=== Available Sources ===\n\n")
-
-	if cli.sourceConfigLoader == nil {
-		fmt.Printf("Source config loader not available.\n")
-		return nil
-	}
-
-	allConfigs := cli.sourceConfigLoader.GetAllSourceConfigs()
-
-	if len(allConfigs) == 0 {
-		fmt.Printf("No source configurations found.\n")
-		return nil
-	}
-
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-	fmt.Fprintf(w, "Source\tProcessing Order\tAuto Optimize\tMin Priority\tDedup Window\n")
-	fmt.Fprintf(w, "---\t---\t---\t---\t---\n")
-
-	for source, config := range allConfigs {
-		autoOptimize := "false"
-		if config.AutoOptimize {
-			autoOptimize = "true"
-		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%.2f\t%v\n",
-			source,
-			config.ProcessingOrder,
-			autoOptimize,
-			config.FilterMinPriority,
-			config.DedupWindow,
-		)
-	}
-	w.Flush()
-
+	fmt.Printf("Source listing would query Ingester CRDs.\n")
+	fmt.Printf("(Source config loader removed - use IngesterConfig instead)\n")
 	return nil
 }

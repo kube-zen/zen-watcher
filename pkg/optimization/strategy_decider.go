@@ -15,7 +15,7 @@
 package optimization
 
 import (
-	"github.com/kube-zen/zen-watcher/pkg/config"
+	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 )
 
 // ProcessingStrategy represents the processing order strategy
@@ -105,7 +105,7 @@ func NewStrategyDeciderWithThresholds(
 // DetermineStrategy determines the optimal processing strategy based on metrics and config
 func (sd *StrategyDecider) DetermineStrategy(
 	metrics *OptimizationMetrics,
-	config *config.SourceConfig,
+	config *generic.SourceConfig,
 ) ProcessingStrategy {
 	// If config specifies a non-auto order, use it
 	if config != nil && config.Processing.Order != "" && config.Processing.Order != "auto" {
@@ -176,7 +176,7 @@ func (sd *StrategyDecider) getDefaultStrategy(source string) ProcessingStrategy 
 // ShouldOptimize determines if optimization should be triggered based on metrics
 func (sd *StrategyDecider) ShouldOptimize(
 	metrics *OptimizationMetrics,
-	config *config.SourceConfig,
+	config *generic.SourceConfig,
 ) bool {
 	if config == nil || !config.Processing.AutoOptimize {
 		return false
@@ -187,28 +187,21 @@ func (sd *StrategyDecider) ShouldOptimize(
 	}
 
 	// Trigger optimization if thresholds are exceeded
-	thresholds := config.Processing.Thresholds
+	// Thresholds are in config.Thresholds, not config.Processing.Thresholds
+	if config.Thresholds == nil {
+		return false
+	}
 
 	// Check observationsPerMinute threshold
-	if obsThreshold, ok := thresholds["observationsPerMinute"]; ok {
-		if metrics.ObservationsPerMinute >= obsThreshold.Warning {
+	if config.Thresholds.ObservationsPerMinute != nil {
+		if metrics.ObservationsPerMinute >= float64(config.Thresholds.ObservationsPerMinute.Warning) {
 			return true
 		}
 	}
 
-	// Check lowSeverityPercent threshold
-	if lowSevThreshold, ok := thresholds["lowSeverityPercent"]; ok {
-		if metrics.LowSeverityPercent >= lowSevThreshold.Warning {
-			return true
-		}
-	}
-
-	// Check dedupEffectiveness threshold
-	if dedupThreshold, ok := thresholds["dedupEffectiveness"]; ok {
-		if metrics.DeduplicationRate <= dedupThreshold.Critical {
-			return true
-		}
-	}
+	// Note: lowSeverityPercent and dedupEffectiveness thresholds would need to be
+	// added to ThresholdsConfig if needed. For now, we use the default optimization
+	// logic based on the metrics available.
 
 	return false
 }

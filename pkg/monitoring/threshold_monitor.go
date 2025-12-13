@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/config"
+	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -27,7 +27,7 @@ import (
 // ThresholdMonitor monitors optimization thresholds and triggers alerts
 type ThresholdMonitor struct {
 	sourceConfigLoader interface {
-		GetSourceConfig(source string) *config.SourceConfig
+		GetSourceConfig(source string) *generic.SourceConfig
 	}
 	thresholdExceeded *prometheus.CounterVec
 	checkInterval     time.Duration
@@ -38,7 +38,7 @@ type ThresholdMonitor struct {
 // NewThresholdMonitor creates a new threshold monitor
 func NewThresholdMonitor(
 	sourceConfigLoader interface {
-		GetSourceConfig(source string) *config.SourceConfig
+		GetSourceConfig(source string) *generic.SourceConfig
 	},
 	thresholdExceeded *prometheus.CounterVec,
 ) *ThresholdMonitor {
@@ -94,7 +94,7 @@ func (tm *ThresholdMonitor) CheckThreshold(source string, metricName string, val
 	}
 
 	// Check rate limiting first (if configured)
-	if sourceConfig.RateLimitMaxPerMinute > 0 {
+	if sourceConfig.RateLimit != nil && sourceConfig.RateLimit.ObservationsPerMinute > 0 {
 		// Rate limiting would be checked here
 		// For now, always allow (rate limiting would need per-source counters)
 	}

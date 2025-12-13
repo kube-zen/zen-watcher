@@ -46,8 +46,10 @@ func TestFileStatePersistence_SaveAndLoad(t *testing.T) {
 		},
 		ActiveRules: []config.DynamicFilterRule{
 			{
-				Condition: "severity == 'low'",
-				Action:    "filter",
+				Expression: "severity == 'low'",
+				Enabled:    true,
+				Priority:   0.5,
+				Source:     "test-source",
 			},
 		},
 		Metrics: map[string]float64{

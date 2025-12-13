@@ -17,7 +17,7 @@ package optimization
 import (
 	"testing"
 
-	"github.com/kube-zen/zen-watcher/pkg/config"
+	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 )
 
 // TestStrategyDecider_ThresholdsMatchDocumentation verifies that thresholds
@@ -57,9 +57,9 @@ func TestStrategyDecider_HighLowSeverityTriggersFilterFirst(t *testing.T) {
 		DeduplicationRate:  0.3,  // Below dedup threshold
 	}
 
-	sourceConfig := &config.SourceConfig{
+	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
-		Processing: config.ProcessingConfig{
+		Processing: &generic.ProcessingConfig{
 			AutoOptimize: true,
 		},
 	}
@@ -82,9 +82,9 @@ func TestStrategyDecider_HighDedupEffectivenessTriggersDedupFirst(t *testing.T) 
 		DeduplicationRate:  0.6, // 60% > 50% threshold
 	}
 
-	sourceConfig := &config.SourceConfig{
+	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
-		Processing: config.ProcessingConfig{
+		Processing: &generic.ProcessingConfig{
 			AutoOptimize: true,
 		},
 	}
@@ -99,9 +99,9 @@ func TestStrategyDecider_HighDedupEffectivenessTriggersDedupFirst(t *testing.T) 
 func TestStrategyDecider_ThresholdBoundaryConditions(t *testing.T) {
 	sd := NewStrategyDecider()
 
-	sourceConfig := &config.SourceConfig{
+	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
-		Processing: config.ProcessingConfig{
+		Processing: &generic.ProcessingConfig{
 			AutoOptimize: true,
 		},
 	}

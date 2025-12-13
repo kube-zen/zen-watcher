@@ -17,7 +17,7 @@ package optimization
 import (
 	"testing"
 
-	"github.com/kube-zen/zen-watcher/pkg/config"
+	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 )
 
 func TestStrategyDecider_DetermineStrategy_FilterFirst(t *testing.T) {
@@ -30,9 +30,9 @@ func TestStrategyDecider_DetermineStrategy_FilterFirst(t *testing.T) {
 		DeduplicationRate:  0.3,
 	}
 
-	sourceConfig := &config.SourceConfig{
+	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
-		Processing: config.ProcessingConfig{
+		Processing: &generic.ProcessingConfig{
 			AutoOptimize: true,
 		},
 	}
@@ -53,9 +53,9 @@ func TestStrategyDecider_DetermineStrategy_DedupFirst(t *testing.T) {
 		DeduplicationRate:  0.6, // 60% dedup effectiveness
 	}
 
-	sourceConfig := &config.SourceConfig{
+	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
-		Processing: config.ProcessingConfig{
+		Processing: &generic.ProcessingConfig{
 			AutoOptimize: true,
 		},
 	}
@@ -76,9 +76,9 @@ func TestStrategyDecider_DetermineStrategy_Hybrid(t *testing.T) {
 		DeduplicationRate:  0.4, // Moderate dedup (30-50%)
 	}
 
-	sourceConfig := &config.SourceConfig{
+	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
-		Processing: config.ProcessingConfig{
+		Processing: &generic.ProcessingConfig{
 			AutoOptimize: true,
 		},
 	}
@@ -99,9 +99,9 @@ func TestStrategyDecider_DetermineStrategy_Adaptive(t *testing.T) {
 		DeduplicationRate:  0.3,
 	}
 
-	sourceConfig := &config.SourceConfig{
+	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
-		Processing: config.ProcessingConfig{
+		Processing: &generic.ProcessingConfig{
 			AutoOptimize: true,
 		},
 	}
@@ -115,9 +115,9 @@ func TestStrategyDecider_DetermineStrategy_Adaptive(t *testing.T) {
 func TestStrategyDecider_DetermineStrategy_NoMetrics(t *testing.T) {
 	sd := NewStrategyDecider()
 
-	sourceConfig := &config.SourceConfig{
+	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
-		Processing: config.ProcessingConfig{
+		Processing: &generic.ProcessingConfig{
 			AutoOptimize: true,
 		},
 	}

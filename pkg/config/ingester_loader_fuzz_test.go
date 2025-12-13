@@ -81,7 +81,17 @@ func FuzzLoadIngesterConfig_MalformedYAML(f *testing.F) {
 
 		unstructuredObj := &unstructured.Unstructured{Object: obj}
 
-		// Try to load - should not panic even with malformed data
-		_, _ = LoadIngesterConfig(unstructuredObj)
+		// Create a minimal IngesterInformer to test conversion
+		store := NewIngesterStore()
+		dynClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
+		factory := dynamicinformer.NewDynamicSharedInformerFactory(dynClient, 0)
+		informer := &IngesterInformer{
+			store:     store,
+			dynClient: dynClient,
+			factory:   factory,
+		}
+
+		// Try to convert - should not panic even with malformed data
+		_ = informer.convertToIngesterConfig(unstructuredObj)
 	})
 }

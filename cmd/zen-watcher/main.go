@@ -17,7 +17,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
@@ -185,6 +184,9 @@ func main() {
 
 	// Create adapter launcher to run all adapters and process events
 	adapterLauncher := watcher.NewAdapterLauncher(adapters, observationCreator)
+
+	// WaitGroup for goroutines
+	var wg sync.WaitGroup
 
 	// Create worker pool (will be configured from ConfigMap)
 	var workerPool *dispatcher.WorkerPool

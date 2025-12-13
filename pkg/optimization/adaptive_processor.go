@@ -17,14 +17,14 @@ package optimization
 import (
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/config"
+	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 )
 
 // AdaptiveProcessor provides adaptive processing capabilities
 type AdaptiveProcessor struct {
 	source             string
-	config             *config.SourceConfig
+	config             *generic.SourceConfig
 	metricsCollector   *PerSourceMetricsCollector
 	performanceTracker *PerformanceTracker
 
@@ -37,7 +37,7 @@ type AdaptiveProcessor struct {
 // NewAdaptiveProcessor creates a new adaptive processor
 func NewAdaptiveProcessor(
 	source string,
-	config *config.SourceConfig,
+	config *generic.SourceConfig,
 	metricsCollector *PerSourceMetricsCollector,
 	performanceTracker *PerformanceTracker,
 ) *AdaptiveProcessor {
@@ -106,113 +106,50 @@ func (ap *AdaptiveProcessor) Adapt() error {
 	}
 
 	// Adjust filter if needed
-	if ap.config.Filter.AdaptiveEnabled {
-		ap.adaptFilter(metrics)
-	}
+	// TODO: Filter configuration is now handled separately, not in SourceConfig
+	// if ap.config.Filter != nil && ap.config.Filter.AdaptiveEnabled {
+	// 	ap.adaptFilter(metrics)
+	// }
 
 	// Adjust deduplication if needed
-	if ap.config.Deduplication.Adaptive {
-		ap.adaptDeduplication(metrics)
-	}
+	// TODO: Deduplication configuration is in ap.config.Dedup, but adaptive features need to be implemented
+	// if ap.config.Dedup != nil {
+	// 	ap.adaptDeduplication(metrics)
+	// }
 
 	ap.lastAdaptation = time.Now()
 	return nil
 }
 
 // adaptFilter adapts filtering parameters
+// TODO: Implement adaptive filtering with new filter configuration structure
 func (ap *AdaptiveProcessor) adaptFilter(metrics *OptimizationMetrics) {
-	// If too many low-severity events are getting through, tighten filter
-	if metrics.LowSeverityPercent > 0.8 && ap.config.Filter.MinPriority < 0.5 {
-		newPriority := ap.config.Filter.MinPriority + (ap.learningRate * 0.1)
-		if newPriority > 1.0 {
-			newPriority = 1.0
-		}
-
-		logger.Info("Adapting filter priority",
-			logger.Fields{
-				Component: "optimization",
-				Operation: "adapt_filter",
-				Source:    ap.source,
-				Additional: map[string]interface{}{
-					"old_priority":         ap.config.Filter.MinPriority,
-					"new_priority":         newPriority,
-					"low_severity_percent": metrics.LowSeverityPercent,
-				},
-			})
-
-		ap.config.Filter.MinPriority = newPriority
-		ap.config.FilterMinPriority = newPriority
-	}
-
-	// If too few events passing filter, relax it
-	if metrics.FilterEffectiveness > 0.9 && ap.config.Filter.MinPriority > 0.1 {
-		newPriority := ap.config.Filter.MinPriority - (ap.learningRate * 0.1)
-		if newPriority < 0.0 {
-			newPriority = 0.0
-		}
-
-		logger.Info("Relaxing filter priority",
-			logger.Fields{
-				Component: "optimization",
-				Operation: "relax_filter",
-				Source:    ap.source,
-				Additional: map[string]interface{}{
-					"old_priority":         ap.config.Filter.MinPriority,
-					"new_priority":         newPriority,
-					"filter_effectiveness": metrics.FilterEffectiveness,
-				},
-			})
-
-		ap.config.Filter.MinPriority = newPriority
-		ap.config.FilterMinPriority = newPriority
-	}
+	// Filter configuration is now handled separately from SourceConfig
+	// This needs to be reimplemented to work with the new structure
+	logger.Debug("Adaptive filter adjustment not yet implemented with new config structure",
+		logger.Fields{
+			Component: "optimization",
+			Operation: "adapt_filter",
+			Source:    ap.source,
+		})
 }
 
 // adaptDeduplication adapts deduplication parameters
+// TODO: Implement adaptive deduplication with new DedupConfig structure
 func (ap *AdaptiveProcessor) adaptDeduplication(metrics *OptimizationMetrics) {
-	// If deduplication is very effective, window might be too large (wasteful)
-	// If deduplication is ineffective, window might be too small
-	if metrics.DeduplicationRate > 0.8 && ap.config.Deduplication.Window > 1*time.Hour {
-		// Very effective, can reduce window slightly
-		newWindow := ap.config.Deduplication.Window - (10 * time.Minute)
-		if newWindow < 5*time.Minute {
-			newWindow = 5 * time.Minute
-		}
-
-		logger.Info("Reducing dedup window",
-			logger.Fields{
-				Component: "optimization",
-				Operation: "adapt_dedup_window",
-				Source:    ap.source,
-				Additional: map[string]interface{}{
-					"old_window": ap.config.Deduplication.Window.String(),
-					"new_window": newWindow.String(),
-					"dedup_rate": metrics.DeduplicationRate,
-				},
-			})
-
-		ap.config.Deduplication.Window = newWindow
-		ap.config.DedupWindow = newWindow
-	} else if metrics.DeduplicationRate < 0.2 && ap.config.Deduplication.Window < 24*time.Hour {
-		// Ineffective, increase window
-		newWindow := ap.config.Deduplication.Window + (10 * time.Minute)
-		if newWindow > 24*time.Hour {
-			newWindow = 24 * time.Hour
-		}
-
-		logger.Info("Increasing dedup window",
-			logger.Fields{
-				Component: "optimization",
-				Operation: "adapt_dedup_window",
-				Source:    ap.source,
-				Additional: map[string]interface{}{
-					"old_window": ap.config.Deduplication.Window.String(),
-					"new_window": newWindow.String(),
-					"dedup_rate": metrics.DeduplicationRate,
-				},
-			})
-
-		ap.config.Deduplication.Window = newWindow
-		ap.config.DedupWindow = newWindow
+	// Deduplication configuration is in ap.config.Dedup, but adaptive window adjustment
+	// needs to be reimplemented to work with the string-based Window field
+	if ap.config.Dedup == nil {
+		return
 	}
+
+	logger.Debug("Adaptive deduplication adjustment not yet fully implemented",
+		logger.Fields{
+			Component: "optimization",
+			Operation: "adapt_dedup",
+			Source:    ap.source,
+			Additional: map[string]interface{}{
+				"dedup_rate": metrics.DeduplicationRate,
+			},
+		})
 }

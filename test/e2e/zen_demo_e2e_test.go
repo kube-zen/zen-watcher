@@ -366,7 +366,7 @@ spec:
 
 // TestMetricsMovement verifies that metrics increment after sending events (W33, W58/W59-related)
 func TestMetricsMovement(t *testing.T) {
-	clientset, err := getKubernetesClient()
+	_, err := getKubernetesClient()
 	if err != nil {
 		t.Fatalf("Failed to get Kubernetes client: %v", err)
 	}
@@ -433,7 +433,7 @@ spec:
 	waitForIngesterReady(t, "test-metrics-ingester", testNamespace, 15*time.Second)
 
 	// Wait for metrics to be available (bounded retry)
-	waitForMetricsAvailable(port, 10*time.Second)
+	waitForMetricsAvailable(t, port, 10*time.Second)
 	finalMetrics, err := fetchMetrics("http://localhost:" + port + "/metrics")
 	if err != nil {
 		t.Skipf("Could not fetch final metrics (non-critical): %v", err)
@@ -476,7 +476,7 @@ func extractMetricValue(metricsOutput, metricName string) string {
 
 // TestMetricsEndpoint verifies that zen-watcher metrics endpoint is accessible
 func TestMetricsEndpoint(t *testing.T) {
-	clientset, err := getKubernetesClient()
+	_, err := getKubernetesClient()
 	if err != nil {
 		t.Fatalf("Failed to get Kubernetes client: %v", err)
 	}
@@ -525,7 +525,7 @@ func TestMetricsEndpoint(t *testing.T) {
 func TestCoreMetrics(t *testing.T) {
 	// This is a placeholder - actual metrics scraping would require port-forwarding
 	// and parsing Prometheus format. For now, we just verify the service exists.
-	clientset, err := getKubernetesClient()
+	_, err := getKubernetesClient()
 	if err != nil {
 		t.Fatalf("Failed to get Kubernetes client: %v", err)
 	}
@@ -542,6 +542,28 @@ func TestCoreMetrics(t *testing.T) {
 	} else {
 		if scrape, ok := svc.Annotations["prometheus.io/scrape"]; ok && scrape == "true" {
 			t.Logf("Service is annotated for Prometheus scraping")
+		}
+	}
+}
+
+// waitForMetricsAvailable waits for metrics endpoint to be available
+func waitForMetricsAvailable(t *testing.T, port string, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			t.Logf("Timeout waiting for metrics on port %s", port)
+			return
+		case <-ticker.C:
+			_, err := fetchMetrics("http://localhost:" + port + "/metrics")
+			if err == nil {
+				return
+			}
 		}
 	}
 }

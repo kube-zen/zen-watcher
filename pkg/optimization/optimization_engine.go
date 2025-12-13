@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/config"
+	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 )
 
@@ -28,8 +28,8 @@ type OptimizationEngine struct {
 	smartProcessor     *SmartProcessor
 	stateManager       *OptimizationStateManager
 	sourceConfigLoader interface {
-		GetSourceConfig(source string) *config.SourceConfig
-		GetAllSourceConfigs() map[string]*config.SourceConfig
+		GetSourceConfig(source string) *generic.SourceConfig
+		GetAllSourceConfigs() map[string]*generic.SourceConfig
 	}
 
 	// Optimization loop control
@@ -45,8 +45,8 @@ func NewOptimizationEngine(
 	smartProcessor *SmartProcessor,
 	stateManager *OptimizationStateManager,
 	sourceConfigLoader interface {
-		GetSourceConfig(source string) *config.SourceConfig
-		GetAllSourceConfigs() map[string]*config.SourceConfig
+		GetSourceConfig(source string) *generic.SourceConfig
+		GetAllSourceConfigs() map[string]*generic.SourceConfig
 	},
 ) *OptimizationEngine {
 	config := DefaultOptimizationConfig()
@@ -175,7 +175,7 @@ func (oe *OptimizationEngine) runOptimizationCycle(ctx context.Context) {
 // applyOptimization applies an optimization decision
 func (oe *OptimizationEngine) applyOptimization(
 	source string,
-	sourceConfig *config.SourceConfig,
+	sourceConfig *generic.SourceConfig,
 	newStrategy ProcessingStrategy,
 	metrics *OptimizationMetrics,
 ) {
@@ -273,7 +273,7 @@ func (oe *OptimizationEngine) canMakeDecision(source string, state *Optimization
 // calculateConfidence calculates the confidence level for an optimization decision
 func (oe *OptimizationEngine) calculateConfidence(
 	metrics *OptimizationMetrics,
-	sourceConfig *config.SourceConfig,
+	sourceConfig *generic.SourceConfig,
 ) float64 {
 	config := DefaultOptimizationConfig()
 	confidence := 0.5 // Base confidence

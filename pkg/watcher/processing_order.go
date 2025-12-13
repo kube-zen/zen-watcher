@@ -15,7 +15,7 @@
 package watcher
 
 import (
-	"github.com/kube-zen/zen-watcher/pkg/config"
+	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 )
 
 // ProcessingOrder represents the processing order strategy
@@ -28,10 +28,10 @@ const (
 )
 
 // DetermineOptimalOrder determines the optimal processing order based on source config and metrics
-func DetermineOptimalOrder(source string, sourceConfig *config.SourceConfig, metrics *SourceMetrics) ProcessingOrder {
+func DetermineOptimalOrder(source string, sourceConfig *generic.SourceConfig, metrics *SourceMetrics) ProcessingOrder {
 	// If source config specifies a non-auto order, use it
-	if sourceConfig != nil && sourceConfig.ProcessingOrder != "" && sourceConfig.ProcessingOrder != "auto" {
-		return ProcessingOrder(sourceConfig.ProcessingOrder)
+	if sourceConfig != nil && sourceConfig.Processing != nil && sourceConfig.Processing.Order != "" && sourceConfig.Processing.Order != "auto" {
+		return ProcessingOrder(sourceConfig.Processing.Order)
 	}
 
 	// Auto-optimization logic

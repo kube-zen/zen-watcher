@@ -18,7 +18,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/kube-zen/zen-watcher/pkg/config"
+	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 )
 
 // Optimizer is the main optimization coordinator that ties everything together
@@ -28,8 +28,8 @@ type Optimizer struct {
 	stateManager       *OptimizationStateManager
 	adaptiveProcessors map[string]*AdaptiveProcessor
 	sourceConfigLoader interface {
-		GetSourceConfig(source string) *config.SourceConfig
-		GetAllSourceConfigs() map[string]*config.SourceConfig
+		GetSourceConfig(source string) *generic.SourceConfig
+		GetAllSourceConfigs() map[string]*generic.SourceConfig
 	}
 
 	mu sync.RWMutex
@@ -38,8 +38,8 @@ type Optimizer struct {
 // NewOptimizer creates a new optimizer with all components
 func NewOptimizer(
 	sourceConfigLoader interface {
-		GetSourceConfig(source string) *config.SourceConfig
-		GetAllSourceConfigs() map[string]*config.SourceConfig
+		GetSourceConfig(source string) *generic.SourceConfig
+		GetAllSourceConfigs() map[string]*generic.SourceConfig
 	},
 ) *Optimizer {
 	smartProcessor := NewSmartProcessor()
@@ -50,8 +50,8 @@ func NewOptimizer(
 func NewOptimizerWithProcessor(
 	smartProcessor *SmartProcessor,
 	sourceConfigLoader interface {
-		GetSourceConfig(source string) *config.SourceConfig
-		GetAllSourceConfigs() map[string]*config.SourceConfig
+		GetSourceConfig(source string) *generic.SourceConfig
+		GetAllSourceConfigs() map[string]*generic.SourceConfig
 	},
 ) *Optimizer {
 	stateManager := NewOptimizationStateManager()
@@ -100,7 +100,7 @@ func (o *Optimizer) GetOrCreateAdaptiveProcessor(source string) *AdaptiveProcess
 		return processor
 	}
 
-	var sourceConfig *config.SourceConfig
+	var sourceConfig *generic.SourceConfig
 	if o.sourceConfigLoader != nil {
 		sourceConfig = o.sourceConfigLoader.GetSourceConfig(source)
 	}

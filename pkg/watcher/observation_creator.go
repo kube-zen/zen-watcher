@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/config"
+	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
@@ -51,7 +51,7 @@ type ObservationCreator struct {
 	optimizationMetrics *OptimizationMetrics
 	// Source config loader (optional, for dynamic processing order)
 	sourceConfigLoader interface {
-		GetSourceConfig(source string) *config.SourceConfig
+		GetSourceConfig(source string) *generic.SourceConfig
 	}
 	// Current processing order per source (for logging changes)
 	currentOrder map[string]ProcessingOrder
@@ -187,7 +187,7 @@ func (oc *ObservationCreator) SetOptimizationMetrics(metrics *OptimizationMetric
 
 // SetSourceConfigLoader sets the source config loader for dynamic processing order
 func (oc *ObservationCreator) SetSourceConfigLoader(loader interface {
-	GetSourceConfig(source string) *config.SourceConfig
+	GetSourceConfig(source string) *generic.SourceConfig
 }) {
 	oc.sourceConfigLoader = loader
 }
