@@ -33,10 +33,27 @@ type FilterConfig struct {
 	// Example: "(severity >= HIGH) AND (category IN [security, compliance])"
 	Expression string `json:"expression,omitempty"`
 
+	// Global namespace filtering (applies to all sources)
+	// These are merged with source-specific namespace filters
+	GlobalNamespaceFilter *GlobalNamespaceFilter `json:"globalNamespaceFilter,omitempty"`
+
 	// Sources is a map of source name to SourceFilter
 	// If a source is not in this map, it is allowed by default
 	// Note: Sources are ignored when Expression is set
 	Sources map[string]SourceFilter `json:"sources"`
+}
+
+// GlobalNamespaceFilter defines global namespace filtering rules
+type GlobalNamespaceFilter struct {
+	// Enabled controls whether global namespace filtering is active
+	Enabled bool `json:"enabled,omitempty"`
+
+	// IncludedNamespaces is a list of namespaces to include (if set, only these are allowed)
+	// Empty list means all namespaces are allowed (unless ExcludedNamespaces is set)
+	IncludedNamespaces []string `json:"includedNamespaces,omitempty"`
+
+	// ExcludedNamespaces is a list of namespaces to exclude
+	ExcludedNamespaces []string `json:"excludedNamespaces,omitempty"`
 }
 
 // SourceFilter defines filtering rules for a specific source

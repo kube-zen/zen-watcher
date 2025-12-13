@@ -40,11 +40,6 @@ data:
       batch_age: 10s
       flush_interval: 30s
     
-    http_client:
-      timeout: 30s
-      max_connections: 100
-      rate_limit: 1000
-    
     namespace_filtering:
       enabled: true
       included_namespaces: []
@@ -114,22 +109,6 @@ event_batching:
 - `EVENT_BATCHING_ENABLED=true`
 - `EVENT_BATCH_SIZE=200`
 - `EVENT_BATCH_AGE=5s`
-
-### HTTP Client
-
-Configures connection pooling and rate limiting:
-
-```yaml
-http_client:
-  timeout: 30s          # Request timeout
-  max_connections: 100  # Maximum idle connections
-  rate_limit: 1000     # Requests per second limit
-```
-
-**Environment Variables** (fallback):
-- `HTTP_TIMEOUT=30s`
-- `HTTP_MAX_IDLE_CONNS=100`
-- `HTTP_RATE_LIMIT_RPS=1000`
 
 ### Namespace Filtering
 

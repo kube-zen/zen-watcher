@@ -194,7 +194,7 @@ func main() {
 
 	// Register config change handler
 	configManager.OnConfigChange(func(newConfig map[string]interface{}) {
-		handleConfigChange(newConfig, workerPool, adapterLauncher, log)
+		handleConfigChange(newConfig, workerPool, adapterLauncher, filterInstance, log)
 	})
 
 	// Start ConfigManager
@@ -214,9 +214,6 @@ func main() {
 	// Apply initial configuration
 	initialConfig := configManager.GetConfigWithDefaults()
 	handleConfigChange(initialConfig, workerPool, adapterLauncher, log)
-
-	// WaitGroup for goroutines
-	var wg sync.WaitGroup
 
 	// Start HTTP server
 	httpServer.Start(ctx, &wg)
@@ -547,13 +544,14 @@ func main() {
 
 // handleConfigChange handles configuration changes from ConfigMap
 func handleConfigChange(
-	config map[string]interface{},
+	newConfig map[string]interface{},
 	workerPool *dispatcher.WorkerPool,
 	adapterLauncher *watcher.AdapterLauncher,
-	log *logger.Logger,
+	filterInstance *filter.Filter,
+	log logger.Logger,
 ) {
 	// Update worker pool configuration
-	if workerPoolConfig, ok := config["worker_pool"].(map[string]interface{}); ok {
+	if workerPoolConfig, ok := newConfig["worker_pool"].(map[string]interface{}); ok {
 		newWorkerConfig := dispatcher.WorkerPoolConfig{
 			Enabled:   getBool(workerPoolConfig, "enabled", false),
 			Size:      getInt(workerPoolConfig, "size", 5),
@@ -587,9 +585,89 @@ func handleConfigChange(
 		}
 	}
 
-	// Event batching configuration would be handled here
-	// HTTP client configuration would be handled here
-	// Namespace filtering configuration would be handled here
+	// Update namespace filtering
+	if nsFilterConfigMap, ok := newConfig["namespace_filtering"].(map[string]interface{}); ok {
+		enabled := getBool(nsFilterConfigMap, "enabled", true)
+		if enabled {
+			// Get current filter config
+			currentFilterConfig := filterInstance.GetConfig()
+			if currentFilterConfig == nil {
+				currentFilterConfig = &filter.FilterConfig{
+					Sources: make(map[string]filter.SourceFilter),
+				}
+			}
+
+			// Create a new config with updated global namespace filter
+			// We need to preserve existing source filters and expression
+			newFilterConfig := &filter.FilterConfig{
+				Expression: currentFilterConfig.Expression,
+				Sources:    currentFilterConfig.Sources,
+			}
+
+			// Create or update global namespace filter
+			globalFilter := &filter.GlobalNamespaceFilter{
+				Enabled: true,
+			}
+
+			// Extract included namespaces
+			if included, ok := nsFilterConfigMap["included_namespaces"].([]interface{}); ok {
+				globalFilter.IncludedNamespaces = make([]string, 0, len(included))
+				for _, ns := range included {
+					if nsStr, ok := ns.(string); ok {
+						globalFilter.IncludedNamespaces = append(globalFilter.IncludedNamespaces, nsStr)
+					}
+				}
+			}
+
+			// Extract excluded namespaces
+			if excluded, ok := nsFilterConfigMap["excluded_namespaces"].([]interface{}); ok {
+				globalFilter.ExcludedNamespaces = make([]string, 0, len(excluded))
+				for _, ns := range excluded {
+					if nsStr, ok := ns.(string); ok {
+						globalFilter.ExcludedNamespaces = append(globalFilter.ExcludedNamespaces, nsStr)
+					}
+				}
+			}
+
+			// Update filter config with global namespace filter
+			newFilterConfig.GlobalNamespaceFilter = globalFilter
+			filterInstance.UpdateConfig(newFilterConfig)
+
+			log.Info("Namespace filtering configuration updated",
+				logger.Fields{
+					Component: "main",
+					Operation: "config_update",
+					Additional: map[string]interface{}{
+						"enabled":             enabled,
+						"included_namespaces":  globalFilter.IncludedNamespaces,
+						"excluded_namespaces":  globalFilter.ExcludedNamespaces,
+					},
+				})
+		} else {
+			// Disable global namespace filtering
+			currentFilterConfig := filterInstance.GetConfig()
+			if currentFilterConfig != nil {
+				// Create a copy to avoid modifying the original
+				newConfig := &filter.FilterConfig{
+					Expression: currentFilterConfig.Expression,
+					Sources:    currentFilterConfig.Sources,
+				}
+				if currentFilterConfig.GlobalNamespaceFilter != nil {
+					newConfig.GlobalNamespaceFilter = &filter.GlobalNamespaceFilter{
+						Enabled:            false,
+						IncludedNamespaces: currentFilterConfig.GlobalNamespaceFilter.IncludedNamespaces,
+						ExcludedNamespaces: currentFilterConfig.GlobalNamespaceFilter.ExcludedNamespaces,
+					}
+				}
+				filterInstance.UpdateConfig(newConfig)
+			}
+			log.Info("Namespace filtering disabled via configuration",
+				logger.Fields{
+					Component: "main",
+					Operation: "config_update",
+				})
+		}
+	}
 }
 
 // Helper functions for type conversion

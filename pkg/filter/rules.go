@@ -63,6 +63,20 @@ func (f *Filter) getConfig() *FilterConfig {
 	return f.config
 }
 
+// GetConfig returns a copy of the current filter configuration (thread-safe read)
+// This is exported for use by external components that need to merge configs
+func (f *Filter) GetConfig() *FilterConfig {
+	f.mu.RLock()
+	defer f.mu.RUnlock()
+	if f.config == nil {
+		return &FilterConfig{
+			Sources: make(map[string]SourceFilter),
+		}
+	}
+	// Return a shallow copy (caller should deep copy if modifying)
+	return f.config
+}
+
 // Allow checks if an observation should be allowed based on filter rules
 // Returns true if the observation should be processed, false if it should be filtered out
 // This is called BEFORE normalization and deduplication

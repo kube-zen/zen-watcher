@@ -142,12 +142,16 @@ func TestOptimizationStateManager_UpdateActiveRules(t *testing.T) {
 
 	rules := []config.DynamicFilterRule{
 		{
-			Condition: "severity == 'low'",
-			Action:    "filter",
+			Expression: "severity == 'low'",
+			Enabled:    true,
+			Priority:   0.5,
+			Source:     "test-source",
 		},
 		{
-			Condition: "namespace == 'default'",
-			Action:    "allow",
+			Expression: "namespace == 'default'",
+			Enabled:    true,
+			Priority:   0.5,
+			Source:     "test-source",
 		},
 	}
 

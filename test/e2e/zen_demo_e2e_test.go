@@ -476,7 +476,7 @@ func extractMetricValue(metricsOutput, metricName string) string {
 
 // TestMetricsEndpoint verifies that zen-watcher metrics endpoint is accessible
 func TestMetricsEndpoint(t *testing.T) {
-	_, err := getKubernetesClient()
+	clientset, err := getKubernetesClient()
 	if err != nil {
 		t.Fatalf("Failed to get Kubernetes client: %v", err)
 	}
@@ -525,7 +525,7 @@ func TestMetricsEndpoint(t *testing.T) {
 func TestCoreMetrics(t *testing.T) {
 	// This is a placeholder - actual metrics scraping would require port-forwarding
 	// and parsing Prometheus format. For now, we just verify the service exists.
-	_, err := getKubernetesClient()
+	clientset, err := getKubernetesClient()
 	if err != nil {
 		t.Fatalf("Failed to get Kubernetes client: %v", err)
 	}

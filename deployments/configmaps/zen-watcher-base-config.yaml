@@ -19,11 +19,6 @@ data:
       batch_age: 10s
       flush_interval: 30s
     
-    http_client:
-      timeout: 30s
-      max_connections: 100
-      rate_limit: 1000
-    
     namespace_filtering:
       enabled: true
       included_namespaces: []

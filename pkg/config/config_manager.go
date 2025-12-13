@@ -391,11 +391,6 @@ func applyDefaults(config map[string]interface{}) map[string]interface{} {
 			"batch_age":      "10s",
 			"flush_interval": "30s",
 		},
-		"http_client": map[string]interface{}{
-			"timeout":         "30s",
-			"max_connections": 100,
-			"rate_limit":      1000,
-		},
 		"namespace_filtering": map[string]interface{}{
 			"enabled":             true,
 			"included_namespaces": []interface{}{},
