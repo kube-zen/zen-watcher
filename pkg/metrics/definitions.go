@@ -50,7 +50,7 @@ type Metrics struct {
 	// Dedup metrics (enhanced - NEW)
 	DedupCacheUsage *prometheus.GaugeVec
 	DedupEvictions  *prometheus.CounterVec
-	
+
 	// Dedup strategy metrics (W33 - v1.1)
 	DedupEffectivenessPerStrategy *prometheus.GaugeVec   // Dedup effectiveness by strategy
 	DedupDecisionsTotal           *prometheus.CounterVec // Dedup decisions by strategy and decision type
@@ -103,7 +103,7 @@ func NewMetrics() *Metrics {
 			Name: "zen_watcher_events_total",
 			Help: "Total number of events that resulted in Observation CRD creation (after filtering and deduplication), grouped by source, category, severity, eventType, namespace, and kind",
 		},
-		[]string{"source", "category", "severity", "eventType", "namespace", "kind"},
+		[]string{"source", "category", "severity", "eventType", "namespace", "kind", "strategy"}, // Added strategy label
 	)
 
 	toolsActive := prometheus.NewGaugeVec(
@@ -615,7 +615,7 @@ func NewMetrics() *Metrics {
 		// Dedup metrics (NEW)
 		DedupCacheUsage: dedupCacheUsage,
 		DedupEvictions:  dedupEvictions,
-		
+
 		// Dedup strategy metrics (W33)
 		DedupEffectivenessPerStrategy: dedupEffectivenessPerStrategy,
 		DedupDecisionsTotal:           dedupDecisionsTotal,

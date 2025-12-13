@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zen-watcher-prod-config
+  namespace: zen-system
+  labels:
+    app.kubernetes.io/name: zen-watcher
+    app.kubernetes.io/component: config
+    environment: production
+data:
+  features.yaml: |
+    worker_pool:
+      enabled: true
+      size: 20
+      queue_size: 5000
+    
+    event_batching:
+      enabled: true
+      batch_size: 200
+      batch_age: 5s
+      flush_interval: 10s
+    
+    namespace_filtering:
+      included_namespaces: ["production", "staging"]
+

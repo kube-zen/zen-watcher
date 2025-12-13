@@ -37,7 +37,7 @@ spec:
           warning: 0.5
           critical: 0.3
   
-  # Legacy fields (backward compatibility - maps to processing.*)
+  # Backward compatibility fields (maps to processing.*)
   filters:
     enabled: true
     minPriority: 0.6

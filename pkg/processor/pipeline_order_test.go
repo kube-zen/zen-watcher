@@ -43,8 +43,8 @@ func (m *mockFilter) AllowWithReason(obs *unstructured.Unstructured) (bool, stri
 
 // mockDeduper tracks when it's called
 type mockDeduper struct {
-	called      bool
-	callOrder   int
+	called       bool
+	callOrder    int
 	shouldCreate bool
 }
 
@@ -79,17 +79,17 @@ func (m *mockOptimizationProvider) GetCurrentStrategy(source string) string {
 // 2. Normalization runs only after both filter and dedup
 func TestPipelineOrder_FilterFirst(t *testing.T) {
 	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
-	
+
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
 	deduper := dedup.NewDeduper(dedup.Config{DefaultWindow: 60 * time.Second, MaxSize: 10000})
-	
+
 	observationGVR := watcher.GetObservationGVR()
 	creator := watcher.NewObservationCreator(dynamicClient, observationGVR, f, deduper, nil, nil, nil, nil)
-	
+
 	proc := NewProcessor(f, deduper, creator)
 	proc.SetOptimizationProvider(&mockOptimizationProvider{strategy: "filter_first"})
-	
+
 	rawEvent := &generic.RawEvent{
 		Source:    "test-source",
 		Timestamp: time.Now(),
@@ -97,7 +97,7 @@ func TestPipelineOrder_FilterFirst(t *testing.T) {
 			"severity": "HIGH",
 		},
 	}
-	
+
 	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
 		Processing: &generic.ProcessingConfig{
@@ -111,33 +111,33 @@ func TestPipelineOrder_FilterFirst(t *testing.T) {
 			},
 		},
 	}
-	
+
 	ctx := context.Background()
 	err := proc.ProcessEvent(ctx, rawEvent, sourceConfig)
 	if err != nil {
 		t.Fatalf("ProcessEvent() error = %v", err)
 	}
-	
+
 	// Wait for async processing
 	time.Sleep(100 * time.Millisecond)
-	
+
 	// Verify observation was created with normalized fields
 	// This proves normalization happened after filter/dedup
 	list, err := dynamicClient.Resource(observationGVR).Namespace("default").List(ctx, nil)
 	if err != nil {
 		t.Fatalf("Failed to list observations: %v", err)
 	}
-	
+
 	if len(list.Items) == 0 {
 		t.Fatal("Expected observation to be created")
 	}
-	
+
 	obs := list.Items[0]
 	spec, ok := obs.Object["spec"].(map[string]interface{})
 	if !ok {
 		t.Fatal("Observation spec is not a map")
 	}
-	
+
 	// Verify normalized fields exist (proves normalization ran)
 	if spec["category"] != "security" {
 		t.Errorf("category = %v, want security", spec["category"])
@@ -145,7 +145,7 @@ func TestPipelineOrder_FilterFirst(t *testing.T) {
 	if spec["eventType"] != "test" {
 		t.Errorf("eventType = %v, want test", spec["eventType"])
 	}
-	
+
 	// Key assertion: If we got here with normalized fields, normalization must have
 	// happened after filter and dedup (since the event passed through both)
 }
@@ -156,17 +156,17 @@ func TestPipelineOrder_FilterFirst(t *testing.T) {
 // 2. Normalization runs only after both dedup and filter
 func TestPipelineOrder_DedupFirst(t *testing.T) {
 	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
-	
+
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
 	deduper := dedup.NewDeduper(dedup.Config{DefaultWindow: 60 * time.Second, MaxSize: 10000})
-	
+
 	observationGVR := watcher.GetObservationGVR()
 	creator := watcher.NewObservationCreator(dynamicClient, observationGVR, f, deduper, nil, nil, nil, nil)
-	
+
 	proc := NewProcessor(f, deduper, creator)
 	proc.SetOptimizationProvider(&mockOptimizationProvider{strategy: "dedup_first"})
-	
+
 	rawEvent := &generic.RawEvent{
 		Source:    "test-source",
 		Timestamp: time.Now(),
@@ -174,7 +174,7 @@ func TestPipelineOrder_DedupFirst(t *testing.T) {
 			"severity": "HIGH",
 		},
 	}
-	
+
 	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
 		Processing: &generic.ProcessingConfig{
@@ -188,32 +188,32 @@ func TestPipelineOrder_DedupFirst(t *testing.T) {
 			},
 		},
 	}
-	
+
 	ctx := context.Background()
 	err := proc.ProcessEvent(ctx, rawEvent, sourceConfig)
 	if err != nil {
 		t.Fatalf("ProcessEvent() error = %v", err)
 	}
-	
+
 	// Wait for async processing
 	time.Sleep(100 * time.Millisecond)
-	
+
 	// Verify observation was created with normalized fields
 	list, err := dynamicClient.Resource(observationGVR).Namespace("default").List(ctx, nil)
 	if err != nil {
 		t.Fatalf("Failed to list observations: %v", err)
 	}
-	
+
 	if len(list.Items) == 0 {
 		t.Fatal("Expected observation to be created")
 	}
-	
+
 	obs := list.Items[0]
 	spec, ok := obs.Object["spec"].(map[string]interface{})
 	if !ok {
 		t.Fatal("Observation spec is not a map")
 	}
-	
+
 	// Verify normalized fields exist (proves normalization ran after dedup+filter)
 	if spec["category"] != "security" {
 		t.Errorf("category = %v, want security", spec["category"])
@@ -225,18 +225,18 @@ func TestPipelineOrder_NormalizationAfterFilterDedup(t *testing.T) {
 	// This test ensures that normalization is never called before both filter and dedup
 	// We verify this by checking that normalized observations have the correct structure
 	// that can only exist after filter/dedup processing
-	
+
 	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
-	
+
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
 	deduper := dedup.NewDeduper(dedup.Config{DefaultWindow: 60 * time.Second, MaxSize: 10000})
-	
+
 	observationGVR := watcher.GetObservationGVR()
 	creator := watcher.NewObservationCreator(dynamicClient, observationGVR, f, deduper, nil, nil, nil, nil)
-	
+
 	proc := NewProcessor(f, deduper, creator)
-	
+
 	rawEvent := &generic.RawEvent{
 		Source:    "test-source",
 		Timestamp: time.Now(),
@@ -245,7 +245,7 @@ func TestPipelineOrder_NormalizationAfterFilterDedup(t *testing.T) {
 			"category": "security",
 		},
 	}
-	
+
 	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
 		Normalization: &generic.NormalizationConfig{
@@ -256,32 +256,32 @@ func TestPipelineOrder_NormalizationAfterFilterDedup(t *testing.T) {
 			},
 		},
 	}
-	
+
 	ctx := context.Background()
 	err := proc.ProcessEvent(ctx, rawEvent, sourceConfig)
 	if err != nil {
 		t.Fatalf("ProcessEvent() error = %v", err)
 	}
-	
+
 	// Wait for async processing
 	time.Sleep(100 * time.Millisecond)
-	
+
 	// Verify observation was created with normalized fields
 	list, err := dynamicClient.Resource(observationGVR).Namespace("default").List(ctx, nil)
 	if err != nil {
 		t.Fatalf("Failed to list observations: %v", err)
 	}
-	
+
 	if len(list.Items) == 0 {
 		t.Fatal("Expected observation to be created")
 	}
-	
+
 	obs := list.Items[0]
 	spec, ok := obs.Object["spec"].(map[string]interface{})
 	if !ok {
 		t.Fatal("Observation spec is not a map")
 	}
-	
+
 	// Verify normalization fields are present (can only exist after normalization)
 	if spec["category"] != "security" {
 		t.Errorf("category = %v, want security", spec["category"])
@@ -289,7 +289,7 @@ func TestPipelineOrder_NormalizationAfterFilterDedup(t *testing.T) {
 	if spec["eventType"] != "vulnerability" {
 		t.Errorf("eventType = %v, want vulnerability", spec["eventType"])
 	}
-	
+
 	// This proves normalization happened, and since the event passed through,
 	// it must have passed filter and dedup first
 }
@@ -298,17 +298,17 @@ func TestPipelineOrder_NormalizationAfterFilterDedup(t *testing.T) {
 func TestObservationCreator_NoFilterDedupReRun(t *testing.T) {
 	// This test verifies that ObservationCreator.CreateObservation does not
 	// re-determine order or re-run filter/dedup
-	
+
 	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
-	
+
 	// Create filter and deduper with call tracking
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
 	deduper := dedup.NewDeduper(dedup.Config{DefaultWindow: 60 * time.Second, MaxSize: 10000})
-	
+
 	observationGVR := watcher.GetObservationGVR()
 	creator := watcher.NewObservationCreator(dynamicClient, observationGVR, f, deduper, nil, nil, nil, nil)
-	
+
 	// Create a pre-processed observation (simulating what Processor passes to CreateObservation)
 	event := &watcher.Event{
 		Source:    "test-source",
@@ -320,27 +320,26 @@ func TestObservationCreator_NoFilterDedupReRun(t *testing.T) {
 		},
 	}
 	observation := watcher.EventToObservation(event)
-	
+
 	// Call CreateObservation directly (bypassing Processor)
 	ctx := context.Background()
 	err := creator.CreateObservation(ctx, observation)
 	if err != nil {
 		t.Fatalf("CreateObservation() error = %v", err)
 	}
-	
+
 	// Verify observation was created
 	time.Sleep(100 * time.Millisecond)
 	list, err := dynamicClient.Resource(observationGVR).Namespace("default").List(ctx, nil)
 	if err != nil {
 		t.Fatalf("Failed to list observations: %v", err)
 	}
-	
+
 	if len(list.Items) == 0 {
 		t.Fatal("Expected observation to be created")
 	}
-	
+
 	// Key assertion: CreateObservation should not have called determineProcessingOrder
 	// or re-run filter/dedup. The fact that it created the observation without
 	// those steps proves it's acting as a sink only.
 }
-

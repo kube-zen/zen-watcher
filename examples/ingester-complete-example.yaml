@@ -4,7 +4,7 @@
 ---
 # Example 1: Informer Ingester (for CRD-based tools like Trivy, Kyverno)
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: trivy-informer-example
   namespace: zen-system
@@ -42,7 +42,7 @@ spec:
 ---
 # Example 2: Webhook Ingester (for push-based tools like Falco, Audit)
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: falco-webhook-example
   namespace: zen-system
@@ -68,7 +68,7 @@ spec:
 ---
 # Example 3: Logs Ingester (for log-based monitoring)
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: sealed-secrets-logs-example
   namespace: zen-system
@@ -96,7 +96,7 @@ spec:
 ---
 # Example 4: ConfigMap Ingester (for batch tools like Checkov, Kube-Bench)
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: checkov-cm-example
   namespace: zen-system
@@ -127,7 +127,7 @@ spec:
 # Note: k8s-events ingester is handled by K8sEventsAdapter which is built-in
 # This example shows how it would be configured (if supported via CRD)
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: kubernetes-events-example
   namespace: zen-system

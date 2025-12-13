@@ -45,7 +45,7 @@ func GetDefaultSourceConfig(source string) DefaultSourceConfig {
 		RateLimitMax:      100,
 	}
 
-	// Source-specific overrides are configured via ObservationSourceConfig CRDs
+	// Source-specific overrides are configured via Ingester CRDs
 	// No hardcoded defaults for specific tools
 
 	return defaults

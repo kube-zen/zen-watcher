@@ -45,7 +45,7 @@ func GenerateFingerprint(rawEvent RawEvent) string {
 	}
 
 	// Generate fingerprint from raw event data
-	// Try common identifier fields (configurable via ObservationSourceConfig)
+	// Try common identifier fields (configurable via Ingester CRD)
 	if idField := extractString(rawEvent.Data, "id", "identifier", "ID", "Identifier"); idField != "" {
 		resourceName := extractResourceName(rawEvent.Resources)
 		return fmt.Sprintf("%s/%s/%s", source, idField, resourceName)

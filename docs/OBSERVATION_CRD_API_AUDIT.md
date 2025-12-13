@@ -220,7 +220,7 @@ status:
 
 ## Related CRDs
 
-### ObservationSourceConfig
+### Ingester
 
 **Group**: `zen.kube-zen.io`  
 **Version**: `v1alpha1`  
@@ -229,22 +229,13 @@ status:
 **Evaluation**:
 - ✅ Properly versioned as alpha
 - ✅ Good validation (enums, patterns, ranges)
-- ⚠️ Could benefit from Conditions in status (future)
-
-### ObservationTypeConfig
-
-**Group**: `zen.kube-zen.io`  
-**Version**: `v1alpha1`  
-**Status**: Alpha (appropriate for configuration CRD)
-
-**Evaluation**:
-- ✅ Properly versioned as alpha
 - ✅ Flexible field mapping (JSONPath)
+- ⚠️ Could benefit from Conditions in status (future)
 - ⚠️ Could benefit from validation of template syntax (future)
 
-### ObservationFilter, ObservationDedupConfig, ObservationMapping
+### ObservationMapping
 
-**Status**: All properly versioned as alpha
+**Status**: Properly versioned as alpha
 
 **Evaluation**: Configuration CRDs are appropriately versioned and don't require immediate changes for KEP readiness.
 
@@ -306,7 +297,7 @@ status:
    - **Version**: v1beta1
    - **Breaking**: No
 
-9. **Validate Template Syntax in ObservationTypeConfig**
+9. **Validate Template Syntax in Ingester CRD**
    - **Impact**: Catches configuration errors early
    - **Effort**: Medium (validation webhook or admission controller)
    - **Version**: v1beta1

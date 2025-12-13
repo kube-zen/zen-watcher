@@ -90,7 +90,7 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	if config.Expression != "" {
 		exprFilter, err := NewExpressionFilter(config.Expression)
 		if err != nil {
-			logger.Debug("Failed to parse filter expression, falling back to legacy filters",
+			logger.Debug("Failed to parse filter expression, falling back to list-based filters",
 				logger.Fields{
 					Component: "filter",
 					Operation: "filter_check",
@@ -103,7 +103,7 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 		} else {
 			result, err := exprFilter.Evaluate(observation)
 			if err != nil {
-				logger.Debug("Failed to evaluate filter expression, falling back to legacy filters",
+				logger.Debug("Failed to evaluate filter expression, falling back to list-based filters",
 					logger.Fields{
 						Component: "filter",
 						Operation: "filter_check",
@@ -112,7 +112,7 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 							"error": err.Error(),
 						},
 					})
-				// Fall through to legacy filtering
+				// Fall through to list-based filtering
 			} else {
 				if !result {
 					return false, "expression_filtered"

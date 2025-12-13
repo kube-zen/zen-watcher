@@ -124,4 +124,3 @@ func NewPipelineError(source, ingester, code, message string, err error) *Pipeli
 		OriginalErr: err,
 	}
 }
-

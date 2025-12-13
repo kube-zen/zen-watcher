@@ -459,9 +459,9 @@ func (ep *EventProcessor) ProcessMyToolReport(ctx context.Context, report *unstr
 ### Phase 2: Advanced Features (v1.0.10) ✅ COMPLETE
 
 - [x] **Modular Adapter Architecture** - SourceAdapter interface for all 9 sources
-- [x] **ObservationFilter CRD** - Kubernetes-native dynamic filtering
+- [x] **Ingester CRD** - Kubernetes-native dynamic filtering
 - [x] **ObservationMapping CRD** - Generic CRD adapter for "long tail" integrations
-- [x] **Filter Merge Semantics** - ConfigMap + ObservationFilter CRD merging with comprehensive tests
+- [x] **Filter Merge Semantics** - ConfigMap + Ingester CRD merging with comprehensive tests
 - [x] **Cluster-Blind Design** - Removed all CLUSTER_ID/TENANT_ID metadata
 - [x] **Enhanced Metrics** - Filter, adapter, mapping, dedup, GC metrics defined
 - [x] **VictoriaMetrics Integration** - VMServiceScrape with automatic discovery

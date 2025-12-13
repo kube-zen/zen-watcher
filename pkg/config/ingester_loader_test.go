@@ -29,18 +29,18 @@ func TestConvertToIngesterConfig_ProcessingFilter(t *testing.T) {
 				"namespace": "default",
 			},
 			"spec": map[string]interface{}{
-				"source":    "test-source",
-				"ingester":  "informer",
+				"source":   "test-source",
+				"ingester": "informer",
 				"processing": map[string]interface{}{
 					"filter": map[string]interface{}{
-						"expression": "severity >= HIGH",
-						"minPriority": 0.5,
+						"expression":        "severity >= HIGH",
+						"minPriority":       0.5,
 						"includeNamespaces": []interface{}{"ns1", "ns2"},
 						"excludeNamespaces": []interface{}{"kube-system"},
 					},
 					"dedup": map[string]interface{}{
-						"enabled": true,
-						"window":  "60s",
+						"enabled":  true,
+						"window":   "60s",
 						"strategy": "fingerprint",
 					},
 				},
@@ -86,8 +86,8 @@ func TestConvertToIngesterConfig_ProcessingFilter(t *testing.T) {
 	}
 }
 
-func TestConvertToIngesterConfig_LegacyFilters(t *testing.T) {
-	// Test backward compatibility: spec.filters should still work
+func TestConvertToIngesterConfig_ProcessingFilterOnly(t *testing.T) {
+	// Test that only spec.processing.filter is supported
 	u := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"metadata": map[string]interface{}{
@@ -98,7 +98,7 @@ func TestConvertToIngesterConfig_LegacyFilters(t *testing.T) {
 				"source":   "test-source",
 				"ingester": "informer",
 				"filters": map[string]interface{}{
-					"expression": "severity = CRITICAL",
+					"expression":  "severity = CRITICAL",
 					"minPriority": 0.7,
 				},
 			},
@@ -112,18 +112,14 @@ func TestConvertToIngesterConfig_LegacyFilters(t *testing.T) {
 		t.Fatal("Expected non-nil config")
 	}
 
-	// Verify filter config is loaded from legacy spec.filters
-	if config.Filter == nil {
-		t.Fatal("Expected Filter config to be loaded from legacy spec.filters")
-	}
-
-	if config.Filter.Expression != "severity = CRITICAL" {
-		t.Errorf("Expected expression 'severity = CRITICAL', got '%s'", config.Filter.Expression)
+	// Verify filter config is NOT loaded from spec.filters (only processing.filter is supported)
+	if config.Filter != nil {
+		t.Fatal("Filter config should not be loaded from spec.filters (only spec.processing.filter is supported)")
 	}
 }
 
-func TestConvertToIngesterConfig_ProcessingFilterTakesPrecedence(t *testing.T) {
-	// Test that spec.processing.filter takes precedence over spec.filters
+func TestConvertToIngesterConfig_ProcessingFilterCanonical(t *testing.T) {
+	// Test that only spec.processing.filter is supported (spec.filters is ignored)
 	u := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"metadata": map[string]interface{}{
@@ -139,7 +135,7 @@ func TestConvertToIngesterConfig_ProcessingFilterTakesPrecedence(t *testing.T) {
 					},
 				},
 				"filters": map[string]interface{}{
-					"expression": "severity = CRITICAL", // Legacy location (should be ignored)
+					"expression": "severity = CRITICAL", // Should be ignored (only processing.filter is supported)
 				},
 			},
 		},
@@ -165,10 +161,10 @@ func TestConvertToIngesterConfig_ProcessingFilterTakesPrecedence(t *testing.T) {
 func TestConvertToIngesterConfig_RequiredFieldsValidation(t *testing.T) {
 	// Test W59: Required fields (source, ingester, destinations) must be present and non-empty
 	tests := []struct {
-		name          string
-		spec          map[string]interface{}
-		shouldReject  bool
-		missingField  string
+		name         string
+		spec         map[string]interface{}
+		shouldReject bool
+		missingField string
 	}{
 		{
 			name: "Missing source field",
@@ -184,7 +180,7 @@ func TestConvertToIngesterConfig_RequiredFieldsValidation(t *testing.T) {
 		{
 			name: "Empty source field",
 			spec: map[string]interface{}{
-				"source": "",
+				"source":   "",
 				"ingester": "informer",
 				"destinations": []interface{}{
 					map[string]interface{}{"type": "crd", "value": "observations"},
@@ -228,8 +224,8 @@ func TestConvertToIngesterConfig_RequiredFieldsValidation(t *testing.T) {
 		{
 			name: "Empty destinations array",
 			spec: map[string]interface{}{
-				"source":      "test-source",
-				"ingester":    "informer",
+				"source":       "test-source",
+				"ingester":     "informer",
 				"destinations": []interface{}{},
 			},
 			shouldReject: true,
@@ -281,4 +277,3 @@ func TestConvertToIngesterConfig_RequiredFieldsValidation(t *testing.T) {
 		})
 	}
 }
-

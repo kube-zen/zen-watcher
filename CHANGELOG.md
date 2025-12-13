@@ -102,7 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Version Sync:** Image and chart now use same version (1.0.0-alpha)
 - KEP status: draft → implementable
 - README: Clearer positioning and value proposition
-- SECURITY_RBAC.md: Added ObservationFilter and ObservationMapping permissions
+- SECURITY_RBAC.md: Added Ingester and ObservationMapping permissions
 
 #### Fixed
 - Chart.yaml: Use `kubezen` (was `zubezen` in some places)
@@ -120,8 +120,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Implemented ingester-based architecture for all sources (Trivy, Kyverno, Falco, Audit, Checkov, KubeBench)
 
 #### Dynamic Filtering with CRDs
-- **Added** ObservationFilter CRD for Kubernetes-native filtering
-- **Implemented** filter merge semantics (ConfigMap + ObservationFilter CRD)
+- **Added** Ingester CRD for Kubernetes-native filtering
+- **Implemented** filter merge semantics (ConfigMap + Ingester CRD)
 - **Added** comprehensive filter merge tests with 20+ test cases
 - **Added** last-good-config fallback for filter errors
 
@@ -146,7 +146,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Testing
 - **Added** filter merger unit tests (pkg/filter/merger_test.go)
-- **Added** ObservationFilter loader tests (pkg/config/observationfilter_loader_test.go)
+- **Added** Ingester loader tests (pkg/config/ingester_loader_test.go)
 - **Improved** test coverage for filter logic
 
 #### Deployment & Demo
@@ -158,11 +158,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Documentation
 - **Created** docs/STABILITY.md - production readiness guide
 - **Updated** KEP to "implementable" status with implementation history
-- **Enhanced** docs/SECURITY_RBAC.md with new CRD permissions
+- **Enhanced** docs/SECURITY_RBAC.md with Ingester CRD permissions
 - **Updated** README.md with v1.0.10 features
 
 ### 🐛 Bug Fixes
-- **Fixed** ObservationFilter CRD validation error (removed conflicting additionalProperties)
+- **Fixed** Ingester CRD validation error (removed conflicting additionalProperties)
 - **Fixed** RBAC permissions for aquasecurity.github.io resources
 - **Fixed** ConfigMap adapter metrics not incrementing
 - **Fixed** Webhook adapter metrics not incrementing
@@ -175,7 +175,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Enhanced** error handling and logging throughout
 
 ### 📦 Helm Chart (v1.0.10)
-- **Added** observationfilter_crd.yaml template
+- **Added** ingester_crd.yaml template
 - **Added** observationmapping_crd.yaml template
 - **Added** mock-data-job.yaml for automated demos
 - **Added** mock-kyverno-policy.yaml for non-blocking policy generation

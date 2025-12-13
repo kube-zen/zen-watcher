@@ -28,7 +28,7 @@ spec:
       order: filter_first
       autoOptimize: true
   
-  # Legacy fields (backward compatibility - maps to processing.*)
+  # Backward compatibility fields (maps to processing.*)
   filters:
     enabled: true
     minPriority: 0.5

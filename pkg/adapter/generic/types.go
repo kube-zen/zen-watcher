@@ -27,17 +27,15 @@ type RawEvent struct {
 	Metadata  map[string]interface{} // Type, priority from config normalization
 }
 
-// SourceConfig represents the adapter configuration from ObservationSourceConfig CRD
+// SourceConfig represents the adapter configuration from Ingester CRD
 type SourceConfig struct {
 	Source   string
 	Ingester string // informer, webhook, logs, k8s-events (cm/configmap is NOT supported)
 
 	// Adapter-specific configs (only one should be set based on ingester)
-	Informer  *InformerConfig
-	Webhook   *WebhookConfig
-	Logs      *LogsConfig
-	// ConfigMap removed: use Informer with GVR for configmaps
-
+	Informer *InformerConfig
+	Webhook  *WebhookConfig
+	Logs     *LogsConfig
 	// Normalization
 	Normalization *NormalizationConfig
 
@@ -100,15 +98,6 @@ type LogPattern struct {
 	Priority float64
 }
 
-// ConfigMapConfig is not supported.
-// Use InformerConfig with GVR { group: "", version: "v1", resource: "configmaps" } instead.
-type ConfigMapConfig struct {
-	Namespace     string
-	LabelSelector string
-	PollInterval  string
-	JSONPath      string
-}
-
 // NormalizationConfig for normalizing raw events
 type NormalizationConfig struct {
 	Domain       string
@@ -152,18 +141,18 @@ type RateLimitConfig struct {
 
 // DedupConfig holds deduplication configuration (W33 - v1.1)
 type DedupConfig struct {
-	Enabled           bool
-	Window            string
-	Strategy          string   // fingerprint, key, event-stream
-	Fields            []string // For key-based strategy
-	MaxEventsPerWindow int     // For event-stream strategy
-	Config            map[string]interface{} // Strategy-specific configuration
+	Enabled            bool
+	Window             string
+	Strategy           string                 // fingerprint, key, event-stream
+	Fields             []string               // For key-based strategy
+	MaxEventsPerWindow int                    // For event-stream strategy
+	Config             map[string]interface{} // Strategy-specific configuration
 }
 
 // ProcessingConfig holds processing order and optimization settings (W33 - v1.1)
 type ProcessingConfig struct {
-	Order              string // filter_first, dedup_first, auto
-	AutoOptimize       bool
-	AnalysisInterval   string
+	Order               string // filter_first, dedup_first, auto
+	AutoOptimize        bool
+	AnalysisInterval    string
 	ConfidenceThreshold float64
 }

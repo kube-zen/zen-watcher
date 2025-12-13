@@ -86,7 +86,7 @@ if [ -d "$DASHBOARD_DIR" ]; then
                 
                 HTTP_CODE2=$(echo "$RESPONSE2" | tail -n1)
                 if [ "$HTTP_CODE2" = "200" ] || [ "$HTTP_CODE2" = "201" ]; then
-                    log_success "  ✓ Imported: $dashboard_name (legacy API)"
+                    log_success "  ✓ Imported: $dashboard_name"
                     IMPORTED=$((IMPORTED + 1))
                 else
                     log_warn "  ✗ Failed to import: $dashboard_name (HTTP $HTTP_CODE/$HTTP_CODE2)"

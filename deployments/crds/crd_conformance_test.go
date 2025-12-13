@@ -15,6 +15,7 @@
 package crds
 
 import (
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -49,7 +50,7 @@ spec:
       LOW: 0.3
 `
 
-	err := validateManifest(validManifest, "ingester")
+	err := validateManifest(t, validManifest, "ingester")
 	if err != nil {
 		t.Fatalf("Valid Ingester manifest should pass validation: %v", err)
 	}
@@ -71,7 +72,7 @@ spec:
       value: observations
 `
 
-	err := validateManifest(invalidManifest, "ingester")
+	err := validateManifest(t, invalidManifest, "ingester")
 	if err == nil {
 		t.Error("Invalid source pattern should be rejected by validation")
 	}
@@ -91,7 +92,7 @@ spec:
   # Missing: destinations (required)
 `
 
-	err := validateManifest(invalidManifest, "ingester")
+	err := validateManifest(t, invalidManifest, "ingester")
 	if err == nil {
 		t.Error("Missing required fields should be rejected by validation")
 	}
@@ -113,7 +114,7 @@ spec:
       value: observations
 `
 
-	err := validateManifest(invalidManifest, "ingester")
+	err := validateManifest(t, invalidManifest, "ingester")
 	if err == nil {
 		t.Error("Invalid ingester type enum should be rejected by validation")
 	}
@@ -135,7 +136,7 @@ spec:
       value: observations
 `
 
-	err := validateManifest(invalidManifest, "ingester")
+	err := validateManifest(t, invalidManifest, "ingester")
 	if err == nil {
 		t.Error("Invalid destination type enum should be rejected by validation")
 	}
@@ -157,7 +158,7 @@ spec:
   detectedAt: "2025-01-15T10:00:00Z"
 `
 
-	err := validateManifest(validManifest, "observation")
+	err := validateManifest(t, validManifest, "observation")
 	if err != nil {
 		t.Fatalf("Valid Observation manifest should pass validation: %v", err)
 	}
@@ -179,7 +180,7 @@ spec:
   detectedAt: "2025-01-15T10:00:00Z"
 `
 
-	err := validateManifest(invalidManifest, "observation")
+	err := validateManifest(t, invalidManifest, "observation")
 	if err == nil {
 		t.Error("Invalid category enum should be rejected by validation")
 	}
@@ -201,7 +202,7 @@ spec:
   detectedAt: "2025-01-15T10:00:00Z"
 `
 
-	err := validateManifest(invalidManifest, "observation")
+	err := validateManifest(t, invalidManifest, "observation")
 	if err == nil {
 		t.Error("Invalid severity enum should be rejected by validation")
 	}
@@ -223,14 +224,14 @@ spec:
   detectedAt: "2025-01-15T10:00:00Z"
 `
 
-	err := validateManifest(invalidManifest, "observation")
+	err := validateManifest(t, invalidManifest, "observation")
 	if err == nil {
 		t.Error("Invalid eventType pattern should be rejected by validation")
 	}
 }
 
 // validateManifest uses kubectl apply --dry-run=client to validate a manifest
-func validateManifest(manifest string, crdType string) error {
+func validateManifest(t *testing.T, manifest string, crdType string) error {
 	// Write manifest to temp file
 	tmpFile := filepath.Join(t.TempDir(), "manifest.yaml")
 	err := os.WriteFile(tmpFile, []byte(manifest), 0644)
@@ -244,9 +245,9 @@ func validateManifest(manifest string, crdType string) error {
 	if err != nil {
 		// Check if error is validation-related (not just missing CRD)
 		outputStr := string(output)
-		if strings.Contains(outputStr, "validation") || 
-		   strings.Contains(outputStr, "invalid") ||
-		   strings.Contains(outputStr, "required") {
+		if strings.Contains(outputStr, "validation") ||
+			strings.Contains(outputStr, "invalid") ||
+			strings.Contains(outputStr, "required") {
 			return err
 		}
 		// If CRD doesn't exist, that's expected in unit tests - return nil
@@ -258,4 +259,3 @@ func validateManifest(manifest string, crdType string) error {
 
 	return nil
 }
-

@@ -144,11 +144,11 @@ filters:
 
 Filter expressions are **additive** and **backwards compatible**:
 
-- If `expression` is **not set**, legacy list-based filters are used (`minSeverity`, `includeNamespaces`, etc.)
-- If `expression` **is set**, it takes precedence and legacy fields are ignored
-- You can migrate gradually: start with legacy filters, then add expressions where needed
+- If `expression` is **not set**, list-based filters are used (`minSeverity`, `includeNamespaces`, etc.)
+- If `expression` **is set**, it takes precedence and list-based fields are ignored
+- You can migrate gradually: start with list-based filters, then add expressions where needed
 
-### Legacy Filters (Still Supported)
+### List-Based Filters (Still Supported)
 
 ```yaml
 filters:
@@ -175,8 +175,8 @@ filters:
 
 Invalid expressions result in:
 
-1. **Parse errors**: Syntax errors are logged and legacy filters are used as fallback
-2. **Evaluation errors**: Runtime errors (e.g., type mismatches) are logged and legacy filters are used as fallback
+1. **Parse errors**: Syntax errors are logged and list-based filters are used as fallback
+2. **Evaluation errors**: Runtime errors (e.g., type mismatches) are logged and list-based filters are used as fallback
 
 **Best Practice**: Test expressions in a development environment before deploying to production.
 
@@ -189,6 +189,6 @@ Invalid expressions result in:
 ## Related Documentation
 
 - [Ingester API](INGESTER_API.md) - Complete Ingester CRD reference
-- [Filtering Guide](FILTERING.md) - Legacy filtering documentation
+- [Filtering Guide](FILTERING.md) - List-based filtering documentation
 - [Troubleshooting](TROUBLESHOOTING.md) - Common filter issues
 

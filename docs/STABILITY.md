@@ -288,7 +288,7 @@ Kubernetes rolling update ensures zero downtime.
 
 **v1.0.0 → v1.0.10:**
 - ✅ No breaking changes
-- ✅ New CRDs (ObservationFilter, ObservationMapping) are additive
+- ✅ New CRDs (Ingester, ObservationMapping) are additive
 - ✅ Existing Observation CRDs compatible
 
 ### Rollback Procedure

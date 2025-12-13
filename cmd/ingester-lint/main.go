@@ -18,7 +18,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 
@@ -26,9 +25,9 @@ import (
 )
 
 type LintResult struct {
-	File    string   `json:"file"`
-	Issues  []Issue  `json:"issues"`
-	Summary Summary  `json:"summary"`
+	File    string  `json:"file"`
+	Issues  []Issue `json:"issues"`
+	Summary Summary `json:"summary"`
 }
 
 type Issue struct {
@@ -40,10 +39,10 @@ type Issue struct {
 }
 
 type Summary struct {
-	Total   int `json:"total"`
-	Errors  int `json:"errors"`
+	Total    int `json:"total"`
+	Errors   int `json:"errors"`
 	Warnings int `json:"warnings"`
-	Infos   int `json:"infos"`
+	Infos    int `json:"infos"`
 }
 
 type IngesterSpec struct {
@@ -395,4 +394,3 @@ func printTextOutput(result LintResult) {
 	fmt.Printf("  Summary: %d total (%d errors, %d warnings, %d infos)\n",
 		result.Summary.Total, result.Summary.Errors, result.Summary.Warnings, result.Summary.Infos)
 }
-

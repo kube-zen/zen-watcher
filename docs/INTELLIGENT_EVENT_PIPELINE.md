@@ -230,7 +230,7 @@ Enable auto-optimization with a single parameter:
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: trivy-config
 spec:
@@ -265,7 +265,7 @@ When you set `autoOptimize: true` for a high-volume source like Falco:
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: trivy-config
 spec:
@@ -296,7 +296,7 @@ spec:
    - Suggests `filter.minPriority: 0.5` to filter out LOW severity events
 
 5. **Applies Optimization** (if auto-apply enabled):
-   - Updates ObservationSourceConfig
+   - Updates Ingester
    - System continues monitoring
 
 6. **Measures Impact**:
@@ -364,7 +364,7 @@ Shows:
 ## Best Practices
 
 1. **Start with Auto-Optimization**: Enable `autoOptimize: true` and let the system learn your patterns
-2. **Set Thresholds**: Configure thresholds in ObservationSourceConfig for early warnings
+2. **Set Thresholds**: Configure thresholds in Ingester for early warnings
 3. **Monitor Metrics**: Watch Prometheus metrics to track optimization effectiveness
 4. **Review Suggestions**: Use `analyze` command to review suggestions before applying
 5. **Tune Dedup Windows**: Use per-source windows for sources with retry patterns (e.g., cert-manager: 24h)

@@ -23,12 +23,12 @@ func ConvertIngesterConfigToGeneric(ingesterConfig *IngesterConfig) *generic.Sou
 	if ingesterConfig == nil {
 		return nil
 	}
-	
+
 	config := &generic.SourceConfig{
 		Source:   ingesterConfig.Source,
 		Ingester: ingesterConfig.Ingester,
 	}
-	
+
 	// Convert informer config
 	if ingesterConfig.Informer != nil {
 		config.Informer = &generic.InformerConfig{
@@ -42,7 +42,7 @@ func ConvertIngesterConfigToGeneric(ingesterConfig *IngesterConfig) *generic.Sou
 			ResyncPeriod:  ingesterConfig.Informer.ResyncPeriod,
 		}
 	}
-	
+
 	// Convert webhook config
 	if ingesterConfig.Webhook != nil {
 		config.Webhook = &generic.WebhookConfig{
@@ -55,7 +55,7 @@ func ConvertIngesterConfigToGeneric(ingesterConfig *IngesterConfig) *generic.Sou
 			}
 		}
 	}
-	
+
 	// Convert normalization config
 	if ingesterConfig.Normalization != nil {
 		config.Normalization = &generic.NormalizationConfig{
@@ -71,14 +71,14 @@ func ConvertIngesterConfigToGeneric(ingesterConfig *IngesterConfig) *generic.Sou
 			})
 		}
 	}
-	
+
 	// Convert dedup config (W33 - v1.1)
 	if ingesterConfig.Dedup != nil {
 		config.Dedup = &generic.DedupConfig{
-			Enabled:           ingesterConfig.Dedup.Enabled,
-			Window:            ingesterConfig.Dedup.Window,
-			Strategy:          ingesterConfig.Dedup.Strategy,
-			Fields:            ingesterConfig.Dedup.Fields,
+			Enabled:            ingesterConfig.Dedup.Enabled,
+			Window:             ingesterConfig.Dedup.Window,
+			Strategy:           ingesterConfig.Dedup.Strategy,
+			Fields:             ingesterConfig.Dedup.Fields,
 			MaxEventsPerWindow: ingesterConfig.Dedup.MaxEventsPerWindow,
 		}
 		// Default strategy if not set
@@ -86,17 +86,16 @@ func ConvertIngesterConfigToGeneric(ingesterConfig *IngesterConfig) *generic.Sou
 			config.Dedup.Strategy = "fingerprint"
 		}
 	}
-	
+
 	// Convert processing config (W33 - v1.1)
 	if ingesterConfig.Processing != nil {
 		config.Processing = &generic.ProcessingConfig{
-			Order:              ingesterConfig.Processing.Order,
-			AutoOptimize:       ingesterConfig.Processing.AutoOptimize,
-			AnalysisInterval:   ingesterConfig.Processing.AnalysisInterval,
+			Order:               ingesterConfig.Processing.Order,
+			AutoOptimize:        ingesterConfig.Processing.AutoOptimize,
+			AnalysisInterval:    ingesterConfig.Processing.AnalysisInterval,
 			ConfidenceThreshold: ingesterConfig.Processing.ConfidenceThreshold,
 		}
 	}
-	
+
 	return config
 }
-

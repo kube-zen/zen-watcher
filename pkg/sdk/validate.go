@@ -171,7 +171,7 @@ func ValidateObservation(obs *Observation) error {
 		return &ValidationError{Field: "spec.eventType", Message: "must match pattern ^[a-z0-9_]+$"}
 	}
 
-	// Validate priority if present (legacy field, but may still be in some Observations)
+	// Validate priority if present (may still be in some Observations)
 	// Note: v1 Observations don't have priority, but we validate for compatibility
 
 	// Validate TTL if present

@@ -164,13 +164,13 @@ spec:
 
 ## Webhook Adapter Configuration
 
-### ObservationSourceConfig for Webhook Gateways
+### Ingester CRD for Webhook Gateways
 
-Webhook gateways create an `ObservationSourceConfig` CRD to register with zen-watcher. The following example shows a generic webhook gateway configuration (zen-hook is one concrete implementation):
+Webhook gateways create an `Ingester` CRD to register with zen-watcher. The following example shows a generic webhook gateway configuration (zen-hook is one concrete implementation):
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: webhook-gateway-config
   namespace: zen-system
@@ -197,11 +197,11 @@ spec:
 
 ### Webhook Endpoint
 
-**Path**: `/webhooks/<gateway-identifier>` (configurable via ObservationSourceConfig, e.g., `/webhooks/webhook-gateway`, `/webhooks/zen-hook`)
+**Path**: `/webhooks/<gateway-identifier>` (configurable via Ingester CRD, e.g., `/webhooks/webhook-gateway`, `/webhooks/zen-hook`)
 
 **Method**: `POST`
 
-**Authentication**: Bearer token (from Secret specified in ObservationSourceConfig)
+**Authentication**: Bearer token (from Secret specified in Ingester CRD)
 
 **Request Body**: Observation spec (as JSON)
 
@@ -241,7 +241,7 @@ zen-hook lies **between zen-watcher and SaaS** in terms of quality bar:
 - Enum values (`category`, `severity`) - existing values won't be removed
 
 **Evolving Contracts** (CAN change with versioning):
-- ObservationSourceConfig schema (v1alpha1, can evolve)
+- Ingester CRD schema (v1alpha1, can evolve)
 - Internal webhook processing logic
 - Metrics names (with deprecation period)
 - New enum values (can be added, but existing values won't be removed)
@@ -313,7 +313,7 @@ zen-hook lies **between zen-watcher and SaaS** in terms of quality bar:
 **Contract**: If registration CRD is implemented:
 - zen-watcher will watch registration CRDs
 - zen-watcher will dynamically create webhook endpoints
-- Registration CRD will reference ObservationSourceConfig
+- Registration CRD will reference Ingester CRD
 
 ---
 
@@ -335,14 +335,14 @@ zen-hook lies **between zen-watcher and SaaS** in terms of quality bar:
 
 **Code References**:
 - Webhook Adapter: `pkg/adapter/generic/webhook_adapter.go`
-- ObservationSourceConfig: `deployments/crds/observationsourceconfig_crd.yaml`
+- Ingester CRD: `deployments/crds/ingester_crd.yaml`
 - Webhook Server: `pkg/server/server.go`
 
 ---
 
 ## Open Questions
 
-1. **Webhook Registration**: Should zen-hook use ObservationSourceConfig or a separate registration CRD?
+1. **Webhook Registration**: Should zen-hook use Ingester CRD or a separate registration CRD?
 2. **Batch Processing**: Should zen-hook batch webhooks, or send individually?
 3. **Multi-Tenancy**: How should zen-hook handle multi-tenant webhook routing?
 4. **Webhook Replay**: Should zen-hook support webhook replay (re-sending historical webhooks)?

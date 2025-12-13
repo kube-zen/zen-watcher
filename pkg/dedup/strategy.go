@@ -33,10 +33,10 @@ type DedupStrategy interface {
 
 // StrategyConfig holds configuration for a dedup strategy
 type StrategyConfig struct {
-	Strategy          string   // "fingerprint", "event-stream", "key"
-	Window            string   // Duration string (e.g., "1h")
-	Fields            []string // Fields for key-based strategy
-	MaxEventsPerWindow int     // Max events per window for event-stream strategy
+	Strategy           string   // "fingerprint", "event-stream", "key"
+	Window             string   // Duration string (e.g., "1h")
+	Fields             []string // Fields for key-based strategy
+	MaxEventsPerWindow int      // Max events per window for event-stream strategy
 }
 
 // GetStrategy returns a DedupStrategy by name
@@ -120,4 +120,3 @@ func (s *KeyBasedStrategy) ShouldCreate(deduper *Deduper, key DedupKey, content 
 	// Future enhancement: build key from specified fields
 	return deduper.ShouldCreateWithContent(key, content)
 }
-

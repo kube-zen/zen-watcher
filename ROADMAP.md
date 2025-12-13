@@ -18,7 +18,7 @@ Zen Watcher will always maintain its **pure core**:
 - Production-ready security (non-root, read-only filesystem)
 - Structured logging with correlation IDs (zap-based, production-ready)
 - Deduplication cache with LRU eviction for event deduplication
-- YAML-only source creation via ObservationSourceConfig CRD (no code required)
+- YAML-only source creation via Ingester CRD (no code required)
 
 ✅ **Enterprise Alerting System (Phase 2 - Complete)**
 - 40+ security alerts covering all sources (Falco, Trivy, Kube-Bench, Checkov, Audit, Kyverno)

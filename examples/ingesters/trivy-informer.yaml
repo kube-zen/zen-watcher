@@ -31,7 +31,7 @@ spec:
       analysisInterval: "15m"
       confidenceThreshold: 0.7
   
-  # Legacy fields (backward compatibility - maps to processing.*)
+  # Backward compatibility fields (maps to processing.*)
   filters:
     enabled: true
     minPriority: 0.3

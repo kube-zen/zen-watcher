@@ -216,4 +216,3 @@ func TestStrategyGetWindow(t *testing.T) {
 		t.Error("Key strategy should use default window")
 	}
 }
-

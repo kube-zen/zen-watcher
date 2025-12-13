@@ -25,22 +25,22 @@ import (
 func TestStrategyDecider_ThresholdsMatchDocumentation(t *testing.T) {
 	sd := NewStrategyDecider()
 	config := sd.config
-	
+
 	// According to AUTO_OPTIMIZATION_STATUS.md and INTELLIGENT_EVENT_PIPELINE.md:
 	// - filter_first threshold: LOW severity > 70%
 	// - dedup_first threshold: dedup effectiveness > 50%
-	
+
 	// Verify filter_first threshold
 	expectedFilterFirstThreshold := 0.70
 	if config.FilterFirstThresholdLowSeverity != expectedFilterFirstThreshold {
-		t.Errorf("FilterFirstThresholdLowSeverity = %v, want %v (70%% as documented)", 
+		t.Errorf("FilterFirstThresholdLowSeverity = %v, want %v (70%% as documented)",
 			config.FilterFirstThresholdLowSeverity, expectedFilterFirstThreshold)
 	}
-	
+
 	// Verify dedup_first threshold
 	expectedDedupFirstThreshold := 0.50
 	if config.DedupFirstThresholdEffectiveness != expectedDedupFirstThreshold {
-		t.Errorf("DedupFirstThresholdEffectiveness = %v, want %v (50%% as documented)", 
+		t.Errorf("DedupFirstThresholdEffectiveness = %v, want %v (50%% as documented)",
 			config.DedupFirstThresholdEffectiveness, expectedDedupFirstThreshold)
 	}
 }
@@ -48,22 +48,22 @@ func TestStrategyDecider_ThresholdsMatchDocumentation(t *testing.T) {
 // TestStrategyDecider_HighLowSeverityTriggersFilterFirst verifies HIGH low-severity ratio → filter_first
 func TestStrategyDecider_HighLowSeverityTriggersFilterFirst(t *testing.T) {
 	sd := NewStrategyDecider()
-	
+
 	// Test with 75% low severity (above 70% threshold)
 	metrics := &OptimizationMetrics{
 		Source:             "test-source",
 		EventsProcessed:    1000,
 		LowSeverityPercent: 0.75, // 75% > 70% threshold
-		DeduplicationRate:  0.3,   // Below dedup threshold
+		DeduplicationRate:  0.3,  // Below dedup threshold
 	}
-	
+
 	sourceConfig := &config.SourceConfig{
 		Source: "test-source",
 		Processing: config.ProcessingConfig{
 			AutoOptimize: true,
 		},
 	}
-	
+
 	strategy := sd.DetermineStrategy(metrics, sourceConfig)
 	if strategy != ProcessingStrategyFilterFirst {
 		t.Errorf("Expected filter_first for 75%% low severity (above 70%% threshold), got %s", strategy.String())
@@ -73,22 +73,22 @@ func TestStrategyDecider_HighLowSeverityTriggersFilterFirst(t *testing.T) {
 // TestStrategyDecider_HighDedupEffectivenessTriggersDedupFirst verifies HIGH dedup effectiveness → dedup_first
 func TestStrategyDecider_HighDedupEffectivenessTriggersDedupFirst(t *testing.T) {
 	sd := NewStrategyDecider()
-	
+
 	// Test with 60% dedup effectiveness (above 50% threshold)
 	metrics := &OptimizationMetrics{
 		Source:             "test-source",
 		EventsProcessed:    1000,
-		LowSeverityPercent: 0.3,  // Below filter threshold
-		DeduplicationRate:  0.6,   // 60% > 50% threshold
+		LowSeverityPercent: 0.3, // Below filter threshold
+		DeduplicationRate:  0.6, // 60% > 50% threshold
 	}
-	
+
 	sourceConfig := &config.SourceConfig{
 		Source: "test-source",
 		Processing: config.ProcessingConfig{
 			AutoOptimize: true,
 		},
 	}
-	
+
 	strategy := sd.DetermineStrategy(metrics, sourceConfig)
 	if strategy != ProcessingStrategyDedupFirst {
 		t.Errorf("Expected dedup_first for 60%% dedup effectiveness (above 50%% threshold), got %s", strategy.String())
@@ -98,14 +98,14 @@ func TestStrategyDecider_HighDedupEffectivenessTriggersDedupFirst(t *testing.T) 
 // TestStrategyDecider_ThresholdBoundaryConditions tests boundary conditions
 func TestStrategyDecider_ThresholdBoundaryConditions(t *testing.T) {
 	sd := NewStrategyDecider()
-	
+
 	sourceConfig := &config.SourceConfig{
 		Source: "test-source",
 		Processing: config.ProcessingConfig{
 			AutoOptimize: true,
 		},
 	}
-	
+
 	// Test exactly at filter_first threshold (70%)
 	metrics := &OptimizationMetrics{
 		Source:             "test-source",
@@ -116,7 +116,7 @@ func TestStrategyDecider_ThresholdBoundaryConditions(t *testing.T) {
 	if strategy != ProcessingStrategyFilterFirst {
 		t.Errorf("Expected filter_first at exactly 70%% threshold, got %s", strategy.String())
 	}
-	
+
 	// Test just below filter_first threshold (69.9%)
 	metrics.LowSeverityPercent = 0.699
 	metrics.DeduplicationRate = 0.6 // Above dedup threshold
@@ -124,7 +124,7 @@ func TestStrategyDecider_ThresholdBoundaryConditions(t *testing.T) {
 	if strategy != ProcessingStrategyDedupFirst {
 		t.Errorf("Expected dedup_first when below filter threshold and above dedup threshold, got %s", strategy.String())
 	}
-	
+
 	// Test exactly at dedup_first threshold (50%)
 	metrics.LowSeverityPercent = 0.3
 	metrics.DeduplicationRate = 0.50 // Exactly at threshold
@@ -133,4 +133,3 @@ func TestStrategyDecider_ThresholdBoundaryConditions(t *testing.T) {
 		t.Errorf("Expected dedup_first at exactly 50%% threshold, got %s", strategy.String())
 	}
 }
-

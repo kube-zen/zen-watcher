@@ -1,7 +1,7 @@
 # Example: Per-Source Deduplication Configuration
 # 
 # This example shows how to configure different deduplication windows per source
-# using the ObservationDedupConfig CRD. This is useful for scenarios like:
+# using the Ingester CRD. This is useful for scenarios like:
 # - Certificate expiration monitoring (cert-manager) - longer window to avoid flooding
 # - Runtime security events (falco) - shorter window for faster detection
 #
@@ -10,7 +10,7 @@
 
 ---
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationDedupConfig
+kind: Ingester
 metadata:
   name: cert-manager-dedup
   namespace: zen-system
@@ -21,7 +21,7 @@ spec:
 
 ---
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationDedupConfig
+kind: Ingester
 metadata:
   name: falco-dedup
   namespace: zen-system
@@ -32,7 +32,7 @@ spec:
 
 ---
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationDedupConfig
+kind: Ingester
 metadata:
   name: trivy-dedup
   namespace: zen-system
@@ -43,7 +43,7 @@ spec:
 
 ---
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationDedupConfig
+kind: Ingester
 metadata:
   name: kyverno-dedup
   namespace: zen-system

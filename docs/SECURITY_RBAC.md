@@ -125,14 +125,14 @@ verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - Rate limiting prevents flooding (see threat model)
 - GC prevents unbounded growth
 
-#### ObservationFilters (Read-Only) ✨ NEW in v1.0.10
+#### Ingesters (Read-Only) ✨ NEW in v1.0.10
 ```yaml
 apiGroups: ["zen.kube-zen.io"]
 resources: ["observationfilters"]
 verbs: ["get", "list", "watch"]
 ```
 **Rationale:**
-- Required to dynamically load filter configuration from ObservationFilter CRDs
+- Required to dynamically load filter configuration from Ingester CRDs
 - Read-only access prevents filter tampering
 - Watches for changes to reload filter config dynamically
 - Merges with ConfigMap-based filters

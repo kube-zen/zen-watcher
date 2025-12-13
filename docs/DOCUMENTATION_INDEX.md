@@ -13,7 +13,7 @@ Complete guide to all Zen Watcher documentation files.
    - Architecture overview
    - Quick start guide (4 minutes to working system)
    - YAML-only source creation
-   - ObservationSourceConfig CRD
+   - Ingester CRD
    - Auto-optimization overview
    - Configuration reference
    - Usage examples
@@ -60,7 +60,7 @@ Complete guide to all Zen Watcher documentation files.
 7. **[SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md)** - Complete source adapter guide ⭐ **UPDATED**
    - YAML-only source creation (no code needed!)
    - All 4 input methods: logs, webhooks, ConfigMaps, CRDs
-   - ObservationSourceConfig CRD documentation
+   - Ingester CRD documentation
    - Auto-optimization configuration
    - Thresholds and warnings
    - Processing order control
@@ -70,7 +70,7 @@ Complete guide to all Zen Watcher documentation files.
 8. **[FILTERING.md](FILTERING.md)** - Source-level filtering guide
    - Filter configuration
    - Dynamic ConfigMap reloading (no restart required)
-   - ObservationFilter CRD usage
+   - Ingester CRD usage
    - Per-source filter rules
    - Examples and best practices
    - Troubleshooting
@@ -94,7 +94,7 @@ Complete guide to all Zen Watcher documentation files.
 
 11. **[OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md)** - Auto-optimization usage guide ⭐ **NEW**
     - CLI commands (analyze, apply, auto, history, list)
-    - Configuration via ObservationSourceConfig
+    - Configuration via Ingester
     - Processing order logic
     - Metrics and alerts
     - Best practices
@@ -202,9 +202,9 @@ Complete guide to all Zen Watcher documentation files.
 
 23. **[CRD.md](CRD.md)** - Custom Resource Definitions
     - Observation CRD schema
-    - ObservationFilter CRD
+    - Ingester CRD
     - ObservationMapping CRD
-    - ObservationSourceConfig CRD
+    - Ingester CRD
     - Schema reference
     - Sync process
 
@@ -358,7 +358,7 @@ Complete guide to all Zen Watcher documentation files.
 
 **Configuration?**
 1. [README.md#configuration](../README.md#configuration) - Environment variables
-2. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - ObservationSourceConfig CRD
+2. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Ingester CRD
 3. [FILTERING.md](FILTERING.md) - Source-level filtering
 4. [OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md) - Auto-optimization
 
@@ -412,7 +412,7 @@ Complete guide to all Zen Watcher documentation files.
 - **[README.md#advanced-configuration](../README.md)** - Quick overview
 - **[OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md)** - Alert configuration
 
-### ObservationSourceConfig CRD
+### Ingester CRD
 
 - **[SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md)** - Complete CRD documentation ⭐
 - **[README.md#advanced-configuration](../README.md)** - Quick reference
@@ -427,7 +427,7 @@ Complete guide to all Zen Watcher documentation files.
 ### Configuration
 
 - [README.md#configuration](../README.md#configuration) - Environment variables
-- [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - ObservationSourceConfig CRD
+- [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Ingester CRD
 - [FILTERING.md](FILTERING.md) - Source-level filtering
 - [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Best practices
 
@@ -516,7 +516,7 @@ Complete guide to all Zen Watcher documentation files.
 - ✅ **YAML-Only Source Creation** - No code needed to add sources
 - ✅ **Auto-Optimization Guide** - Complete optimization documentation
 - ✅ **Thresholds & Warnings** - Comprehensive threshold configuration
-- ✅ **ObservationSourceConfig CRD** - Complete CRD documentation
+- ✅ **Ingester CRD** - Complete CRD documentation
 - ✅ **4 Input Methods** - Logs, webhooks, ConfigMaps, CRDs all documented
 
 See [CHANGELOG.md](../CHANGELOG.md) for complete version history and updates.

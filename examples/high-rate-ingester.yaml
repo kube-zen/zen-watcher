@@ -50,8 +50,7 @@ spec:
           warning: 100
           critical: 500
   
-  # Legacy fields (backward compatibility - maps to processing.*)
-  # Compatibility note: Legacy fields (filters, deduplication, optimization) are still supported
+  # Backward compatibility fields (maps to processing.*)
   # but new examples should use spec.processing.* as the primary form
   filters:
     enabled: true

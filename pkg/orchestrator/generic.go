@@ -16,7 +16,6 @@ package orchestrator
 
 import (
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -28,12 +27,12 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-// GenericOrchestrator manages generic adapters based on ObservationSourceConfig CRDs
+// GenericOrchestrator manages generic adapters based on Ingester CRDs
 type GenericOrchestrator struct {
 	adapterFactory     *generic.Factory
 	dynClient          dynamic.Interface
 	processor          *processor.Processor
-	batchProcessor     *processor.BatchProcessor // Optional: for batch processing
+	batchProcessor     *processor.BatchProcessor          // Optional: for batch processing
 	activeAdapters     map[string]generic.GenericAdapter  // source -> adapter
 	activeConfigs      map[string]*generic.SourceConfig   // source -> config
 	activeEventStreams map[string]<-chan generic.RawEvent // source -> event stream
@@ -50,18 +49,18 @@ func NewGenericOrchestrator(
 	proc *processor.Processor,
 ) *GenericOrchestrator {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	// Enable batch processing by default for performance optimization
 	// Batch size: 15 events, max age: 100ms (balances throughput and latency)
 	enableBatching := true
 	maxBatchSize := 15
 	maxBatchAge := 100 * time.Millisecond
-	
+
 	var batchProcessor *processor.BatchProcessor
 	if enableBatching {
 		batchProcessor = processor.NewBatchProcessor(proc, maxBatchSize, maxBatchAge)
 	}
-	
+
 	return &GenericOrchestrator{
 		adapterFactory:     adapterFactory,
 		dynClient:          dynClient,
@@ -76,7 +75,7 @@ func NewGenericOrchestrator(
 	}
 }
 
-// Start starts the orchestrator and watches for ObservationSourceConfig changes
+// Start starts the orchestrator and watches for Ingester CRD changes
 func (o *GenericOrchestrator) Start(ctx context.Context) error {
 	logger.Info("Starting generic adapter orchestrator",
 		logger.Fields{
@@ -93,10 +92,9 @@ func (o *GenericOrchestrator) Start(ctx context.Context) error {
 	return nil
 }
 
-// watchConfigChanges watches for ObservationSourceConfig changes
+// watchConfigChanges watches for Ingester CRD changes
 func (o *GenericOrchestrator) watchConfigChanges(ctx context.Context) {
-	// This would integrate with SourceConfigLoader's informer
-	// For now, we'll poll periodically
+	// Poll periodically for Ingester CRD changes
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
@@ -110,12 +108,12 @@ func (o *GenericOrchestrator) watchConfigChanges(ctx context.Context) {
 	}
 }
 
-// reloadAdapters reloads all adapters based on current ObservationSourceConfigs
+// reloadAdapters reloads all adapters based on current Ingester CRDs
 func (o *GenericOrchestrator) reloadAdapters() {
-	// Load all ObservationSourceConfig CRDs
-	configs, err := o.dynClient.Resource(config.ObservationSourceConfigGVR).List(o.ctx, metav1.ListOptions{})
+	// Load all Ingester CRDs
+	configs, err := o.dynClient.Resource(config.IngesterGVR).List(o.ctx, metav1.ListOptions{})
 	if err != nil {
-		logger.Error("Failed to list ObservationSourceConfigs",
+		logger.Error("Failed to list Ingester CRDs",
 			logger.Fields{
 				Component: "orchestrator",
 				Operation: "reload_adapters",
@@ -132,15 +130,32 @@ func (o *GenericOrchestrator) reloadAdapters() {
 
 	// Start/update adapters for each config
 	for _, item := range configs.Items {
-		// Convert to generic.SourceConfig
-		genericConfig, err := config.ConvertToGenericSourceConfig(&item)
-		if err != nil {
-			logger.Warn("Failed to convert source config",
+		// Convert Ingester CRD to IngesterConfig
+		// Create IngesterInformer instance to access conversion method
+		store := config.NewIngesterStore()
+		ii := config.NewIngesterInformer(store, o.dynClient)
+		ingesterConfig := ii.convertToIngesterConfig(&item)
+		if ingesterConfig == nil {
+			logger.Warn("Failed to convert Ingester CRD",
 				logger.Fields{
 					Component: "orchestrator",
-					Operation: "convert_config",
-					Source:    genericConfig.Source,
-					Error:     err,
+					Operation: "convert_ingester",
+					Additional: map[string]interface{}{
+						"name":      item.GetName(),
+						"namespace": item.GetNamespace(),
+					},
+				})
+			continue
+		}
+
+		// Convert IngesterConfig to generic.SourceConfig
+		genericConfig := config.ConvertIngesterConfigToGeneric(ingesterConfig)
+		if genericConfig == nil {
+			logger.Warn("Failed to convert IngesterConfig to generic.SourceConfig",
+				logger.Fields{
+					Component: "orchestrator",
+					Operation: "convert_to_generic",
+					Source:    ingesterConfig.Source,
 				})
 			continue
 		}

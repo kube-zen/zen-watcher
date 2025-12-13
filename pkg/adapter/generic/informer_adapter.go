@@ -24,28 +24,18 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 )
 
-// InformerAdapter handles ALL CRD-based sources via dynamic informers
+// InformerAdapter handles ALL Kubernetes resources via dynamic informers (GVR-capable)
+// Can watch any Kubernetes resource including ConfigMaps, CRDs, Pods, etc.
 type InformerAdapter struct {
 	manager *informers.Manager
-	factory dynamicinformer.DynamicSharedInformerFactory
 	stopCh  chan struct{}
 	queue   workqueue.RateLimitingInterface // Internal queue for backpressure
 	workers int                             // Number of worker goroutines
 	mu      sync.Mutex
-}
-
-// NewInformerAdapter creates a new generic informer adapter
-// Prefer NewInformerAdapterWithManager for new code
-func NewInformerAdapter(factory dynamicinformer.DynamicSharedInformerFactory) *InformerAdapter {
-	return &InformerAdapter{
-		factory: factory,
-		stopCh:  make(chan struct{}),
-	}
 }
 
 // NewInformerAdapterWithManager creates a new informer adapter using the informer manager
@@ -104,17 +94,8 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 		}
 	}
 
-	// Get informer from manager (preferred) or factory (backward compatibility)
-	var informer cache.SharedIndexInformer
-	if a.manager != nil {
-		// Use manager with per-GVR resync period support
-		informer = a.manager.GetInformer(gvr, resyncPeriod)
-	} else if a.factory != nil {
-		// Fallback to factory (backward compatibility)
-		informer = a.factory.ForResource(gvr).Informer()
-	} else {
-		return nil, fmt.Errorf("neither manager nor factory is set")
-	}
+	// Get informer from manager (GVR-capable - can watch any Kubernetes resource)
+	informer := a.manager.GetInformer(gvr, resyncPeriod)
 
 	// Add event handlers
 	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -187,20 +168,11 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 		},
 	})
 
-	// Start informer factory/manager
-	if a.manager != nil {
-		a.manager.Start(ctx)
-		// Wait for cache sync via manager
-		if err := a.manager.WaitForCacheSync(ctx); err != nil {
-			return nil, fmt.Errorf("failed to sync informer cache for %s: %w", gvr.String(), err)
-		}
-	} else if a.factory != nil {
-		// Fallback to factory (backward compatibility)
-		a.factory.Start(ctx.Done())
-		// Wait for cache sync
-		if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
-			return nil, fmt.Errorf("failed to sync informer cache for %s", gvr.String())
-		}
+	// Start informer manager
+	a.manager.Start(ctx)
+	// Wait for cache sync via manager
+	if err := a.manager.WaitForCacheSync(ctx); err != nil {
+		return nil, fmt.Errorf("failed to sync informer cache for %s: %w", gvr.String(), err)
 	}
 
 	logger.Info("Informer adapter started",

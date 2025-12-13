@@ -120,7 +120,7 @@ Create a simple source configuration to start collecting observations. This exam
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: k8s-events-example
   namespace: zen-system
@@ -134,7 +134,7 @@ Apply the configuration:
 ```bash
 kubectl apply -f - <<EOF
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: k8s-events-example
   namespace: zen-system
@@ -169,7 +169,7 @@ This example shows how to configure a source that watches ConfigMaps (useful for
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: configmap-source-example
   namespace: zen-system
@@ -185,7 +185,7 @@ Configure zen-watcher to receive webhooks from external tools:
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: webhook-source-example
   namespace: zen-system

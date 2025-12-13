@@ -3,12 +3,12 @@
 # Scenario: Multi-tenant platform where each tenant gets their own namespace
 # Requirement: Filter observations per tenant, different severity thresholds
 #
-# Solution: Use namespace-scoped ObservationFilter CRDs
+# Solution: Use namespace-scoped Ingester CRDs
 
 ---
 # Tenant A: High-security namespace, only CRITICAL/HIGH
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationFilter
+kind: Ingester
 metadata:
   name: tenant-a-strict-filter
   namespace: tenant-a
@@ -32,7 +32,7 @@ spec:
 ---
 # Tenant B: Development namespace, more permissive
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationFilter
+kind: Ingester
 metadata:
   name: tenant-b-dev-filter
   namespace: tenant-b
@@ -51,7 +51,7 @@ spec:
 ---
 # Tenant C: Trivy-specific filtering
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationFilter
+kind: Ingester
 metadata:
   name: tenant-c-trivy-filter
   namespace: tenant-c
@@ -73,7 +73,7 @@ spec:
 ---
 # Cross-namespace: Platform team sees everything
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationFilter
+kind: Ingester
 metadata:
   name: platform-team-all-events
   namespace: zen-system

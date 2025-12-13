@@ -21,9 +21,17 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// WorkerPoolInterface defines the interface for worker pool integration
+// This avoids circular dependencies between packages
+type WorkerPoolInterface interface {
+	EnqueueBlocking(ctx context.Context, work interface{}) error
+	Start()
+	Stop()
+}
+
 // AdapterFactory creates SourceAdapter instances for all configured sources
 // Only creates the K8sEventsAdapter (exception). All other sources are configured
-// via ObservationSourceConfig CRDs and handled by the GenericOrchestrator.
+// via Ingester CRDs and handled by the GenericOrchestrator.
 type AdapterFactory struct {
 	clientSet kubernetes.Interface
 }
@@ -39,13 +47,13 @@ func NewAdapterFactory(
 
 // CreateAdapters creates all enabled source adapters
 // Only creates K8sEventsAdapter. All other sources are configured via
-// ObservationSourceConfig CRDs and handled by GenericOrchestrator.
+// Ingester CRDs and handled by GenericOrchestrator.
 func (af *AdapterFactory) CreateAdapters() []SourceAdapter {
 	var adapters []SourceAdapter
 
 	// Only create K8sEventsAdapter (exception - watching native Kubernetes Events API)
-	// All other sources are configured via ObservationSourceConfig CRDs and handled by GenericOrchestrator
-	// which creates generic adapters (informer, webhook, logs, configmap) based on YAML config.
+	// All other sources are configured via Ingester CRDs and handled by GenericOrchestrator
+	// which creates generic adapters (informer, webhook, logs) based on YAML config.
 	if af.clientSet != nil {
 		adapters = append(adapters, NewK8sEventsAdapter(af.clientSet))
 	}
@@ -58,6 +66,8 @@ type AdapterLauncher struct {
 	adapters           []SourceAdapter
 	observationCreator *ObservationCreator
 	eventCh            chan *Event
+	workerPool         WorkerPoolInterface
+	useWorkerPool      bool
 }
 
 // NewAdapterLauncher creates a new adapter launcher
@@ -72,11 +82,23 @@ func NewAdapterLauncher(
 		adapters:           adapters,
 		observationCreator: observationCreator,
 		eventCh:            eventCh,
+		useWorkerPool:      false, // Can be enabled via SetWorkerPool
 	}
+}
+
+// SetWorkerPool sets the worker pool for async dispatch
+func (al *AdapterLauncher) SetWorkerPool(workerPool WorkerPoolInterface) {
+	al.workerPool = workerPool
+	al.useWorkerPool = workerPool != nil
 }
 
 // Start starts all adapters and processes events
 func (al *AdapterLauncher) Start(ctx context.Context) error {
+	// Start worker pool if configured
+	if al.useWorkerPool && al.workerPool != nil {
+		al.workerPool.Start()
+	}
+
 	// Start all adapters
 	for _, adapter := range al.adapters {
 		adapter := adapter // Capture for goroutine
@@ -99,27 +121,72 @@ func (al *AdapterLauncher) Start(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case event := <-al.eventCh:
-			// Convert Event to Observation and create via ObservationCreator
-			observation := EventToObservation(event)
-			if observation != nil {
-				// Use centralized observation creator (handles filter, dedup, metrics)
-				err := al.observationCreator.CreateObservation(ctx, observation)
-				if err != nil {
-					logger.Warn("Failed to create Observation from adapter event",
+			// Use worker pool if enabled, otherwise process synchronously
+			if al.useWorkerPool && al.workerPool != nil {
+				// Create work item for async processing
+				workItem := &eventWorkItem{
+					event:              event,
+					observationCreator: al.observationCreator,
+				}
+				if err := al.workerPool.EnqueueBlocking(ctx, workItem); err != nil {
+					logger.Warn("Failed to enqueue event for processing",
 						logger.Fields{
 							Component: "watcher",
-							Operation: "adapter_observation_create",
+							Operation: "adapter_event_enqueue",
 							Source:    event.Source,
 							Error:     err,
 						})
 				}
+			} else {
+				// Process synchronously (original behavior)
+				al.processEvent(ctx, event)
 			}
 		}
 	}
 }
 
+// processEvent processes a single event
+func (al *AdapterLauncher) processEvent(ctx context.Context, event *Event) {
+	// Convert Event to Observation and create via ObservationCreator
+	observation := EventToObservation(event)
+	if observation != nil {
+		// Use centralized observation creator (handles filter, dedup, metrics)
+		err := al.observationCreator.CreateObservation(ctx, observation)
+		if err != nil {
+			logger.Warn("Failed to create Observation from adapter event",
+				logger.Fields{
+					Component: "watcher",
+					Operation: "adapter_observation_create",
+					Source:    event.Source,
+					Error:     err,
+				})
+		}
+	}
+}
+
+// eventWorkItem implements WorkItem interface for worker pool
+type eventWorkItem struct {
+	event              *Event
+	observationCreator *ObservationCreator
+}
+
+// Process processes the event work item
+func (w *eventWorkItem) Process(ctx context.Context) error {
+	observation := EventToObservation(w.event)
+	if observation != nil {
+		return w.observationCreator.CreateObservation(ctx, observation)
+	}
+	return nil
+}
+
 // Stop stops all adapters gracefully
 func (al *AdapterLauncher) Stop() {
+	// Stop worker pool if configured
+	if al.useWorkerPool && al.workerPool != nil {
+		al.workerPool.Stop()
+	}
+
+	// Stop all adapters
 	for _, adapter := range al.adapters {
 		adapter.Stop()
 	}

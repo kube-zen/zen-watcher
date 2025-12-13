@@ -67,8 +67,7 @@ type AuthConfig struct {
 	SecretRef string
 }
 
-// RateLimitConfig holds rate limiting configuration (simple version for Ingester)
-// For advanced rate limiting, see RateLimitConfig in source_config_loader.go
+// RateLimitConfig holds rate limiting configuration
 type RateLimitConfig struct {
 	RequestsPerMinute int
 }
@@ -401,7 +400,7 @@ func (ii *IngesterInformer) onUpdate(oldObj, newObj interface{}) {
 					"source":   config.Source,
 					"ingester": config.Ingester,
 				},
-				Source:    config.Source,
+				Source: config.Source,
 			})
 	}
 }
@@ -572,8 +571,7 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 		}
 	}
 
-	// Extract dedup config - support both canonical spec.processing.dedup (v1.1+) and legacy spec.deduplication
-	// Priority: spec.processing.dedup > spec.deduplication (legacy)
+	// Extract dedup config from spec.processing.dedup (canonical location)
 	var dedupConfig *DedupConfig
 	var filterConfig *FilterConfig
 
@@ -638,84 +636,6 @@ func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured
 			}
 			if maxEvents, ok := dedup["maxEventsPerWindow"].(float64); ok {
 				dedupConfig.MaxEventsPerWindow = int(maxEvents)
-			}
-		}
-	}
-
-	// Fallback to legacy spec.deduplication if processing.dedup not found
-	if dedupConfig == nil {
-		if dedup, ok := spec["deduplication"].(map[string]interface{}); ok {
-			dedupConfig = &DedupConfig{
-				Enabled: true, // Default enabled
-			}
-			if enabled, ok := dedup["enabled"].(bool); ok {
-				dedupConfig.Enabled = enabled
-			}
-			dedupConfig.Window = getString(dedup, "window")
-			dedupConfig.Strategy = getString(dedup, "strategy")
-			if dedupConfig.Strategy == "" {
-				dedupConfig.Strategy = "fingerprint" // Default strategy
-			}
-			if fields, ok := dedup["fields"].([]interface{}); ok {
-				for _, f := range fields {
-					if fStr, ok := f.(string); ok {
-						dedupConfig.Fields = append(dedupConfig.Fields, fStr)
-					}
-				}
-			}
-			// Legacy deduplication doesn't have maxEventsPerWindow
-		}
-	}
-
-	// Also support legacy spec.dedup (for backward compatibility with ObservationSourceConfig)
-	if dedupConfig == nil {
-		if dedup, ok := spec["dedup"].(map[string]interface{}); ok {
-			dedupConfig = &DedupConfig{
-				Enabled: true, // Default enabled
-			}
-			if enabled, ok := dedup["enabled"].(bool); ok {
-				dedupConfig.Enabled = enabled
-			}
-			dedupConfig.Window = getString(dedup, "window")
-			dedupConfig.Strategy = getString(dedup, "strategy")
-			if dedupConfig.Strategy == "" {
-				dedupConfig.Strategy = "fingerprint" // Default strategy
-			}
-			if fields, ok := dedup["fields"].([]interface{}); ok {
-				for _, f := range fields {
-					if fStr, ok := f.(string); ok {
-						dedupConfig.Fields = append(dedupConfig.Fields, fStr)
-					}
-				}
-			}
-		}
-	}
-
-	// Fallback to legacy spec.filters if processing.filter not found
-	if filterConfig == nil {
-		if filter, ok := spec["filters"].(map[string]interface{}); ok {
-			filterConfig = &FilterConfig{}
-			// Check for expression (v1.1 feature)
-			if expression, ok := filter["expression"].(string); ok && expression != "" {
-				filterConfig.Expression = expression
-			}
-			// Legacy fields (only used if expression is not set)
-			if minPriority, ok := filter["minPriority"].(float64); ok {
-				filterConfig.MinPriority = minPriority
-			}
-			if includeNS, ok := filter["includeNamespaces"].([]interface{}); ok {
-				for _, ns := range includeNS {
-					if nsStr, ok := ns.(string); ok {
-						filterConfig.IncludeNamespaces = append(filterConfig.IncludeNamespaces, nsStr)
-					}
-				}
-			}
-			if excludeNS, ok := filter["excludeNamespaces"].([]interface{}); ok {
-				for _, ns := range excludeNS {
-					if nsStr, ok := ns.(string); ok {
-						filterConfig.ExcludeNamespaces = append(filterConfig.ExcludeNamespaces, nsStr)
-					}
-				}
 			}
 		}
 	}

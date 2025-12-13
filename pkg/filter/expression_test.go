@@ -31,45 +31,45 @@ func TestExpressionFilter_BasicComparisons(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
+		name       string
 		expression string
-		expected  bool
-		wantErr   bool
+		expected   bool
+		wantErr    bool
 	}{
 		{
-			name:      "equality match",
+			name:       "equality match",
 			expression: `spec.severity = "HIGH"`,
-			expected:  true,
+			expected:   true,
 		},
 		{
-			name:      "equality mismatch",
+			name:       "equality mismatch",
 			expression: `spec.severity = "LOW"`,
-			expected:  false,
+			expected:   false,
 		},
 		{
-			name:      "greater than severity",
+			name:       "greater than severity",
 			expression: `spec.severity >= "HIGH"`,
-			expected:  true,
+			expected:   true,
 		},
 		{
-			name:      "less than severity",
+			name:       "less than severity",
 			expression: `spec.severity < "CRITICAL"`,
-			expected:  true,
+			expected:   true,
 		},
 		{
-			name:      "IN operator match",
+			name:       "IN operator match",
 			expression: `spec.category IN ["security", "compliance"]`,
-			expected:  true,
+			expected:   true,
 		},
 		{
-			name:      "IN operator mismatch",
+			name:       "IN operator mismatch",
 			expression: `spec.category IN ["ops", "monitoring"]`,
-			expected:  false,
+			expected:   false,
 		},
 		{
-			name:      "NOT IN operator",
+			name:       "NOT IN operator",
 			expression: `spec.category NOT IN ["ops", "monitoring"]`,
-			expected:  true,
+			expected:   true,
 		},
 	}
 
@@ -105,44 +105,44 @@ func TestExpressionFilter_LogicalOperators(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
+		name       string
 		expression string
-		expected  bool
+		expected   bool
 	}{
 		{
-			name:      "AND both true",
+			name:       "AND both true",
 			expression: `spec.severity >= "HIGH" AND spec.category = "security"`,
-			expected:  true,
+			expected:   true,
 		},
 		{
-			name:      "AND one false",
+			name:       "AND one false",
 			expression: `spec.severity >= "HIGH" AND spec.category = "compliance"`,
-			expected:  false,
+			expected:   false,
 		},
 		{
-			name:      "OR both true",
+			name:       "OR both true",
 			expression: `spec.severity >= "CRITICAL" OR spec.category = "security"`,
-			expected:  true,
+			expected:   true,
 		},
 		{
-			name:      "OR one true",
+			name:       "OR one true",
 			expression: `spec.severity >= "CRITICAL" OR spec.category = "security"`,
-			expected:  true,
+			expected:   true,
 		},
 		{
-			name:      "OR both false",
+			name:       "OR both false",
 			expression: `spec.severity >= "CRITICAL" OR spec.category = "compliance"`,
-			expected:  false,
+			expected:   false,
 		},
 		{
-			name:      "NOT operator",
+			name:       "NOT operator",
 			expression: `NOT (spec.category = "compliance")`,
-			expected:  true,
+			expected:   true,
 		},
 		{
-			name:      "parentheses grouping",
+			name:       "parentheses grouping",
 			expression: `(spec.severity >= "HIGH") AND (spec.category IN ["security", "compliance"])`,
-			expected:  true,
+			expected:   true,
 		},
 	}
 
@@ -175,24 +175,24 @@ func TestExpressionFilter_Macros(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
+		name       string
 		expression string
-		expected  bool
+		expected   bool
 	}{
 		{
-			name:      "is_critical macro",
+			name:       "is_critical macro",
 			expression: `is_critical`,
-			expected:  true,
+			expected:   true,
 		},
 		{
-			name:      "is_security macro",
+			name:       "is_security macro",
 			expression: `is_security`,
-			expected:  true,
+			expected:   true,
 		},
 		{
-			name:      "macro with AND",
+			name:       "macro with AND",
 			expression: `is_critical AND is_security`,
-			expected:  true,
+			expected:   true,
 		},
 	}
 
@@ -234,28 +234,28 @@ func TestExpressionFilter_FieldExistence(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
+		name       string
 		expression string
 		obs        *unstructured.Unstructured
-		expected  bool
+		expected   bool
 	}{
 		{
-			name:      "EXISTS field present",
+			name:       "EXISTS field present",
 			expression: `spec.details.vulnerabilityID EXISTS`,
 			obs:        obsWithField,
-			expected:  true,
+			expected:   true,
 		},
 		{
-			name:      "EXISTS field missing",
+			name:       "EXISTS field missing",
 			expression: `spec.details.vulnerabilityID EXISTS`,
 			obs:        obsWithoutField,
-			expected:  false,
+			expected:   false,
 		},
 		{
-			name:      "NOT EXISTS field missing",
+			name:       "NOT EXISTS field missing",
 			expression: `spec.details.vulnerabilityID NOT EXISTS`,
 			obs:        obsWithoutField,
-			expected:  true,
+			expected:   true,
 		},
 	}
 
@@ -276,4 +276,3 @@ func TestExpressionFilter_FieldExistence(t *testing.T) {
 		})
 	}
 }
-

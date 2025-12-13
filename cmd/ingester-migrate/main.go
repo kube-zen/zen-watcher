@@ -15,7 +15,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -33,18 +32,18 @@ type IngesterV1Alpha1 struct {
 }
 
 type IngesterSpecV1Alpha1 struct {
-	Source         string                    `yaml:"source" json:"source"`
-	Ingester       string                    `yaml:"ingester" json:"ingester"`
-	Destinations   []DestinationV1Alpha1     `yaml:"destinations" json:"destinations"`
-	Normalization  *NormalizationConfig      `yaml:"normalization,omitempty" json:"normalization,omitempty"`
-	Deduplication  map[string]interface{}    `yaml:"deduplication,omitempty" json:"deduplication,omitempty"`
-	Filters        map[string]interface{}    `yaml:"filters,omitempty" json:"filters,omitempty"`
-	Optimization   map[string]interface{}    `yaml:"optimization,omitempty" json:"optimization,omitempty"`
-	Processing     map[string]interface{}    `yaml:"processing,omitempty" json:"processing,omitempty"`
-	Informer       map[string]interface{}    `yaml:"informer,omitempty" json:"informer,omitempty"`
-	Webhook        map[string]interface{}    `yaml:"webhook,omitempty" json:"webhook,omitempty"`
-	Logs           map[string]interface{}    `yaml:"logs,omitempty" json:"logs,omitempty"`
-	K8sEvents      map[string]interface{}    `yaml:"k8sEvents,omitempty" json:"k8sEvents,omitempty"`
+	Source        string                 `yaml:"source" json:"source"`
+	Ingester      string                 `yaml:"ingester" json:"ingester"`
+	Destinations  []DestinationV1Alpha1  `yaml:"destinations" json:"destinations"`
+	Normalization *NormalizationConfig   `yaml:"normalization,omitempty" json:"normalization,omitempty"`
+	Deduplication map[string]interface{} `yaml:"deduplication,omitempty" json:"deduplication,omitempty"`
+	Filters       map[string]interface{} `yaml:"filters,omitempty" json:"filters,omitempty"`
+	Optimization  map[string]interface{} `yaml:"optimization,omitempty" json:"optimization,omitempty"`
+	Processing    map[string]interface{} `yaml:"processing,omitempty" json:"processing,omitempty"`
+	Informer      map[string]interface{} `yaml:"informer,omitempty" json:"informer,omitempty"`
+	Webhook       map[string]interface{} `yaml:"webhook,omitempty" json:"webhook,omitempty"`
+	Logs          map[string]interface{} `yaml:"logs,omitempty" json:"logs,omitempty"`
+	K8sEvents     map[string]interface{} `yaml:"k8sEvents,omitempty" json:"k8sEvents,omitempty"`
 }
 
 type DestinationV1Alpha1 struct {
@@ -61,7 +60,7 @@ type NormalizationConfig struct {
 	Priority     map[string]interface{} `yaml:"priority,omitempty" json:"priority,omitempty"`
 	SeverityMap  map[string]interface{} `yaml:"severityMap,omitempty" json:"severityMap,omitempty"`
 	FieldMapping []interface{}          `yaml:"fieldMapping,omitempty" json:"fieldMapping,omitempty"`
-	Resource     map[string]interface{}  `yaml:"resource,omitempty" json:"resource,omitempty"`
+	Resource     map[string]interface{} `yaml:"resource,omitempty" json:"resource,omitempty"`
 	Templates    map[string]interface{} `yaml:"templates,omitempty" json:"templates,omitempty"`
 }
 
@@ -87,9 +86,9 @@ type IngesterSpecV1 struct {
 }
 
 type DestinationV1 struct {
-	Type    string                 `yaml:"type" json:"type"`
-	Value   string                 `yaml:"value" json:"value"`
-	Mapping *NormalizationConfig   `yaml:"mapping,omitempty" json:"mapping,omitempty"`
+	Type    string               `yaml:"type" json:"type"`
+	Value   string               `yaml:"value" json:"value"`
+	Mapping *NormalizationConfig `yaml:"mapping,omitempty" json:"mapping,omitempty"`
 }
 
 func main() {
@@ -224,7 +223,7 @@ func migrateToV1(v1alpha1 IngesterV1Alpha1) (IngesterV1, []string) {
 			{
 				Type:  "crd",
 				Value: "observations",
-			}
+			},
 		}
 		// Still add normalization as mapping if present
 		if v1alpha1.Spec.Normalization != nil {
@@ -241,4 +240,3 @@ func migrateToV1(v1alpha1 IngesterV1Alpha1) (IngesterV1, []string) {
 
 	return v1, warnings
 }
-

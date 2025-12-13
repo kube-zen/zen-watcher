@@ -503,7 +503,7 @@ kubectl get clusterpolicies -o yaml
 
 2. **Optimize Zen Watcher filters**:
    ```yaml
-   # Update ObservationSourceConfig to reduce noise
+   # Update Ingester to reduce noise
    spec:
      filter:
        minPriority: 0.7  # Increase threshold

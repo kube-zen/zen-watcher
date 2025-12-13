@@ -858,7 +858,7 @@ test_filtering() {
         log_success "Filtering is active (${filter_rate}% filtered)"
     else
         log_warn "No filtering detected - filters may not be configured"
-        log_info "To enable filtering, create ObservationFilter CRD or ConfigMap filter"
+        log_info "To enable filtering, create Ingester CRD or ConfigMap filter"
     fi
 }
 

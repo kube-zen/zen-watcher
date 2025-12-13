@@ -21,7 +21,7 @@ import (
 // GenericAdapter is the interface for all generic adapters
 // All adapters work with ANY tool via YAML configuration
 type GenericAdapter interface {
-	// Type returns the adapter type (informer, webhook, logs, configmap)
+	// Type returns the adapter type (informer, webhook, logs, k8s-events)
 	Type() string
 
 	// Start starts the adapter and returns a channel of RawEvents

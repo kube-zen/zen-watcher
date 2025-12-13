@@ -168,7 +168,7 @@ func (sd *StrategyDecider) parseStrategy(strategy string) ProcessingStrategy {
 
 // getDefaultStrategy returns the default strategy for a source
 func (sd *StrategyDecider) getDefaultStrategy(source string) ProcessingStrategy {
-	// Default: filter first (configurable via ObservationSourceConfig)
+	// Default: filter first (configurable via Ingester CRD)
 	// Source-specific defaults are configured via YAML, not hardcoded
 	return ProcessingStrategyFilterFirst
 }

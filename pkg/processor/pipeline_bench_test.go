@@ -32,14 +32,14 @@ import (
 // setupBenchmarkProcessor creates a processor for benchmarking
 func setupBenchmarkProcessor() (*Processor, dynamic.Interface) {
 	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
-	
+
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
 	deduper := dedup.NewDeduper(dedup.Config{DefaultWindow: 60 * time.Second, MaxSize: 10000})
-	
+
 	observationGVR := watcher.GetObservationGVR()
 	creator := watcher.NewObservationCreator(dynamicClient, observationGVR, f, deduper, nil, nil, nil, nil)
-	
+
 	proc := NewProcessor(f, deduper, creator)
 	return proc, dynamicClient
 }
@@ -48,7 +48,7 @@ func setupBenchmarkProcessor() (*Processor, dynamic.Interface) {
 func BenchmarkPipeline_HighVolumeLowSeverity(b *testing.B) {
 	proc, _ := setupBenchmarkProcessor()
 	ctx := context.Background()
-	
+
 	sourceConfig := &generic.SourceConfig{
 		Source: "benchmark-source",
 		Processing: &generic.ProcessingConfig{
@@ -58,12 +58,12 @@ func BenchmarkPipeline_HighVolumeLowSeverity(b *testing.B) {
 			Domain: "security",
 			Type:   "vulnerability",
 			Priority: map[string]float64{
-				"LOW":   0.3,
-				"HIGH":  0.8,
+				"LOW":  0.3,
+				"HIGH": 0.8,
 			},
 		},
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// 85% LOW severity, 15% HIGH
@@ -71,7 +71,7 @@ func BenchmarkPipeline_HighVolumeLowSeverity(b *testing.B) {
 		if i%20 == 0 {
 			severity = "HIGH"
 		}
-		
+
 		rawEvent := &generic.RawEvent{
 			Source:    "benchmark-source",
 			Timestamp: time.Now(),
@@ -80,7 +80,7 @@ func BenchmarkPipeline_HighVolumeLowSeverity(b *testing.B) {
 				"id":       i,
 			},
 		}
-		
+
 		_ = proc.ProcessEvent(ctx, rawEvent, sourceConfig)
 	}
 }
@@ -89,7 +89,7 @@ func BenchmarkPipeline_HighVolumeLowSeverity(b *testing.B) {
 func BenchmarkPipeline_HighDeduplicationRate(b *testing.B) {
 	proc, _ := setupBenchmarkProcessor()
 	ctx := context.Background()
-	
+
 	sourceConfig := &generic.SourceConfig{
 		Source: "benchmark-source",
 		Processing: &generic.ProcessingConfig{
@@ -103,7 +103,7 @@ func BenchmarkPipeline_HighDeduplicationRate(b *testing.B) {
 			},
 		},
 	}
-	
+
 	// Create base event that will be duplicated
 	baseEvent := &generic.RawEvent{
 		Source:    "benchmark-source",
@@ -113,7 +113,7 @@ func BenchmarkPipeline_HighDeduplicationRate(b *testing.B) {
 			"id":       "duplicate-id",
 		},
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// 60% duplicates (same content), 40% unique
@@ -129,7 +129,7 @@ func BenchmarkPipeline_HighDeduplicationRate(b *testing.B) {
 				},
 			}
 		}
-		
+
 		_ = proc.ProcessEvent(ctx, event, sourceConfig)
 	}
 }
@@ -138,7 +138,7 @@ func BenchmarkPipeline_HighDeduplicationRate(b *testing.B) {
 func BenchmarkPipeline_BalancedSeverity(b *testing.B) {
 	proc, _ := setupBenchmarkProcessor()
 	ctx := context.Background()
-	
+
 	sourceConfig := &generic.SourceConfig{
 		Source: "benchmark-source",
 		Normalization: &generic.NormalizationConfig{
@@ -151,7 +151,7 @@ func BenchmarkPipeline_BalancedSeverity(b *testing.B) {
 			},
 		},
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// 40% LOW, 30% MEDIUM, 30% HIGH
@@ -164,7 +164,7 @@ func BenchmarkPipeline_BalancedSeverity(b *testing.B) {
 		case 7, 8, 9:
 			severity = "HIGH"
 		}
-		
+
 		rawEvent := &generic.RawEvent{
 			Source:    "benchmark-source",
 			Timestamp: time.Now(),
@@ -173,7 +173,7 @@ func BenchmarkPipeline_BalancedSeverity(b *testing.B) {
 				"id":       i,
 			},
 		}
-		
+
 		_ = proc.ProcessEvent(ctx, rawEvent, sourceConfig)
 	}
 }
@@ -182,7 +182,7 @@ func BenchmarkPipeline_BalancedSeverity(b *testing.B) {
 func BenchmarkPipeline_FilterFirst(b *testing.B) {
 	proc, _ := setupBenchmarkProcessor()
 	ctx := context.Background()
-	
+
 	sourceConfig := &generic.SourceConfig{
 		Source: "benchmark-source",
 		Processing: &generic.ProcessingConfig{
@@ -196,7 +196,7 @@ func BenchmarkPipeline_FilterFirst(b *testing.B) {
 			},
 		},
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		rawEvent := &generic.RawEvent{
@@ -207,7 +207,7 @@ func BenchmarkPipeline_FilterFirst(b *testing.B) {
 				"id":       i,
 			},
 		}
-		
+
 		_ = proc.ProcessEvent(ctx, rawEvent, sourceConfig)
 	}
 }
@@ -216,7 +216,7 @@ func BenchmarkPipeline_FilterFirst(b *testing.B) {
 func BenchmarkPipeline_DedupFirst(b *testing.B) {
 	proc, _ := setupBenchmarkProcessor()
 	ctx := context.Background()
-	
+
 	sourceConfig := &generic.SourceConfig{
 		Source: "benchmark-source",
 		Processing: &generic.ProcessingConfig{
@@ -230,7 +230,7 @@ func BenchmarkPipeline_DedupFirst(b *testing.B) {
 			},
 		},
 	}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		rawEvent := &generic.RawEvent{
@@ -241,8 +241,7 @@ func BenchmarkPipeline_DedupFirst(b *testing.B) {
 				"id":       i,
 			},
 		}
-		
+
 		_ = proc.ProcessEvent(ctx, rawEvent, sourceConfig)
 	}
 }
-

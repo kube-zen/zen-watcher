@@ -104,7 +104,7 @@ kubectl edit configmap zen-watcher-filter -n zen-system
 # Changes take effect within seconds (no restart needed)
 ```
 
-**Via ObservationFilter CRD:**
+**Via Ingester CRD:**
 ```bash
 kubectl apply -f my-filter.yaml
 # Dynamic reload, no restart needed

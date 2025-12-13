@@ -29,7 +29,7 @@ import (
 // FilterConfig represents the filter configuration loaded from ConfigMap
 type FilterConfig struct {
 	// Expression is an optional filter expression (v1.1 feature)
-	// If set, this expression is evaluated instead of legacy list-based filters
+	// If set, this expression is evaluated instead of list-based filters
 	// Example: "(severity >= HIGH) AND (category IN [security, compliance])"
 	Expression string `json:"expression,omitempty"`
 

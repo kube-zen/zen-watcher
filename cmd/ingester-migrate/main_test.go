@@ -16,7 +16,6 @@ package main
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -122,8 +121,8 @@ func TestMigrate_NoDestinations(t *testing.T) {
 		APIVersion: "zen.kube-zen.io/v1alpha1",
 		Kind:       "Ingester",
 		Spec: IngesterSpecV1Alpha1{
-			Source:   "test",
-			Ingester: "informer",
+			Source:       "test",
+			Ingester:     "informer",
 			Destinations: []DestinationV1Alpha1{},
 		},
 	}
@@ -225,4 +224,3 @@ func TestMigrate_GoldenFiles(t *testing.T) {
 		})
 	}
 }
-

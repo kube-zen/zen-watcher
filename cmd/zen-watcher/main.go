@@ -25,6 +25,7 @@ import (
 	"github.com/kube-zen/zen-watcher/internal/lifecycle"
 	"github.com/kube-zen/zen-watcher/pkg/balancer"
 	"github.com/kube-zen/zen-watcher/pkg/config"
+	"github.com/kube-zen/zen-watcher/pkg/dispatcher"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/gc"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
@@ -115,9 +116,15 @@ func main() {
 	// Create ConfigMap loader for dynamic reloading
 	configMapLoader := config.NewConfigMapLoader(clients.Standard, filterInstance)
 
-	// Create SourceConfig and TypeConfig loaders for new universal event watcher architecture
-	sourceConfigLoader := config.NewSourceConfigLoader(clients.Dynamic)
-	typeConfigLoader := config.NewTypeConfigLoader(clients.Dynamic)
+	// Initialize ConfigManager for feature configuration
+	configNamespace := os.Getenv("CONFIG_NAMESPACE")
+	if configNamespace == "" {
+		configNamespace = "zen-system"
+	}
+	configManager := config.NewConfigManager(clients.Standard, configNamespace)
+
+	// Ingester CRD is now the single source of configuration
+	// Filter and dedup configuration is part of Ingester CRD spec.processing
 
 	// Create optimization metrics wrapper
 	optimizationMetrics := watcher.NewOptimizationMetrics(
@@ -143,8 +150,7 @@ func main() {
 		optimizationMetrics,
 	)
 
-	// Set source config loader for dynamic processing order
-	observationCreator.SetSourceConfigLoader(sourceConfigLoader)
+	// Processing order is configured via Ingester CRD spec.processing.order
 
 	// Set system metrics tracker for HA coordination
 	if systemMetrics != nil {
@@ -152,7 +158,7 @@ func main() {
 	}
 
 	// Create webhook channels for Falco and Audit webhooks
-	// Note: Other webhook sources can be configured via ObservationSourceConfig CRDs
+	// Note: Other webhook sources can be configured via Ingester CRDs
 	falcoAlertsChan := make(chan map[string]interface{}, 100)
 	auditEventsChan := make(chan map[string]interface{}, 200)
 
@@ -171,7 +177,7 @@ func main() {
 	)
 
 	// Create adapter factory - only creates K8sEventsAdapter (exception)
-	// All other sources are configured via ObservationSourceConfig CRDs
+	// All other sources are configured via Ingester CRDs
 	adapterFactory := watcher.NewAdapterFactory(clients.Standard)
 
 	// Create all adapters
@@ -179,6 +185,33 @@ func main() {
 
 	// Create adapter launcher to run all adapters and process events
 	adapterLauncher := watcher.NewAdapterLauncher(adapters, observationCreator)
+
+	// Create worker pool (will be configured from ConfigMap)
+	var workerPool *dispatcher.WorkerPool
+	workerPool = dispatcher.NewWorkerPool(5, 10) // Defaults, will be updated from config
+
+	// Register config change handler
+	configManager.OnConfigChange(func(newConfig map[string]interface{}) {
+		handleConfigChange(newConfig, workerPool, adapterLauncher, log)
+	})
+
+	// Start ConfigManager
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := configManager.Start(ctx); err != nil {
+			log.Error("ConfigManager stopped",
+				logger.Fields{
+					Component: "main",
+					Operation: "config_manager",
+					Error:     err,
+				})
+		}
+	}()
+
+	// Apply initial configuration
+	initialConfig := configManager.GetConfigWithDefaults()
+	handleConfigChange(initialConfig, workerPool, adapterLauncher, log)
 
 	// WaitGroup for goroutines
 	var wg sync.WaitGroup
@@ -217,77 +250,8 @@ func main() {
 		}
 	}()
 
-	// Create ObservationFilter loader for CRD-based filter configuration
-	// This merges with ConfigMap config automatically
-	observationFilterLoader := config.NewObservationFilterLoader(clients.Dynamic, filterInstance, configMapLoader)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := observationFilterLoader.Start(ctx); err != nil {
-			log.Error("ObservationFilter loader stopped",
-				logger.Fields{
-					Component: "main",
-					Operation: "observationfilter_loader",
-					Error:     err,
-				})
-		}
-	}()
-
-	// Get default dedup window from env for ObservationDedupConfig loader
-	defaultDedupWindow := 60
-	if windowStr := os.Getenv("DEDUP_WINDOW_SECONDS"); windowStr != "" {
-		if w, err := strconv.Atoi(windowStr); err == nil && w > 0 {
-			defaultDedupWindow = w
-		}
-	}
-
-	// Create ObservationDedupConfig loader for CRD-based dedup configuration
-	// This allows per-source deduplication windows to be configured via CRD
-	observationDedupConfigLoader := config.NewObservationDedupConfigLoader(
-		clients.Dynamic,
-		observationCreator.GetDeduper(),
-		defaultDedupWindow,
-	)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := observationDedupConfigLoader.Start(ctx); err != nil {
-			log.Error("ObservationDedupConfig loader stopped",
-				logger.Fields{
-					Component: "main",
-					Operation: "observationdedupconfig_loader",
-					Error:     err,
-				})
-		}
-	}()
-
-	// Start SourceConfig loader watcher (for new universal event watcher architecture)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := sourceConfigLoader.Start(ctx); err != nil {
-			log.Error("SourceConfig loader stopped",
-				logger.Fields{
-					Component: "main",
-					Operation: "sourceconfig_loader",
-					Error:     err,
-				})
-		}
-	}()
-
-	// Start TypeConfig loader watcher (for new universal event watcher architecture)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := typeConfigLoader.Start(ctx); err != nil {
-			log.Error("TypeConfig loader stopped",
-				logger.Fields{
-					Component: "main",
-					Operation: "typeconfig_loader",
-					Error:     err,
-				})
-		}
-	}()
+	// Filter and dedup configuration is now part of Ingester CRD spec.processing
+	// The IngesterInformer (started below) handles all configuration updates
 
 	// Start Ingester informer to populate the store
 	wg.Add(1)
@@ -303,7 +267,6 @@ func main() {
 		}
 	}()
 
-
 	// Create and start optimization engine (for per-source auto-optimization)
 	// Share the SmartProcessor instance from ObservationCreator so metrics are unified
 	obsSmartProc := observationCreator.GetSmartProcessor()
@@ -311,7 +274,8 @@ func main() {
 
 	if obsSmartProc != nil {
 		// Create optimizer with shared SmartProcessor
-		optimizer = optimization.NewOptimizerWithProcessor(obsSmartProc, sourceConfigLoader)
+		// Ingester CRD configuration is accessed via ingesterStore
+		optimizer = optimization.NewOptimizerWithProcessor(obsSmartProc, nil)
 		log.Info("Optimization engine initialized with shared SmartProcessor",
 			logger.Fields{
 				Component: "main",
@@ -322,7 +286,8 @@ func main() {
 			})
 	} else {
 		// Fallback: create optimizer with its own SmartProcessor
-		optimizer = optimization.NewOptimizer(sourceConfigLoader)
+		// Ingester CRD configuration is accessed via ingesterStore
+		optimizer = optimization.NewOptimizer(nil)
 		log.Info("Optimization engine initialized with independent SmartProcessor",
 			logger.Fields{
 				Component: "main",
@@ -567,10 +532,87 @@ func main() {
 	lifecycle.WaitForShutdown(ctx, &wg, func() {
 		// Stop adapter launcher gracefully
 		adapterLauncher.Stop()
+		if workerPool != nil {
+			workerPool.Stop()
+		}
 		log.Info("zen-watcher stopped",
 			logger.Fields{
 				Component: "main",
 				Operation: "shutdown",
 			})
 	})
+}
+
+// handleConfigChange handles configuration changes from ConfigMap
+func handleConfigChange(
+	config map[string]interface{},
+	workerPool *dispatcher.WorkerPool,
+	adapterLauncher *watcher.AdapterLauncher,
+	log *logger.Logger,
+) {
+	// Update worker pool configuration
+	if workerPoolConfig, ok := config["worker_pool"].(map[string]interface{}); ok {
+		newWorkerConfig := dispatcher.WorkerPoolConfig{
+			Enabled:   getBool(workerPoolConfig, "enabled", false),
+			Size:      getInt(workerPoolConfig, "size", 5),
+			QueueSize: getInt(workerPoolConfig, "queue_size", 1000),
+		}
+
+		if newWorkerConfig.Enabled {
+			workerPool.UpdateConfig(newWorkerConfig)
+			if !workerPool.IsRunning() {
+				workerPool.Start()
+			}
+			adapterLauncher.SetWorkerPool(workerPool)
+			log.Info("Worker pool configuration updated",
+				logger.Fields{
+					Component: "main",
+					Operation: "config_update",
+					Additional: map[string]interface{}{
+						"enabled":    newWorkerConfig.Enabled,
+						"size":       newWorkerConfig.Size,
+						"queue_size": newWorkerConfig.QueueSize,
+					},
+				})
+		} else {
+			workerPool.Stop()
+			adapterLauncher.SetWorkerPool(nil)
+			log.Info("Worker pool disabled via configuration",
+				logger.Fields{
+					Component: "main",
+					Operation: "config_update",
+				})
+		}
+	}
+
+	// Event batching configuration would be handled here
+	// HTTP client configuration would be handled here
+	// Namespace filtering configuration would be handled here
+}
+
+// Helper functions for type conversion
+func getBool(config map[string]interface{}, key string, defaultValue bool) bool {
+	if value, ok := config[key].(bool); ok {
+		return value
+	}
+	return defaultValue
+}
+
+func getInt(config map[string]interface{}, key string, defaultValue int) int {
+	if value, ok := config[key].(int); ok {
+		return value
+	}
+	if floatValue, ok := config[key].(float64); ok {
+		return int(floatValue)
+	}
+	return defaultValue
+}
+
+func getDuration(config map[string]interface{}, key string, defaultValue time.Duration) time.Duration {
+	if strValue, ok := config[key].(string); ok {
+		if duration, err := time.ParseDuration(strValue); err == nil {
+			return duration
+		}
+	}
+	return defaultValue
 }

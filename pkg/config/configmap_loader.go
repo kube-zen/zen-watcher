@@ -251,8 +251,7 @@ func (cml *ConfigMapLoader) handleConfigMapChange(cm *corev1.ConfigMap) {
 	cml.setLastGoodConfig(&config)
 
 	// Update filter with new config
-	// Note: If ObservationFilterLoader is active, it will merge ConfigMap + CRD configs
-	// For backward compatibility without ObservationFilterLoader, we still update directly
+	// ConfigMap configs are loaded directly
 	cml.updateFilter(&config)
 	logger.Info("Reloaded filter configuration from ConfigMap",
 		logger.Fields{

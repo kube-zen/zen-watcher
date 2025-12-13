@@ -20,9 +20,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// TestFilter_ExpressionVsLegacy tests that expression-based filters work
-// and that legacy filters still work when expression is not set
-func TestFilter_ExpressionVsLegacy(t *testing.T) {
+// TestFilter_ExpressionVsListBased tests that expression-based filters work
+// and that list-based filters still work when expression is not set
+func TestFilter_ExpressionVsListBased(t *testing.T) {
 	// Test observation
 	obs := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -45,7 +45,7 @@ func TestFilter_ExpressionVsLegacy(t *testing.T) {
 		t.Errorf("Expression filter should allow observation, got reason: %s", reason)
 	}
 
-	// Test 2: Legacy filter (should still work when expression is not set)
+	// Test 2: List-based filter (should still work when expression is not set)
 	configLegacy := &FilterConfig{
 		Expression: "", // No expression
 		Sources: map[string]SourceFilter{
@@ -54,18 +54,18 @@ func TestFilter_ExpressionVsLegacy(t *testing.T) {
 			},
 		},
 	}
-	filterLegacy := NewFilter(configLegacy)
-	allowed, reason = filterLegacy.AllowWithReason(obs)
+	filterListBased := NewFilter(configLegacy)
+	allowed, reason = filterListBased.AllowWithReason(obs)
 	if !allowed {
-		t.Errorf("Legacy filter should allow observation, got reason: %s", reason)
+		t.Errorf("List-based filter should allow observation, got reason: %s", reason)
 	}
 
-	// Test 3: Expression takes precedence over legacy fields
+	// Test 3: Expression takes precedence over list-based fields
 	configBoth := &FilterConfig{
 		Expression: `spec.severity = "LOW"`, // This should filter out HIGH
 		Sources: map[string]SourceFilter{
 			"trivy": {
-				MinSeverity: "HIGH", // Legacy field should be ignored
+				MinSeverity: "HIGH", // List-based field should be ignored when expression is set
 			},
 		},
 	}
@@ -80,7 +80,7 @@ func TestFilter_ExpressionVsLegacy(t *testing.T) {
 }
 
 // TestFilter_InvalidExpressionFallback tests that invalid expressions
-// fall back to legacy filters gracefully
+// fall back to list-based filters gracefully
 func TestFilter_InvalidExpressionFallback(t *testing.T) {
 	obs := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -91,7 +91,7 @@ func TestFilter_InvalidExpressionFallback(t *testing.T) {
 		},
 	}
 
-	// Invalid expression should fall back to legacy filters
+	// Invalid expression should fall back to list-based filters
 	config := &FilterConfig{
 		Expression: `invalid syntax !!!`, // Invalid
 		Sources: map[string]SourceFilter{
@@ -103,7 +103,7 @@ func TestFilter_InvalidExpressionFallback(t *testing.T) {
 	filter := NewFilter(config)
 	allowed, _ := filter.AllowWithReason(obs)
 	if !allowed {
-		t.Error("Invalid expression should fall back to legacy filters and allow HIGH severity")
+		t.Error("Invalid expression should fall back to list-based filters and allow HIGH severity")
 	}
 }
 
@@ -129,9 +129,8 @@ func TestFilter_ExpressionErrorHandling(t *testing.T) {
 	}
 	filter := NewFilter(config)
 	allowed, _ := filter.AllowWithReason(obs)
-	// Should fall back to legacy filters
+	// Should fall back to list-based filters
 	if !allowed {
-		t.Error("Expression evaluation error should fall back to legacy filters")
+		t.Error("Expression evaluation error should fall back to list-based filters")
 	}
 }
-

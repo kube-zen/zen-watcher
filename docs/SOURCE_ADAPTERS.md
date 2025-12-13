@@ -4,7 +4,7 @@ This guide explains how to add support for new event sources to Zen Watcher. The
 
 ## 🎯 Adding a New Source: Just YAML!
 
-**You don't need to write any code to add a new source!** Zen Watcher supports **four input methods** that can all be configured via YAML using the `ObservationSourceConfig` CRD:
+**You don't need to write any code to add a new source!** Zen Watcher supports **four input methods** that can all be configured via YAML using the `Ingester` CRD:
 
 1. **🔍 Logs** - Monitor pod logs with regex patterns
 2. **📡 Webhooks** - Receive HTTP webhooks from external tools
@@ -15,7 +15,7 @@ This guide explains how to add support for new event sources to Zen Watcher. The
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: my-custom-source
   namespace: zen-system
@@ -88,7 +88,7 @@ See [Generic Source Configuration](#generic-source-configuration-via-yaml) secti
 
 ## Generic Source Configuration (Via YAML)
 
-**No code required!** Zen Watcher supports four input methods that can all be configured using the `ObservationSourceConfig` CRD:
+**No code required!** Zen Watcher supports four input methods that can all be configured using the `Ingester` CRD:
 
 ### Input Methods Overview
 
@@ -106,7 +106,7 @@ Monitor pod logs and extract events using regex patterns:
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: sealed-secrets-source
   namespace: zen-system
@@ -143,7 +143,7 @@ Receive HTTP webhooks from external tools:
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: custom-webhook-source
   namespace: zen-system
@@ -174,7 +174,7 @@ Poll ConfigMaps for batch scan results:
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: checkov-source
   namespace: zen-system
@@ -203,7 +203,7 @@ Watch Kubernetes Custom Resource Definitions:
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: cert-manager-source
   namespace: zen-system
@@ -235,7 +235,7 @@ Here's a full example with all optional features including auto-optimization, th
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: comprehensive-example
   namespace: zen-system
@@ -488,7 +488,7 @@ When thresholds are exceeded:
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: trivy-with-thresholds
 spec:

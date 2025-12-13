@@ -860,7 +860,7 @@ spec:
           spec:
             properties:
               deduplication:
-                description: Deduplication configuration for this ingester (legacy - use spec.processing.dedup in v1.1+)
+                description: Deduplication configuration for this ingester
                 properties:
                   adaptive:
                     default: false

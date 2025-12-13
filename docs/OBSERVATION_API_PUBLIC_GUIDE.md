@@ -322,7 +322,7 @@ Observations with `ttlSecondsAfterCreation` set are automatically deleted by zen
 
 ### Default TTL
 
-If `ttlSecondsAfterCreation` is not set, zen-watcher uses the default TTL from GC configuration (configurable via `ObservationSourceConfig` or global config).
+If `ttlSecondsAfterCreation` is not set, zen-watcher uses the default TTL from GC configuration (configurable via `Ingester` CRD or global config).
 
 ---
 

@@ -27,7 +27,7 @@ Format: `MAJOR.MINOR.PATCH`
 
 ### MINOR (New Features)
 - New adapters or sources
-- New CRDs (ObservationFilter, ObservationMapping)
+- New CRDs (Ingester, ObservationMapping)
 - New features (backward compatible)
 - Significant enhancements
 

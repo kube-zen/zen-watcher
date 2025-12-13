@@ -71,13 +71,13 @@ Lists all configured sources with their optimization status:
 
 ## Configuration
 
-### ObservationSourceConfig CRD
+### Ingester CRD
 
 Configure optimization per source:
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationSourceConfig
+kind: Ingester
 metadata:
   name: trivy-config
 spec:
@@ -128,7 +128,7 @@ Zen Watcher automatically determines optimal processing order:
 - `zen_watcher_optimization_adaptive_adjustments_total{source,adjustment_type}` - Adaptive adjustments applied
 - `zen_watcher_optimization_confidence{source}` - Confidence level of optimization decisions (0.0-1.0)
 
-### Legacy Metrics (Still Available)
+### Additional Metrics (Still Available)
 
 - `zen_watcher_filter_pass_rate{source}` - Filter effectiveness (0.0-1.0)
 - `zen_watcher_dedup_effectiveness{source}` - Dedup effectiveness (0.0-1.0)
@@ -163,7 +163,7 @@ Prometheus alerts are configured in `config/monitoring/optimization-alerts.yaml`
 1. **Start with Auto-Optimization**: Enable `autoOptimize: true` and let Zen Watcher learn your patterns
 2. **Review Suggestions**: Use `analyze` command to review suggestions before applying
 3. **Monitor Metrics**: Watch Prometheus metrics to track optimization effectiveness
-4. **Set Thresholds**: Configure thresholds in ObservationSourceConfig to get early warnings
+4. **Set Thresholds**: Configure thresholds in Ingester CRD to get early warnings
 5. **Review Weekly Reports**: Check optimization impact reports to measure success
 
 ## Examples
@@ -179,7 +179,7 @@ zen-watcher-optimize --command=analyze --source=trivy
 zen-watcher-optimize --command=apply --source=trivy --suggestion=1
 
 # Or configure directly
-kubectl patch observationsourceconfig trivy --type=merge -p '{"spec":{"filter":{"minPriority":0.5}}}'
+kubectl patch ingester trivy --type=merge -p '{"spec":{"processing":{"filter":{"minPriority":0.5}}}}'
 ```
 
 ### Example 2: Optimize Cert-Manager (Retry Patterns)
@@ -188,7 +188,7 @@ kubectl patch observationsourceconfig trivy --type=merge -p '{"spec":{"filter":{
 # Cert-manager failures retry frequently
 # Zen Watcher automatically switches to dedup_first
 # Or configure explicitly:
-kubectl patch observationsourceconfig cert-manager --type=merge -p '{"spec":{"processing":{"order":"dedup_first"},"dedup":{"window":"24h"}}}'
+kubectl patch ingester cert-manager --type=merge -p '{"spec":{"processing":{"order":"dedup_first","dedup":{"window":"24h"}}}}'
 ```
 
 ### Example 3: Enable Auto-Optimization Globally
@@ -284,7 +284,7 @@ The system runs continuous optimization cycles:
 
 ### Auto-Optimization Not Working
 
-- Verify `autoOptimize: true` in ObservationSourceConfig
+- Verify `autoOptimize: true` in Ingester CRD
 - Check that processing order is set to "auto"
 - Review logs for optimization advisor messages
 

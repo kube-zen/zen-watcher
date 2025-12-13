@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"time"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -71,6 +72,24 @@ func (m *Manager) GetInformer(gvr schema.GroupVersionResource, resyncPeriod time
 
 	// Use default factory
 	return m.factory.ForResource(gvr).Informer()
+}
+
+// GetFilteredInformer returns a SharedIndexInformer for the given GVR with namespace filtering
+// This is useful for namespace-scoped resources to reduce watch overhead
+func (m *Manager) GetFilteredInformer(
+	gvr schema.GroupVersionResource,
+	namespace string,
+	resyncPeriod time.Duration,
+	tweakListOptions func(*metav1.ListOptions),
+) cache.SharedIndexInformer {
+	// Use filtered factory for namespace-scoped resources
+	factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(
+		m.dynamicClient,
+		resyncPeriod,
+		namespace,
+		tweakListOptions,
+	)
+	return factory.ForResource(gvr).Informer()
 }
 
 // Start starts all informers in the factory

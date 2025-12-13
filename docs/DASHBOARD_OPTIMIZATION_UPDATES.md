@@ -54,7 +54,7 @@ This document outlines the Grafana dashboard updates needed to display optimizat
 **Location**: New panel in Executive Dashboard
 
 **Metrics**:
-- Processing order per source (from ObservationSourceConfig)
+- Processing order per source (from Ingester)
 - Auto-optimization enabled status
 - Last optimization timestamp
 
@@ -128,7 +128,7 @@ avg(zen_watcher_optimization_impact{source=~".+"})
 ### Processing Order Status
 ```promql
 # This would require a custom metric or annotation
-# Could be derived from ObservationSourceConfig CRD status
+# Could be derived from Ingester CRD status
 ```
 
 ## Implementation Notes

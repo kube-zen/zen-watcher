@@ -71,8 +71,7 @@ spec:
       order: filter_first
       autoOptimize: false
   
-  # Legacy fields (backward compatibility - maps to processing.*)
-  # Compatibility note: Legacy fields (filters, deduplication, optimization) are still supported
+  # Deprecated: Use spec.processing.* instead
   # but new examples should use spec.processing.* as the primary form
   filters:
     enabled: true

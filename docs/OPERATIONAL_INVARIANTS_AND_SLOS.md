@@ -53,7 +53,7 @@
 
 **Definition**: 
 - Invalid Observation CRDs are rejected by CRD validation (schema validation)
-- Invalid ObservationSourceConfig CRDs are rejected with clear error messages
+- Invalid Ingester CRDs are rejected with clear error messages
 - Invalid configs produce Kubernetes events or status conditions
 
 **Metrics**:
@@ -62,7 +62,7 @@
 
 **Test Assertion**: Pipeline tests verify invalid configs produce errors and no observations are created.
 
-**Status Conditions**: Invalid ObservationSourceConfigs should have status conditions indicating validation errors (future enhancement).
+**Status Conditions**: Invalid Ingesters should have status conditions indicating validation errors (future enhancement).
 
 ---
 
@@ -86,7 +86,7 @@
 
 **Invariant**: Filter configuration changes (ConfigMap or CRD) should take effect within seconds without restart.
 
-**Definition**: When filter ConfigMap or ObservationFilter CRD is updated, new filter rules should apply within 10 seconds.
+**Definition**: When filter ConfigMap or Ingester CRD is updated, new filter rules should apply within 10 seconds.
 
 **Metrics**:
 - `zen_watcher_filter_reload_total` - Filter reload count

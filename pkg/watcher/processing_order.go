@@ -55,7 +55,7 @@ func DetermineOptimalOrder(source string, sourceConfig *config.SourceConfig, met
 
 // GetDefaultOrder returns the default processing order for a source
 func GetDefaultOrder(source string) ProcessingOrder {
-	// Default: filter first (configurable via ObservationSourceConfig)
+	// Default: filter first (configurable via Ingester CRD)
 	// Source-specific defaults are configured via YAML, not hardcoded
 	return ProcessingOrderFilterFirst
 }

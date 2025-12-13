@@ -187,9 +187,9 @@ spec:
 	waitForIngesterReady(t, "test-e2e-ingester", testNamespace, 10*time.Second)
 
 	// Verify the Ingester exists
-	output, err = runKubectl("get", "ingester", "test-e2e-ingester", "-n", testNamespace)
+	ingesterOutput, err := runKubectl("get", "ingester", "test-e2e-ingester", "-n", testNamespace)
 	if err != nil {
-		t.Errorf("Test Ingester not found: %v\nOutput: %s", err, output)
+		t.Errorf("Test Ingester not found: %v\nOutput: %s", err, ingesterOutput)
 	}
 
 	// Cleanup
@@ -236,22 +236,22 @@ spec:
 	waitForIngesterReady(t, "test-canonical-spec", testNamespace, 10*time.Second)
 
 	// Verify Ingester exists and has correct spec
-	output, err = runKubectl("get", "ingester", "test-canonical-spec", "-n", testNamespace, "-o", "jsonpath={.spec.processing.filter.expression}")
+	specOutput, err := runKubectl("get", "ingester", "test-canonical-spec", "-n", testNamespace, "-o", "jsonpath={.spec.processing.filter.expression}")
 	if err != nil {
 		t.Errorf("Failed to get Ingester spec: %v", err)
 	} else {
-		if !strings.Contains(output, "severity >= HIGH") {
-			t.Errorf("Canonical spec.processing.filter.expression not found. Got: %s", output)
+		if !strings.Contains(specOutput, "severity >= HIGH") {
+			t.Errorf("Canonical spec.processing.filter.expression not found. Got: %s", specOutput)
 		}
 	}
 
 	// Verify dedup strategy
-	output, err = runKubectl("get", "ingester", "test-canonical-spec", "-n", testNamespace, "-o", "jsonpath={.spec.processing.dedup.strategy}")
+	dedupOutput, err := runKubectl("get", "ingester", "test-canonical-spec", "-n", testNamespace, "-o", "jsonpath={.spec.processing.dedup.strategy}")
 	if err != nil {
 		t.Errorf("Failed to get dedup strategy: %v", err)
 	} else {
-		if output != "event-stream" {
-			t.Errorf("Expected dedup strategy 'event-stream', got: %s", output)
+		if dedupOutput != "event-stream" {
+			t.Errorf("Expected dedup strategy 'event-stream', got: %s", dedupOutput)
 		}
 	}
 
@@ -542,6 +542,33 @@ func TestCoreMetrics(t *testing.T) {
 	} else {
 		if scrape, ok := svc.Annotations["prometheus.io/scrape"]; ok && scrape == "true" {
 			t.Logf("Service is annotated for Prometheus scraping")
+		}
+	}
+}
+
+// waitForIngesterReady waits for an Ingester to be ready
+func waitForIngesterReady(t *testing.T, name, namespace string, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			t.Fatalf("Timeout waiting for Ingester %s/%s to be ready", namespace, name)
+		case <-ticker.C:
+			output, err := runKubectl("get", "ingester", name, "-n", namespace, "-o", "jsonpath={.status.phase}")
+			if err == nil && strings.TrimSpace(output) == "Ready" {
+				return
+			}
+			// Also check if it exists at all
+			_, err = runKubectl("get", "ingester", name, "-n", namespace)
+			if err != nil {
+				continue // Not found yet, keep waiting
+			}
+			// If it exists but not ready, continue waiting
 		}
 	}
 }

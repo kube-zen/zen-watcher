@@ -134,7 +134,7 @@ func (cli *OptimizeCLI) Auto(ctx context.Context, enable bool) error {
 		})
 
 	fmt.Printf("Auto-optimization: %s\n", action)
-	fmt.Printf("(This would update ObservationSourceConfig CRDs to set autoOptimize=%v)\n", enable)
+	fmt.Printf("(This would update Ingester CRDs to set autoOptimize=%v)\n", enable)
 
 	return nil
 }

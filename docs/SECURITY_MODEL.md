@@ -50,7 +50,7 @@ Zen-watcher is a security tool and therefore must operate under a comprehensive 
 - Mapping validation before informer creation
 - Errors isolated per mapping (don't crash adapter)
 
-❌ **ObservationFilter CRDs**
+❌ **Ingester CRDs**
 - Validated before application
 - Invalid filters fall back to last-good-config
 - No filter can execute arbitrary code

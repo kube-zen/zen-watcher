@@ -350,7 +350,7 @@ func TestPipelineIntegration_Normalization(t *testing.T) {
 			Domain: "security",
 			Type:   "vulnerability",
 			Priority: map[string]float64{
-				"HIGH": 0.8,
+				"HIGH":   0.8,
 				"MEDIUM": 0.5,
 			},
 			FieldMapping: []generic.FieldMapping{
@@ -462,4 +462,3 @@ func TestPipelineIntegration_ErrorHandling(t *testing.T) {
 		t.Logf("ProcessEvent() with empty source returned error (acceptable): %v", err)
 	}
 }
-

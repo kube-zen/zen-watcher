@@ -72,9 +72,9 @@ kubectl create configmap zen-watcher-filter -n zen-system \
 - Missing key → Last known good config is preserved
 - ConfigMap deleted → Last known good config is preserved (no reset to default)
 
-### ObservationFilter CRD (Kubernetes-Native)
+### Ingester CRD (Kubernetes-Native)
 
-**✨ New in v1.0+:** You can also use Kubernetes-native `ObservationFilter` CRDs instead of (or in addition to) ConfigMap-based filters.
+**✨ New in v1.0+:** You can also use Kubernetes-native `Ingester` CRDs instead of (or in addition to) ConfigMap-based filters.
 
 **Advantages:**
 - ✅ **RBAC-granular** - Per-namespace or cluster-scoped permissions
@@ -85,7 +85,7 @@ kubectl create configmap zen-watcher-filter -n zen-system \
 **Usage:**
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
-kind: ObservationFilter
+kind: Ingester
 metadata:
   name: trivy-high-severity
   namespace: zen-system
@@ -100,8 +100,8 @@ spec:
 
 **Merging Behavior:**
 - ConfigMap filters are applied first
-- ObservationFilter CRDs are merged on top
-- Multiple ObservationFilters targeting the same source are merged together
+- Ingester CRDs are merged on top
+- Multiple Ingesters targeting the same source are merged together
 - Lists are unioned (exclude) or intersected (include)
 - Most restrictive settings win (e.g., higher minSeverity)
 
@@ -109,7 +109,7 @@ spec:
 - Default: Watches all namespaces (cluster-wide)
 - Set `OBSERVATION_FILTER_NAMESPACE` env var to watch specific namespace only
 
-See [ObservationFilter CRD Reference](#observationfilter-crd-reference) for complete CRD specification.
+See [Ingester CRD Reference](#observationfilter-crd-reference) for complete CRD specification.
 
 ### Environment Variables
 
@@ -118,7 +118,7 @@ See [ObservationFilter CRD Reference](#observationfilter-crd-reference) for comp
 | `FILTER_CONFIGMAP_NAME` | Filter ConfigMap name | `zen-watcher-filter` |
 | `FILTER_CONFIGMAP_NAMESPACE` | Filter ConfigMap namespace | `zen-system` (or `WATCH_NAMESPACE`) |
 | `FILTER_CONFIGMAP_KEY` | Filter ConfigMap data key | `filter.json` |
-| `OBSERVATION_FILTER_NAMESPACE` | Namespace to watch for ObservationFilter CRDs (empty = all namespaces) | `""` (all namespaces) |
+| `OBSERVATION_FILTER_NAMESPACE` | Namespace to watch for Ingester CRDs (empty = all namespaces) | `""` (all namespaces) |
 
 ### Filter Configuration Format
 

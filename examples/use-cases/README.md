@@ -10,7 +10,7 @@ Real-world scenarios showing how to use zen-watcher in production.
 **Scenario:** Multi-tenant Kubernetes platform with different security requirements per tenant
 
 **What it shows:**
-- Namespace-scoped ObservationFilter CRDs
+- Namespace-scoped Ingester CRDs
 - Different severity thresholds per tenant
 - Platform team sees all, tenants see filtered view
 - Dynamic updates without restart

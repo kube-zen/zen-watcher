@@ -153,9 +153,9 @@ See examples in `examples/adapters/` directory.
 
 ---
 
-## Legacy: Adding a New Watcher (Direct Implementation)
+## Adding a New Watcher (Direct Implementation)
 
-For reference, the legacy approach (still supported):
+For reference, the direct implementation approach (still supported):
 
 ### Step 1: Choose the Right Processor Type
 

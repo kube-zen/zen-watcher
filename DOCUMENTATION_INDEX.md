@@ -51,7 +51,7 @@ Complete guide to Zen Watcher documentation.
 8. **[docs/FILTERING.md](docs/FILTERING.md)** - Source-level filtering guide
    - Filter configuration
    - Dynamic ConfigMap reloading (no restart required)
-   - ObservationFilter CRD usage
+   - Ingester CRD usage
    - Per-source filter rules
    - Examples and best practices
    - Troubleshooting

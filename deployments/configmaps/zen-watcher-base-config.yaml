@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zen-watcher-base-config
+  namespace: zen-system
+  labels:
+    app.kubernetes.io/name: zen-watcher
+    app.kubernetes.io/component: config
+data:
+  features.yaml: |
+    worker_pool:
+      enabled: false
+      size: 5
+      queue_size: 1000
+    
+    event_batching:
+      enabled: false
+      batch_size: 50
+      batch_age: 10s
+      flush_interval: 30s
+    
+    http_client:
+      timeout: 30s
+      max_connections: 100
+      rate_limit: 1000
+    
+    namespace_filtering:
+      enabled: true
+      included_namespaces: []
+      excluded_namespaces: ["kube-system", "kube-public", "kube-node-lease"]
+

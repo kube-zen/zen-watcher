@@ -161,9 +161,9 @@ func TestPipelineStrategy_EventStream(t *testing.T) {
 	config := &generic.SourceConfig{
 		Source: "test-source",
 		Dedup: &generic.DedupConfig{
-			Enabled:           true,
-			Window:            "5s", // Shorter window for event-stream
-			Strategy:          "event-stream",
+			Enabled:            true,
+			Window:             "5s", // Shorter window for event-stream
+			Strategy:           "event-stream",
 			MaxEventsPerWindow: 10,
 		},
 	}
@@ -261,4 +261,3 @@ func TestPipelineStrategy_KeyBased(t *testing.T) {
 		t.Errorf("Duplicate event should be deduplicated (no error): %v", err)
 	}
 }
-

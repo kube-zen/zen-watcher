@@ -88,7 +88,9 @@ func TestMergeFilterConfigs_SingleConfig(t *testing.T) {
 	}
 
 	// Verify it's a copy, not the same reference
-	if &result.Sources["trivy"] == &config.Sources["trivy"] {
+	trivyResult := result.Sources["trivy"]
+	trivyConfig := config.Sources["trivy"]
+	if &trivyResult == &trivyConfig {
 		t.Error("Expected a copy, but got the same reference")
 	}
 }
@@ -457,7 +459,7 @@ func TestMergeFilterConfigs_ComplexMerge(t *testing.T) {
 		},
 	}
 
-	// ObservationFilter CRD
+	// Ingester CRD filter configuration
 	crdConfig := &FilterConfig{
 		Sources: map[string]SourceFilter{
 			"trivy": {

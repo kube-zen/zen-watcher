@@ -47,7 +47,7 @@ rules:
     urgency: "low"
     impact: "Consider relaxing filter rules to allow more observations through"
 
-# Default thresholds (used when not specified in ObservationSourceConfig)
+# Default thresholds (used when not specified in Ingester)
 defaults:
   observations_per_minute:
     warning: 100

@@ -45,7 +45,7 @@ func NewLoadGenerator(watcherURL string, rate int, duration time.Duration, names
 // GenerateFalcoWebhook generates a Falco webhook payload
 func (lg *LoadGenerator) GenerateFalcoWebhook(priority, rule, podName string) map[string]interface{} {
 	return map[string]interface{}{
-		"output": fmt.Sprintf("Test event: %s - %s", rule, time.Now().Format(time.RFC3339)),
+		"output":   fmt.Sprintf("Test event: %s - %s", rule, time.Now().Format(time.RFC3339)),
 		"priority": priority,
 		"rule":     rule,
 		"time":     time.Now().UTC().Format(time.RFC3339Nano),
@@ -68,7 +68,7 @@ func (lg *LoadGenerator) SendWebhook(endpoint string, payload map[string]interfa
 	// Use kubectl exec to send webhook from within cluster (avoids port-forward complexity)
 	// This is a minimal approach - reuse existing send-webhooks.sh pattern
 	url := fmt.Sprintf("%s%s", lg.watcherURL, endpoint)
-	
+
 	// For e2e, we'll use a simple HTTP client approach if URL is accessible
 	// Otherwise, fall back to kubectl exec pattern
 	client := &http.Client{Timeout: 5 * time.Second}
@@ -92,11 +92,11 @@ func (lg *LoadGenerator) sendWebhookViaKubectl(endpoint string, jsonData []byte)
 	// For e2e, we'll use a pod-based approach similar to send-webhooks.sh
 	kubeconfig := getKubeconfigPath()
 	clusterName := "zen-demo"
-	
+
 	// Create a temporary pod to send webhook (reuse send-webhooks.sh pattern)
 	podName := fmt.Sprintf("load-gen-%d", time.Now().Unix())
 	watcherURL := fmt.Sprintf("http://zen-watcher.%s.svc.cluster.local:8080%s", lg.namespace, endpoint)
-	
+
 	// Use curl pod pattern from send-webhooks.sh
 	podYAML := fmt.Sprintf(`
 apiVersion: v1
@@ -158,4 +158,3 @@ func (lg *LoadGenerator) Run() error {
 	fmt.Printf("Load generation complete: sent %d events over %v\n", eventCount, lg.duration)
 	return nil
 }
-

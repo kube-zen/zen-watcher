@@ -143,7 +143,7 @@ status:
 ### Processing Pipeline
 
 1. **Source Detection**: Informer/webhook/ConfigMap adapters detect events
-2. **Filtering**: Per-source filter rules (via `ObservationFilter` CRD)
+2. **Filtering**: Per-source filter rules (via `Ingester` CRD)
 3. **Normalization**: Convert tool-specific formats to Observation spec
 4. **Deduplication**: Content-based fingerprinting + time-windowed deduplication
 5. **CRD Creation**: Write Observation CRD to etcd
@@ -201,10 +201,7 @@ status:
 ### Source Integration
 
 **Config-Driven via CRDs**:
-- `ObservationSourceConfig`: Defines source adapters (informer, webhook, logs, configmap)
-- `ObservationTypeConfig`: Defines normalization rules per event type
-- `ObservationFilter`: Defines per-source filter rules
-- `ObservationDedupConfig`: Defines per-source deduplication windows
+- `Ingester`: Defines source adapters (informer, webhook, logs, k8s-events) and processing configuration
 
 **No Code Changes Required**: New sources can be added by creating CRDs
 
