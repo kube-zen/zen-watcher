@@ -200,15 +200,28 @@ kubectl delete mutatingwebhookconfiguration ingress-nginx-admission 2>&1 | grep 
 if [ "$SKIP_MONITORING" != true ]; then
     log_step "Setting up observability..."
     
+    # Wait for grafana namespace to be created by helmfile, then create dashboard ConfigMap
+    log_info "Waiting for Grafana namespace..."
+    for i in {1..30}; do
+        if kubectl get namespace grafana >/dev/null 2>&1; then
+            break
+        fi
+        sleep 1
+    done
+    
     # Create Grafana dashboard ConfigMap for permanent provisioning
-    log_info "Creating Grafana dashboard ConfigMap..."
-    if [ -f "${SCRIPT_DIR}/observability/generate-dashboard-configmap.sh" ]; then
-        "${SCRIPT_DIR}/observability/generate-dashboard-configmap.sh" grafana | kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" || {
-            log_warn "Dashboard ConfigMap creation had issues, continuing..."
-        }
-        log_success "Dashboard ConfigMap created (dashboards will be automatically provisioned)"
+    if kubectl get namespace grafana >/dev/null 2>&1; then
+        log_info "Creating Grafana dashboard ConfigMap..."
+        if [ -f "${SCRIPT_DIR}/observability/generate-dashboard-configmap.sh" ]; then
+            "${SCRIPT_DIR}/observability/generate-dashboard-configmap.sh" grafana | kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" || {
+                log_warn "Dashboard ConfigMap creation had issues, continuing..."
+            }
+            log_success "Dashboard ConfigMap created (dashboards will be automatically provisioned)"
+        else
+            log_warn "Dashboard ConfigMap generator script not found, skipping..."
+        fi
     else
-        log_warn "Dashboard ConfigMap generator script not found, skipping..."
+        log_warn "Grafana namespace not found, will create ConfigMap later..."
     fi
     
     "${SCRIPT_DIR}/observability/setup.sh" "$NAMESPACE" "$KUBECONFIG_FILE" || {
