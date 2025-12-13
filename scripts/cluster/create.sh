@@ -56,6 +56,25 @@ case "$PLATFORM" in
             exit 1
         fi
         
+        # Check if ingress HTTP port is available, find alternative if needed
+        if ! check_port "${INGRESS_HTTP_PORT}" "k3d ingress HTTP"; then
+            log_warn "Port ${INGRESS_HTTP_PORT} is already in use, finding alternative..."
+            INGRESS_HTTP_PORT=$(find_available_port "${INGRESS_HTTP_PORT}" "k3d ingress HTTP")
+            log_info "Using port ${INGRESS_HTTP_PORT} for ingress HTTP"
+        fi
+        
+        # Check if ingress HTTPS port is available
+        INGRESS_HTTPS_PORT=$((INGRESS_HTTP_PORT + 1))
+        if ! check_port "${INGRESS_HTTPS_PORT}" "k3d ingress HTTPS"; then
+            log_warn "Port ${INGRESS_HTTPS_PORT} is already in use, finding alternative..."
+            INGRESS_HTTPS_PORT=$(find_available_port "${INGRESS_HTTPS_PORT}" "k3d ingress HTTPS")
+            log_info "Using port ${INGRESS_HTTPS_PORT} for ingress HTTPS"
+        fi
+        
+        # Export the ports so they're available to other scripts
+        export INGRESS_HTTP_PORT
+        export INGRESS_HTTPS_PORT
+        
         # Build k3d command
         k3d_create_args=(
             "cluster" "create" "${CLUSTER_NAME}"
@@ -63,7 +82,7 @@ case "$PLATFORM" in
             "--host-pid-mode"
             "--k3s-arg" "--disable=traefik@server:0"
             "--port" "${INGRESS_HTTP_PORT}:80@loadbalancer"
-            "--port" "$((INGRESS_HTTP_PORT + 1)):443@loadbalancer"
+            "--port" "${INGRESS_HTTPS_PORT}:443@loadbalancer"
         )
         
         # Handle API port
