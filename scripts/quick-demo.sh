@@ -314,11 +314,15 @@ if [ "$SKIP_MONITORING" != true ]; then
     
     # Try to get from k3d loadbalancer port mapping (most reliable for k3d)
     if command -v k3d >/dev/null 2>&1 && k3d cluster list 2>/dev/null | grep -q "${CLUSTER_NAME}"; then
-        # Extract port from k3d cluster info or docker inspect
-        K3D_PORT=$(docker ps --format '{{.Ports}}' --filter "name=k3d-${CLUSTER_NAME}-serverlb" 2>/dev/null | grep -oP '0.0.0.0:\K[0-9]+(?=->80/tcp)' | head -1)
-        if [ -n "$K3D_PORT" ] && [ "$K3D_PORT" != "0" ]; then
-            INGRESS_PORT="$K3D_PORT"
-            log_info "Detected ingress port from k3d loadbalancer: ${INGRESS_PORT}"
+        # Get the loadbalancer container ID
+        LB_CONTAINER=$(docker ps -q --filter "name=k3d-${CLUSTER_NAME}-serverlb" 2>/dev/null)
+        if [ -n "$LB_CONTAINER" ]; then
+            # Extract port mapping for port 80
+            K3D_PORT=$(docker port "$LB_CONTAINER" 2>/dev/null | grep "80/tcp" | awk -F: '{print $2}' | head -1)
+            if [ -n "$K3D_PORT" ] && [ "$K3D_PORT" != "0" ] && [ "$K3D_PORT" -gt 0 ] 2>/dev/null; then
+                INGRESS_PORT="$K3D_PORT"
+                log_info "Detected ingress port from k3d loadbalancer: ${INGRESS_PORT}"
+            fi
         fi
     fi
     
