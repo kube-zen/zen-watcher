@@ -232,8 +232,15 @@ releases:
                 editable: true
                 options:
                   path: /var/lib/grafana/dashboards/default
-      # Note: dashboardsConfigMaps is not used - we create individual ConfigMaps
-      # with label grafana_dashboard: "1" which Grafana sidecar will pick up automatically
+      - sidecar:
+          dashboards:
+            enabled: true
+            label: grafana_dashboard
+            labelValue: "1"
+            folder: /var/lib/grafana/dashboards/default
+            searchNamespace: grafana
+            watchMethod: WATCH
+            resource: configmap
       - resources:
           requests:
             memory: {{ if eq $demoMinimal "true" }}64Mi{{ else }}128Mi{{ end }}
