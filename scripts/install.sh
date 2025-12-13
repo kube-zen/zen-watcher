@@ -209,26 +209,27 @@ if [ "$SKIP_MONITORING" != true ]; then
         sleep 1
     done
     
-    # Create Grafana dashboard ConfigMap for permanent provisioning
+    # Create Grafana dashboard ConfigMaps for permanent provisioning
+    # One ConfigMap per dashboard for better modularity and smaller size
     # Use server-side apply to avoid annotation size limits
     if kubectl get namespace grafana >/dev/null 2>&1; then
-        log_info "Creating Grafana dashboard ConfigMap (server-side to avoid size limits)..."
+        log_info "Creating Grafana dashboard ConfigMaps (one per dashboard)..."
         if [ -f "${SCRIPT_DIR}/observability/generate-dashboard-configmap.sh" ]; then
-            # Use kubectl create --dry-run=client -o yaml | kubectl apply --server-side to avoid annotation issues
+            # Generate and apply all dashboard ConfigMaps
+            # Each dashboard gets its own ConfigMap with label grafana_dashboard: "1"
             "${SCRIPT_DIR}/observability/generate-dashboard-configmap.sh" grafana | \
                 kubectl apply --server-side --field-manager=helmfile --force-conflicts -f - 2>&1 | \
-                grep -v "already exists\|unchanged\|Warning" || {
-                # Fallback: try regular apply
-                "${SCRIPT_DIR}/observability/generate-dashboard-configmap.sh" grafana | \
-                    kubectl create -f - 2>&1 | grep -v "already exists" || \
-                    kubectl replace -f - 2>&1 | grep -v "already exists" || true
+                grep -E "configmap/grafana-dashboard|created|serverside-applied" | \
+                sed 's/^/  /' || {
+                log_warn "Some dashboard ConfigMaps may have had issues, continuing..."
             }
-            log_success "Dashboard ConfigMap created (dashboards will be automatically provisioned)"
+            DASHBOARD_COUNT=$(kubectl get configmap -n grafana -l grafana_dashboard=1 --no-headers 2>/dev/null | wc -l || echo "0")
+            log_success "Created ${DASHBOARD_COUNT} dashboard ConfigMap(s) (dashboards will be automatically provisioned)"
         else
             log_warn "Dashboard ConfigMap generator script not found, skipping..."
         fi
     else
-        log_warn "Grafana namespace not found, will create ConfigMap later..."
+        log_warn "Grafana namespace not found, will create ConfigMaps later..."
     fi
     
     "${SCRIPT_DIR}/observability/setup.sh" "$NAMESPACE" "$KUBECONFIG_FILE" || {
