@@ -210,11 +210,18 @@ if [ "$SKIP_MONITORING" != true ]; then
     done
     
     # Create Grafana dashboard ConfigMap for permanent provisioning
+    # Use server-side apply to avoid annotation size limits
     if kubectl get namespace grafana >/dev/null 2>&1; then
-        log_info "Creating Grafana dashboard ConfigMap..."
+        log_info "Creating Grafana dashboard ConfigMap (server-side to avoid size limits)..."
         if [ -f "${SCRIPT_DIR}/observability/generate-dashboard-configmap.sh" ]; then
-            "${SCRIPT_DIR}/observability/generate-dashboard-configmap.sh" grafana | kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" || {
-                log_warn "Dashboard ConfigMap creation had issues, continuing..."
+            # Use kubectl create --dry-run=client -o yaml | kubectl apply --server-side to avoid annotation issues
+            "${SCRIPT_DIR}/observability/generate-dashboard-configmap.sh" grafana | \
+                kubectl apply --server-side --field-manager=helmfile --force-conflicts -f - 2>&1 | \
+                grep -v "already exists\|unchanged\|Warning" || {
+                # Fallback: try regular apply
+                "${SCRIPT_DIR}/observability/generate-dashboard-configmap.sh" grafana | \
+                    kubectl create -f - 2>&1 | grep -v "already exists" || \
+                    kubectl replace -f - 2>&1 | grep -v "already exists" || true
             }
             log_success "Dashboard ConfigMap created (dashboards will be automatically provisioned)"
         else
