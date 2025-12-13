@@ -226,11 +226,15 @@ echo ""
 if [ "$SKIP_MONITORING" != true ]; then
     log_step "Getting Grafana credentials..."
     GRAFANA_PASSWORD=""
+    GRAFANA_USER="zen"
+    
+    # Try to get password from Grafana secret (helmfile sets admin-password key)
     if kubectl get secret -n grafana grafana -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null > /tmp/grafana-password.txt 2>/dev/null; then
         GRAFANA_PASSWORD=$(cat /tmp/grafana-password.txt 2>/dev/null || echo "")
         rm -f /tmp/grafana-password.txt 2>/dev/null || true
     fi
     
+    # If password not found, try to get from helmfile values or generate one
     if [ -z "$GRAFANA_PASSWORD" ]; then
         # Try alternative secret name
         if kubectl get secret -n zen-system grafana -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null > /tmp/grafana-password.txt 2>/dev/null; then
@@ -239,23 +243,27 @@ if [ "$SKIP_MONITORING" != true ]; then
         fi
     fi
     
+    # Get ingress port (default 8080)
+    INGRESS_PORT="${INGRESS_HTTP_PORT:-8080}"
+    
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${CYAN}  Access Information${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
     echo -e "${YELLOW}Grafana Dashboard:${NC}"
-    echo -e "  URL: ${CYAN}http://localhost:8080/grafana${NC}"
+    echo -e "  URL: ${CYAN}http://localhost:${INGRESS_PORT}/grafana${NC}"
     if [ -n "$GRAFANA_PASSWORD" ]; then
-        echo -e "  Username: ${CYAN}admin${NC}"
+        echo -e "  Username: ${CYAN}${GRAFANA_USER}${NC}"
         echo -e "  Password: ${CYAN}${GRAFANA_PASSWORD}${NC}"
     else
-        echo -e "  Username: ${CYAN}admin${NC}"
+        echo -e "  Username: ${CYAN}${GRAFANA_USER}${NC}"
         echo -e "  Password: ${CYAN}(check Grafana secret in cluster)${NC}"
     fi
     echo ""
     echo -e "${YELLOW}Port-forward Grafana (if needed):${NC}"
-    echo -e "  ${CYAN}kubectl port-forward -n grafana svc/grafana 3000:80${NC}"
+    echo -e "  ${CYAN}kubectl port-forward -n grafana svc/grafana 3100:3000${NC}"
+    echo -e "  Then access: ${CYAN}http://localhost:3100${NC}"
     echo ""
 fi
 
