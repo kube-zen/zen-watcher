@@ -199,6 +199,18 @@ kubectl delete mutatingwebhookconfiguration ingress-nginx-admission 2>&1 | grep 
 # Setup observability (if not skipped)
 if [ "$SKIP_MONITORING" != true ]; then
     log_step "Setting up observability..."
+    
+    # Create Grafana dashboard ConfigMap for permanent provisioning
+    log_info "Creating Grafana dashboard ConfigMap..."
+    if [ -f "${SCRIPT_DIR}/observability/generate-dashboard-configmap.sh" ]; then
+        "${SCRIPT_DIR}/observability/generate-dashboard-configmap.sh" grafana | kubectl apply -f - 2>&1 | grep -v "already exists\|unchanged" || {
+            log_warn "Dashboard ConfigMap creation had issues, continuing..."
+        }
+        log_success "Dashboard ConfigMap created (dashboards will be automatically provisioned)"
+    else
+        log_warn "Dashboard ConfigMap generator script not found, skipping..."
+    fi
+    
     "${SCRIPT_DIR}/observability/setup.sh" "$NAMESPACE" "$KUBECONFIG_FILE" || {
         log_warn "Observability setup had issues, continuing..."
     }

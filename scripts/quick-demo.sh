@@ -403,17 +403,9 @@ EOF
         log_info "You can test manually: curl -sL http://localhost:${INGRESS_PORT}/grafana/api/health"
     fi
     
-    # Import dashboards if password is available
-    if [ -n "$GRAFANA_PASSWORD" ]; then
-        log_info "Importing Grafana dashboards..."
-        export GRAFANA_USER
-        export GRAFANA_PASSWORD
-        export GRAFANA_BASE_URL="http://localhost:${INGRESS_PORT}/grafana"
-        export INGRESS_PORT
-        "${SCRIPT_DIR}/observability/dashboards.sh" "$NAMESPACE" "$KUBECONFIG_FILE" || {
-            log_warn "Dashboard import had issues, continuing..."
-        }
-    fi
+    # Dashboards are automatically provisioned via ConfigMap (created in install.sh)
+    # No need for API-based import - they will appear automatically when Grafana starts
+    log_info "Dashboards are automatically provisioned via ConfigMap (no manual import needed)"
     
     # Build Grafana URL - use ingress path-based routing
     # INGRESS_PORT should already be set from the detection above
