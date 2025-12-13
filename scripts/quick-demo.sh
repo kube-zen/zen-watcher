@@ -308,13 +308,20 @@ if [ "$SKIP_MONITORING" != true ]; then
         fi
     fi
     
-    # Get the ingress port (which may be different from default if port conflict occurred)
-    # Check if INGRESS_HTTP_PORT was set by cluster creation script
-    if [ -z "${INGRESS_HTTP_PORT:-}" ]; then
-        # Try to get it from environment or use default
-        INGRESS_PORT="${INGRESS_HTTP_PORT:-8080}"
-    else
+    # Get the actual ingress port being used
+    # First, try to get it from the ingress-nginx service (most reliable)
+    INGRESS_PORT=""
+    if $KUBECTL_CMD get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null | grep -qE '^[0-9]+$'; then
+        INGRESS_PORT=$($KUBECTL_CMD get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null)
+        log_info "Detected ingress port from service: ${INGRESS_PORT}"
+    elif [ -n "${INGRESS_HTTP_PORT:-}" ]; then
+        # Use the port set by cluster creation script
         INGRESS_PORT="${INGRESS_HTTP_PORT}"
+        log_info "Using ingress port from environment: ${INGRESS_PORT}"
+    else
+        # Fallback: try to detect from k3d cluster
+        INGRESS_PORT="8080"
+        log_warn "Could not detect ingress port, using default: ${INGRESS_PORT}"
     fi
     
     # Wait for ingress to be ready and Grafana API to respond via ingress
