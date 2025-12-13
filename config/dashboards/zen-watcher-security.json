@@ -98,7 +98,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(zen_watcher_events_total{severity=\"CRITICAL\",source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1h]))",
+          "expr": "sum(increase(zen_watcher_events_total{severity=\"critical\",source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1h]))",
           "legendFormat": "Critical (1h)",
           "refId": "A"
         }
@@ -168,7 +168,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(zen_watcher_events_total{severity=\"HIGH\",source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1h]))",
+          "expr": "sum(increase(zen_watcher_events_total{severity=\"high\",source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1h]))",
           "legendFormat": "High (1h)",
           "refId": "A"
         }
@@ -234,7 +234,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(zen_watcher_events_total{severity=\"MEDIUM\",source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1h]))",
+          "expr": "sum(increase(zen_watcher_events_total{severity=\"medium\",source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1h]))",
           "legendFormat": "Medium (1h)",
           "refId": "A"
         }
@@ -1145,7 +1145,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "topk(10, zen_watcher_events_total{severity=~\"CRITICAL|HIGH\",source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"})",
+          "expr": "topk(10, zen_watcher_events_total{severity=~\"CRITICAL|severity=~\"critical|high\",source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"})",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -1591,7 +1591,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[5m])) by (source, category)",
+          "expr": "sum(rate(zen_watcher_events_total{severity=\"critical\"}[5m])) by (source, category)",
           "legendFormat": "{{source}} - {{category}}",
           "refId": "A"
         }
@@ -1636,7 +1636,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(zen_watcher_events_total{severity=~\"CRITICAL|HIGH\"}[1h])) by (source, category)",
+          "expr": "sum(rate(zen_watcher_events_total{severity=~\"CRITICAL|severity=~\"critical|high\"}[1h])) by (source, category)",
           "format": "heatmap",
           "refId": "A"
         }
@@ -1700,7 +1700,7 @@
       },
       "targets": [
         {
-          "expr": "(\n            sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[1h])) * 50 +\n            sum(rate(zen_watcher_events_total{severity=\"HIGH\"}[1h])) * 30 +\n            sum(rate(zen_watcher_events_total{severity=\"MEDIUM\"}[1h])) * 10\n        ) by (source)",
+          "expr": "(\n            sum(rate(zen_watcher_events_total{severity=\"critical\"}[1h])) * 50 +\n            sum(rate(zen_watcher_events_total{severity=\"high\"}[1h])) * 30 +\n            sum(rate(zen_watcher_events_total{severity=\"medium\"}[1h])) * 10\n        ) by (source)",
           "legendFormat": "{{source}} Risk Score",
           "refId": "A"
         }
@@ -1742,7 +1742,7 @@
       },
       "targets": [
         {
-          "expr": "topk(10, sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[1h])) by (source, category, namespace))",
+          "expr": "topk(10, sum(rate(zen_watcher_events_total{severity=\"critical\"}[1h])) by (source, category, namespace))",
           "format": "table",
           "instant": true,
           "refId": "A"

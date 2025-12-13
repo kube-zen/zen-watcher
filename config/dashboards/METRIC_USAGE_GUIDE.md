@@ -15,7 +15,7 @@
 **Example Queries**:
 ```promql
 # Critical events in last hour
-sum(increase(zen_watcher_events_total{severity="CRITICAL"}[1h]))
+sum(increase(zen_watcher_events_total{severity="critical"}[1h]))
 
 # Events by category
 sum by (category) (rate(zen_watcher_events_total[5m]))

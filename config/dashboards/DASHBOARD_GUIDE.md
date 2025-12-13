@@ -45,7 +45,7 @@ The Zen Watcher dashboard provides comprehensive visibility into your security a
 
 #### 4. Critical Events
 **Type**: Stat with sparkline  
-**Metric**: `sum(rate(zen_watcher_events_total{severity="CRITICAL"}[5m])) * 60`  
+**Metric**: `sum(rate(zen_watcher_events_total{severity="critical"}[5m])) * 60`  
 **Thresholds**:
 - 🟢 < 10 = Normal
 - 🟡 10-50 = Review urgently

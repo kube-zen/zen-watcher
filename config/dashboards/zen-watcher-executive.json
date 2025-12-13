@@ -305,7 +305,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(zen_watcher_events_total{severity=\"CRITICAL\",source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1h]))",
+          "expr": "sum(increase(zen_watcher_events_total{severity=\"critical\",source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1h]))",
           "legendFormat": "Critical (1h)",
           "refId": "A"
         }
@@ -1171,7 +1171,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "100 - (\n            (sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[24h])) * 10) +\n            (sum(rate(zen_watcher_events_total{severity=\"HIGH\"}[24h])) * 5) +\n            (sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"FAIL|CRITICAL\"}[24h])) * 15)\n        ) / max(sum(rate(zen_watcher_events_total[24h])), 1) * 100",
+          "expr": "100 - (\n            (sum(rate(zen_watcher_events_total{severity=\"critical\"}[24h])) * 10) +\n            (sum(rate(zen_watcher_events_total{severity=\"high\"}[24h])) * 5) +\n            (sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"FAIL|severity=~\"fail|critical\"}[24h])) * 15)\n        ) / max(sum(rate(zen_watcher_events_total[24h])), 1) * 100",
           "refId": "A"
         }
       ],
@@ -1232,7 +1232,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(zen_watcher_events_total{severity=~\"CRITICAL|HIGH\"}[1h])) by (severity)",
+          "expr": "sum(rate(zen_watcher_events_total{severity=~\"CRITICAL|severity=~\"critical|high\"}[1h])) by (severity)",
           "legendFormat": "{{severity}}",
           "refId": "A"
         }
@@ -1308,7 +1308,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "100 * (\n            1 - (sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"FAIL|CRITICAL\"}[24h])) / \n            max(sum(rate(zen_watcher_events_total{category=\"compliance\"}[24h])), 1))\n        )",
+          "expr": "100 * (\n            1 - (sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"FAIL|severity=~\"fail|critical\"}[24h])) / \n            max(sum(rate(zen_watcher_events_total{category=\"compliance\"}[24h])), 1))\n        )",
           "refId": "A"
         }
       ],
@@ -1369,7 +1369,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "(\n            sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[24h])) * 50000 +\n            sum(rate(zen_watcher_events_total{severity=\"HIGH\"}[24h])) * 10000 +\n            sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"FAIL|CRITICAL\"}[24h])) * 25000\n        ) * 24 * 30",
+          "expr": "(\n            sum(rate(zen_watcher_events_total{severity=\"critical\"}[24h])) * 50000 +\n            sum(rate(zen_watcher_events_total{severity=\"high\"}[24h])) * 10000 +\n            sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"FAIL|severity=~\"fail|critical\"}[24h])) * 25000\n        ) * 24 * 30",
           "refId": "A"
         }
       ],
@@ -1426,7 +1426,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[1h]))",
+          "expr": "sum(rate(zen_watcher_events_total{severity=\"critical\"}[1h]))",
           "legendFormat": "Actual Critical Events",
           "refId": "A"
         },
@@ -1435,7 +1435,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "predict_linear(sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[1h]))[7d:1h], 7*24*3600)",
+          "expr": "predict_linear(sum(rate(zen_watcher_events_total{severity=\"critical\"}[1h]))[7d:1h], 7*24*3600)",
           "legendFormat": "7-Day Forecast",
           "refId": "B"
         }
@@ -1492,7 +1492,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "topk(5, sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[1h])) by (source, category))",
+          "expr": "topk(5, sum(rate(zen_watcher_events_total{severity=\"critical\"}[1h])) by (source, category))",
           "format": "table",
           "instant": true,
           "refId": "A"

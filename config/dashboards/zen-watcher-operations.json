@@ -1553,7 +1553,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (kind) (zen_watcher_events_total{severity=\"CRITICAL\"})",
+          "expr": "sum by (kind) (zen_watcher_events_total{severity=\"critical\"})",
           "format": "table",
           "instant": true,
           "refId": "B"
@@ -1563,7 +1563,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (kind) (zen_watcher_events_total{severity=\"HIGH\"})",
+          "expr": "sum by (kind) (zen_watcher_events_total{severity=\"high\"})",
           "format": "table",
           "instant": true,
           "refId": "C"

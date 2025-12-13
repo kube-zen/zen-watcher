@@ -338,7 +338,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(zen_watcher_events_total{severity=\"CRITICAL\"})",
+          "expr": "sum(zen_watcher_events_total{severity=\"critical\"})",
           "refId": "A"
         }
       ],
@@ -405,7 +405,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(zen_watcher_events_total{severity=\"HIGH\"})",
+          "expr": "sum(zen_watcher_events_total{severity=\"high\"})",
           "refId": "A"
         }
       ],
@@ -1313,7 +1313,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "topk(10, zen_watcher_events_total{severity=~\"CRITICAL|HIGH\",source=~\"$source\"})",
+          "expr": "topk(10, zen_watcher_events_total{severity=~\"CRITICAL|severity=~\"critical|high\",source=~\"$source\"})",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -1913,7 +1913,7 @@
       },
       "targets": [
         {
-          "expr": "topk(10, sum(rate(zen_watcher_events_total{severity=\"CRITICAL\"}[5m])) by (source, category, namespace))",
+          "expr": "topk(10, sum(rate(zen_watcher_events_total{severity=\"critical\"}[5m])) by (source, category, namespace))",
           "format": "table",
           "instant": true,
           "refId": "A"

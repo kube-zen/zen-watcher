@@ -16,7 +16,7 @@ Zen Watcher includes 6 pre-built Grafana dashboards for monitoring and analysis.
 - System Status (UP/DOWN indicator using `up{job="zen-watcher"}`)
 - Tools Monitored (count of active tools using `zen_watcher_tools_active`)
 - Observations (24h total using `zen_watcher_observations_created_total`)
-- Critical Events (1h count using `zen_watcher_events_total{severity="CRITICAL"}`)
+- Critical Events (1h count using `zen_watcher_events_total{severity="critical"}`)
 - Success Rate (processing efficiency)
 - Live Event Stream (stacked area chart by severity)
 - Events by Source (donut chart)
@@ -64,7 +64,7 @@ Zen Watcher includes 6 pre-built Grafana dashboards for monitoring and analysis.
 
 **Sections**:
 1. **Security Posture Overview**
-   - Critical Events (1h using `zen_watcher_events_total{severity="CRITICAL"}`)
+   - Critical Events (1h using `zen_watcher_events_total{severity="critical"}`)
    - High/Medium Severity events
    - Total Events (24h)
    - Active Tools (`zen_watcher_tools_active`)
@@ -172,7 +172,7 @@ All metrics are defined in `pkg/metrics/definitions.go` and exposed at `/metrics
 ```promql
 # Events created (after filtering and dedup)
 # Labels: source, category, severity, eventType, namespace, kind
-zen_watcher_events_total{source="trivy", category="security", severity="CRITICAL"}
+zen_watcher_events_total{source="trivy", category="security", severity="critical"}
 
 # Observations created successfully
 # Labels: source
