@@ -308,25 +308,23 @@ if [ "$SKIP_MONITORING" != true ]; then
         fi
     fi
     
-    # Set up port-forward in background
-    log_info "Setting up port-forward on port ${GRAFANA_PORT}..."
-    # Kill any existing port-forward on this port (in case it's a stale process)
-    lsof -ti:${GRAFANA_PORT} 2>/dev/null | xargs kill -9 2>/dev/null || true
-    sleep 1
+    # Get the ingress port (which may be different from default if port conflict occurred)
+    # Check if INGRESS_HTTP_PORT was set by cluster creation script
+    if [ -z "${INGRESS_HTTP_PORT:-}" ]; then
+        # Try to get it from environment or use default
+        INGRESS_PORT="${INGRESS_HTTP_PORT:-8080}"
+    else
+        INGRESS_PORT="${INGRESS_HTTP_PORT}"
+    fi
     
-    # Start port-forward in background
-    $KUBECTL_CMD port-forward -n grafana svc/grafana ${GRAFANA_PORT}:3000 >/tmp/grafana-pf.log 2>&1 &
-    GRAFANA_PF_PID=$!
-    sleep 2
-    
-    # Wait for port-forward to be ready and Grafana API to respond
-    log_info "Waiting for Grafana API to be ready..."
+    # Wait for ingress to be ready and Grafana API to respond via ingress
+    log_info "Waiting for Grafana to be accessible via ingress..."
     GRAFANA_API_READY=false
     for i in {1..60}; do
-        if curl -s http://localhost:${GRAFANA_PORT}/api/health >/dev/null 2>&1; then
+        if curl -s http://localhost:${INGRESS_PORT}/grafana/api/health >/dev/null 2>&1; then
             # Also check if we can authenticate
             if [ -n "$GRAFANA_PASSWORD" ]; then
-                if curl -s -u "${GRAFANA_USER}:${GRAFANA_PASSWORD}" http://localhost:${GRAFANA_PORT}/api/health >/dev/null 2>&1; then
+                if curl -s -u "${GRAFANA_USER}:${GRAFANA_PASSWORD}" http://localhost:${INGRESS_PORT}/grafana/api/health >/dev/null 2>&1; then
                     GRAFANA_API_READY=true
                     break
                 fi
@@ -339,9 +337,9 @@ if [ "$SKIP_MONITORING" != true ]; then
     done
     
     if [ "$GRAFANA_API_READY" = true ]; then
-        log_success "Grafana API is ready"
+        log_success "Grafana is accessible via ingress"
     else
-        log_warn "Grafana API may not be fully ready, continuing anyway..."
+        log_warn "Grafana may not be fully ready via ingress, continuing anyway..."
     fi
     
     # Import dashboards if password is available
@@ -355,8 +353,10 @@ if [ "$SKIP_MONITORING" != true ]; then
         }
     fi
     
-    # Build Grafana URL
-    GRAFANA_URL="http://localhost:${GRAFANA_PORT}"
+    # Build Grafana URL - use ingress path-based routing
+    # Get the ingress port from environment (set by cluster creation script)
+    INGRESS_PORT="${INGRESS_HTTP_PORT:-8080}"
+    GRAFANA_URL="http://localhost:${INGRESS_PORT}/grafana"
     
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -391,9 +391,6 @@ if [ "$SKIP_MONITORING" != true ]; then
         fi
         echo -e "${GREEN}✓ Browser opened! Login with credentials above.${NC}"
     fi
-    echo ""
-    echo -e "${YELLOW}Note:${NC} Port-forward is running in background (PID: ${GRAFANA_PF_PID})"
-    echo -e "  To stop it: ${CYAN}kill ${GRAFANA_PF_PID}${NC}"
     echo ""
 fi
 
