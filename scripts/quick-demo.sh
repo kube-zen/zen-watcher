@@ -229,8 +229,18 @@ if [ "$SKIP_MONITORING" != true ]; then
     GRAFANA_USER="zen"
     GRAFANA_PORT="${GRAFANA_PORT:-8080}"
     
+    # Get kubectl context if available
+    KUBECTL_CMD="kubectl"
+    if [ -n "${KUBECONFIG:-}" ]; then
+        # Extract context from kubeconfig if possible
+        KUBECTL_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "")
+        if [ -n "$KUBECTL_CONTEXT" ]; then
+            KUBECTL_CMD="kubectl --context ${KUBECTL_CONTEXT}"
+        fi
+    fi
+    
     # Try to get password from Grafana secret (helmfile sets admin-password key)
-    if kubectl get secret -n grafana grafana -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null > /tmp/grafana-password.txt 2>/dev/null; then
+    if $KUBECTL_CMD get secret -n grafana grafana -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null > /tmp/grafana-password.txt 2>/dev/null; then
         GRAFANA_PASSWORD=$(cat /tmp/grafana-password.txt 2>/dev/null || echo "")
         rm -f /tmp/grafana-password.txt 2>/dev/null || true
     fi
@@ -238,7 +248,7 @@ if [ "$SKIP_MONITORING" != true ]; then
     # If password not found, try to get from helmfile values or generate one
     if [ -z "$GRAFANA_PASSWORD" ]; then
         # Try alternative secret name
-        if kubectl get secret -n zen-system grafana -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null > /tmp/grafana-password.txt 2>/dev/null; then
+        if $KUBECTL_CMD get secret -n zen-system grafana -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null > /tmp/grafana-password.txt 2>/dev/null; then
             GRAFANA_PASSWORD=$(cat /tmp/grafana-password.txt 2>/dev/null || echo "")
             rm -f /tmp/grafana-password.txt 2>/dev/null || true
         fi
@@ -246,7 +256,7 @@ if [ "$SKIP_MONITORING" != true ]; then
     
     # Wait for Grafana pod to be ready
     log_info "Waiting for Grafana to be ready..."
-    if kubectl wait --for=condition=ready pod -n grafana -l app.kubernetes.io/name=grafana --timeout=120s 2>/dev/null; then
+    if $KUBECTL_CMD wait --for=condition=ready pod -n grafana -l app.kubernetes.io/name=grafana --timeout=120s 2>/dev/null; then
         log_success "Grafana is ready"
     else
         log_warn "Grafana may not be ready yet, continuing anyway..."
@@ -259,17 +269,34 @@ if [ "$SKIP_MONITORING" != true ]; then
     sleep 1
     
     # Start port-forward in background
-    kubectl port-forward -n grafana svc/grafana ${GRAFANA_PORT}:3000 >/tmp/grafana-pf.log 2>&1 &
+    $KUBECTL_CMD port-forward -n grafana svc/grafana ${GRAFANA_PORT}:3000 >/tmp/grafana-pf.log 2>&1 &
     GRAFANA_PF_PID=$!
-    sleep 3
+    sleep 2
     
-    # Wait for port-forward to be ready
-    for i in {1..30}; do
+    # Wait for port-forward to be ready and Grafana API to respond
+    log_info "Waiting for Grafana API to be ready..."
+    GRAFANA_API_READY=false
+    for i in {1..60}; do
         if curl -s http://localhost:${GRAFANA_PORT}/api/health >/dev/null 2>&1; then
-            break
+            # Also check if we can authenticate
+            if [ -n "$GRAFANA_PASSWORD" ]; then
+                if curl -s -u "${GRAFANA_USER}:${GRAFANA_PASSWORD}" http://localhost:${GRAFANA_PORT}/api/health >/dev/null 2>&1; then
+                    GRAFANA_API_READY=true
+                    break
+                fi
+            else
+                GRAFANA_API_READY=true
+                break
+            fi
         fi
         sleep 1
     done
+    
+    if [ "$GRAFANA_API_READY" = true ]; then
+        log_success "Grafana API is ready"
+    else
+        log_warn "Grafana API may not be fully ready, continuing anyway..."
+    fi
     
     # Import dashboards if password is available
     if [ -n "$GRAFANA_PASSWORD" ]; then
