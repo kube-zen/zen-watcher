@@ -11,12 +11,29 @@ set -euo pipefail
 
 # Source utilities
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/../utils/common.sh"
+if [ -f "${SCRIPT_DIR}/../utils/common.sh" ]; then
+    source "${SCRIPT_DIR}/../utils/common.sh"
+else
+    # Fallback logging functions if common.sh not available
+    log_step() { echo "→ $*"; }
+    log_info() { echo "ℹ  $*"; }
+    log_success() { echo "✓ $*"; }
+    log_warn() { echo "⚠  $*"; }
+fi
 
 NAMESPACE="${1:-zen-system}"
-KUBECONFIG_FILE="${2:-${HOME}/.kube/config}"
+KUBECONFIG_FILE="${2:-}"
 
-export KUBECONFIG="${KUBECONFIG_FILE}"
+# Use KUBECONFIG_FILE if provided, otherwise use current KUBECONFIG or default
+if [ -n "$KUBECONFIG_FILE" ] && [ -f "$KUBECONFIG_FILE" ]; then
+    export KUBECONFIG="${KUBECONFIG_FILE}"
+elif [ -n "${KUBECONFIG:-}" ] && [ -f "${KUBECONFIG}" ]; then
+    # Use existing KUBECONFIG
+    :
+else
+    # Try to use default
+    export KUBECONFIG="${HOME}/.kube/config"
+fi
 
 # Get repo root
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$(cd "$(dirname "$0")/../.." && pwd)")"
@@ -24,15 +41,16 @@ DASHBOARD_DIR="${REPO_ROOT}/config/dashboards"
 
 log_step "Importing Grafana dashboards..."
 
-# Wait for Grafana API
-GRAFANA_POD=$(kubectl get pod -n grafana -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+# Wait for Grafana API - check in grafana namespace
+GRAFANA_NAMESPACE="${GRAFANA_NAMESPACE:-grafana}"
+GRAFANA_POD=$(kubectl get pod -n "$GRAFANA_NAMESPACE" -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 if [ -z "$GRAFANA_POD" ]; then
-    log_warn "Grafana pod not found, skipping dashboard import"
+    log_warn "Grafana pod not found in namespace $GRAFANA_NAMESPACE, skipping dashboard import"
     exit 0
 fi
 
 # Get Grafana admin password and username
-GRAFANA_PASSWORD=$(kubectl get secret -n grafana grafana -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null || echo "admin")
+GRAFANA_PASSWORD=$(kubectl get secret -n "$GRAFANA_NAMESPACE" grafana -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null || echo "admin")
 GRAFANA_USER="${GRAFANA_USER:-zen}"
 
 # Determine Grafana URL - prefer ingress URL if available
@@ -71,7 +89,7 @@ if [ -z "$GRAFANA_BASE_URL" ]; then
     else
         # Port-forward to Grafana
         log_info "Setting up port-forward to Grafana on port ${GRAFANA_PORT}..."
-        kubectl port-forward -n grafana svc/grafana ${GRAFANA_PORT}:3000 >/tmp/grafana-pf.log 2>&1 &
+        kubectl port-forward -n "$GRAFANA_NAMESPACE" svc/grafana ${GRAFANA_PORT}:3000 >/tmp/grafana-pf.log 2>&1 &
         PF_PID=$!
         sleep 5
     fi
