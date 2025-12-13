@@ -35,25 +35,55 @@ fi
 GRAFANA_PASSWORD=$(kubectl get secret -n grafana grafana -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null || echo "admin")
 GRAFANA_USER="${GRAFANA_USER:-zen}"
 
-# Use existing port-forward if available (check if port 8080 is already forwarded)
-GRAFANA_PORT="${GRAFANA_PORT:-8080}"
-USE_EXISTING_PF=false
+# Determine Grafana URL - prefer ingress URL if available
+GRAFANA_BASE_URL="${GRAFANA_BASE_URL:-}"
+INGRESS_PORT="${INGRESS_PORT:-}"
 
-if curl -s http://localhost:${GRAFANA_PORT}/api/health >/dev/null 2>&1; then
-    log_info "Using existing port-forward on port ${GRAFANA_PORT}"
-    USE_EXISTING_PF=true
+if [ -z "$GRAFANA_BASE_URL" ]; then
+    # Try to detect ingress port from k3d loadbalancer
+    if [ -n "$INGRESS_PORT" ]; then
+        GRAFANA_BASE_URL="http://localhost:${INGRESS_PORT}/grafana"
+    else
+        # Fallback: try to detect from k3d
+        CLUSTER_NAME=$(kubectl config view --minify -o jsonpath='{.clusters[0].name}' 2>/dev/null | sed 's/k3d-//' || echo "")
+        if [ -n "$CLUSTER_NAME" ]; then
+            LB_CONTAINER="k3d-${CLUSTER_NAME}-serverlb"
+            if docker inspect "$LB_CONTAINER" >/dev/null 2>&1; then
+                DETECTED_PORT=$(docker port "$LB_CONTAINER" 2>/dev/null | grep "80/tcp" | awk -F: '{print $2}' | head -1)
+                if [ -n "$DETECTED_PORT" ] && [ "$DETECTED_PORT" != "0" ] && [ "$DETECTED_PORT" -gt 0 ] 2>/dev/null; then
+                    GRAFANA_BASE_URL="http://localhost:${DETECTED_PORT}/grafana"
+                    log_info "Detected ingress port: ${DETECTED_PORT}"
+                fi
+            fi
+        fi
+    fi
+fi
+
+# Final fallback: use port-forward on default port
+if [ -z "$GRAFANA_BASE_URL" ]; then
+    GRAFANA_PORT="${GRAFANA_PORT:-8080}"
+    GRAFANA_BASE_URL="http://localhost:${GRAFANA_PORT}"
+    USE_EXISTING_PF=false
+    
+    if curl -s "${GRAFANA_BASE_URL}/api/health" >/dev/null 2>&1; then
+        log_info "Using existing connection on ${GRAFANA_BASE_URL}"
+        USE_EXISTING_PF=true
+    else
+        # Port-forward to Grafana
+        log_info "Setting up port-forward to Grafana on port ${GRAFANA_PORT}..."
+        kubectl port-forward -n grafana svc/grafana ${GRAFANA_PORT}:3000 >/tmp/grafana-pf.log 2>&1 &
+        PF_PID=$!
+        sleep 5
+    fi
 else
-    # Port-forward to Grafana
-    log_info "Setting up port-forward to Grafana on port ${GRAFANA_PORT}..."
-    kubectl port-forward -n grafana svc/grafana ${GRAFANA_PORT}:3000 >/tmp/grafana-pf.log 2>&1 &
-    PF_PID=$!
-    sleep 5
+    USE_EXISTING_PF=true
+    log_info "Using ingress URL: ${GRAFANA_BASE_URL}"
 fi
 
 # Wait for Grafana to be ready
 GRAFANA_READY=false
-for i in {1..30}; do
-    if curl -s -u "${GRAFANA_USER:-zen}:${GRAFANA_PASSWORD}" http://localhost:${GRAFANA_PORT}/api/health &>/dev/null; then
+for i in {1..60}; do
+    if curl -sL -u "${GRAFANA_USER:-zen}:${GRAFANA_PASSWORD}" "${GRAFANA_BASE_URL}/api/health" 2>/dev/null | grep -q "database\|ok"; then
         GRAFANA_READY=true
         break
     fi
@@ -61,7 +91,7 @@ for i in {1..30}; do
 done
 
 if [ "$GRAFANA_READY" != true ]; then
-    log_warn "Grafana not ready after 30s, attempting import anyway..."
+    log_warn "Grafana not ready after 60s, attempting import anyway..."
 fi
 
 # Import dashboards
@@ -75,11 +105,11 @@ if [ -d "$DASHBOARD_DIR" ]; then
             
             # Try new API endpoint first (Grafana 7+)
             DASHBOARD_JSON=$(cat "$dashboard")
-            RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            RESPONSE=$(curl -sL -w "\n%{http_code}" -X POST \
                 -H "Content-Type: application/json" \
                 -u "${GRAFANA_USER}:${GRAFANA_PASSWORD}" \
                 -d "{\"dashboard\":${DASHBOARD_JSON},\"overwrite\":true}" \
-                http://localhost:${GRAFANA_PORT}/api/dashboards/db 2>/dev/null || echo -e "\n000")
+                "${GRAFANA_BASE_URL}/api/dashboards/db" 2>/dev/null || echo -e "\n000")
             
             HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
             
@@ -88,11 +118,11 @@ if [ -d "$DASHBOARD_DIR" ]; then
                 IMPORTED=$((IMPORTED + 1))
             else
                 # Try alternative endpoint (older Grafana)
-                RESPONSE2=$(curl -s -w "\n%{http_code}" -X POST \
+                RESPONSE2=$(curl -sL -w "\n%{http_code}" -X POST \
                     -H "Content-Type: application/json" \
                     -u "${GRAFANA_USER}:${GRAFANA_PASSWORD}" \
                     -d @"$dashboard" \
-                    http://localhost:${GRAFANA_PORT}/api/dashboards/db 2>/dev/null || echo -e "\n000")
+                    "${GRAFANA_BASE_URL}/api/dashboards/db" 2>/dev/null || echo -e "\n000")
                 
                 HTTP_CODE2=$(echo "$RESPONSE2" | tail -n1)
                 if [ "$HTTP_CODE2" = "200" ] || [ "$HTTP_CODE2" = "201" ]; then
@@ -100,6 +130,9 @@ if [ -d "$DASHBOARD_DIR" ]; then
                     IMPORTED=$((IMPORTED + 1))
                 else
                     log_warn "  ✗ Failed to import: $dashboard_name (HTTP $HTTP_CODE/$HTTP_CODE2)"
+                    if [ "$HTTP_CODE" != "000" ]; then
+                        echo "$RESPONSE" | head -5
+                    fi
                     FAILED=$((FAILED + 1))
                 fi
             fi

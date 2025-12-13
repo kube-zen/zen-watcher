@@ -205,6 +205,21 @@ releases:
           pathType: ImplementationSpecific
           hosts:
             - localhost
+      - datasources:
+          datasources.yaml:
+            apiVersion: 1
+            datasources:
+              - name: VictoriaMetrics
+                type: prometheus
+                access: proxy
+                uid: victoriametrics
+                url: http://victoriametrics-single-vms-server.victoriametrics:8428
+                isDefault: true
+                jsonData:
+                  timeInterval: 30s
+                  queryTimeout: 60s
+                  httpMethod: POST
+                editable: false
       - resources:
           requests:
             memory: {{ if eq $demoMinimal "true" }}64Mi{{ else }}128Mi{{ end }}

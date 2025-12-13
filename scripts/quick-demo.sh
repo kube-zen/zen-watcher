@@ -407,8 +407,9 @@ EOF
     if [ -n "$GRAFANA_PASSWORD" ]; then
         log_info "Importing Grafana dashboards..."
         export GRAFANA_USER
-        export GRAFANA_PORT
         export GRAFANA_PASSWORD
+        export GRAFANA_BASE_URL="http://localhost:${INGRESS_PORT}/grafana"
+        export INGRESS_PORT
         "${SCRIPT_DIR}/observability/dashboards.sh" "$NAMESPACE" "$KUBECONFIG_FILE" || {
             log_warn "Dashboard import had issues, continuing..."
         }
