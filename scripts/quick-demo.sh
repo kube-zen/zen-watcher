@@ -384,8 +384,11 @@ if [ "$SKIP_MONITORING" != true ]; then
     fi
     
     # Build Grafana URL - use ingress path-based routing
-    # Get the ingress port from environment (set by cluster creation script)
-    INGRESS_PORT="${INGRESS_HTTP_PORT:-8080}"
+    # INGRESS_PORT should already be set from the detection above
+    # Only set it if it wasn't detected
+    if [ -z "${INGRESS_PORT:-}" ]; then
+        INGRESS_PORT="${INGRESS_HTTP_PORT:-8080}"
+    fi
     GRAFANA_URL="http://localhost:${INGRESS_PORT}/grafana"
     
     echo ""
