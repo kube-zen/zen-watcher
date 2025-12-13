@@ -16,7 +16,7 @@ spec:
     rules:
     # Falco Critical Runtime Threats
     - alert: FalcoCriticalRuntimeThreat
-      expr: sum(rate(zen_watcher_events_total{source="falco",severity="Critical"}[2m])) * 60 > 1
+      expr: sum(rate(zen_watcher_events_total{source="falco",severity="critical"}[2m])) * 60 > 1
       for: 0s
       labels:
         severity: critical
@@ -26,14 +26,14 @@ spec:
         runbook_category: runtime_incident
       annotations:
         summary: "Critical runtime security threat detected by Falco"
-        description: "Falco detected {{$value}} critical security events/min. Rule: {{$labels.rule_name}}. Potential container escape or privilege escalation."
+        description: "Falco detected {{$value}} critical security events/min. Namespace: {{$labels.namespace}}, Kind: {{$labels.kind}}"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#falco-runtime-threats"
         escalation_policy: "critical-immediate"
-        action_required: "Investigate container {{$labels.container_name}} in pod {{$labels.pod_name}} namespace {{$labels.namespace}}"
+        action_required: "Investigate Falco events in namespace {{$labels.namespace}}"
         
     # Critical Vulnerability Detected
     - alert: CriticalVulnerabilityDetected
-      expr: sum(rate(zen_watcher_events_total{source="trivy",severity="CRITICAL"}[5m])) * 60 > 0
+      expr: sum(rate(zen_watcher_events_total{source="trivy",severity="critical"}[5m])) * 60 > 0
       for: 0s
       labels:
         severity: critical
@@ -43,14 +43,14 @@ spec:
         runbook_category: vuln_response
       annotations:
         summary: "Critical vulnerability detected"
-        description: "Trivy found {{$value}} critical vulnerabilities/min. CVE: {{$labels.cve_id}}, Resource: {{$labels.resource_kind}}/{{$labels.resource_name}}"
+        description: "Trivy found {{$value}} critical vulnerabilities/min. EventType: {{$labels.eventType}}, Resource: {{$labels.kind}}/{{$labels.namespace}}"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#critical-vulnerabilities"
         escalation_policy: "critical-4h"
-        action_required: "Patch or mitigate CVE {{$labels.cve_id}} in {{$labels.resource_kind}} {{$labels.resource_name}}"
+        action_required: "Patch or mitigate critical vulnerabilities in {{$labels.kind}} resources"
         
     # CIS Benchmark Critical Failure
     - alert: CISBenchmarkCriticalFailure
-      expr: sum(rate(zen_watcher_events_total{source="kube-bench",severity="FAIL"}[5m])) * 60 > 0
+      expr: sum(rate(zen_watcher_events_total{source="kube-bench",category="compliance",severity=~"critical|high"}[5m])) * 60 > 0
       for: 0s
       labels:
         severity: critical
@@ -60,14 +60,14 @@ spec:
         runbook_category: compliance_incident
       annotations:
         summary: "Critical CIS benchmark compliance failure"
-        description: "Kube-Bench test {{$labels.test_id}} failed compliance check. Status: {{$labels.status}}"
+        description: "Kube-Bench detected {{$value}} critical/high compliance failures/min. EventType: {{$labels.eventType}}"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#cis-benchmark-failures"
         escalation_policy: "critical-24h"
-        action_required: "Fix CIS benchmark compliance issue for test {{$labels.test_id}}"
+        action_required: "Fix CIS benchmark compliance issues"
         
     # Critical Infrastructure as Code Issue
     - alert: CriticalIaCIssue
-      expr: sum(rate(zen_watcher_events_total{source="checkov",severity="CRITICAL"}[5m])) * 60 > 0
+      expr: sum(rate(zen_watcher_events_total{source="checkov",severity="critical"}[5m])) * 60 > 0
       for: 0s
       labels:
         severity: critical
@@ -77,14 +77,14 @@ spec:
         runbook_category: iac_response
       annotations:
         summary: "Critical Infrastructure as Code security issue"
-        description: "Checkov found critical IaC issue. Check: {{$labels.check_id}}, Severity: {{$labels.severity}}"
+        description: "Checkov found {{$value}} critical IaC issues/min. EventType: {{$labels.eventType}}"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#iac-critical-issues"
         escalation_policy: "critical-24h"
-        action_required: "Fix IaC security issue for check {{$labels.check_id}}"
+        action_required: "Fix IaC security issues"
         
     # Suspicious Audit Activity
     - alert: SuspiciousAuditActivity
-      expr: sum(rate(zen_watcher_events_total{source="audit",severity="RequestResponse"}[1m])) * 60 > 100
+      expr: sum(rate(zen_watcher_events_total{source="audit",severity=~"critical|high"}[1m])) * 60 > 100
       for: 2m
       labels:
         severity: critical
@@ -94,14 +94,14 @@ spec:
         runbook_category: audit_incident
       annotations:
         summary: "Suspicious audit activity detected"
-        description: "Unusual audit activity: {{$value}} events/min. User: {{$labels.user}}, Verb: {{$labels.verb}}, Resource: {{$labels.resource}}"
+        description: "Unusual audit activity: {{$value}} critical/high events/min. Namespace: {{$labels.namespace}}, EventType: {{$labels.eventType}}"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#suspicious-audit-activity"
         escalation_policy: "critical-immediate"
-        action_required: "Investigate suspicious activity by user {{$labels.user}} on {{$labels.resource}}"
+        action_required: "Investigate suspicious activity in namespace {{$labels.namespace}}"
         
     # Policy Violation Critical
     - alert: PolicyViolationCritical
-      expr: sum(rate(zen_watcher_events_total{source="kyverno",severity="Critical"}[2m])) * 60 > 0
+      expr: sum(rate(zen_watcher_events_total{source="kyverno",severity="critical"}[2m])) * 60 > 0
       for: 0s
       labels:
         severity: critical
@@ -111,14 +111,14 @@ spec:
         runbook_category: policy_incident
       annotations:
         summary: "Critical policy violation detected"
-        description: "Kyverno policy violation detected. Policy: {{$labels.policy_name}}, Resource: {{$labels.resource_kind}}/{{$labels.resource_name}}"
+        description: "Kyverno policy violation detected. EventType: {{$labels.eventType}}, Resource: {{$labels.kind}}/{{$labels.namespace}}"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#policy-violations"
         escalation_policy: "critical-immediate"
-        action_required: "Review and remediate policy violation for {{$labels.policy_name}}"
+        action_required: "Review and remediate policy violations"
         
     # Security Tool Outage - Multiple Tools
     - alert: MultipleSecurityToolsOffline
-      expr: count(zen_watcher_tools_active == 0) >= 3
+      expr: count(sum(zen_watcher_tools_active) by (tool) == 0) >= 3
       for: 5m
       labels:
         severity: critical
@@ -128,7 +128,7 @@ spec:
         runbook_category: infrastructure_incident
       annotations:
         summary: "Multiple security tools are offline"
-        description: "{{$value}} security tools are offline for more than 5 minutes. Tools offline: {{$labels.offline_tools}}"
+        description: "{{$value}} security tools are offline for more than 5 minutes"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#security-tool-outages"
         escalation_policy: "critical-immediate"
         action_required: "Restore security tool functionality - check deployments and health"
@@ -139,7 +139,7 @@ spec:
     rules:
     # High Severity Vulnerability
     - alert: HighSeverityVulnerability
-      expr: sum(rate(zen_watcher_events_total{source="trivy",severity="HIGH"}[5m])) * 60 > 5
+      expr: sum(rate(zen_watcher_events_total{source="trivy",severity="high"}[5m])) * 60 > 5
       for: 5m
       labels:
         severity: warning
@@ -149,14 +149,14 @@ spec:
         runbook_category: vuln_response
       annotations:
         summary: "High severity vulnerability detected"
-        description: "Trivy found {{$value}} high severity vulnerabilities/min. CVE: {{$labels.cve_id}}"
+        description: "Trivy found {{$value}} high severity vulnerabilities/min. EventType: {{$labels.eventType}}"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#high-vulnerabilities"
         escalation_policy: "high-24h"
-        action_required: "Plan remediation for CVE {{$labels.cve_id}}"
+        action_required: "Plan remediation for high severity vulnerabilities"
         
     # Falco High Priority Events
     - alert: FalcoHighPriorityEvent
-      expr: sum(rate(zen_watcher_events_total{source="falco",severity="Warning"}[2m])) * 60 > 10
+      expr: sum(rate(zen_watcher_events_total{source="falco",severity="high"}[2m])) * 60 > 10
       for: 5m
       labels:
         severity: warning
@@ -166,14 +166,14 @@ spec:
         runbook_category: runtime_incident
       annotations:
         summary: "High priority runtime security event"
-        description: "Falco detected {{$value}} warning level events/min. Rule: {{$labels.rule_name}}"
+        description: "Falco detected {{$value}} high severity events/min. EventType: {{$labels.eventType}}"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#falco-warning-events"
         escalation_policy: "high-4h"
-        action_required: "Review Falco rule {{$labels.rule_name}} for potential security concerns"
+        action_required: "Review Falco events for potential security concerns"
         
     # Compliance Warning
     - alert: CISBenchmarkWarning
-      expr: sum(rate(zen_watcher_events_total{source="kube-bench",severity="WARN"}[5m])) * 60 > 2
+      expr: sum(rate(zen_watcher_events_total{source="kube-bench",severity="medium"}[5m])) * 60 > 2
       for: 10m
       labels:
         severity: warning
@@ -183,14 +183,14 @@ spec:
         runbook_category: compliance_incident
       annotations:
         summary: "CIS benchmark compliance warning"
-        description: "Kube-Bench test {{$labels.test_id}} has compliance warning. Status: {{$labels.status}}"
+        description: "Kube-Bench detected {{$value}} medium severity compliance warnings/min"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#cis-benchmark-warnings"
         escalation_policy: "high-48h"
-        action_required: "Review and address compliance warning for test {{$labels.test_id}}"
+        action_required: "Review and address compliance warnings"
         
     # High Severity IaC Issue
     - alert: HighSeverityIaCIssue
-      expr: sum(rate(zen_watcher_events_total{source="checkov",severity="HIGH"}[5m])) * 60 > 3
+      expr: sum(rate(zen_watcher_events_total{source="checkov",severity="high"}[5m])) * 60 > 3
       for: 10m
       labels:
         severity: warning
@@ -200,14 +200,14 @@ spec:
         runbook_category: iac_response
       annotations:
         summary: "High severity Infrastructure as Code issue"
-        description: "Checkov found high severity IaC issue. Check: {{$labels.check_id}}"
+        description: "Checkov found {{$value}} high severity IaC issues/min. EventType: {{$labels.eventType}}"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#iac-high-issues"
         escalation_policy: "high-48h"
-        action_required: "Review and fix IaC security issue for check {{$labels.check_id}}"
+        action_required: "Review and fix IaC security issues"
         
     # Unauthorized Access Attempt
     - alert: UnauthorizedAccessAttempt
-      expr: sum(rate(zen_watcher_events_total{source="audit",verb=~"create|delete|patch|update",severity="RequestResponse"}[2m])) * 60 > 50
+      expr: sum(rate(zen_watcher_events_total{source="audit",eventType=~".*unauthorized.*|.*forbidden.*",severity=~"critical|high"}[2m])) * 60 > 50
       for: 5m
       labels:
         severity: warning
@@ -217,14 +217,14 @@ spec:
         runbook_category: access_incident
       annotations:
         summary: "Potential unauthorized access attempt"
-        description: "High rate of privileged operations: {{$value}} operations/min. User: {{$labels.user}}, Verb: {{$labels.verb}}"
+        description: "High rate of unauthorized/forbidden operations: {{$value}} operations/min. Namespace: {{$labels.namespace}}"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#unauthorized-access"
         escalation_policy: "high-2h"
-        action_required: "Review access patterns for user {{$labels.user}} - potential unauthorized activity"
+        action_required: "Review access patterns - potential unauthorized activity"
         
     # Policy Violation Warning
     - alert: PolicyViolationWarning
-      expr: sum(rate(zen_watcher_events_total{source="kyverno",severity="Warning"}[2m])) * 60 > 5
+      expr: sum(rate(zen_watcher_events_total{source="kyverno",severity="high"}[2m])) * 60 > 5
       for: 5m
       labels:
         severity: warning
@@ -234,10 +234,10 @@ spec:
         runbook_category: policy_incident
       annotations:
         summary: "Policy violation warning"
-        description: "Kyverno policy violation warning. Policy: {{$labels.policy_name}}"
+        description: "Kyverno policy violation warning. EventType: {{$labels.eventType}}, Namespace: {{$labels.namespace}}"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#policy-warnings"
         escalation_policy: "high-8h"
-        action_required: "Review policy configuration for {{$labels.policy_name}}"
+        action_required: "Review policy configuration"
 
   # Medium Priority Security Events - Within Week Response
   - name: zen-watcher.medium-security
@@ -245,7 +245,7 @@ spec:
     rules:
     # Medium Severity Vulnerabilities
     - alert: MediumSeverityVulnerability
-      expr: sum(rate(zen_watcher_events_total{source="trivy",severity="MEDIUM"}[5m])) * 60 > 20
+      expr: sum(rate(zen_watcher_events_total{source="trivy",severity="medium"}[5m])) * 60 > 20
       for: 15m
       labels:
         severity: info
@@ -255,14 +255,14 @@ spec:
         runbook_category: vuln_response
       annotations:
         summary: "Medium severity vulnerability trend"
-        description: "Trivy found {{$value}} medium severity vulnerabilities/min. CVE: {{$labels.cve_id}}"
+        description: "Trivy found {{$value}} medium severity vulnerabilities/min. EventType: {{$labels.eventType}}"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#medium-vulnerabilities"
         escalation_policy: "medium-1w"
-        action_required: "Plan remediation for multiple medium severity CVEs"
+        action_required: "Plan remediation for multiple medium severity vulnerabilities"
         
     # Security Tool Single Outage
     - alert: SecurityToolOffline
-      expr: zen_watcher_tools_active == 0
+      expr: sum(zen_watcher_tools_active) by (tool) == 0
       for: 10m
       labels:
         severity: info
@@ -293,23 +293,6 @@ spec:
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#audit-spikes"
         escalation_policy: "medium-2h"
         action_required: "Review audit log volume increase - investigate if legitimate"
-        
-    # Vulnerability Scan Overdue
-    - alert: VulnerabilityScanOverdue
-      expr: time() - max(zen_watcher_last_scan_timestamp{source="trivy"}) > 86400
-      for: 0s
-      labels:
-        severity: warning
-        component: vulnerability-management
-        source: trivy
-        category: scan-schedule
-        runbook_category: vuln_response
-      annotations:
-        summary: "Vulnerability scan is overdue"
-        description: "Trivy vulnerability scan has not run for more than 24 hours"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#scan-overdue"
-        escalation_policy: "high-4h"
-        action_required: "Trigger manual vulnerability scan or check scan schedule"
 
   # Anomaly Detection and Behavioral Analysis
   - name: zen-watcher.security-anomalies
@@ -319,9 +302,9 @@ spec:
     - alert: SecurityEventAnomaly
       expr: |
         (
-          sum(rate(zen_watcher_events_total{severity=~"CRITICAL|HIGH|High|Critical"}[5m])) * 60
+          sum(rate(zen_watcher_events_total{severity=~"critical|high"}[5m])) * 60
         ) > (
-          avg_over_time(sum(rate(zen_watcher_events_total{severity=~"CRITICAL|HIGH|High|Critical"}[5m]))[1h:5m]) * 60 * 3
+          avg_over_time(sum(rate(zen_watcher_events_total{severity=~"critical|high"}[5m]))[1h:5m]) * 60 * 3
         )
       for: 3m
       labels:
@@ -332,54 +315,32 @@ spec:
         runbook_category: anomaly_investigation
       annotations:
         summary: "Anomalous security event pattern detected"
-        description: "Security event rate is 3x higher than baseline. Current: {{$value}} events/min, Baseline: {{$value}} events/min"
+        description: "Security event rate is 3x higher than baseline. Current: {{$value}} events/min"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#security-anomalies"
         escalation_policy: "high-1h"
         action_required: "Investigate unusual security event pattern - possible security incident"
         
-    # User Behavioral Anomaly
-    - alert: UserBehavioralAnomaly
+    # Namespace Behavioral Anomaly
+    - alert: NamespaceBehavioralAnomaly
       expr: |
         (
-          sum(rate(zen_watcher_events_total{source="audit"}[5m]) by (user)) * 60
+          sum(rate(zen_watcher_events_total{source="audit"}[5m]) by (namespace)) * 60
         ) > (
-          avg_over_time(sum(rate(zen_watcher_events_total{source="audit"}[5m])) by (user)[1h:5m]) * 60 * 5
+          avg_over_time(sum(rate(zen_watcher_events_total{source="audit"}[5m]) by (namespace))[1h:5m]) * 60 * 5
         )
       for: 10m
       labels:
         severity: warning
-        component: user-behavior
+        component: namespace-behavior
         source: audit
-        category: user-anomaly
-        runbook_category: user_investigation
+        category: namespace-anomaly
+        runbook_category: namespace_investigation
       annotations:
-        summary: "Unusual user activity pattern detected"
-        description: "User {{$labels.user}} activity is 5x higher than baseline. {{$value}} operations/min"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#user-anomalies"
+        summary: "Unusual namespace activity pattern detected"
+        description: "Namespace {{$labels.namespace}} activity is 5x higher than baseline. {{$value}} operations/min"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#namespace-anomalies"
         escalation_policy: "high-2h"
-        action_required: "Review activity pattern for user {{$labels.user}} - potential compromised account"
-        
-    # Container Behavioral Anomaly
-    - alert: ContainerBehavioralAnomaly
-      expr: |
-        (
-          sum(rate(zen_watcher_events_total{source="falco",container_name!=""}[5m]) by (container_name, pod_name) * 60)
-        ) > (
-          avg_over_time(sum(rate(zen_watcher_events_total{source="falco",container_name!=""}[5m])) by (container_name, pod_name)[2h:5m]) * 60 * 4
-        )
-      for: 15m
-      labels:
-        severity: warning
-        component: container-behavior
-        source: falco
-        category: container-anomaly
-        runbook_category: container_investigation
-      annotations:
-        summary: "Unusual container activity pattern"
-        description: "Container {{$labels.container_name}} in {{$labels.pod_name}} shows 4x normal activity. {{$value}} events/min"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#container-anomalies"
-        escalation_policy: "high-4h"
-        action_required: "Investigate container {{$labels.container_name}} behavior - possible compromise"
+        action_required: "Review activity pattern for namespace {{$labels.namespace}} - potential security issue"
 
   # Security Compliance Monitoring
   - name: zen-watcher.security-compliance
@@ -389,7 +350,7 @@ spec:
     - alert: ComplianceScoreDegradation
       expr: |
         (
-          sum(rate(zen_watcher_events_total{source="kube-bench",severity="PASS"}[1h])) /
+          sum(rate(zen_watcher_events_total{source="kube-bench",severity=~"low|info"}[1h])) /
           (sum(rate(zen_watcher_events_total{source="kube-bench"}[1h])) + 0.001)
         ) < 0.8
       for: 30m
@@ -410,7 +371,7 @@ spec:
     - alert: IaCSecurityDrift
       expr: |
         (
-          sum(rate(zen_watcher_events_total{source="checkov",severity=~"CRITICAL|HIGH"}[6h])) /
+          sum(rate(zen_watcher_events_total{source="checkov",severity=~"critical|high"}[6h])) /
           (sum(rate(zen_watcher_events_total{source="checkov"}[6h])) + 0.001)
         ) > 0.3
       for: 2h
@@ -435,10 +396,10 @@ spec:
     - alert: MultiSourceSecurityEvent
       expr: |
         (
-          sum(rate(zen_watcher_events_total{severity=~"CRITICAL|HIGH"}[5m])) by (namespace) * 60
+          sum(rate(zen_watcher_events_total{severity=~"critical|high"}[5m])) by (namespace) * 60
         ) > 5 and on(namespace)
         (
-          count(sum(rate(zen_watcher_events_total{severity=~"CRITICAL|HIGH"}[5m])) by (namespace, source)) >= 2
+          count(sum(rate(zen_watcher_events_total{severity=~"critical|high"}[5m])) by (namespace, source)) >= 2
         )
       for: 10m
       labels:
@@ -449,7 +410,7 @@ spec:
         runbook_category: threat_investigation
       annotations:
         summary: "Correlated security events across multiple sources"
-        description: "Namespace {{$labels.namespace}} has security events from multiple sources ({{$labels.source_count}} sources)"
+        description: "Namespace {{$labels.namespace}} has security events from multiple sources"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#correlated-events"
         escalation_policy: "critical-30m"
         action_required: "Investigate correlated security events in namespace {{$labels.namespace}} - possible coordinated attack"
@@ -458,10 +419,10 @@ spec:
     - alert: VulnerabilityRuntimeCorrelation
       expr: |
         (
-          sum(rate(zen_watcher_events_total{source="falco",severity=~"Critical|Warning"}[5m])) * 60
-        ) > 0 and on(namespace, pod_name)
+          sum(rate(zen_watcher_events_total{source="falco",severity=~"critical|high"}[5m])) * 60
+        ) > 0 and on(namespace)
         (
-          sum(rate(zen_watcher_events_total{source="trivy",severity=~"CRITICAL|HIGH"}[1h])) > 0
+          sum(rate(zen_watcher_events_total{source="trivy",severity=~"critical|high"}[1h])) > 0
         )
       for: 15m
       labels:
@@ -472,10 +433,10 @@ spec:
         runbook_category: threat_investigation
       annotations:
         summary: "Runtime threat detected on vulnerable workload"
-        description: "Runtime threats detected on pod {{$labels.pod_name}} that also has known vulnerabilities"
+        description: "Runtime threats detected in namespace {{$labels.namespace}} that also has known vulnerabilities"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#vuln-runtime-correlation"
         escalation_policy: "critical-immediate"
-        action_required: "Immediate investigation required - vulnerable pod showing runtime threats"
+        action_required: "Immediate investigation required - vulnerable namespace showing runtime threats"
 
   # Security Tool Health and Performance
   - name: zen-watcher.security-tool-health
@@ -505,7 +466,7 @@ spec:
     - alert: HighFalsePositiveRate
       expr: |
         (
-          sum(rate(zen_watcher_events_total{rule_name=~".*Suspicious.*|.*Unauthorized.*"}[5m])) /
+          sum(rate(zen_watcher_events_total{eventType=~".*suspicious.*|.*unauthorized.*"}[5m])) /
           (sum(rate(zen_watcher_events_total[5m])) + 0.001)
         ) > 0.4
       for: 30m
@@ -528,7 +489,7 @@ spec:
     rules:
     # New Security Tool Discovered
     - alert: NewSecurityToolDiscovered
-      expr: changes(zen_watcher_tools_active[10m]) > 0 and zen_watcher_tools_active > 0
+      expr: changes(sum(zen_watcher_tools_active) by (tool)[10m]) > 0 and sum(zen_watcher_tools_active) by (tool) > 0
       for: 1m
       labels:
         severity: info

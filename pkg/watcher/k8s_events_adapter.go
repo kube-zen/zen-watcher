@@ -294,7 +294,7 @@ func (a *K8sEventsAdapter) determineSeverity(k8sEvent *corev1.Event) string {
 	reason := strings.ToLower(k8sEvent.Reason)
 	for _, criticalReason := range criticalReasons {
 		if strings.Contains(reason, strings.ToLower(criticalReason)) {
-			return "CRITICAL"
+			return "critical"
 		}
 	}
 
@@ -310,16 +310,16 @@ func (a *K8sEventsAdapter) determineSeverity(k8sEvent *corev1.Event) string {
 
 	for _, highReason := range highReasons {
 		if strings.Contains(reason, strings.ToLower(highReason)) {
-			return "HIGH"
+			return "high"
 		}
 	}
 
-	// Default to MEDIUM for Warning events, LOW for others
+	// Default to medium for Warning events, low for others
 	if k8sEvent.Type == corev1.EventTypeWarning {
-		return "MEDIUM"
+		return "medium"
 	}
 
-	return "LOW"
+	return "low"
 }
 
 // determineEventType determines the event type based on reason and involved object
@@ -329,41 +329,41 @@ func (a *K8sEventsAdapter) determineEventType(k8sEvent *corev1.Event) string {
 
 	// Authentication/Authorization events
 	if strings.Contains(reason, "unauthorized") || strings.Contains(reason, "forbidden") {
-		return "access-control-violation"
+		return "access_control_violation"
 	}
 
 	// Policy violation events
 	if strings.Contains(reason, "policy") || strings.Contains(reason, "validation") {
-		return "policy-violation"
+		return "policy_violation"
 	}
 
 	// Network policy events
 	if strings.Contains(kind, "networkpolicy") || strings.Contains(reason, "network") {
-		return "network-policy-violation"
+		return "network_policy_violation"
 	}
 
 	// Pod security events
 	if strings.Contains(reason, "pod") && strings.Contains(reason, "security") {
-		return "pod-security-violation"
+		return "pod_security_violation"
 	}
 
 	// Resource quota events (potential DoS)
 	if strings.Contains(reason, "quota") || strings.Contains(reason, "resource") {
-		return "resource-exhaustion"
+		return "resource_exhaustion"
 	}
 
 	// Image pull events (supply chain)
 	if strings.Contains(reason, "pull") || strings.Contains(reason, "image") {
-		return "image-pull-failure"
+		return "image_pull_failure"
 	}
 
 	// Volume mount events
 	if strings.Contains(reason, "mount") || strings.Contains(reason, "volume") {
-		return "storage-access-failure"
+		return "storage_access_failure"
 	}
 
 	// Default event type
-	return "kubernetes-event"
+	return "kubernetes_event"
 }
 
 // GetOptimizationMetrics returns optimization metrics (not implemented for K8s Events)

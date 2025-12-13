@@ -1,7 +1,13 @@
-# Prometheus Alert Rules for Zen Watcher Optimization
-# These alerts help identify optimization opportunities and resource issues
-
-groups:
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zen-watcher-optimization-alerts
+  namespace: zen-system
+  labels:
+    app.kubernetes.io/name: zen-watcher
+    app.kubernetes.io/component: optimization-monitoring
+spec:
+  groups:
   - name: zen_watcher_optimization
     interval: 30s
     rules:
@@ -106,4 +112,3 @@ groups:
         annotations:
           summary: "High filter pass rate for {{$labels.source}}"
           description: "{{$labels.source}} has {{$value | humanizePercentage}} filter pass rate. Consider adding more restrictive filter rules to reduce noise."
-

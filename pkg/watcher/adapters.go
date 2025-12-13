@@ -18,19 +18,22 @@ import (
 	"strings"
 )
 
-// normalizeSeverity normalizes severity strings to uppercase standard levels
+// normalizeSeverity normalizes severity strings to lowercase standard levels
+// CRD expects: critical, high, medium, low, info
 func normalizeSeverity(severity string) string {
 	upper := strings.ToUpper(severity)
 	switch upper {
 	case "CRITICAL", "FATAL", "EMERGENCY":
-		return "CRITICAL"
+		return "critical"
 	case "HIGH", "ERROR", "ALERT":
-		return "HIGH"
+		return "high"
 	case "MEDIUM", "WARNING", "WARN":
-		return "MEDIUM"
-	case "LOW", "INFO", "INFORMATIONAL":
-		return "LOW"
+		return "medium"
+	case "LOW", "INFORMATIONAL":
+		return "low"
+	case "INFO":
+		return "info"
 	default:
-		return "UNKNOWN"
+		return "info" // Default to info instead of unknown
 	}
 }

@@ -46,7 +46,7 @@ spec:
     - alert: ZenWatcherSourceCriticalLatency
       expr: |
         histogram_quantile(0.95, 
-          sum(rate(zen_watcher_optimization_source_processing_latency_seconds_bucket[5m])) by (le, source)
+          sum(rate(zen_watcher_ingester_processing_latency_seconds_bucket[5m])) by (le, source)
         ) > 15
       for: 3m
       labels:
@@ -108,7 +108,7 @@ spec:
     # Per-source throughput alerts
     - alert: ZenWatcherSourceNoProcessing
       expr: |
-        sum(rate(zen_watcher_optimization_source_events_processed_total[10m])) by (source) == 0
+        sum(rate(zen_watcher_ingester_events_processed_total[10m])) by (source) == 0
       for: 15m
       labels:
         severity: warning
@@ -236,7 +236,7 @@ spec:
     # Tool integration alerts
     - alert: ZenWatcherToolsOffline
       expr: |
-        count(zen_watcher_tools_active == 0) >= 3
+        count(sum(zen_watcher_tools_active) by (tool) == 0) >= 3
       for: 5m
       labels:
         severity: critical
@@ -248,7 +248,7 @@ spec:
 
     - alert: ZenWatcherSingleToolOffline
       expr: |
-        zen_watcher_tools_active == 0
+        sum(zen_watcher_tools_active) by (tool) == 0
       for: 10m
       labels:
         severity: warning
@@ -341,7 +341,7 @@ spec:
     # Filter effectiveness alerts
     - alert: ZenWatcherFilterIneffective
       expr: |
-        zen_watcher_optimization_filter_effectiveness_ratio < 0.3
+        zen_watcher_filter_pass_rate < 0.3
       for: 30m
       labels:
         severity: info
@@ -349,12 +349,12 @@ spec:
         team: operations
       annotations:
         summary: "Filter effectiveness low for {{$labels.source}}"
-        description: "Filter effectiveness is only {{$value | humanizePercentage}} for {{$labels.source}}. Consider filter optimization."
+        description: "Filter pass rate is only {{$value | humanizePercentage}} for {{$labels.source}}. Consider filter optimization."
 
     # Dedup optimization alerts
     - alert: ZenWatcherDedupOpportunity
       expr: |
-        zen_watcher_optimization_deduplication_rate_ratio < 0.2
+        zen_watcher_dedup_effectiveness < 0.2
       for: 30m
       labels:
         severity: info
@@ -362,7 +362,7 @@ spec:
         team: operations
       annotations:
         summary: "Low dedup rate for {{$labels.source}}"
-        description: "Deduplication rate is only {{$value | humanizePercentage}} for {{$labels.source}}. Consider increasing dedup window."
+        description: "Deduplication effectiveness is only {{$value | humanizePercentage}} for {{$labels.source}}. Consider increasing dedup window."
 
     # Processing strategy alerts
     - alert: ZenWatcherFrequentStrategyChanges

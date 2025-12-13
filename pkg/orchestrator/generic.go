@@ -22,6 +22,7 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
+	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/processor"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/dynamic"
@@ -39,7 +40,11 @@ type GenericOrchestrator struct {
 	mu                 sync.RWMutex
 	ctx                context.Context
 	cancel             context.CancelFunc
-	enableBatching     bool // Whether to use batch processing
+	enableBatching     bool             // Whether to use batch processing
+	metrics            *metrics.Metrics // Optional metrics
+	// Track last event timestamp per source
+	lastEventTimestamp map[string]time.Time
+	lastEventMu        sync.RWMutex
 }
 
 // NewGenericOrchestrator creates a new generic adapter orchestrator
@@ -47,6 +52,16 @@ func NewGenericOrchestrator(
 	adapterFactory *generic.Factory,
 	dynClient dynamic.Interface,
 	proc *processor.Processor,
+) *GenericOrchestrator {
+	return NewGenericOrchestratorWithMetrics(adapterFactory, dynClient, proc, nil)
+}
+
+// NewGenericOrchestratorWithMetrics creates a new generic adapter orchestrator with metrics
+func NewGenericOrchestratorWithMetrics(
+	adapterFactory *generic.Factory,
+	dynClient dynamic.Interface,
+	proc *processor.Processor,
+	m *metrics.Metrics,
 ) *GenericOrchestrator {
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -72,6 +87,8 @@ func NewGenericOrchestrator(
 		ctx:                ctx,
 		cancel:             cancel,
 		enableBatching:     enableBatching,
+		metrics:            m,
+		lastEventTimestamp: make(map[string]time.Time),
 	}
 }
 
@@ -151,6 +168,9 @@ func (o *GenericOrchestrator) reloadAdapters() {
 		// Convert IngesterConfig to generic.SourceConfig
 		genericConfig := config.ConvertIngesterConfigToGeneric(ingesterConfig)
 		if genericConfig == nil {
+			if o.metrics != nil {
+				o.metrics.IngestersConfigErrors.WithLabelValues(ingesterConfig.Source, "convert_to_generic_failed").Inc()
+			}
 			logger.Warn("Failed to convert IngesterConfig to generic.SourceConfig",
 				logger.Fields{
 					Component: "orchestrator",
@@ -162,6 +182,12 @@ func (o *GenericOrchestrator) reloadAdapters() {
 
 		source := genericConfig.Source
 		activeSources[source] = true
+
+		// Update ingester active status
+		if o.metrics != nil {
+			o.metrics.IngestersActive.WithLabelValues(source, genericConfig.Ingester, item.GetNamespace()).Set(1)
+			o.metrics.IngestersStatus.WithLabelValues(source).Set(1) // 1 = active
+		}
 
 		// Check if adapter already exists
 		if existingAdapter, exists := o.activeAdapters[source]; exists {
@@ -177,8 +203,13 @@ func (o *GenericOrchestrator) reloadAdapters() {
 		}
 
 		// Create new adapter
+		startupStartTime := time.Now()
 		adapter, err := o.adapterFactory.NewAdapter(genericConfig.Ingester)
 		if err != nil {
+			if o.metrics != nil {
+				o.metrics.IngestersConfigErrors.WithLabelValues(source, "create_adapter_failed").Inc()
+				o.metrics.IngestersStatus.WithLabelValues(source).Set(-1) // -1 = error
+			}
 			logger.Error("Failed to create adapter",
 				logger.Fields{
 					Component: "orchestrator",
@@ -191,6 +222,10 @@ func (o *GenericOrchestrator) reloadAdapters() {
 
 		// Validate config
 		if err := adapter.Validate(genericConfig); err != nil {
+			if o.metrics != nil {
+				o.metrics.IngestersConfigErrors.WithLabelValues(source, "validation_failed").Inc()
+				o.metrics.IngestersStatus.WithLabelValues(source).Set(-1) // -1 = error
+			}
 			logger.Error("Adapter validation failed",
 				logger.Fields{
 					Component: "orchestrator",
@@ -204,6 +239,10 @@ func (o *GenericOrchestrator) reloadAdapters() {
 		// Start adapter
 		events, err := adapter.Start(o.ctx, genericConfig)
 		if err != nil {
+			if o.metrics != nil {
+				o.metrics.IngestersConfigErrors.WithLabelValues(source, "start_failed").Inc()
+				o.metrics.IngestersStatus.WithLabelValues(source).Set(-1) // -1 = error
+			}
 			logger.Error("Failed to start adapter",
 				logger.Fields{
 					Component: "orchestrator",
@@ -212,6 +251,11 @@ func (o *GenericOrchestrator) reloadAdapters() {
 					Error:     err,
 				})
 			continue
+		}
+
+		// Record startup duration
+		if o.metrics != nil {
+			o.metrics.IngestersStartupDuration.WithLabelValues(source).Observe(time.Since(startupStartTime).Seconds())
 		}
 
 		// Store adapter, config, and event stream
@@ -236,10 +280,21 @@ func (o *GenericOrchestrator) reloadAdapters() {
 	// Stop adapters for sources that no longer exist
 	for source, adapter := range o.activeAdapters {
 		if !activeSources[source] {
+			// Get config before deleting
+			config := o.activeConfigs[source]
 			adapter.Stop()
 			delete(o.activeAdapters, source)
 			delete(o.activeConfigs, source)
 			delete(o.activeEventStreams, source)
+			if o.metrics != nil {
+				// Get ingester type from config before deletion
+				if config != nil {
+					// Find namespace from original CRD (we'd need to track this)
+					// For now, use empty namespace
+					o.metrics.IngestersActive.WithLabelValues(source, config.Ingester, "").Set(0)
+				}
+				o.metrics.IngestersStatus.WithLabelValues(source).Set(0) // 0 = inactive
+			}
 			logger.Info("Generic adapter stopped",
 				logger.Fields{
 					Component: "orchestrator",
@@ -252,10 +307,17 @@ func (o *GenericOrchestrator) reloadAdapters() {
 
 // processEvents processes RawEvents from an adapter
 func (o *GenericOrchestrator) processEvents(source string, config *generic.SourceConfig, events <-chan generic.RawEvent) {
+	eventCount := 0
+	lastRateUpdate := time.Now()
+
 	if o.enableBatching && o.batchProcessor != nil {
 		// Use batch processing for improved throughput
 		for rawEvent := range events {
+			processStart := time.Now()
 			if err := o.batchProcessor.AddEvent(o.ctx, &rawEvent, config); err != nil {
+				if o.metrics != nil {
+					o.metrics.IngesterErrorsTotal.WithLabelValues(source, "batch_add_failed", "batch").Inc()
+				}
 				logger.Error("Failed to add event to batch",
 					logger.Fields{
 						Component: "orchestrator",
@@ -263,12 +325,37 @@ func (o *GenericOrchestrator) processEvents(source string, config *generic.Sourc
 						Source:    source,
 						Error:     err,
 					})
+			} else {
+				eventCount++
+				if o.metrics != nil {
+					o.metrics.IngesterEventsProcessed.WithLabelValues(source, config.Ingester).Inc()
+					o.metrics.IngesterProcessingLatency.WithLabelValues(source, "batch").Observe(time.Since(processStart).Seconds())
+
+					// Update last event timestamp
+					now := time.Now()
+					o.lastEventMu.Lock()
+					o.lastEventTimestamp[source] = now
+					o.lastEventMu.Unlock()
+					o.metrics.IngestersLastEventTimestamp.WithLabelValues(source).Set(float64(now.Unix()))
+
+					// Update rate every second
+					if time.Since(lastRateUpdate) >= time.Second {
+						rate := float64(eventCount) / time.Since(lastRateUpdate).Seconds()
+						o.metrics.IngesterEventsProcessedRate.WithLabelValues(source).Set(rate)
+						eventCount = 0
+						lastRateUpdate = time.Now()
+					}
+				}
 			}
 		}
 	} else {
 		// Process events one-by-one (original behavior)
 		for rawEvent := range events {
+			processStart := time.Now()
 			if err := o.processor.ProcessEvent(o.ctx, &rawEvent, config); err != nil {
+				if o.metrics != nil {
+					o.metrics.IngesterErrorsTotal.WithLabelValues(source, "process_failed", "processor").Inc()
+				}
 				logger.Error("Failed to process event",
 					logger.Fields{
 						Component: "orchestrator",
@@ -276,6 +363,27 @@ func (o *GenericOrchestrator) processEvents(source string, config *generic.Sourc
 						Source:    source,
 						Error:     err,
 					})
+			} else {
+				eventCount++
+				if o.metrics != nil {
+					o.metrics.IngesterEventsProcessed.WithLabelValues(source, config.Ingester).Inc()
+					o.metrics.IngesterProcessingLatency.WithLabelValues(source, "processor").Observe(time.Since(processStart).Seconds())
+
+					// Update last event timestamp
+					now := time.Now()
+					o.lastEventMu.Lock()
+					o.lastEventTimestamp[source] = now
+					o.lastEventMu.Unlock()
+					o.metrics.IngestersLastEventTimestamp.WithLabelValues(source).Set(float64(now.Unix()))
+
+					// Update rate every second
+					if time.Since(lastRateUpdate) >= time.Second {
+						rate := float64(eventCount) / time.Since(lastRateUpdate).Seconds()
+						o.metrics.IngesterEventsProcessedRate.WithLabelValues(source).Set(rate)
+						eventCount = 0
+						lastRateUpdate = time.Now()
+					}
+				}
 			}
 		}
 	}

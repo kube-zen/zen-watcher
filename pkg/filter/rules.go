@@ -18,22 +18,31 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/logger"
+	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // Filter provides filtering functionality for observations
 // Thread-safe: config can be updated dynamically via UpdateConfig()
 type Filter struct {
-	mu     sync.RWMutex
-	config *FilterConfig
+	mu      sync.RWMutex
+	config  *FilterConfig
+	metrics *metrics.Metrics // Optional metrics
 }
 
 // NewFilter creates a new filter with the given configuration
 func NewFilter(config *FilterConfig) *Filter {
+	return NewFilterWithMetrics(config, nil)
+}
+
+// NewFilterWithMetrics creates a new filter with metrics support
+func NewFilterWithMetrics(config *FilterConfig, m *metrics.Metrics) *Filter {
 	return &Filter{
-		config: config,
+		config:  config,
+		metrics: m,
 	}
 }
 
@@ -88,6 +97,8 @@ func (f *Filter) Allow(observation *unstructured.Unstructured) bool {
 // AllowWithReason checks if an observation should be allowed and returns the reason if filtered
 // Returns (true, "") if allowed, (false, reason) if filtered
 func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, string) {
+	startTime := time.Now()
+
 	if f == nil {
 		// No filter configured - allow all
 		return true, ""
@@ -99,6 +110,21 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 		// No filter configured - allow all
 		return true, ""
 	}
+
+	// Track evaluation latency
+	defer func() {
+		if f.metrics != nil {
+			// Extract source for metrics
+			sourceVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
+			source := "unknown"
+			if sourceVal != nil {
+				source = strings.ToLower(fmt.Sprintf("%v", sourceVal))
+			}
+			// Track evaluation duration (use "total" as rule_type for overall evaluation)
+			duration := time.Since(startTime).Seconds()
+			f.metrics.FilterRuleEvaluationDuration.WithLabelValues(source, "total").Observe(duration)
+		}
+	}()
 
 	// Check if expression-based filtering is enabled
 	if config.Expression != "" {
@@ -129,7 +155,23 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 				// Fall through to list-based filtering
 			} else {
 				if !result {
+					if f.metrics != nil {
+						sourceVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
+						source := "unknown"
+						if sourceVal != nil {
+							source = strings.ToLower(fmt.Sprintf("%v", sourceVal))
+						}
+						f.metrics.FilterDecisions.WithLabelValues(source, "filter", "expression_filtered").Inc()
+					}
 					return false, "expression_filtered"
+				}
+				if f.metrics != nil {
+					sourceVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
+					source := "unknown"
+					if sourceVal != nil {
+						source = strings.ToLower(fmt.Sprintf("%v", sourceVal))
+					}
+					f.metrics.FilterDecisions.WithLabelValues(source, "allow", "expression_passed").Inc()
 				}
 				return true, ""
 			}
@@ -153,6 +195,9 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 
 	// Check if source is enabled
 	if !sourceFilter.IsSourceEnabled() {
+		if f.metrics != nil {
+			f.metrics.FilterDecisions.WithLabelValues(source, "filter", "source_disabled").Inc()
+		}
 		logger.Debug("Source disabled, filtering out observation",
 			logger.Fields{
 				Component: "filter",
@@ -195,6 +240,9 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 		if len(globalFilter.ExcludedNamespaces) > 0 {
 			for _, excluded := range globalFilter.ExcludedNamespaces {
 				if strings.EqualFold(namespace, excluded) {
+					if f.metrics != nil {
+						f.metrics.FilterDecisions.WithLabelValues(source, "filter", "global_exclude_namespace").Inc()
+					}
 					logger.Debug("Namespace excluded by global filter",
 						logger.Fields{
 							Component: "filter",
@@ -217,6 +265,9 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 				}
 			}
 			if !allowed {
+				if f.metrics != nil {
+					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "global_include_namespace").Inc()
+				}
 				logger.Debug("Namespace not in global include list",
 					logger.Fields{
 						Component: "filter",
@@ -259,6 +310,9 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			}
 		}
 		if !allowed {
+			if f.metrics != nil {
+				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "include_severity").Inc()
+			}
 			logger.Debug("Severity not in include list, filtering out observation",
 				logger.Fields{
 					Component: "filter",
@@ -275,6 +329,9 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	} else if sourceFilter.MinSeverity != "" {
 		// MinSeverity filter (only if IncludeSeverity is not set)
 		if !f.meetsMinSeverity(severity, sourceFilter.MinSeverity) {
+			if f.metrics != nil {
+				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "min_severity").Inc()
+			}
 			logger.Debug("Severity below minimum, filtering out observation",
 				logger.Fields{
 					Component: "filter",
@@ -294,6 +351,9 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	if len(sourceFilter.ExcludeEventTypes) > 0 {
 		for _, excluded := range sourceFilter.ExcludeEventTypes {
 			if strings.EqualFold(eventType, excluded) {
+				if f.metrics != nil {
+					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_event_type").Inc()
+				}
 				logger.Debug("EventType excluded, filtering out observation",
 					logger.Fields{
 						Component: "filter",
@@ -315,6 +375,9 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			}
 		}
 		if !allowed {
+			if f.metrics != nil {
+				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "include_event_type").Inc()
+			}
 			logger.Debug("EventType not in include list, filtering out observation",
 				logger.Fields{
 					Component: "filter",
@@ -331,6 +394,9 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	if len(sourceFilter.ExcludeNamespaces) > 0 {
 		for _, excluded := range sourceFilter.ExcludeNamespaces {
 			if strings.EqualFold(namespace, excluded) {
+				if f.metrics != nil {
+					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_namespace").Inc()
+				}
 				logger.Debug("Namespace excluded, filtering out observation",
 					logger.Fields{
 						Component: "filter",
@@ -352,6 +418,9 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			}
 		}
 		if !allowed {
+			if f.metrics != nil {
+				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "include_namespace").Inc()
+			}
 			logger.Debug("Namespace not in include list, filtering out observation",
 				logger.Fields{
 					Component: "filter",
@@ -368,6 +437,9 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	if len(sourceFilter.ExcludeKinds) > 0 {
 		for _, excluded := range sourceFilter.ExcludeKinds {
 			if strings.EqualFold(kind, excluded) {
+				if f.metrics != nil {
+					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_kind").Inc()
+				}
 				logger.Debug("Kind excluded, filtering out observation",
 					logger.Fields{
 						Component:    "filter",
@@ -389,6 +461,9 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			}
 		}
 		if !allowed {
+			if f.metrics != nil {
+				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "include_kind").Inc()
+			}
 			logger.Debug("Kind not in include list, filtering out observation",
 				logger.Fields{
 					Component:    "filter",
@@ -405,6 +480,9 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	if len(sourceFilter.ExcludeCategories) > 0 {
 		for _, excluded := range sourceFilter.ExcludeCategories {
 			if strings.EqualFold(category, excluded) {
+				if f.metrics != nil {
+					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_category").Inc()
+				}
 				logger.Debug("Category excluded, filtering out observation",
 					logger.Fields{
 						Component: "filter",
@@ -428,6 +506,9 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			}
 		}
 		if !allowed {
+			if f.metrics != nil {
+				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "include_category").Inc()
+			}
 			logger.Debug("Category not in include list, filtering out observation",
 				logger.Fields{
 					Component: "filter",
@@ -446,6 +527,9 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	if len(sourceFilter.ExcludeRules) > 0 && rule != "" {
 		for _, excluded := range sourceFilter.ExcludeRules {
 			if strings.EqualFold(rule, excluded) {
+				if f.metrics != nil {
+					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_rule").Inc()
+				}
 				logger.Debug("Rule excluded, filtering out observation",
 					logger.Fields{
 						Component: "filter",
@@ -462,6 +546,9 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	}
 
 	// All filters passed
+	if f.metrics != nil {
+		f.metrics.FilterDecisions.WithLabelValues(source, "allow", "all_passed").Inc()
+	}
 	return true, ""
 }
 

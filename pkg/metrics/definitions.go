@@ -29,10 +29,11 @@ type Metrics struct {
 	ObservationsCreateErrors *prometheus.CounterVec
 
 	// Filter metrics (NEW)
-	FilterDecisions      *prometheus.CounterVec
-	FilterReloadTotal    *prometheus.CounterVec
-	FilterLastReload     *prometheus.GaugeVec
-	FilterPoliciesActive *prometheus.GaugeVec
+	FilterDecisions              *prometheus.CounterVec
+	FilterReloadTotal            *prometheus.CounterVec
+	FilterLastReload             *prometheus.GaugeVec
+	FilterPoliciesActive         *prometheus.GaugeVec
+	FilterRuleEvaluationDuration *prometheus.HistogramVec // Filter rule evaluation latency
 
 	// ObservationMapping / CRD adapter metrics (NEW)
 	ObservationMappingsActive *prometheus.GaugeVec
@@ -41,6 +42,32 @@ type Metrics struct {
 
 	// Adapter lifecycle metrics (NEW)
 	AdapterRunsTotal *prometheus.CounterVec
+
+	// Ingester lifecycle metrics (NEW - High Priority)
+	IngestersActive             *prometheus.GaugeVec     // Active ingesters by source, type, namespace
+	IngestersStatus             *prometheus.GaugeVec     // Ingester status (1=active, 0=inactive, -1=error)
+	IngestersConfigErrors       *prometheus.CounterVec   // Config load errors by source and error type
+	IngestersStartupDuration    *prometheus.HistogramVec // Startup duration by source
+	IngestersLastEventTimestamp *prometheus.GaugeVec     // Last event timestamp by source
+	IngesterEventsProcessed     *prometheus.CounterVec   // Events processed per ingester
+	IngesterEventsProcessedRate *prometheus.GaugeVec     // Events per second per ingester
+	IngesterProcessingLatency   *prometheus.HistogramVec // Processing latency by source and stage
+	IngesterErrorsTotal         *prometheus.CounterVec   // Errors by source, error type, and stage
+	InformerCacheSyncDuration   *prometheus.HistogramVec // Cache sync duration by source and GVR
+	InformerResyncEvents        *prometheus.CounterVec   // Resync events by source and GVR
+
+	// Destination delivery metrics (NEW - High Priority)
+	DestinationDeliveryTotal   *prometheus.CounterVec   // Delivery attempts by source, destination type, status
+	DestinationDeliveryLatency *prometheus.HistogramVec // Delivery latency by source and destination type
+	DestinationQueueDepth      *prometheus.GaugeVec     // Queue depth by source and destination type
+	DestinationRetriesTotal    *prometheus.CounterVec   // Retry attempts by source and destination type
+
+	// ConfigManager metrics (NEW - High Priority)
+	ConfigMapLoadTotal              *prometheus.CounterVec   // ConfigMap loads by name and result
+	ConfigMapReloadDuration         *prometheus.HistogramVec // Reload duration by ConfigMap name
+	ConfigMapMergeConflicts         *prometheus.CounterVec   // Merge conflicts by ConfigMap name
+	ConfigMapValidationErrors       *prometheus.CounterVec   // Validation errors by ConfigMap name and error type
+	ConfigUpdatePropagationDuration *prometheus.HistogramVec // Update propagation time by component
 
 	// Webhook metrics (enhanced)
 	WebhookRequests   *prometheus.CounterVec
@@ -243,6 +270,15 @@ func NewMetrics() *Metrics {
 		[]string{"type"},
 	)
 
+	filterRuleEvaluationDuration := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "zen_watcher_filter_rule_evaluation_duration_seconds",
+			Help:    "Filter rule evaluation duration",
+			Buckets: []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1},
+		},
+		[]string{"source", "rule_type"},
+	)
+
 	// NEW: ObservationMapping metrics
 	observationMappingsActive := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
@@ -275,6 +311,175 @@ func NewMetrics() *Metrics {
 			Help: "Adapter run iterations",
 		},
 		[]string{"adapter", "outcome"},
+	)
+
+	// NEW: Ingester lifecycle metrics (High Priority)
+	ingestersActive := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_ingesters_active",
+			Help: "Number of active ingesters (1=active, 0=inactive)",
+		},
+		[]string{"source", "ingester_type", "namespace"},
+	)
+
+	ingestersStatus := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_ingesters_status",
+			Help: "Ingester status (1=active, 0=inactive, -1=error)",
+		},
+		[]string{"source"},
+	)
+
+	ingestersConfigErrors := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_ingesters_config_errors_total",
+			Help: "Ingester configuration load errors",
+		},
+		[]string{"source", "error_type"},
+	)
+
+	ingestersStartupDuration := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "zen_watcher_ingesters_startup_duration_seconds",
+			Help:    "Ingester startup duration",
+			Buckets: []float64{0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0},
+		},
+		[]string{"source"},
+	)
+
+	ingestersLastEventTimestamp := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_ingesters_last_event_timestamp_seconds",
+			Help: "Timestamp of last event processed by ingester (Unix timestamp)",
+		},
+		[]string{"source"},
+	)
+
+	ingesterEventsProcessed := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_ingester_events_processed_total",
+			Help: "Total events processed per ingester",
+		},
+		[]string{"source", "ingester_type"},
+	)
+
+	ingesterEventsProcessedRate := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_ingester_events_processed_rate",
+			Help: "Events processed per second per ingester",
+		},
+		[]string{"source"},
+	)
+
+	ingesterProcessingLatency := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "zen_watcher_ingester_processing_latency_seconds",
+			Help:    "Processing latency per ingester by stage",
+			Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0},
+		},
+		[]string{"source", "stage"},
+	)
+
+	ingesterErrorsTotal := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_ingester_errors_total",
+			Help: "Total errors per ingester",
+		},
+		[]string{"source", "error_type", "stage"},
+	)
+
+	informerCacheSyncDuration := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "zen_watcher_informer_cache_sync_duration_seconds",
+			Help:    "Informer cache sync duration",
+			Buckets: []float64{0.1, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0},
+		},
+		[]string{"source", "gvr"},
+	)
+
+	informerResyncEvents := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_informer_resync_events_total",
+			Help: "Informer resync events",
+		},
+		[]string{"source", "gvr"},
+	)
+
+	// NEW: Destination delivery metrics (High Priority)
+	destinationDeliveryTotal := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_destination_delivery_total",
+			Help: "Destination delivery attempts",
+		},
+		[]string{"source", "destination_type", "status"},
+	)
+
+	destinationDeliveryLatency := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "zen_watcher_destination_delivery_latency_seconds",
+			Help:    "Destination delivery latency",
+			Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0},
+		},
+		[]string{"source", "destination_type"},
+	)
+
+	destinationQueueDepth := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "zen_watcher_destination_queue_depth",
+			Help: "Destination queue depth",
+		},
+		[]string{"source", "destination_type"},
+	)
+
+	destinationRetriesTotal := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_destination_retries_total",
+			Help: "Destination retry attempts",
+		},
+		[]string{"source", "destination_type"},
+	)
+
+	// NEW: ConfigManager metrics (High Priority)
+	configMapLoadTotal := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_configmap_load_total",
+			Help: "ConfigMap load attempts",
+		},
+		[]string{"configmap", "result"},
+	)
+
+	configMapReloadDuration := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "zen_watcher_configmap_reload_duration_seconds",
+			Help:    "ConfigMap reload duration",
+			Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0},
+		},
+		[]string{"configmap"},
+	)
+
+	configMapMergeConflicts := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_configmap_merge_conflicts_total",
+			Help: "ConfigMap merge conflicts",
+		},
+		[]string{"configmap"},
+	)
+
+	configMapValidationErrors := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_configmap_validation_errors_total",
+			Help: "ConfigMap validation errors",
+		},
+		[]string{"configmap", "error_type"},
+	)
+
+	configUpdatePropagationDuration := prometheus.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "zen_watcher_config_update_propagation_duration_seconds",
+			Help:    "Config update propagation time to components",
+			Buckets: []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0},
+		},
+		[]string{"component"},
 	)
 
 	// NEW: Enhanced webhook metrics
@@ -350,10 +555,34 @@ func NewMetrics() *Metrics {
 	prometheus.MustRegister(filterReloadTotal)
 	prometheus.MustRegister(filterLastReload)
 	prometheus.MustRegister(filterPoliciesActive)
+	prometheus.MustRegister(filterRuleEvaluationDuration)
 	prometheus.MustRegister(observationMappingsActive)
 	prometheus.MustRegister(observationMappingsEvents)
 	prometheus.MustRegister(crdAdapterErrors)
 	prometheus.MustRegister(adapterRunsTotal)
+	// Register Ingester lifecycle metrics
+	prometheus.MustRegister(ingestersActive)
+	prometheus.MustRegister(ingestersStatus)
+	prometheus.MustRegister(ingestersConfigErrors)
+	prometheus.MustRegister(ingestersStartupDuration)
+	prometheus.MustRegister(ingestersLastEventTimestamp)
+	prometheus.MustRegister(ingesterEventsProcessed)
+	prometheus.MustRegister(ingesterEventsProcessedRate)
+	prometheus.MustRegister(ingesterProcessingLatency)
+	prometheus.MustRegister(ingesterErrorsTotal)
+	prometheus.MustRegister(informerCacheSyncDuration)
+	prometheus.MustRegister(informerResyncEvents)
+	// Register Destination delivery metrics
+	prometheus.MustRegister(destinationDeliveryTotal)
+	prometheus.MustRegister(destinationDeliveryLatency)
+	prometheus.MustRegister(destinationQueueDepth)
+	prometheus.MustRegister(destinationRetriesTotal)
+	// Register ConfigManager metrics
+	prometheus.MustRegister(configMapLoadTotal)
+	prometheus.MustRegister(configMapReloadDuration)
+	prometheus.MustRegister(configMapMergeConflicts)
+	prometheus.MustRegister(configMapValidationErrors)
+	prometheus.MustRegister(configUpdatePropagationDuration)
 	prometheus.MustRegister(webhookQueueUsage)
 	prometheus.MustRegister(dedupCacheUsage)
 	prometheus.MustRegister(dedupEvictions)
@@ -594,10 +823,11 @@ func NewMetrics() *Metrics {
 		ObservationsCreateErrors: observationsCreateErrors,
 
 		// Filter metrics (NEW)
-		FilterDecisions:      filterDecisions,
-		FilterReloadTotal:    filterReloadTotal,
-		FilterLastReload:     filterLastReload,
-		FilterPoliciesActive: filterPoliciesActive,
+		FilterDecisions:              filterDecisions,
+		FilterReloadTotal:            filterReloadTotal,
+		FilterLastReload:             filterLastReload,
+		FilterPoliciesActive:         filterPoliciesActive,
+		FilterRuleEvaluationDuration: filterRuleEvaluationDuration,
 
 		// ObservationMapping / CRD adapter metrics (NEW)
 		ObservationMappingsActive: observationMappingsActive,
@@ -606,6 +836,32 @@ func NewMetrics() *Metrics {
 
 		// Adapter lifecycle metrics (NEW)
 		AdapterRunsTotal: adapterRunsTotal,
+
+		// Ingester lifecycle metrics (NEW - High Priority)
+		IngestersActive:             ingestersActive,
+		IngestersStatus:             ingestersStatus,
+		IngestersConfigErrors:       ingestersConfigErrors,
+		IngestersStartupDuration:    ingestersStartupDuration,
+		IngestersLastEventTimestamp: ingestersLastEventTimestamp,
+		IngesterEventsProcessed:     ingesterEventsProcessed,
+		IngesterEventsProcessedRate: ingesterEventsProcessedRate,
+		IngesterProcessingLatency:   ingesterProcessingLatency,
+		IngesterErrorsTotal:         ingesterErrorsTotal,
+		InformerCacheSyncDuration:   informerCacheSyncDuration,
+		InformerResyncEvents:        informerResyncEvents,
+
+		// Destination delivery metrics (NEW - High Priority)
+		DestinationDeliveryTotal:   destinationDeliveryTotal,
+		DestinationDeliveryLatency: destinationDeliveryLatency,
+		DestinationQueueDepth:      destinationQueueDepth,
+		DestinationRetriesTotal:    destinationRetriesTotal,
+
+		// ConfigManager metrics (NEW - High Priority)
+		ConfigMapLoadTotal:              configMapLoadTotal,
+		ConfigMapReloadDuration:         configMapReloadDuration,
+		ConfigMapMergeConflicts:         configMapMergeConflicts,
+		ConfigMapValidationErrors:       configMapValidationErrors,
+		ConfigUpdatePropagationDuration: configUpdatePropagationDuration,
 
 		// Webhook metrics
 		WebhookRequests:   webhookRequests,

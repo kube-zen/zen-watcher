@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/logger"
+	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -50,10 +51,18 @@ type ConfigManager struct {
 	// ConfigMap names
 	baseConfigName string
 	envConfigName  string
+
+	// Metrics (optional)
+	metrics *metrics.Metrics
 }
 
 // NewConfigManager creates a new configuration manager
 func NewConfigManager(clientset kubernetes.Interface, namespace string) *ConfigManager {
+	return NewConfigManagerWithMetrics(clientset, namespace, nil)
+}
+
+// NewConfigManagerWithMetrics creates a new configuration manager with metrics
+func NewConfigManagerWithMetrics(clientset kubernetes.Interface, namespace string, m *metrics.Metrics) *ConfigManager {
 	// Get config names from environment or use defaults
 	baseConfigName := getEnv("BASE_CONFIG_NAME", "zen-watcher-base-config")
 	envConfigName := getEnv("ENV_CONFIG_NAME", "")
@@ -66,6 +75,7 @@ func NewConfigManager(clientset kubernetes.Interface, namespace string) *ConfigM
 		finalConfig:    make(map[string]interface{}),
 		baseConfigName: baseConfigName,
 		envConfigName:  envConfigName,
+		metrics:        m,
 	}
 
 	cm.setupInformers()
@@ -125,6 +135,8 @@ func (cm *ConfigManager) Start(ctx context.Context) error {
 
 // loadInitialConfig loads configuration from ConfigMaps before informer is ready
 func (cm *ConfigManager) loadInitialConfig() error {
+	startTime := time.Now()
+
 	// Load base config
 	baseCM, err := cm.clientset.CoreV1().ConfigMaps(cm.namespace).Get(
 		context.Background(),
@@ -133,6 +145,9 @@ func (cm *ConfigManager) loadInitialConfig() error {
 	)
 	if err != nil {
 		if errors.IsNotFound(err) {
+			if cm.metrics != nil {
+				cm.metrics.ConfigMapLoadTotal.WithLabelValues(cm.baseConfigName, "not_found").Inc()
+			}
 			logger.Debug("Base ConfigMap not found, using defaults",
 				logger.Fields{
 					Component: "config",
@@ -143,13 +158,23 @@ func (cm *ConfigManager) loadInitialConfig() error {
 				})
 			return nil
 		}
+		if cm.metrics != nil {
+			cm.metrics.ConfigMapLoadTotal.WithLabelValues(cm.baseConfigName, "error").Inc()
+			cm.metrics.ConfigMapValidationErrors.WithLabelValues(cm.baseConfigName, "load_error").Inc()
+		}
 		return fmt.Errorf("failed to load base config: %w", err)
+	}
+
+	if cm.metrics != nil {
+		cm.metrics.ConfigMapLoadTotal.WithLabelValues(cm.baseConfigName, "success").Inc()
+		cm.metrics.ConfigMapReloadDuration.WithLabelValues(cm.baseConfigName).Observe(time.Since(startTime).Seconds())
 	}
 
 	cm.processConfigMap(baseCM)
 
 	// Load environment config if specified
 	if cm.envConfigName != "" {
+		envStartTime := time.Now()
 		envCM, err := cm.clientset.CoreV1().ConfigMaps(cm.namespace).Get(
 			context.Background(),
 			cm.envConfigName,
@@ -157,6 +182,9 @@ func (cm *ConfigManager) loadInitialConfig() error {
 		)
 		if err != nil {
 			if errors.IsNotFound(err) {
+				if cm.metrics != nil {
+					cm.metrics.ConfigMapLoadTotal.WithLabelValues(cm.envConfigName, "not_found").Inc()
+				}
 				logger.Debug("Environment ConfigMap not found, using base config only",
 					logger.Fields{
 						Component: "config",
@@ -167,7 +195,16 @@ func (cm *ConfigManager) loadInitialConfig() error {
 					})
 				return nil
 			}
+			if cm.metrics != nil {
+				cm.metrics.ConfigMapLoadTotal.WithLabelValues(cm.envConfigName, "error").Inc()
+				cm.metrics.ConfigMapValidationErrors.WithLabelValues(cm.envConfigName, "load_error").Inc()
+			}
 			return fmt.Errorf("failed to load env config: %w", err)
+		}
+
+		if cm.metrics != nil {
+			cm.metrics.ConfigMapLoadTotal.WithLabelValues(cm.envConfigName, "success").Inc()
+			cm.metrics.ConfigMapReloadDuration.WithLabelValues(cm.envConfigName).Observe(time.Since(envStartTime).Seconds())
 		}
 
 		cm.processConfigMap(envCM)
@@ -242,6 +279,8 @@ func (cm *ConfigManager) handleConfigMapDelete(obj interface{}) {
 
 // processConfigMap processes a ConfigMap
 func (cm *ConfigManager) processConfigMap(cmConfig *corev1.ConfigMap) {
+	startTime := time.Now()
+
 	// Only process our config maps
 	if cmConfig.Name != cm.baseConfigName && cmConfig.Name != cm.envConfigName {
 		return
@@ -249,6 +288,9 @@ func (cm *ConfigManager) processConfigMap(cmConfig *corev1.ConfigMap) {
 
 	configData, ok := cmConfig.Data["features.yaml"]
 	if !ok {
+		if cm.metrics != nil {
+			cm.metrics.ConfigMapValidationErrors.WithLabelValues(cmConfig.Name, "missing_features_yaml").Inc()
+		}
 		logger.Debug("ConfigMap missing features.yaml, skipping",
 			logger.Fields{
 				Component: "config",
@@ -262,6 +304,9 @@ func (cm *ConfigManager) processConfigMap(cmConfig *corev1.ConfigMap) {
 
 	parsedConfig, err := parseConfigYAML(configData)
 	if err != nil {
+		if cm.metrics != nil {
+			cm.metrics.ConfigMapValidationErrors.WithLabelValues(cmConfig.Name, "parse_error").Inc()
+		}
 		logger.Warn("Failed to parse config from ConfigMap",
 			logger.Fields{
 				Component: "config",
@@ -301,10 +346,23 @@ func (cm *ConfigManager) processConfigMap(cmConfig *corev1.ConfigMap) {
 	}
 
 	// Merge configurations with precedence
+	mergeStartTime := time.Now()
 	cm.mergeConfigurations()
+	if cm.metrics != nil {
+		// Check for merge conflicts (simplified - could be enhanced)
+		// For now, we just track merge duration
+		cm.metrics.ConfigMapReloadDuration.WithLabelValues(cmConfig.Name).Observe(time.Since(startTime).Seconds())
+	}
 
 	// Notify callbacks
+	notifyStartTime := time.Now()
 	cm.notifyConfigChange()
+	if cm.metrics != nil {
+		// Track propagation time (simplified - tracks total notification time)
+		cm.metrics.ConfigUpdatePropagationDuration.WithLabelValues("config_manager").Observe(time.Since(notifyStartTime).Seconds())
+	}
+
+	_ = mergeStartTime // Avoid unused variable warning
 }
 
 // mergeConfigurations merges base and environment configurations

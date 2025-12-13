@@ -1,0 +1,377 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zen-watcher-ingester-destination-config-alerts
+  namespace: zen-system
+  labels:
+    app.kubernetes.io/name: zen-watcher
+    app.kubernetes.io/component: ingester-monitoring
+    prometheus: kube-prometheus-stack
+    role: alert-rules
+spec:
+  groups:
+  # Ingester Lifecycle and Health Alerts
+  - name: zen-watcher.ingester-health
+    interval: 30s
+    rules:
+    # Ingester Status Errors
+    - alert: ZenWatcherIngesterStatusError
+      expr: zen_watcher_ingesters_status == -1
+      for: 2m
+      labels:
+        severity: critical
+        component: ingester
+        team: sre
+      annotations:
+        summary: "Ingester {{$labels.source}} in error state"
+        description: "Ingester {{$labels.source}} has status -1 (error). Check ingester configuration and logs."
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/INGESTER_TROUBLESHOOTING.md"
+
+    # Ingester Inactive
+    - alert: ZenWatcherIngesterInactive
+      expr: zen_watcher_ingesters_active == 0
+      for: 5m
+      labels:
+        severity: warning
+        component: ingester
+        team: operations
+      annotations:
+        summary: "Ingester {{$labels.source}} is inactive"
+        description: "Ingester {{$labels.source}} (type: {{$labels.ingester_type}}, namespace: {{$labels.namespace}}) has been inactive for 5+ minutes."
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/INGESTER_TROUBLESHOOTING.md"
+
+    # Ingester Configuration Errors
+    - alert: ZenWatcherIngesterConfigErrors
+      expr: rate(zen_watcher_ingesters_config_errors_total[5m]) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        component: ingester
+        team: sre
+      annotations:
+        summary: "Ingester {{$labels.source}} configuration errors"
+        description: "Ingester {{$labels.source}} has {{$value}} config errors/sec. Error type: {{$labels.error_type}}"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/INGESTER_TROUBLESHOOTING.md"
+
+    # Slow Ingester Startup
+    - alert: ZenWatcherIngesterSlowStartup
+      expr: |
+        histogram_quantile(0.95, 
+          sum(rate(zen_watcher_ingesters_startup_duration_seconds_bucket[10m])) by (le, source)
+        ) > 30
+      for: 5m
+      labels:
+        severity: warning
+        component: ingester
+        team: sre
+      annotations:
+        summary: "Ingester {{$labels.source}} startup taking too long"
+        description: "Ingester {{$labels.source}} (type: {{$labels.ingester_type}}) p95 startup duration is {{$value}}s. Check resource constraints."
+
+    # Ingester No Events
+    - alert: ZenWatcherIngesterNoEvents
+      expr: |
+        (time() - zen_watcher_ingesters_last_event_timestamp_seconds) > 600
+      for: 10m
+      labels:
+        severity: warning
+        component: ingester
+        team: operations
+      annotations:
+        summary: "Ingester {{$labels.source}} not processing events"
+        description: "Ingester {{$labels.source}} has not processed events in 10+ minutes. Last event: {{$value}}s ago."
+
+    # Ingester Processing Stopped
+    - alert: ZenWatcherIngesterProcessingStopped
+      expr: |
+        sum(rate(zen_watcher_ingester_events_processed_total[10m])) by (source) == 0
+      for: 15m
+      labels:
+        severity: critical
+        component: ingester
+        team: operations
+      annotations:
+        summary: "Ingester {{$labels.source}} processing stopped"
+        description: "Ingester {{$labels.source}} has not processed any events in 15+ minutes."
+
+    # Ingester High Processing Latency
+    - alert: ZenWatcherIngesterHighLatency
+      expr: |
+        histogram_quantile(0.95, 
+          sum(rate(zen_watcher_ingester_processing_latency_seconds_bucket[5m])) by (le, source)
+        ) > 10
+      for: 5m
+      labels:
+        severity: warning
+        component: ingester
+        team: sre
+      annotations:
+        summary: "Ingester {{$labels.source}} high processing latency"
+        description: "Ingester {{$labels.source}} (type: {{$labels.ingester_type}}) p95 processing latency is {{$value}}s."
+
+    # Ingester High Error Rate
+    - alert: ZenWatcherIngesterHighErrorRate
+      expr: |
+        sum(rate(zen_watcher_ingester_errors_total[5m])) by (source) > 1
+      for: 5m
+      labels:
+        severity: warning
+        component: ingester
+        team: sre
+      annotations:
+        summary: "Ingester {{$labels.source}} high error rate"
+        description: "Ingester {{$labels.source}} has {{$value}} errors/sec. Error type: {{$labels.error_type}}, Stage: {{$labels.stage}}"
+
+    # Informer Cache Sync Issues
+    - alert: ZenWatcherInformerCacheSyncSlow
+      expr: |
+        histogram_quantile(0.95, 
+          sum(rate(zen_watcher_informer_cache_sync_duration_seconds_bucket[10m])) by (le, gvr)
+        ) > 60
+      for: 5m
+      labels:
+        severity: warning
+        component: informer
+        team: sre
+      annotations:
+        summary: "Informer cache sync slow for {{$labels.gvr}}"
+        description: "Informer cache sync for {{$labels.gvr}} (namespace: {{$labels.namespace}}) p95 duration is {{$value}}s."
+
+    # Frequent Informer Resyncs
+    - alert: ZenWatcherInformerFrequentResyncs
+      expr: |
+        sum(rate(zen_watcher_informer_resync_events_total[1h])) by (gvr) > 5
+      for: 1h
+      labels:
+        severity: warning
+        component: informer
+        team: sre
+      annotations:
+        summary: "Frequent informer resyncs for {{$labels.gvr}}"
+        description: "Informer {{$labels.gvr}} (namespace: {{$labels.namespace}}) has {{$value}} resync events/hour. Check for API server issues."
+
+  # Destination Delivery Alerts
+  - name: zen-watcher.destination-delivery
+    interval: 30s
+    rules:
+    # Destination Delivery Failures
+    - alert: ZenWatcherDestinationDeliveryFailures
+      expr: |
+        (
+          sum(rate(zen_watcher_destination_delivery_total{status="failure"}[5m])) by (source, destination_type) /
+          (sum(rate(zen_watcher_destination_delivery_total[5m])) by (source, destination_type) + 0.001)
+        ) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        component: destination
+        team: sre
+      annotations:
+        summary: "High destination delivery failure rate for {{$labels.source}}"
+        description: "Destination {{$labels.destination_type}} for source {{$labels.source}} has {{$value | humanizePercentage}} failure rate."
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/DESTINATION_TROUBLESHOOTING.md"
+
+    # Destination Delivery Critical Failures
+    - alert: ZenWatcherDestinationDeliveryCriticalFailures
+      expr: |
+        (
+          sum(rate(zen_watcher_destination_delivery_total{status="failure"}[5m])) by (source, destination_type) /
+          (sum(rate(zen_watcher_destination_delivery_total[5m])) by (source, destination_type) + 0.001)
+        ) > 0.5
+      for: 2m
+      labels:
+        severity: critical
+        component: destination
+        team: sre
+      annotations:
+        summary: "Critical destination delivery failure rate for {{$labels.source}}"
+        description: "Destination {{$labels.destination_type}} for source {{$labels.source}} has {{$value | humanizePercentage}} failure rate."
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/DESTINATION_TROUBLESHOOTING.md"
+
+    # Destination High Latency
+    - alert: ZenWatcherDestinationHighLatency
+      expr: |
+        histogram_quantile(0.95, 
+          sum(rate(zen_watcher_destination_delivery_latency_seconds_bucket[5m])) by (le, source, destination_type)
+        ) > 5
+      for: 5m
+      labels:
+        severity: warning
+        component: destination
+        team: sre
+      annotations:
+        summary: "High destination delivery latency for {{$labels.source}}"
+        description: "Destination {{$labels.destination_type}} for source {{$labels.source}} has p95 latency of {{$value}}s."
+
+    # Destination Queue Depth High
+    - alert: ZenWatcherDestinationQueueDepthHigh
+      expr: |
+        zen_watcher_destination_queue_depth > 1000
+      for: 5m
+      labels:
+        severity: warning
+        component: destination
+        team: sre
+      annotations:
+        summary: "High destination queue depth for {{$labels.source}}"
+        description: "Destination {{$labels.destination_type}} for source {{$labels.source}} has queue depth of {{$value}}."
+
+    # Destination High Retry Rate
+    - alert: ZenWatcherDestinationHighRetryRate
+      expr: |
+        sum(rate(zen_watcher_destination_retries_total[5m])) by (source, destination_type) > 10
+      for: 5m
+      labels:
+        severity: warning
+        component: destination
+        team: sre
+      annotations:
+        summary: "High destination retry rate for {{$labels.source}}"
+        description: "Destination {{$labels.destination_type}} for source {{$labels.source}} has {{$value}} retries/sec."
+
+  # ConfigManager Alerts
+  - name: zen-watcher.configmanager-health
+    interval: 30s
+    rules:
+    # ConfigMap Load Failures
+    - alert: ZenWatcherConfigMapLoadFailures
+      expr: |
+        sum(rate(zen_watcher_configmap_load_total{result="failure"}[5m])) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        component: configmanager
+        team: sre
+      annotations:
+        summary: "ConfigMap {{$labels.configmap}} load failures"
+        description: "ConfigMap {{$labels.configmap}} has {{$value}} load failures/sec."
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/CONFIGMAP_TROUBLESHOOTING.md"
+
+    # ConfigMap Slow Reload
+    - alert: ZenWatcherConfigMapSlowReload
+      expr: |
+        histogram_quantile(0.95, 
+          sum(rate(zen_watcher_configmap_reload_duration_seconds_bucket[10m])) by (le, configmap_name)
+        ) > 10
+      for: 5m
+      labels:
+        severity: warning
+        component: configmanager
+        team: sre
+      annotations:
+        summary: "ConfigMap {{$labels.configmap}} slow reload"
+        description: "ConfigMap {{$labels.configmap}} p95 reload duration is {{$value}}s."
+
+    # ConfigMap Merge Conflicts
+    - alert: ZenWatcherConfigMapMergeConflicts
+      expr: |
+        sum(rate(zen_watcher_configmap_merge_conflicts_total[5m])) > 0
+      for: 1m
+      labels:
+        severity: warning
+        component: configmanager
+        team: sre
+      annotations:
+        summary: "ConfigMap {{$labels.configmap}} merge conflicts"
+        description: "ConfigMap {{$labels.configmap}} has merge conflicts."
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/CONFIGMAP_TROUBLESHOOTING.md"
+
+    # ConfigMap Validation Errors
+    - alert: ZenWatcherConfigMapValidationErrors
+      expr: |
+        sum(rate(zen_watcher_configmap_validation_errors_total[5m])) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        component: configmanager
+        team: sre
+      annotations:
+        summary: "ConfigMap {{$labels.configmap}} validation errors"
+        description: "ConfigMap {{$labels.configmap}} has {{$value}} validation errors/sec. Error type: {{$labels.error_type}}"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/CONFIGMAP_TROUBLESHOOTING.md"
+
+    # Config Update Propagation Slow
+    - alert: ZenWatcherConfigUpdatePropagationSlow
+      expr: |
+        histogram_quantile(0.95, 
+          sum(rate(zen_watcher_config_update_propagation_duration_seconds_bucket[10m])) by (le, component)
+        ) > 30
+      for: 5m
+      labels:
+        severity: warning
+        component: configmanager
+        team: sre
+      annotations:
+        summary: "Config update propagation slow to {{$labels.component}}"
+        description: "Config update propagation to {{$labels.component}} p95 duration is {{$value}}s."
+
+  # Filter Performance Alerts
+  - name: zen-watcher.filter-performance
+    interval: 30s
+    rules:
+    # Filter Rule Evaluation Slow
+    - alert: ZenWatcherFilterRuleEvaluationSlow
+      expr: |
+        histogram_quantile(0.95, 
+          sum(rate(zen_watcher_filter_rule_evaluation_duration_seconds_bucket[5m])) by (le, source)
+        ) > 0.1
+      for: 5m
+      labels:
+        severity: warning
+        component: filter
+        team: sre
+      annotations:
+        summary: "Filter rule evaluation slow for {{$labels.source}}"
+        description: "Filter rule evaluation for source {{$labels.source}} p95 duration is {{$value}}s."
+
+  # Mapping and Normalization Alerts
+  # NOTE: These alerts are commented out until mapping/normalization metrics are fully implemented
+  # Currently, mapping/normalization operations are tracked via FilterDecisions metric as placeholders
+  # TODO: Uncomment when zen_watcher_mapping_transformations_total, zen_watcher_normalization_errors_total,
+  #       zen_watcher_priority_mapping_hits_total, and zen_watcher_normalization_latency_seconds metrics are added
+  # - name: zen-watcher.mapping-normalization
+  #   interval: 30s
+  #   rules:
+  #   # Mapping Transformation Errors
+  #   - alert: ZenWatcherMappingTransformationErrors
+  #     expr: |
+  #       rate(zen_watcher_mapping_transformations_total{status="error"}[5m]) > 0.5
+  #     for: 5m
+  #     labels:
+  #       severity: warning
+  #       component: mapping
+  #       team: sre
+  #     annotations:
+  #       summary: "Mapping transformation errors for {{$labels.source}}"
+  #       description: "Mapping {{$labels.mapping_name}} for source {{$labels.source}} has {{$value}} errors/sec. Field: {{$labels.field_from}} -> {{$labels.field_to}}"
+  #       runbook_url: "https://github.com/kube-zen/zen-watcher/docs/MAPPING_TROUBLESHOOTING.md"
+  #
+  #   # Normalization Errors
+  #   - alert: ZenWatcherNormalizationErrors
+  #     expr: |
+  #       rate(zen_watcher_normalization_errors_total[5m]) > 0.5
+  #     for: 5m
+  #     labels:
+  #       severity: warning
+  #       component: normalization
+  #       team: sre
+  #     annotations:
+  #       summary: "Normalization errors for {{$labels.source}}"
+  #       description: "Source {{$labels.source}} has {{$value}} normalization errors/sec. Error type: {{$labels.error_type}}"
+  #       runbook_url: "https://github.com/kube-zen/zen-watcher/docs/NORMALIZATION_TROUBLESHOOTING.md"
+  #
+  #   # Normalization Slow
+  #   - alert: ZenWatcherNormalizationSlow
+  #     expr: |
+  #       histogram_quantile(0.95, 
+  #         sum(rate(zen_watcher_normalization_latency_seconds_bucket[5m])) by (le, source)
+  #       ) > 1
+  #     for: 5m
+  #     labels:
+  #       severity: warning
+  #       component: normalization
+  #       team: sre
+  #     annotations:
+  #       summary: "Normalization slow for {{$labels.source}}"
+  #       description: "Normalization for source {{$labels.source}} p95 duration is {{$value}}s."
+

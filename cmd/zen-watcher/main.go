@@ -20,8 +20,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kube-zen/zen-watcher/internal/informers"
 	"github.com/kube-zen/zen-watcher/internal/kubernetes"
 	"github.com/kube-zen/zen-watcher/internal/lifecycle"
+	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/balancer"
 	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/kube-zen/zen-watcher/pkg/dispatcher"
@@ -30,6 +32,8 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/optimization"
+	"github.com/kube-zen/zen-watcher/pkg/orchestrator"
+	"github.com/kube-zen/zen-watcher/pkg/processor"
 	"github.com/kube-zen/zen-watcher/pkg/scaling"
 	"github.com/kube-zen/zen-watcher/pkg/server"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
@@ -110,7 +114,7 @@ func main() {
 			})
 		filterConfig = &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	}
-	filterInstance := filter.NewFilter(filterConfig)
+	filterInstance := filter.NewFilterWithMetrics(filterConfig, m)
 
 	// Create ConfigMap loader for dynamic reloading
 	configMapLoader := config.NewConfigMapLoader(clients.Standard, filterInstance)
@@ -120,7 +124,7 @@ func main() {
 	if configNamespace == "" {
 		configNamespace = "zen-system"
 	}
-	configManager := config.NewConfigManager(clients.Standard, configNamespace)
+	configManager := config.NewConfigManagerWithMetrics(clients.Standard, configNamespace, m)
 
 	// Ingester CRD is now the single source of configuration
 	// Filter and dedup configuration is part of Ingester CRD spec.processing
@@ -155,6 +159,30 @@ func main() {
 	if systemMetrics != nil {
 		observationCreator.SetSystemMetrics(systemMetrics)
 	}
+
+	// Set destination metrics for tracking delivery
+	observationCreator.SetDestinationMetrics(m)
+
+	// Create processor for GenericOrchestrator (uses same filter, deduper, and observationCreator)
+	deduper := observationCreator.GetDeduper()
+	proc := processor.NewProcessorWithMetrics(filterInstance, deduper, observationCreator, m)
+
+	// Create informer manager for generic adapters
+	informerManager := informers.NewManager(informers.Config{
+		DynamicClient: clients.Dynamic,
+		DefaultResync: 0, // Watch-only, no periodic resync
+	})
+
+	// Create generic adapter factory
+	genericAdapterFactory := generic.NewFactory(informerManager, clients.Standard)
+
+	// Create GenericOrchestrator with metrics for dynamic Ingester CRD-based adapter management
+	genericOrchestrator := orchestrator.NewGenericOrchestratorWithMetrics(
+		genericAdapterFactory,
+		clients.Dynamic,
+		proc,
+		m,
+	)
 
 	// Create webhook channels for Falco and Audit webhooks
 	// Note: Other webhook sources can be configured via Ingester CRDs
@@ -261,6 +289,20 @@ func main() {
 				logger.Fields{
 					Component: "main",
 					Operation: "ingester_informer",
+					Error:     err,
+				})
+		}
+	}()
+
+	// Start GenericOrchestrator for dynamic Ingester CRD-based adapter management
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := genericOrchestrator.Start(ctx); err != nil {
+			log.Error("GenericOrchestrator stopped",
+				logger.Fields{
+					Component: "main",
+					Operation: "generic_orchestrator",
 					Error:     err,
 				})
 		}

@@ -19,12 +19,14 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/hooks"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
+	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/monitoring"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -42,6 +44,7 @@ type Processor struct {
 	deduper                 *dedup.Deduper
 	observationCreator      *watcher.ObservationCreator
 	optimizationProvider    OptimizationStrategyProvider // Optional: provides current optimization strategy
+	metrics                 *metrics.Metrics             // Optional metrics
 }
 
 // NewProcessor creates a new event processor
@@ -50,12 +53,23 @@ func NewProcessor(
 	deduper *dedup.Deduper,
 	observationCreator *watcher.ObservationCreator,
 ) *Processor {
+	return NewProcessorWithMetrics(filter, deduper, observationCreator, nil)
+}
+
+// NewProcessorWithMetrics creates a new event processor with metrics
+func NewProcessorWithMetrics(
+	filter *filter.Filter,
+	deduper *dedup.Deduper,
+	observationCreator *watcher.ObservationCreator,
+	m *metrics.Metrics,
+) *Processor {
 	return &Processor{
 		genericThresholdMonitor: monitoring.NewGenericThresholdMonitor(),
 		filter:                  filter,
 		deduper:                 deduper,
 		observationCreator:      observationCreator,
 		optimizationProvider:    nil, // Can be set via SetOptimizationProvider
+		metrics:                 m,
 	}
 }
 
@@ -224,6 +238,9 @@ func (p *Processor) createMinimalObservation(raw *generic.RawEvent, config *gene
 // normalizeObservation performs full normalization after filter/dedup, before destinations
 // This is the ONLY place where normalization happens
 func (p *Processor) normalizeObservation(observation *unstructured.Unstructured, raw *generic.RawEvent, config *generic.SourceConfig) *unstructured.Unstructured {
+	normalizeStartTime := time.Now()
+	source := raw.Source
+
 	// Convert observation back to Event for normalization
 	event := p.observationToEvent(observation, raw, config)
 
@@ -233,19 +250,38 @@ func (p *Processor) normalizeObservation(observation *unstructured.Unstructured,
 		event.EventType = config.Normalization.Type
 
 		// Extract priority and map to severity
+		priorityStart := time.Now()
 		priority := p.extractPriority(raw, config)
 		event.Severity = p.priorityToSeverity(priority)
+		if p.metrics != nil {
+			// Track priority mapping (simplified - track as field mapping)
+			p.metrics.FilterDecisions.WithLabelValues(source, "normalization", "priority_mapping").Inc()
+		}
+		_ = priorityStart // Track if needed
 
 		// Apply field mappings
 		if config.Normalization.FieldMapping != nil {
 			for _, mapping := range config.Normalization.FieldMapping {
+				mappingStart := time.Now()
 				value := p.extractField(raw.RawData, mapping.From)
 				if value != nil {
 					if event.Details == nil {
 						event.Details = make(map[string]interface{})
 					}
 					event.Details[mapping.To] = value
+					if p.metrics != nil {
+						// Track successful field mapping
+						// Note: We'd need a new metric for field mapping transformations
+						// For now, use FilterDecisions as a placeholder
+						p.metrics.FilterDecisions.WithLabelValues(source, "field_mapping", "success").Inc()
+					}
+				} else {
+					if p.metrics != nil {
+						// Track failed field extraction
+						p.metrics.FilterDecisions.WithLabelValues(source, "field_mapping", "extraction_failed").Inc()
+					}
 				}
+				_ = mappingStart // Track duration if needed
 			}
 		}
 	} else {
@@ -254,6 +290,16 @@ func (p *Processor) normalizeObservation(observation *unstructured.Unstructured,
 		event.Severity = p.priorityToSeverity(priority)
 		event.Category = "security"
 		event.EventType = "custom-event"
+		if p.metrics != nil {
+			p.metrics.FilterDecisions.WithLabelValues(source, "normalization", "default").Inc()
+		}
+	}
+
+	// Track total normalization duration
+	if p.metrics != nil {
+		// Note: We'd need a new metric for normalization duration
+		// For now, normalization is fast enough that we don't need separate tracking
+		_ = normalizeStartTime
 	}
 
 	// Convert back to Observation

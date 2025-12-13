@@ -27,6 +27,7 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
+	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/optimization"
 	"github.com/prometheus/client_golang/prometheus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -65,6 +66,8 @@ type ObservationCreator struct {
 	}
 	// Field extractor for optimized field access (Phase 2 optimization)
 	fieldExtractor *FieldExtractor
+	// Metrics for destination delivery tracking
+	destinationMetrics *metrics.Metrics
 }
 
 // OptimizationMetrics holds optimization-related metrics
@@ -195,6 +198,11 @@ func (oc *ObservationCreator) SetSourceConfigLoader(loader interface {
 // GetSmartProcessor returns the SmartProcessor instance (for integration with optimizer)
 func (oc *ObservationCreator) GetSmartProcessor() *optimization.SmartProcessor {
 	return oc.smartProcessor
+}
+
+// SetDestinationMetrics sets destination metrics for tracking delivery
+func (oc *ObservationCreator) SetDestinationMetrics(m *metrics.Metrics) {
+	oc.destinationMetrics = m
 }
 
 // CreateObservation creates an Observation CRD and increments metrics
@@ -349,7 +357,10 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 
 	// STEP 1: CREATE OBSERVATION CRD FIRST (before metrics)
 	// Create the Observation (first event always creates)
+	deliveryStartTime := time.Now()
 	createdObservation, err := oc.dynClient.Resource(oc.eventGVR).Namespace(namespace).Create(ctx, observation, metav1.CreateOptions{})
+	deliveryDuration := time.Since(deliveryStartTime)
+
 	if err != nil {
 		// Track creation errors
 		if oc.observationsCreateErrors != nil {
@@ -365,7 +376,18 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 			}
 			oc.observationsCreateErrors.WithLabelValues(source, errorType).Inc()
 		}
+		// Track destination delivery failure
+		if oc.destinationMetrics != nil {
+			oc.destinationMetrics.DestinationDeliveryTotal.WithLabelValues(source, "crd", "failure").Inc()
+			oc.destinationMetrics.DestinationDeliveryLatency.WithLabelValues(source, "crd").Observe(deliveryDuration.Seconds())
+		}
 		return fmt.Errorf("failed to create Observation: %w", err)
+	}
+
+	// Track successful destination delivery
+	if oc.destinationMetrics != nil {
+		oc.destinationMetrics.DestinationDeliveryTotal.WithLabelValues(source, "crd", "success").Inc()
+		oc.destinationMetrics.DestinationDeliveryLatency.WithLabelValues(source, "crd").Observe(deliveryDuration.Seconds())
 	}
 
 	// STEP 2: UPDATE METRICS ONLY AFTER SUCCESSFUL CREATION
@@ -392,7 +414,7 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 			category = "unknown"
 		}
 		if severity == "" {
-			severity = "UNKNOWN"
+			severity = "info"
 		}
 		if eventType == "" {
 			eventType = "unknown"
@@ -421,7 +443,15 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 			resourceKind = "Unknown"
 		}
 
-		oc.eventsTotal.WithLabelValues(source, category, severity, eventType, resourceNamespace, resourceKind).Inc()
+		// Get processing strategy for this source (default to filter_first)
+		strategy := "filter_first"
+		oc.orderMu.RLock()
+		if order, exists := oc.currentOrder[source]; exists {
+			strategy = string(order)
+		}
+		oc.orderMu.RUnlock()
+
+		oc.eventsTotal.WithLabelValues(source, category, severity, eventType, resourceNamespace, resourceKind, strategy).Inc()
 		logger.Debug("Metric incremented after observation creation",
 			logger.Fields{
 				Component: "watcher",
@@ -719,7 +749,8 @@ func (oc *ObservationCreator) recordEventCreated(source, severity string) {
 	oc.optimizationMetrics.sourceCounters[source].totalCount++
 
 	// Track low severity
-	if strings.ToUpper(severity) == "LOW" || strings.ToUpper(severity) == "INFO" {
+	severityLower := strings.ToLower(severity)
+	if severityLower == "low" || severityLower == "info" {
 		oc.optimizationMetrics.sourceCounters[source].lowSeverity++
 	}
 

@@ -49,8 +49,9 @@ spec:
                   format: date-time
                   description: "When this observation was detected (required)"
                 expiresAt:
-                  type: ["string", "null"]
+                  type: string
                   format: date-time
+                  nullable: true
                   description: "When this observation expires (null = never expires, uses TTL instead)"
                 resources:
                   type: array
@@ -77,8 +78,9 @@ spec:
                   type: string
                   description: "Adapter that processed this observation"
                 processedAt:
-                  type: ["string", "null"]
+                  type: string
                   format: date-time
+                  nullable: true
                   description: "When this observation was processed (null = not yet processed)"
               x-kubernetes-preserve-unknown-fields: true
             status:
@@ -91,14 +93,6 @@ spec:
                   type: string
                   format: date-time
                   description: "Timestamp when observation was last processed"
-            metadata:
-              type: object
-              properties:
-                labels:
-                  type: object
-                  additionalProperties:
-                    type: string
-                  description: "Standard labels: zen.io/source, zen.io/type, zen.io/priority"
       subresources:
         status: {}
       additionalPrinterColumns:
@@ -110,7 +104,7 @@ spec:
           jsonPath: .spec.type
         - name: Priority
           type: number
-          format: "0.00"
+          format: float
           jsonPath: .spec.priority
         - name: Title
           type: string
