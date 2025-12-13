@@ -23,8 +23,9 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/dynamic"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 )
@@ -82,10 +83,23 @@ func TestPipelineOrder_FilterFirst(t *testing.T) {
 
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
-	deduper := dedup.NewDeduper(dedup.Config{DefaultWindow: 60 * time.Second, MaxSize: 10000})
+	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 
-	observationGVR := watcher.GetObservationGVR()
-	creator := watcher.NewObservationCreator(dynamicClient, observationGVR, f, deduper, nil, nil, nil, nil)
+	observationGVR := schema.GroupVersionResource{
+		Group:    "zen.kube-zen.io",
+		Version:  "v1",
+		Resource: "observations",
+	}
+	creator := watcher.NewObservationCreator(
+		dynamicClient,
+		observationGVR,
+		nil, // eventsTotal
+		nil, // observationsCreated
+		nil, // observationsFiltered
+		nil, // observationsDeduped
+		nil, // observationsCreateErrors
+		f,   // filter
+	)
 
 	proc := NewProcessor(f, deduper, creator)
 	proc.SetOptimizationProvider(&mockOptimizationProvider{strategy: "filter_first"})
@@ -123,7 +137,7 @@ func TestPipelineOrder_FilterFirst(t *testing.T) {
 
 	// Verify observation was created with normalized fields
 	// This proves normalization happened after filter/dedup
-	list, err := dynamicClient.Resource(observationGVR).Namespace("default").List(ctx, nil)
+	list, err := dynamicClient.Resource(observationGVR).Namespace("default").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list observations: %v", err)
 	}
@@ -159,10 +173,23 @@ func TestPipelineOrder_DedupFirst(t *testing.T) {
 
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
-	deduper := dedup.NewDeduper(dedup.Config{DefaultWindow: 60 * time.Second, MaxSize: 10000})
+	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 
-	observationGVR := watcher.GetObservationGVR()
-	creator := watcher.NewObservationCreator(dynamicClient, observationGVR, f, deduper, nil, nil, nil, nil)
+	observationGVR := schema.GroupVersionResource{
+		Group:    "zen.kube-zen.io",
+		Version:  "v1",
+		Resource: "observations",
+	}
+	creator := watcher.NewObservationCreator(
+		dynamicClient,
+		observationGVR,
+		nil, // eventsTotal
+		nil, // observationsCreated
+		nil, // observationsFiltered
+		nil, // observationsDeduped
+		nil, // observationsCreateErrors
+		f,   // filter
+	)
 
 	proc := NewProcessor(f, deduper, creator)
 	proc.SetOptimizationProvider(&mockOptimizationProvider{strategy: "dedup_first"})
@@ -199,7 +226,7 @@ func TestPipelineOrder_DedupFirst(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Verify observation was created with normalized fields
-	list, err := dynamicClient.Resource(observationGVR).Namespace("default").List(ctx, nil)
+	list, err := dynamicClient.Resource(observationGVR).Namespace("default").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list observations: %v", err)
 	}
@@ -230,10 +257,23 @@ func TestPipelineOrder_NormalizationAfterFilterDedup(t *testing.T) {
 
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
-	deduper := dedup.NewDeduper(dedup.Config{DefaultWindow: 60 * time.Second, MaxSize: 10000})
+	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 
-	observationGVR := watcher.GetObservationGVR()
-	creator := watcher.NewObservationCreator(dynamicClient, observationGVR, f, deduper, nil, nil, nil, nil)
+	observationGVR := schema.GroupVersionResource{
+		Group:    "zen.kube-zen.io",
+		Version:  "v1",
+		Resource: "observations",
+	}
+	creator := watcher.NewObservationCreator(
+		dynamicClient,
+		observationGVR,
+		nil, // eventsTotal
+		nil, // observationsCreated
+		nil, // observationsFiltered
+		nil, // observationsDeduped
+		nil, // observationsCreateErrors
+		f,   // filter
+	)
 
 	proc := NewProcessor(f, deduper, creator)
 
@@ -267,7 +307,7 @@ func TestPipelineOrder_NormalizationAfterFilterDedup(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Verify observation was created with normalized fields
-	list, err := dynamicClient.Resource(observationGVR).Namespace("default").List(ctx, nil)
+	list, err := dynamicClient.Resource(observationGVR).Namespace("default").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list observations: %v", err)
 	}
@@ -304,10 +344,23 @@ func TestObservationCreator_NoFilterDedupReRun(t *testing.T) {
 	// Create filter and deduper with call tracking
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
-	deduper := dedup.NewDeduper(dedup.Config{DefaultWindow: 60 * time.Second, MaxSize: 10000})
+	_ = dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000 (unused in this test)
 
-	observationGVR := watcher.GetObservationGVR()
-	creator := watcher.NewObservationCreator(dynamicClient, observationGVR, f, deduper, nil, nil, nil, nil)
+	observationGVR := schema.GroupVersionResource{
+		Group:    "zen.kube-zen.io",
+		Version:  "v1",
+		Resource: "observations",
+	}
+	creator := watcher.NewObservationCreator(
+		dynamicClient,
+		observationGVR,
+		nil, // eventsTotal
+		nil, // observationsCreated
+		nil, // observationsFiltered
+		nil, // observationsDeduped
+		nil, // observationsCreateErrors
+		f,   // filter
+	)
 
 	// Create a pre-processed observation (simulating what Processor passes to CreateObservation)
 	event := &watcher.Event{
@@ -330,7 +383,7 @@ func TestObservationCreator_NoFilterDedupReRun(t *testing.T) {
 
 	// Verify observation was created
 	time.Sleep(100 * time.Millisecond)
-	list, err := dynamicClient.Resource(observationGVR).Namespace("default").List(ctx, nil)
+	list, err := dynamicClient.Resource(observationGVR).Namespace("default").List(ctx, metav1.ListOptions{})
 	if err != nil {
 		t.Fatalf("Failed to list observations: %v", err)
 	}

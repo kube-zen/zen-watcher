@@ -358,7 +358,7 @@ func (ii *IngesterInformer) onAdd(obj interface{}) {
 		return
 	}
 
-	config := ii.convertToIngesterConfig(u)
+	config := ii.ConvertToIngesterConfig(u)
 	if config != nil {
 		ii.store.AddOrUpdate(config)
 		logger.Debug("Added Ingester config",
@@ -387,7 +387,7 @@ func (ii *IngesterInformer) onUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
-	config := ii.convertToIngesterConfig(u)
+	config := ii.ConvertToIngesterConfig(u)
 	if config != nil {
 		ii.store.AddOrUpdate(config)
 		logger.Debug("Updated Ingester config",
@@ -438,8 +438,8 @@ func (ii *IngesterInformer) onDelete(obj interface{}) {
 		})
 }
 
-// convertToIngesterConfig converts an unstructured Ingester CRD to IngesterConfig
-func (ii *IngesterInformer) convertToIngesterConfig(u *unstructured.Unstructured) *IngesterConfig {
+// ConvertToIngesterConfig converts an unstructured Ingester CRD to IngesterConfig
+func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured) *IngesterConfig {
 	spec, ok := u.Object["spec"].(map[string]interface{})
 	if !ok {
 		logger.Warn("Ingester CRD missing spec",

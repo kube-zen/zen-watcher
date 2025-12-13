@@ -23,7 +23,6 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
@@ -43,7 +42,17 @@ func setupBenchmarkProcessor() (*Processor, dynamic.Interface) {
 		Version:  "v1",
 		Resource: "observations",
 	}
-	creator := watcher.NewObservationCreator(dynamicClient, observationGVR, f, deduper, nil, nil, nil, nil)
+	// Create observation creator with nil metrics for benchmarking
+	creator := watcher.NewObservationCreator(
+		dynamicClient,
+		observationGVR,
+		nil, // eventsTotal
+		nil, // observationsCreated
+		nil, // observationsFiltered
+		nil, // observationsDeduped
+		nil, // observationsCreateErrors
+		f,   // filter
+	)
 
 	proc := NewProcessor(f, deduper, creator)
 	return proc, dynamicClient

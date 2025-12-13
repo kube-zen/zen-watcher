@@ -188,6 +188,48 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 		namespace = "default"
 	}
 
+	// Apply global namespace filtering first (if enabled)
+	if config.GlobalNamespaceFilter != nil && config.GlobalNamespaceFilter.Enabled {
+		globalFilter := config.GlobalNamespaceFilter
+		// Check excluded namespaces
+		if len(globalFilter.ExcludedNamespaces) > 0 {
+			for _, excluded := range globalFilter.ExcludedNamespaces {
+				if strings.EqualFold(namespace, excluded) {
+					logger.Debug("Namespace excluded by global filter",
+						logger.Fields{
+							Component: "filter",
+							Operation: "filter_check",
+							Source:    source,
+							Namespace: namespace,
+							Reason:    "global_exclude_namespace",
+						})
+					return false, "global_exclude_namespace"
+				}
+			}
+		}
+		// Check included namespaces (if set, only these are allowed)
+		if len(globalFilter.IncludedNamespaces) > 0 {
+			allowed := false
+			for _, included := range globalFilter.IncludedNamespaces {
+				if strings.EqualFold(namespace, included) {
+					allowed = true
+					break
+				}
+			}
+			if !allowed {
+				logger.Debug("Namespace not in global include list",
+					logger.Fields{
+						Component: "filter",
+						Operation: "filter_check",
+						Source:    source,
+						Namespace: namespace,
+						Reason:    "global_include_namespace",
+					})
+				return false, "global_include_namespace"
+			}
+		}
+	}
+
 	// Extract kind from resource
 	kind := ""
 	if resourceVal != nil {

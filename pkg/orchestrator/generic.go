@@ -134,7 +134,7 @@ func (o *GenericOrchestrator) reloadAdapters() {
 		// Create IngesterInformer instance to access conversion method
 		store := config.NewIngesterStore()
 		ii := config.NewIngesterInformer(store, o.dynClient)
-		ingesterConfig := ii.convertToIngesterConfig(&item)
+		ingesterConfig := ii.ConvertToIngesterConfig(&item)
 		if ingesterConfig == nil {
 			logger.Warn("Failed to convert Ingester CRD",
 				logger.Fields{

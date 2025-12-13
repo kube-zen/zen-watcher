@@ -136,9 +136,9 @@ func TestStrategyDecider_DetermineStrategy_ConfigOverride(t *testing.T) {
 		LowSeverityPercent: 0.8, // Would normally trigger filter_first
 	}
 
-	sourceConfig := &config.SourceConfig{
+	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
-		Processing: config.ProcessingConfig{
+		Processing: &generic.ProcessingConfig{
 			Order: "dedup_first", // Explicit override
 		},
 	}
@@ -158,15 +158,16 @@ func TestStrategyDecider_ShouldOptimize_ThresholdsExceeded(t *testing.T) {
 		LowSeverityPercent:    0.8,
 	}
 
-	sourceConfig := &config.SourceConfig{
+	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
-		Processing: config.ProcessingConfig{
+		Processing: &generic.ProcessingConfig{
 			AutoOptimize: true,
-			Thresholds: map[string]config.Threshold{
-				"observationsPerMinute": {
-					Warning:  100,
-					Critical: 200,
-				},
+		},
+		// Note: Thresholds are now in generic.ThresholdsConfig, not ProcessingConfig
+		Thresholds: &generic.ThresholdsConfig{
+			ObservationsPerMinute: &generic.ThresholdValues{
+				Warning:  100,
+				Critical: 200,
 			},
 		},
 	}
@@ -185,9 +186,9 @@ func TestStrategyDecider_ShouldOptimize_AutoOptimizeDisabled(t *testing.T) {
 		ObservationsPerMinute: 150,
 	}
 
-	sourceConfig := &config.SourceConfig{
+	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
-		Processing: config.ProcessingConfig{
+		Processing: &generic.ProcessingConfig{
 			AutoOptimize: false, // Disabled
 		},
 	}

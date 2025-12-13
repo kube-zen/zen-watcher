@@ -194,7 +194,7 @@ func main() {
 
 	// Register config change handler
 	configManager.OnConfigChange(func(newConfig map[string]interface{}) {
-		handleConfigChange(newConfig, workerPool, adapterLauncher, filterInstance, log)
+		handleConfigChange(newConfig, workerPool, adapterLauncher, filterInstance, *log)
 	})
 
 	// Start ConfigManager
@@ -213,7 +213,7 @@ func main() {
 
 	// Apply initial configuration
 	initialConfig := configManager.GetConfigWithDefaults()
-	handleConfigChange(initialConfig, workerPool, adapterLauncher, log)
+	handleConfigChange(initialConfig, workerPool, adapterLauncher, filterInstance, *log)
 
 	// Start HTTP server
 	httpServer.Start(ctx, &wg)
@@ -639,8 +639,8 @@ func handleConfigChange(
 					Operation: "config_update",
 					Additional: map[string]interface{}{
 						"enabled":             enabled,
-						"included_namespaces":  globalFilter.IncludedNamespaces,
-						"excluded_namespaces":  globalFilter.ExcludedNamespaces,
+						"included_namespaces": globalFilter.IncludedNamespaces,
+						"excluded_namespaces": globalFilter.ExcludedNamespaces,
 					},
 				})
 		} else {

@@ -25,10 +25,7 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/processor"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
 )
 
 // TestPipelineIntegration_FullFlow_FilterFirst tests complete pipeline with filter_first strategy
@@ -47,13 +44,22 @@ func TestPipelineIntegration_FullFlow_FilterFirst(t *testing.T) {
 	filterConfig := &filter.FilterConfig{
 		Sources: map[string]filter.SourceFilter{
 			"test-source": {
-				MinPriority: 0.7, // Only HIGH (0.8) and above
+				MinSeverity: "HIGH", // Only HIGH and above
 			},
 		},
 	}
 	f := filter.NewFilter(filterConfig)
-	deduper := dedup.NewDeduper(dedup.Config{DefaultWindow: 60 * time.Second, MaxSize: 10000})
-	creator := watcher.NewObservationCreator(dynamicClient, observationGVR, f, deduper, nil, nil, nil, nil)
+	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+	creator := watcher.NewObservationCreator(
+		dynamicClient,
+		observationGVR,
+		nil, // eventsTotal
+		nil, // observationsCreated
+		nil, // observationsFiltered
+		nil, // observationsDeduped
+		nil, // observationsCreateErrors
+		f,   // filter
+	)
 	proc = processor.NewProcessor(f, deduper, creator)
 
 	// Test 1: HIGH severity event should pass filter and create observation
@@ -137,10 +143,19 @@ func TestPipelineIntegration_FullFlow_DedupFirst(t *testing.T) {
 		Resource: "observations",
 	}
 
-	deduper := dedup.NewDeduper(dedup.Config{DefaultWindow: 60 * time.Second, MaxSize: 10000})
+	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
-	creator := watcher.NewObservationCreator(dynamicClient, observationGVR, f, deduper, nil, nil, nil, nil)
+	creator := watcher.NewObservationCreator(
+		dynamicClient,
+		observationGVR,
+		nil, // eventsTotal
+		nil, // observationsCreated
+		nil, // observationsFiltered
+		nil, // observationsDeduped
+		nil, // observationsCreateErrors
+		f,   // filter
+	)
 	proc = processor.NewProcessor(f, deduper, creator)
 
 	sourceConfig := &generic.SourceConfig{
@@ -219,19 +234,28 @@ func TestPipelineIntegration_FullFlow_FilterAndDedup(t *testing.T) {
 	filterConfig := &filter.FilterConfig{
 		Sources: map[string]filter.SourceFilter{
 			"test-source": {
-				MinPriority: 0.7, // Only HIGH (0.8) and above
+				MinSeverity: "HIGH", // Only HIGH and above
 			},
 		},
 	}
 	f := filter.NewFilter(filterConfig)
-	deduper := dedup.NewDeduper(dedup.Config{DefaultWindow: 60 * time.Second, MaxSize: 10000})
+	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 
 	observationGVR := schema.GroupVersionResource{
 		Group:    "zen.kube-zen.io",
 		Version:  "v1",
 		Resource: "observations",
 	}
-	creator := watcher.NewObservationCreator(dynamicClient, observationGVR, f, deduper, nil, nil, nil, nil)
+	creator := watcher.NewObservationCreator(
+		dynamicClient,
+		observationGVR,
+		nil, // eventsTotal
+		nil, // observationsCreated
+		nil, // observationsFiltered
+		nil, // observationsDeduped
+		nil, // observationsCreateErrors
+		f,   // filter
+	)
 	proc := processor.NewProcessor(f, deduper, creator)
 
 	ctx := context.Background()

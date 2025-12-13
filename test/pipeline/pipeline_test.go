@@ -55,10 +55,7 @@ func setupPipeline(t *testing.T, dynamicClient dynamic.Interface) *processor.Pro
 	f := filter.NewFilter(filterConfig)
 
 	// Create deduper
-	deduper := dedup.NewDeduper(dedup.Config{
-		DefaultWindow: 60 * time.Second,
-		MaxSize:       10000,
-	})
+	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 
 	// Create observation creator
 	creator := watcher.NewObservationCreator(
@@ -101,7 +98,7 @@ func TestPipeline_NormalPath(t *testing.T) {
 	// Create source config
 	sourceConfig := &generic.SourceConfig{
 		Source: "trivy",
-		Normalization: generic.NormalizationConfig{
+		Normalization: &generic.NormalizationConfig{
 			Domain: "security",
 			Type:   "vulnerability",
 			Priority: map[string]float64{
@@ -158,7 +155,7 @@ func TestPipeline_InvalidSourceConfigRejected(t *testing.T) {
 	// Create a raw event with invalid source config (missing normalization)
 	rawEvent := &generic.RawEvent{
 		Source: "invalid-source",
-		Data: map[string]interface{}{
+		RawData: map[string]interface{}{
 			"message": "test",
 		},
 		Timestamp: time.Now(),

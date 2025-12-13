@@ -49,7 +49,7 @@ func TestConvertToIngesterConfig_ProcessingFilter(t *testing.T) {
 	}
 
 	ii := &IngesterInformer{}
-	config := ii.convertToIngesterConfig(u)
+	config := ii.ConvertToIngesterConfig(u)
 
 	if config == nil {
 		t.Fatal("Expected non-nil config")
@@ -106,7 +106,7 @@ func TestConvertToIngesterConfig_ProcessingFilterOnly(t *testing.T) {
 	}
 
 	ii := &IngesterInformer{}
-	config := ii.convertToIngesterConfig(u)
+	config := ii.ConvertToIngesterConfig(u)
 
 	if config == nil {
 		t.Fatal("Expected non-nil config")
@@ -142,7 +142,7 @@ func TestConvertToIngesterConfig_ProcessingFilterCanonical(t *testing.T) {
 	}
 
 	ii := &IngesterInformer{}
-	config := ii.convertToIngesterConfig(u)
+	config := ii.ConvertToIngesterConfig(u)
 
 	if config == nil {
 		t.Fatal("Expected non-nil config")
@@ -257,7 +257,7 @@ func TestConvertToIngesterConfig_RequiredFieldsValidation(t *testing.T) {
 			}
 
 			ii := &IngesterInformer{}
-			config := ii.convertToIngesterConfig(u)
+			config := ii.ConvertToIngesterConfig(u)
 
 			if tt.shouldReject {
 				if config != nil {

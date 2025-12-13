@@ -61,7 +61,7 @@ func FuzzLoadIngesterConfig(f *testing.F) {
 
 		// Try to convert - should not panic
 		// Errors are OK, but panics are not
-		_ = informer.convertToIngesterConfig(unstructuredObj)
+		_ = informer.ConvertToIngesterConfig(unstructuredObj)
 		// We don't check for nil - fuzzing is about finding panics
 	})
 }
@@ -92,6 +92,6 @@ func FuzzLoadIngesterConfig_MalformedYAML(f *testing.F) {
 		}
 
 		// Try to convert - should not panic even with malformed data
-		_ = informer.convertToIngesterConfig(unstructuredObj)
+		_ = informer.ConvertToIngesterConfig(unstructuredObj)
 	})
 }

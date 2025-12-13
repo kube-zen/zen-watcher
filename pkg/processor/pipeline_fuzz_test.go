@@ -22,11 +22,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 )
@@ -55,15 +57,28 @@ func FuzzProcessEvent(f *testing.F) {
 		dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
 		filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 		f := filter.NewFilter(filterConfig)
-		deduper := dedup.NewDeduper(dedup.Config{DefaultWindow: 60, MaxSize: 10000})
-		observationGVR := watcher.GetObservationGVR()
-		creator := watcher.NewObservationCreator(dynamicClient, observationGVR, f, deduper, nil, nil, nil, nil)
+		deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+		observationGVR := schema.GroupVersionResource{
+			Group:    "zen.kube-zen.io",
+			Version:  "v1",
+			Resource: "observations",
+		}
+		creator := watcher.NewObservationCreator(
+			dynamicClient,
+			observationGVR,
+			nil, // eventsTotal
+			nil, // observationsCreated
+			nil, // observationsFiltered
+			nil, // observationsDeduped
+			nil, // observationsCreateErrors
+			f,   // filter
+		)
 		proc := NewProcessor(f, deduper, creator)
 
 		// Create raw event
 		rawEvent := &generic.RawEvent{
 			Source:    "fuzz-source",
-			Timestamp: nil, // May be nil, that's OK
+			Timestamp: time.Now(), // Use current time
 			RawData:   eventData,
 		}
 
@@ -108,9 +123,22 @@ func FuzzProcessEvent_ExtremeSizes(f *testing.F) {
 		dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
 		filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 		filter := filter.NewFilter(filterConfig)
-		deduper := dedup.NewDeduper(dedup.Config{DefaultWindow: 60, MaxSize: 10000})
-		observationGVR := watcher.GetObservationGVR()
-		creator := watcher.NewObservationCreator(dynamicClient, observationGVR, filter, deduper, nil, nil, nil, nil)
+		deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+		observationGVR := schema.GroupVersionResource{
+			Group:    "zen.kube-zen.io",
+			Version:  "v1",
+			Resource: "observations",
+		}
+		creator := watcher.NewObservationCreator(
+			dynamicClient,
+			observationGVR,
+			nil,    // eventsTotal
+			nil,    // observationsCreated
+			nil,    // observationsFiltered
+			nil,    // observationsDeduped
+			nil,    // observationsCreateErrors
+			filter, // filter
+		)
 		proc := NewProcessor(filter, deduper, creator)
 
 		rawEvent := &generic.RawEvent{
@@ -151,9 +179,22 @@ func FuzzProcessEvent_HighCardinalityLabels(f *testing.F) {
 		dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
 		filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 		filter := filter.NewFilter(filterConfig)
-		deduper := dedup.NewDeduper(dedup.Config{DefaultWindow: 60, MaxSize: 10000})
-		observationGVR := watcher.GetObservationGVR()
-		creator := watcher.NewObservationCreator(dynamicClient, observationGVR, filter, deduper, nil, nil, nil, nil)
+		deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+		observationGVR := schema.GroupVersionResource{
+			Group:    "zen.kube-zen.io",
+			Version:  "v1",
+			Resource: "observations",
+		}
+		creator := watcher.NewObservationCreator(
+			dynamicClient,
+			observationGVR,
+			nil,    // eventsTotal
+			nil,    // observationsCreated
+			nil,    // observationsFiltered
+			nil,    // observationsDeduped
+			nil,    // observationsCreateErrors
+			filter, // filter
+		)
 		proc := NewProcessor(filter, deduper, creator)
 
 		rawEvent := &generic.RawEvent{
