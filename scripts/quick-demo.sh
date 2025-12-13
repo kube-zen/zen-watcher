@@ -262,9 +262,55 @@ if [ "$SKIP_MONITORING" != true ]; then
         log_warn "Grafana may not be ready yet, continuing anyway..."
     fi
     
+    # Check if port is available and find alternative if needed
+    if command_exists "check_port" 2>/dev/null || type check_port >/dev/null 2>&1; then
+        # Use the check_port function from cluster/utils.sh if available
+        if ! check_port ${GRAFANA_PORT} "Grafana"; then
+            log_warn "Port ${GRAFANA_PORT} is already in use, finding alternative..."
+            if command_exists "find_available_port" 2>/dev/null || type find_available_port >/dev/null 2>&1; then
+                GRAFANA_PORT=$(find_available_port ${GRAFANA_PORT} "Grafana")
+                log_info "Using port ${GRAFANA_PORT} instead"
+            else
+                # Fallback: try ports 8080-8099
+                for port in $(seq ${GRAFANA_PORT} 8099); do
+                    if check_port $port "Grafana"; then
+                        GRAFANA_PORT=$port
+                        log_info "Using port ${GRAFANA_PORT} instead"
+                        break
+                    fi
+                done
+            fi
+        fi
+    else
+        # Fallback port checking using lsof/ss
+        if command -v lsof >/dev/null 2>&1; then
+            if lsof -Pi :${GRAFANA_PORT} -sTCP:LISTEN -t >/dev/null 2>&1; then
+                log_warn "Port ${GRAFANA_PORT} is already in use, finding alternative..."
+                for port in $(seq ${GRAFANA_PORT} 8099); do
+                    if ! lsof -Pi :${port} -sTCP:LISTEN -t >/dev/null 2>&1; then
+                        GRAFANA_PORT=$port
+                        log_info "Using port ${GRAFANA_PORT} instead"
+                        break
+                    fi
+                done
+            fi
+        elif command -v ss >/dev/null 2>&1; then
+            if ss -tlnp 2>/dev/null | grep -qE ":${GRAFANA_PORT}[[:space:]]|:${GRAFANA_PORT}$"; then
+                log_warn "Port ${GRAFANA_PORT} is already in use, finding alternative..."
+                for port in $(seq ${GRAFANA_PORT} 8099); do
+                    if ! ss -tlnp 2>/dev/null | grep -qE ":${port}[[:space:]]|:${port}$"; then
+                        GRAFANA_PORT=$port
+                        log_info "Using port ${GRAFANA_PORT} instead"
+                        break
+                    fi
+                done
+            fi
+        fi
+    fi
+    
     # Set up port-forward in background
     log_info "Setting up port-forward on port ${GRAFANA_PORT}..."
-    # Kill any existing port-forward on this port
+    # Kill any existing port-forward on this port (in case it's a stale process)
     lsof -ti:${GRAFANA_PORT} 2>/dev/null | xargs kill -9 2>/dev/null || true
     sleep 1
     
