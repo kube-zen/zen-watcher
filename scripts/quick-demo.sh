@@ -262,6 +262,35 @@ if [ "$SKIP_MONITORING" != true ]; then
         log_warn "Grafana may not be ready yet, continuing anyway..."
     fi
     
+    # Ensure Grafana ingress exists
+    if ! $KUBECTL_CMD get ingress -n grafana grafana >/dev/null 2>&1; then
+        log_info "Creating Grafana ingress..."
+        $KUBECTL_CMD apply -f - <<EOF 2>/dev/null || true
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana
+  namespace: grafana
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /\$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: localhost
+    http:
+      paths:
+      - path: /grafana(/|$)(.*)
+        pathType: ImplementationSpecific
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+EOF
+        sleep 2
+    fi
+    
     # Check if port is available and find alternative if needed
     if command_exists "check_port" 2>/dev/null || type check_port >/dev/null 2>&1; then
         # Use the check_port function from cluster/utils.sh if available

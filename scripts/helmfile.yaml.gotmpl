@@ -195,6 +195,16 @@ releases:
       - service:
           type: ClusterIP
           port: 3000
+      - ingress:
+          enabled: true
+          ingressClassName: nginx
+          annotations:
+            nginx.ingress.kubernetes.io/rewrite-target: /\$2
+            nginx.ingress.kubernetes.io/use-regex: "true"
+          path: /grafana(/|$)(.*)
+          pathType: ImplementationSpecific
+          hosts:
+            - localhost
       - resources:
           requests:
             memory: {{ if eq $demoMinimal "true" }}64Mi{{ else }}128Mi{{ end }}
