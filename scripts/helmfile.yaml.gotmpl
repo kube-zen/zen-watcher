@@ -267,10 +267,24 @@ releases:
       - service:
           type: ClusterIP
           port: 8080
+          metricsPort: 9090
           annotations:
             prometheus.io/scrape: "true"
-            prometheus.io/port: "8080"
+            prometheus.io/port: "9090"
             prometheus.io/path: "/metrics"
+      - ingress:
+          enabled: true
+          ingressClassName: nginx
+          annotations:
+            nginx.ingress.kubernetes.io/rewrite-target: /\$2
+            nginx.ingress.kubernetes.io/use-regex: "true"
+          hosts:
+            - host: localhost
+              paths:
+                - path: /zen-watcher/health(/|$)(.*)
+                  pathType: ImplementationSpecific
+                - path: /zen-watcher/metrics(/|$)(.*)
+                  pathType: ImplementationSpecific
       - crd:
           install: true
       - rbac:
