@@ -224,9 +224,10 @@ echo ""
 
 # Show endpoints and credentials
 if [ "$SKIP_MONITORING" != true ]; then
-    log_step "Getting Grafana credentials..."
+    log_step "Setting up Grafana access..."
     GRAFANA_PASSWORD=""
     GRAFANA_USER="zen"
+    GRAFANA_PORT="${GRAFANA_PORT:-8080}"
     
     # Try to get password from Grafana secret (helmfile sets admin-password key)
     if kubectl get secret -n grafana grafana -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null > /tmp/grafana-password.txt 2>/dev/null; then
@@ -243,16 +244,54 @@ if [ "$SKIP_MONITORING" != true ]; then
         fi
     fi
     
-    # Get ingress port (default 8080)
-    INGRESS_PORT="${INGRESS_HTTP_PORT:-8080}"
+    # Wait for Grafana pod to be ready
+    log_info "Waiting for Grafana to be ready..."
+    if kubectl wait --for=condition=ready pod -n grafana -l app.kubernetes.io/name=grafana --timeout=120s 2>/dev/null; then
+        log_success "Grafana is ready"
+    else
+        log_warn "Grafana may not be ready yet, continuing anyway..."
+    fi
+    
+    # Set up port-forward in background
+    log_info "Setting up port-forward on port ${GRAFANA_PORT}..."
+    # Kill any existing port-forward on this port
+    lsof -ti:${GRAFANA_PORT} 2>/dev/null | xargs kill -9 2>/dev/null || true
+    sleep 1
+    
+    # Start port-forward in background
+    kubectl port-forward -n grafana svc/grafana ${GRAFANA_PORT}:3000 >/tmp/grafana-pf.log 2>&1 &
+    GRAFANA_PF_PID=$!
+    sleep 3
+    
+    # Wait for port-forward to be ready
+    for i in {1..30}; do
+        if curl -s http://localhost:${GRAFANA_PORT}/api/health >/dev/null 2>&1; then
+            break
+        fi
+        sleep 1
+    done
+    
+    # Import dashboards if password is available
+    if [ -n "$GRAFANA_PASSWORD" ]; then
+        log_info "Importing Grafana dashboards..."
+        export GRAFANA_USER
+        export GRAFANA_PORT
+        export GRAFANA_PASSWORD
+        "${SCRIPT_DIR}/observability/dashboards.sh" "$NAMESPACE" "$KUBECONFIG_FILE" || {
+            log_warn "Dashboard import had issues, continuing..."
+        }
+    fi
+    
+    # Build Grafana URL
+    GRAFANA_URL="http://localhost:${GRAFANA_PORT}"
     
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${CYAN}  Access Information${NC}"
+    echo -e "${CYAN}  📊 Grafana Dashboard${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    echo -e "${YELLOW}Grafana Dashboard:${NC}"
-    echo -e "  URL: ${CYAN}http://localhost:${INGRESS_PORT}/grafana${NC}"
+    echo -e "${YELLOW}Access Information:${NC}"
+    echo -e "  URL: ${CYAN}${GRAFANA_URL}${NC}"
     if [ -n "$GRAFANA_PASSWORD" ]; then
         echo -e "  Username: ${CYAN}${GRAFANA_USER}${NC}"
         echo -e "  Password: ${CYAN}${GRAFANA_PASSWORD}${NC}"
@@ -261,9 +300,27 @@ if [ "$SKIP_MONITORING" != true ]; then
         echo -e "  Password: ${CYAN}(check Grafana secret in cluster)${NC}"
     fi
     echo ""
-    echo -e "${YELLOW}Port-forward Grafana (if needed):${NC}"
-    echo -e "  ${CYAN}kubectl port-forward -n grafana svc/grafana 3100:3000${NC}"
-    echo -e "  Then access: ${CYAN}http://localhost:3100${NC}"
+    
+    # Open browser automatically
+    if [ -n "$GRAFANA_PASSWORD" ]; then
+        log_info "Opening browser..."
+        if command -v xdg-open >/dev/null 2>&1; then
+            # Linux
+            xdg-open "${GRAFANA_URL}" >/dev/null 2>&1 &
+        elif command -v open >/dev/null 2>&1; then
+            # macOS
+            open "${GRAFANA_URL}" >/dev/null 2>&1 &
+        elif command -v start >/dev/null 2>&1; then
+            # Windows (Git Bash)
+            start "${GRAFANA_URL}" >/dev/null 2>&1 &
+        else
+            log_warn "Could not detect browser command, please open manually: ${GRAFANA_URL}"
+        fi
+        echo -e "${GREEN}✓ Browser opened! Login with credentials above.${NC}"
+    fi
+    echo ""
+    echo -e "${YELLOW}Note:${NC} Port-forward is running in background (PID: ${GRAFANA_PF_PID})"
+    echo -e "  To stop it: ${CYAN}kill ${GRAFANA_PF_PID}${NC}"
     echo ""
 fi
 

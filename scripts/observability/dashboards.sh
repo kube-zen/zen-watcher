@@ -31,19 +31,29 @@ if [ -z "$GRAFANA_POD" ]; then
     exit 0
 fi
 
-# Get Grafana admin password
+# Get Grafana admin password and username
 GRAFANA_PASSWORD=$(kubectl get secret -n grafana grafana -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null || echo "admin")
+GRAFANA_USER="${GRAFANA_USER:-zen}"
 
-# Port-forward to Grafana
-log_info "Setting up port-forward to Grafana..."
-kubectl port-forward -n grafana svc/grafana 3100:80 >/tmp/grafana-pf.log 2>&1 &
-PF_PID=$!
-sleep 5
+# Use existing port-forward if available (check if port 8080 is already forwarded)
+GRAFANA_PORT="${GRAFANA_PORT:-8080}"
+USE_EXISTING_PF=false
+
+if curl -s http://localhost:${GRAFANA_PORT}/api/health >/dev/null 2>&1; then
+    log_info "Using existing port-forward on port ${GRAFANA_PORT}"
+    USE_EXISTING_PF=true
+else
+    # Port-forward to Grafana
+    log_info "Setting up port-forward to Grafana on port ${GRAFANA_PORT}..."
+    kubectl port-forward -n grafana svc/grafana ${GRAFANA_PORT}:3000 >/tmp/grafana-pf.log 2>&1 &
+    PF_PID=$!
+    sleep 5
+fi
 
 # Wait for Grafana to be ready
 GRAFANA_READY=false
 for i in {1..30}; do
-    if curl -s -u "admin:${GRAFANA_PASSWORD}" http://localhost:3100/api/health &>/dev/null; then
+    if curl -s -u "${GRAFANA_USER:-zen}:${GRAFANA_PASSWORD}" http://localhost:${GRAFANA_PORT}/api/health &>/dev/null; then
         GRAFANA_READY=true
         break
     fi
@@ -67,9 +77,9 @@ if [ -d "$DASHBOARD_DIR" ]; then
             DASHBOARD_JSON=$(cat "$dashboard")
             RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
                 -H "Content-Type: application/json" \
-                -u "admin:${GRAFANA_PASSWORD}" \
+                -u "${GRAFANA_USER}:${GRAFANA_PASSWORD}" \
                 -d "{\"dashboard\":${DASHBOARD_JSON},\"overwrite\":true}" \
-                http://localhost:3100/api/dashboards/db 2>/dev/null || echo -e "\n000")
+                http://localhost:${GRAFANA_PORT}/api/dashboards/db 2>/dev/null || echo -e "\n000")
             
             HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
             
@@ -80,9 +90,9 @@ if [ -d "$DASHBOARD_DIR" ]; then
                 # Try alternative endpoint (older Grafana)
                 RESPONSE2=$(curl -s -w "\n%{http_code}" -X POST \
                     -H "Content-Type: application/json" \
-                    -u "admin:${GRAFANA_PASSWORD}" \
+                    -u "${GRAFANA_USER}:${GRAFANA_PASSWORD}" \
                     -d @"$dashboard" \
-                    http://localhost:3100/api/dashboards/db 2>/dev/null || echo -e "\n000")
+                    http://localhost:${GRAFANA_PORT}/api/dashboards/db 2>/dev/null || echo -e "\n000")
                 
                 HTTP_CODE2=$(echo "$RESPONSE2" | tail -n1)
                 if [ "$HTTP_CODE2" = "200" ] || [ "$HTTP_CODE2" = "201" ]; then
@@ -107,7 +117,9 @@ else
     log_warn "Dashboard directory not found: $DASHBOARD_DIR"
 fi
 
-# Cleanup port-forward
-kill $PF_PID 2>/dev/null || true
-wait $PF_PID 2>/dev/null || true
+# Cleanup port-forward only if we created it
+if [ "$USE_EXISTING_PF" != true ] && [ -n "${PF_PID:-}" ]; then
+    kill $PF_PID 2>/dev/null || true
+    wait $PF_PID 2>/dev/null || true
+fi
 
