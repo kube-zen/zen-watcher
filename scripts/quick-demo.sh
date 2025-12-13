@@ -309,17 +309,36 @@ if [ "$SKIP_MONITORING" != true ]; then
     fi
     
     # Get the actual ingress port being used
-    # First, try to get it from the ingress-nginx service (most reliable)
+    # For k3d, the port is mapped via loadbalancer, so we need to check the actual k3d port mapping
     INGRESS_PORT=""
-    if $KUBECTL_CMD get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null | grep -qE '^[0-9]+$'; then
-        INGRESS_PORT=$($KUBECTL_CMD get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null)
-        log_info "Detected ingress port from service: ${INGRESS_PORT}"
-    elif [ -n "${INGRESS_HTTP_PORT:-}" ]; then
-        # Use the port set by cluster creation script
+    
+    # Try to get from k3d loadbalancer port mapping (most reliable for k3d)
+    if command -v k3d >/dev/null 2>&1 && k3d cluster list 2>/dev/null | grep -q "${CLUSTER_NAME}"; then
+        # Extract port from k3d cluster info or docker inspect
+        K3D_PORT=$(docker ps --format '{{.Ports}}' --filter "name=k3d-${CLUSTER_NAME}-serverlb" 2>/dev/null | grep -oP '0.0.0.0:\K[0-9]+(?=->80/tcp)' | head -1)
+        if [ -n "$K3D_PORT" ] && [ "$K3D_PORT" != "0" ]; then
+            INGRESS_PORT="$K3D_PORT"
+            log_info "Detected ingress port from k3d loadbalancer: ${INGRESS_PORT}"
+        fi
+    fi
+    
+    # Fallback: try ingress-nginx service NodePort
+    if [ -z "$INGRESS_PORT" ]; then
+        NODE_PORT=$($KUBECTL_CMD get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null)
+        if [ -n "$NODE_PORT" ] && [ "$NODE_PORT" != "null" ] && [ "$NODE_PORT" != "0" ]; then
+            INGRESS_PORT="$NODE_PORT"
+            log_info "Detected ingress port from service NodePort: ${INGRESS_PORT}"
+        fi
+    fi
+    
+    # Fallback: use environment variable from cluster creation
+    if [ -z "$INGRESS_PORT" ] && [ -n "${INGRESS_HTTP_PORT:-}" ]; then
         INGRESS_PORT="${INGRESS_HTTP_PORT}"
         log_info "Using ingress port from environment: ${INGRESS_PORT}"
-    else
-        # Fallback: try to detect from k3d cluster
+    fi
+    
+    # Final fallback: default
+    if [ -z "$INGRESS_PORT" ]; then
         INGRESS_PORT="8080"
         log_warn "Could not detect ingress port, using default: ${INGRESS_PORT}"
     fi
