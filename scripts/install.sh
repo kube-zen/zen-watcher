@@ -192,12 +192,23 @@ if [ -d "$CRD_DIR" ]; then
                 fi
                 # Create temporary CRD file without kubectl annotations
                 TEMP_CRD_FILE="/tmp/$(basename "$crd_file")"
-                # Use yq to properly remove kubectl annotation if available, otherwise use sed carefully
-                if command -v yq >/dev/null 2>&1; then
+                # Use Python to properly remove kubectl annotation (most reliable)
+                if command -v python3 >/dev/null 2>&1 && python3 -c "import yaml" 2>/dev/null; then
+                    python3 <<PYEOF
+import yaml
+import sys
+with open("$crd_file", 'r') as f:
+    data = yaml.safe_load(f)
+if 'metadata' in data and 'annotations' in data.get('metadata', {}):
+    data['metadata']['annotations'].pop('kubectl.kubernetes.io/last-applied-configuration', None)
+with open("$TEMP_CRD_FILE", 'w') as f:
+    yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
+PYEOF
+                elif command -v yq >/dev/null 2>&1; then
                     yq eval 'del(.metadata.annotations."kubectl.kubernetes.io/last-applied-configuration")' "$crd_file" > "$TEMP_CRD_FILE" 2>/dev/null || cp "$crd_file" "$TEMP_CRD_FILE"
                 else
-                    # Use awk to remove the annotation line more carefully
-                    awk '/kubectl\.kubernetes\.io\/last-applied-configuration:/{getline; while(/^[[:space:]]+.*/ || /^[[:space:]]*$/){getline}}1' "$crd_file" > "$TEMP_CRD_FILE" 2>/dev/null || cp "$crd_file" "$TEMP_CRD_FILE"
+                    # Fallback: copy file and hope Helm can handle it
+                    cp "$crd_file" "$TEMP_CRD_FILE"
                 fi
                 # Install CRD using server-side apply with Helm field manager
                 if kubectl apply --server-side --field-manager=helm --force-conflicts -f "$TEMP_CRD_FILE" 2>&1 | tee /tmp/crd-install-${crd_name}.log; then

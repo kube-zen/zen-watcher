@@ -64,6 +64,8 @@ releases:
       - server:
           enabled: true
           replicaCount: 1
+          ingress:
+            enabled: false
           resources:
             requests:
               memory: {{ if eq $demoMinimal "true" }}128Mi{{ else }}256Mi{{ end }}
