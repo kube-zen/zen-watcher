@@ -1,0 +1,43 @@
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: test-logs-ingester
+  namespace: zen-system
+spec:
+  source: test-logs
+  ingester: logs
+  logs:
+    podSelector: app=test-logs
+    container: test-container
+    patterns:
+      - regex: 'ERROR: (?P<message>.*)'
+        type: error
+        priority: 0.9
+      - regex: 'WARN: (?P<message>.*)'
+        type: warning
+        priority: 0.6
+      - regex: 'INFO: (?P<message>.*)'
+        type: info
+        priority: 0.3
+    sinceSeconds: 300
+    pollInterval: "1s"
+  destinations:
+    - type: crd
+      value: observations
+      mapping:
+        domain: operations
+        type: log_event
+        fieldMapping:
+          - from: matches.message
+            to: message
+        priority:
+          error: 0.9
+          warning: 0.6
+          info: 0.3
+  filters:
+    minPriority: 0.5
+  deduplication:
+    enabled: true
+    window: "5m"
+    strategy: fingerprint
+

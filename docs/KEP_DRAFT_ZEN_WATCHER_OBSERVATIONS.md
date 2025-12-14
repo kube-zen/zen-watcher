@@ -253,19 +253,7 @@ status:
 
 ### Extensibility
 
-**Dynamic Webhooks Integration** (Future):
-- Webhook gateways (generic) can generate Observations via webhook adapter
-- zen-hook (kube-zen ecosystem) is one concrete implementation example
-- Observations include `source: "<gateway-identifier>"` and webhook-specific metadata
-- Integration contract defined in `docs/DYNAMIC_WEBHOOKS_WATCHER_INTEGRATION.md`
-
 **Vendor Neutrality**: zen-watcher is designed to work with any webhook gateway or integration. Components like zen-hook, zen-agent, and zen-alpha (in the kube-zen ecosystem) are example producers/consumers, not required dependencies.
-
-**See**: `docs/DYNAMIC_WEBHOOKS_WATCHER_INTEGRATION.md` for complete integration details, including:
-- Observation CRD usage and labeling conventions
-- Error and backpressure handling contracts
-- Webhook adapter configuration
-- Quality expectations and contract stability
 
 ---
 
@@ -319,7 +307,6 @@ status:
 
 **⚠️ Partially Implemented**:
 - v2 CRD schema (defined but not yet implemented)
-- Dynamic webhooks integration (design phase)
 - Advanced optimization features (per-source auto-optimization)
 
 **📋 Future Work**:
@@ -335,7 +322,6 @@ status:
 - `docs/STRESS_TEST_RESULTS.md` - Performance baselines
 - `docs/INFORMERS_CONVERGENCE_NOTES.md` - Informer architecture evolution
 - `docs/OBSERVATION_CRD_API_AUDIT.md` - API analysis and future improvements
-- `docs/DYNAMIC_WEBHOOKS_WATCHER_INTEGRATION.md` - zen-hook integration contract
 - `CONTRIBUTING.md` - Quality bar and standards
 
 **Historical Reference**:

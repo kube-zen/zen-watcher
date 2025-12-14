@@ -25,7 +25,6 @@ Real-world scenarios showing how to use zen-watcher in production.
 **Scenario:** You have an internal security scanner that creates custom CRDs
 
 **What it shows:**
-- ObservationMapping CRD configuration
 - JSONPath-based field extraction
 - Severity mapping
 - Zero-code integration of custom tools

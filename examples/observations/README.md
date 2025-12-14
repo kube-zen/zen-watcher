@@ -112,7 +112,6 @@
 - Severity: `medium`
 - Source: `webhook-gateway` (generic identifier - implementations can use custom identifiers)
 
-**See**: `docs/DYNAMIC_WEBHOOKS_WATCHER_INTEGRATION.md` for webhook integration contract.
 
 ---
 
@@ -215,7 +214,6 @@ These examples are referenced in:
 - **API Guide**: `docs/OBSERVATION_API_PUBLIC_GUIDE.md` - Complete API documentation
 - **Versioning Plan**: `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` - Versioning strategy
 - **CRD Definition**: `deployments/crds/observation_crd.yaml` - Complete CRD schema
-- **Webhook Integration**: `docs/DYNAMIC_WEBHOOKS_WATCHER_INTEGRATION.md` - Webhook contract
 
 ---
 

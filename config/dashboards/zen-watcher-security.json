@@ -374,7 +374,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count(zen_watcher_tools_active == 1)",
+          "expr": "count(count by (source) (zen_watcher_events_total))",
           "legendFormat": "Active Tools",
           "refId": "A"
         }
@@ -1498,7 +1498,7 @@
       },
       "targets": [
         {
-          "expr": "count(zen_watcher_tools_active == 1)",
+          "expr": "count(count by (source) (zen_watcher_events_total))",
           "refId": "A"
         }
       ],

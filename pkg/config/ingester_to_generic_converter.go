@@ -56,6 +56,24 @@ func ConvertIngesterConfigToGeneric(ingesterConfig *IngesterConfig) *generic.Sou
 		}
 	}
 
+	// Convert logs config
+	if ingesterConfig.Logs != nil {
+		config.Logs = &generic.LogsConfig{
+			PodSelector:  ingesterConfig.Logs.PodSelector,
+			Container:    ingesterConfig.Logs.Container,
+			SinceSeconds: ingesterConfig.Logs.SinceSeconds,
+			PollInterval: ingesterConfig.Logs.PollInterval,
+		}
+		// Convert patterns
+		for _, p := range ingesterConfig.Logs.Patterns {
+			config.Logs.Patterns = append(config.Logs.Patterns, generic.LogPattern{
+				Regex:    p.Regex,
+				Type:     p.Type,
+				Priority: p.Priority,
+			})
+		}
+	}
+
 	// Convert normalization config
 	if ingesterConfig.Normalization != nil {
 		config.Normalization = &generic.NormalizationConfig{

@@ -35,11 +35,6 @@ type Metrics struct {
 	FilterPoliciesActive         *prometheus.GaugeVec
 	FilterRuleEvaluationDuration *prometheus.HistogramVec // Filter rule evaluation latency
 
-	// ObservationMapping / CRD adapter metrics (NEW)
-	ObservationMappingsActive *prometheus.GaugeVec
-	ObservationMappingsEvents *prometheus.CounterVec
-	CRDAdapterErrors          *prometheus.CounterVec
-
 	// Adapter lifecycle metrics (NEW)
 	AdapterRunsTotal *prometheus.CounterVec
 
@@ -277,31 +272,6 @@ func NewMetrics() *Metrics {
 			Buckets: []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1},
 		},
 		[]string{"source", "rule_type"},
-	)
-
-	// NEW: ObservationMapping metrics
-	observationMappingsActive := prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "zen_watcher_observation_mappings_active",
-			Help: "Active ObservationMapping CRDs",
-		},
-		[]string{"mapping", "group", "version", "kind", "namespace_scope"},
-	)
-
-	observationMappingsEvents := prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "zen_watcher_observation_mappings_events_total",
-			Help: "Events processed by ObservationMapping",
-		},
-		[]string{"mapping", "result"},
-	)
-
-	crdAdapterErrors := prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "zen_watcher_crd_adapter_errors_total",
-			Help: "CRD adapter errors",
-		},
-		[]string{"mapping", "stage", "error_type"},
 	)
 
 	// NEW: Adapter lifecycle metrics
@@ -556,9 +526,6 @@ func NewMetrics() *Metrics {
 	prometheus.MustRegister(filterLastReload)
 	prometheus.MustRegister(filterPoliciesActive)
 	prometheus.MustRegister(filterRuleEvaluationDuration)
-	prometheus.MustRegister(observationMappingsActive)
-	prometheus.MustRegister(observationMappingsEvents)
-	prometheus.MustRegister(crdAdapterErrors)
 	prometheus.MustRegister(adapterRunsTotal)
 	// Register Ingester lifecycle metrics
 	prometheus.MustRegister(ingestersActive)
@@ -828,11 +795,6 @@ func NewMetrics() *Metrics {
 		FilterLastReload:             filterLastReload,
 		FilterPoliciesActive:         filterPoliciesActive,
 		FilterRuleEvaluationDuration: filterRuleEvaluationDuration,
-
-		// ObservationMapping / CRD adapter metrics (NEW)
-		ObservationMappingsActive: observationMappingsActive,
-		ObservationMappingsEvents: observationMappingsEvents,
-		CRDAdapterErrors:          crdAdapterErrors,
 
 		// Adapter lifecycle metrics (NEW)
 		AdapterRunsTotal: adapterRunsTotal,

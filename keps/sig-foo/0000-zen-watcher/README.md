@@ -460,7 +460,6 @@ func (ep *EventProcessor) ProcessMyToolReport(ctx context.Context, report *unstr
 
 - [x] **Modular Adapter Architecture** - SourceAdapter interface for all 9 sources
 - [x] **Ingester CRD** - Kubernetes-native dynamic filtering
-- [x] **ObservationMapping CRD** - Generic CRD adapter for "long tail" integrations
 - [x] **Filter Merge Semantics** - ConfigMap + Ingester CRD merging with comprehensive tests
 - [x] **Cluster-Blind Design** - Removed all CLUSTER_ID/TENANT_ID metadata
 - [x] **Enhanced Metrics** - Filter, adapter, mapping, dedup, GC metrics defined

@@ -72,9 +72,20 @@ type RateLimitConfig struct {
 	RequestsPerMinute int
 }
 
-// LogsConfig holds logs-specific configuration (placeholder)
+// LogsConfig holds logs-specific configuration
 type LogsConfig struct {
-	// TBD
+	PodSelector  string
+	Container    string
+	Patterns     []LogPattern
+	SinceSeconds int
+	PollInterval string
+}
+
+// LogPattern defines a regex pattern to match in logs
+type LogPattern struct {
+	Regex    string
+	Type     string
+	Priority float64
 }
 
 // K8sEventsConfig holds Kubernetes events configuration
@@ -492,6 +503,21 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 	}
 	config.Ingester = ingester
 
+	// Debug: log spec keys for logs ingester
+	if ingester == "logs" {
+		logger.Info("Processing logs ingester",
+			logger.Fields{
+				Component: "config",
+				Operation: "ingester_convert",
+				Source:    source,
+				Additional: map[string]interface{}{
+					"name":      u.GetName(),
+					"namespace": u.GetNamespace(),
+					"spec_keys": getSpecKeys(spec),
+				},
+			})
+	}
+
 	// Validate destinations (required field)
 	destinations, destinationsOk := spec["destinations"].([]interface{})
 	if !destinationsOk || len(destinations) == 0 {
@@ -542,6 +568,67 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 				}
 			}
 		}
+	}
+
+	// Extract logs config
+	logs, logsOk := spec["logs"]
+	if logsOk {
+		logger.Info("Found logs section in spec",
+			logger.Fields{
+				Component: "config",
+				Operation: "ingester_convert",
+				Source:    config.Source,
+				Additional: map[string]interface{}{
+					"logs_type":  fmt.Sprintf("%T", logs),
+					"logs_value": logs,
+				},
+			})
+	}
+	if logs, ok := spec["logs"].(map[string]interface{}); ok {
+		config.Logs = &LogsConfig{
+			PodSelector:  getString(logs, "podSelector"),
+			Container:    getString(logs, "container"),
+			PollInterval: getString(logs, "pollInterval"),
+		}
+		// Default poll interval if not set
+		if config.Logs.PollInterval == "" {
+			config.Logs.PollInterval = "1s"
+		}
+		// Default sinceSeconds if not set
+		if sinceSeconds, ok := logs["sinceSeconds"].(int); ok {
+			config.Logs.SinceSeconds = sinceSeconds
+		} else if sinceSeconds, ok := logs["sinceSeconds"].(float64); ok {
+			config.Logs.SinceSeconds = int(sinceSeconds)
+		} else {
+			config.Logs.SinceSeconds = 300 // Default 5 minutes
+		}
+		// Extract patterns
+		if patterns, ok := logs["patterns"].([]interface{}); ok {
+			for _, p := range patterns {
+				if patternMap, ok := p.(map[string]interface{}); ok {
+					pattern := LogPattern{
+						Regex: getString(patternMap, "regex"),
+						Type:  getString(patternMap, "type"),
+					}
+					if priority, ok := patternMap["priority"].(float64); ok {
+						pattern.Priority = priority
+					}
+					config.Logs.Patterns = append(config.Logs.Patterns, pattern)
+				}
+			}
+		}
+		logger.Info("Extracted logs config",
+			logger.Fields{
+				Component: "config",
+				Operation: "ingester_convert",
+				Source:    config.Source,
+				Additional: map[string]interface{}{
+					"podSelector":  config.Logs.PodSelector,
+					"container":    config.Logs.Container,
+					"patterns":     len(config.Logs.Patterns),
+					"pollInterval": config.Logs.PollInterval,
+				},
+			})
 	}
 
 	// Extract normalization config
@@ -751,4 +838,13 @@ func getBool(m map[string]interface{}, key string) bool {
 		return v
 	}
 	return false
+}
+
+// getSpecKeys returns all keys in the spec map for debugging
+func getSpecKeys(spec map[string]interface{}) []string {
+	keys := make([]string, 0, len(spec))
+	for k := range spec {
+		keys = append(keys, k)
+	}
+	return keys
 }

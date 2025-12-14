@@ -1,11 +1,15 @@
 #!/bin/bash
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/utils/common.sh"
+
 VERSION="1.0.0-alpha"
 IMAGE="kubezen/zen-watcher"
 
 echo "🔨 Building ${IMAGE}:${VERSION}..."
-docker build \
+echo "   Using resource limits: 1 CPU, best-effort I/O, nice priority"
+run_limited docker build \
   --build-arg VERSION=${VERSION} \
   --build-arg COMMIT=$(git rev-parse --short HEAD) \
   --build-arg BUILD_DATE=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
@@ -17,13 +21,14 @@ docker build \
 echo ""
 echo "📤 Pushing to Docker Hub..."
 echo "   Make sure you're logged in: docker login"
+echo "   Using resource limits: 1 CPU, best-effort I/O, nice priority"
 echo ""
 
 # Push version tag
-docker push ${IMAGE}:${VERSION}
+run_limited docker push ${IMAGE}:${VERSION}
 
 # Push latest tag
-docker push ${IMAGE}:latest
+run_limited docker push ${IMAGE}:latest
 
 echo ""
 echo "✅ Done! Image ${IMAGE}:${VERSION} is now available on Docker Hub"

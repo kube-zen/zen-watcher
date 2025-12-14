@@ -87,6 +87,30 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Function to run resource-limited commands (CPU, I/O, priority)
+# Usage: run_limited <command> [args...]
+# Limits to 1 CPU, best-effort I/O priority, nice priority 10
+run_limited() {
+    local cmd="$1"
+    shift
+    
+    # Check if cpulimit is available
+    if command_exists cpulimit && command_exists ionice && command_exists nice; then
+        # Use cpulimit to limit to 1 CPU (100% of 1 core)
+        # Use ionice for best-effort I/O (class 2, priority 7)
+        # Use nice for lower CPU priority (10)
+        nice -n 10 ionice -c 2 -n 7 cpulimit -l 100 -- "$cmd" "$@"
+    else
+        # Fallback: just use nice and ionice if cpulimit not available
+        if command_exists ionice && command_exists nice; then
+            nice -n 10 ionice -c 2 -n 7 "$cmd" "$@"
+        else
+            # Last resort: just run the command
+            "$cmd" "$@"
+        fi
+    fi
+}
+
 # Check if cluster exists
 cluster_exists() {
     local platform="$1"

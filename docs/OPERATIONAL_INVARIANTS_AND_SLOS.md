@@ -58,7 +58,6 @@
 
 **Metrics**:
 - `zen_watcher_observations_create_errors_total{source=...,reason=...}` - Observation creation errors
-- `zen_watcher_crd_adapter_errors_total{source=...,reason=...}` - CRD adapter errors
 
 **Test Assertion**: Pipeline tests verify invalid configs produce errors and no observations are created.
 

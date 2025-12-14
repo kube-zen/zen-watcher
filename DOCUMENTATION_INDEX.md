@@ -60,7 +60,6 @@ Complete guide to Zen Watcher documentation.
    - SourceAdapter interface
    - Event normalization model
    - Implementation patterns (informer, webhook, polling)
-   - ObservationMapping CRD for generic adapters
    - Best practices and examples
    - Testing guide
 

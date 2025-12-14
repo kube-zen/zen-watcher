@@ -56,9 +56,6 @@ This document reviews the current observability/metrics implementation in zen-wa
    - ❌ **MISSING**: Informer resync events per ingester
 
 3. **Mapping/Normalization Metrics**
-   - ✅ `zen_watcher_observation_mappings_active` - Active mappings
-   - ✅ `zen_watcher_observation_mappings_events_total` - Events processed by mapping
-   - ✅ `zen_watcher_crd_adapter_errors_total` - CRD adapter errors
    - ❌ **MISSING**: Field mapping transformation latency
    - ❌ **MISSING**: Field mapping transformation errors
    - ❌ **MISSING**: Normalization rule application counts

@@ -271,10 +271,6 @@ spec:
         summary: "Adapter {{$labels.adapter}} experiencing errors"
         description: "Adapter {{$labels.adapter}} has {{$value}} errors/sec. Check adapter configuration."
 
-    - alert: ZenWatcherCRDAdapterDown
-      expr: |
-        sum(rate(zen_watcher_crd_adapter_errors_total[5m])) > 1
-      for: 3m
       labels:
         severity: critical
         component: adapter

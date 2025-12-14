@@ -119,17 +119,40 @@ gosec:
 ## image: Build Docker image (alias for docker-build)
 image: docker-build
 
-## docker-build: Build Docker image
+## docker-build: Build Docker image (with resource limits)
 docker-build:
 	@echo "$(GREEN)Building Docker image...$(NC)"
-	docker build \
-		--build-arg VERSION=$(VERSION) \
-		--build-arg COMMIT=$(COMMIT) \
-		--build-arg BUILD_DATE=$(BUILD_DATE) \
-		-t $(IMAGE_NAME):$(IMAGE_TAG) \
-		-t $(IMAGE_NAME):latest \
-		-f build/Dockerfile \
-		.
+	@echo "$(YELLOW)   Using resource limits: 1 CPU, best-effort I/O, nice priority$(NC)"
+	@if command -v cpulimit >/dev/null 2>&1 && command -v ionice >/dev/null 2>&1 && command -v nice >/dev/null 2>&1; then \
+		nice -n 10 ionice -c 2 -n 7 cpulimit -l 100 -- docker build \
+			--build-arg VERSION=$(VERSION) \
+			--build-arg COMMIT=$(COMMIT) \
+			--build-arg BUILD_DATE=$(BUILD_DATE) \
+			-t $(IMAGE_NAME):$(IMAGE_TAG) \
+			-t $(IMAGE_NAME):latest \
+			-f build/Dockerfile \
+			.; \
+	else \
+		if command -v ionice >/dev/null 2>&1 && command -v nice >/dev/null 2>&1; then \
+			nice -n 10 ionice -c 2 -n 7 docker build \
+				--build-arg VERSION=$(VERSION) \
+				--build-arg COMMIT=$(COMMIT) \
+				--build-arg BUILD_DATE=$(BUILD_DATE) \
+				-t $(IMAGE_NAME):$(IMAGE_TAG) \
+				-t $(IMAGE_NAME):latest \
+				-f build/Dockerfile \
+				.; \
+		else \
+			docker build \
+				--build-arg VERSION=$(VERSION) \
+				--build-arg COMMIT=$(COMMIT) \
+				--build-arg BUILD_DATE=$(BUILD_DATE) \
+				-t $(IMAGE_NAME):$(IMAGE_TAG) \
+				-t $(IMAGE_NAME):latest \
+				-f build/Dockerfile \
+				.; \
+		fi; \
+	fi
 	@echo "$(GREEN)✅ Docker image built: $(IMAGE_NAME):$(IMAGE_TAG)$(NC)"
 
 ## image-push: Push Docker image to registry

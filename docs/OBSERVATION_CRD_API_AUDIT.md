@@ -233,10 +233,6 @@ status:
 - ⚠️ Could benefit from Conditions in status (future)
 - ⚠️ Could benefit from validation of template syntax (future)
 
-### ObservationMapping
-
-**Status**: Properly versioned as alpha
-
 **Evaluation**: Configuration CRDs are appropriately versioned and don't require immediate changes for KEP readiness.
 
 ---

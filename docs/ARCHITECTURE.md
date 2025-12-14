@@ -25,7 +25,6 @@ Zen Watcher is a Kubernetes-native security event aggregator that consolidates e
 - **Efficient**: <100m CPU, <50MB RAM under normal load (tested with 9 sources)
 - **Observable**: 20+ Prometheus metrics, structured logging, health endpoints
 - **Infrastructure-Blind**: Avoids cluster-unique identifiers (AWS account ID, GKE project name) while preserving Kubernetes-native context (namespace, name, kind) for RBAC, auditing, and multi-tenancy
-- **Extensible**: ObservationMapping CRD enables custom CRD integration without code
 
 ---
 

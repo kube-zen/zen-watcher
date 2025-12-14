@@ -51,9 +51,8 @@ echo -e "${GREEN}✓${NC} zen-watcher is ready"
 echo ""
 
 # Step 4: Install missing CRDs
-echo -e "${YELLOW}→${NC} Installing Ingester and ObservationMapping CRDs..."
+echo -e "${YELLOW}→${NC} Installing CRDs..."
 kubectl apply -f deployments/crds/observationfilter_crd.yaml >/dev/null 2>&1
-kubectl apply -f deployments/crds/observationmapping_crd.yaml >/dev/null 2>&1
 echo -e "${GREEN}✓${NC} CRDs installed"
 echo ""
 

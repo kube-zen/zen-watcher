@@ -203,8 +203,6 @@ Complete guide to all Zen Watcher documentation files.
 23. **[CRD.md](CRD.md)** - Custom Resource Definitions
     - Observation CRD schema
     - Ingester CRD
-    - ObservationMapping CRD
-    - Ingester CRD
     - Schema reference
     - Sync process
 

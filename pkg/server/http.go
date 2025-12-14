@@ -76,7 +76,6 @@ func NewServerWithIngester(
 	},
 ) *Server {
 	// Note: ingesterStore and observationCreator parameters are kept for API compatibility
-	// but are no longer used (dynamic webhooks removed)
 	port := os.Getenv("WATCHER_PORT")
 	if port == "" {
 		port = "8080"

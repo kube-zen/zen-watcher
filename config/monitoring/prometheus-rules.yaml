@@ -174,9 +174,6 @@ spec:
         summary: "Webhook queue near capacity"
         description: "Queue at {{$value | humanizePercentage}} capacity. Risk of dropped events."
 
-    - alert: ZenWatcherAdapterErrors
-      expr: sum(rate(zen_watcher_crd_adapter_errors_total[5m])) > 0.5
-      for: 5m
       labels:
         severity: warning
         component: adapter

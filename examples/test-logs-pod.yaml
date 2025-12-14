@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-logs-pod
+  namespace: default
+  labels:
+    app: test-logs
+spec:
+  containers:
+  - name: test-container
+    image: busybox:latest
+    command: ["/bin/sh", "-c"]
+    args:
+    - |
+      while true; do
+        echo "INFO: This is an informational message"
+        echo "WARN: This is a warning message"
+        echo "ERROR: This is an error message"
+        sleep 5
+      done
+

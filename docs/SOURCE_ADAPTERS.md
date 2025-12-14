@@ -60,12 +60,6 @@ Zen Watcher uses a **two-tier adapter strategy** that balances reliability with 
 - ✅ **Confidence** - Battle-tested adapters that "just work" out of the box
 - ✅ **Clean story** - Users know these integrations are production-ready
 
-### Tier 2: Generic CRD Adapter (ObservationMapping)
-
-**Generic adapter** for the "long tail" of tools:
-- ✅ **CRDSourceAdapter** - Configurable via `ObservationMapping` CRDs
-- ✅ Covers new tools, internal CRDs, prototyping
-- ✅ Allows users to create custom mappings without touching Go code
 
 **Why generic adapter?**
 - ✅ **Extensibility** - Add new tools via YAML configuration

@@ -142,14 +142,6 @@ verbs: ["get", "list", "watch"]
 - Invalid filters fall back to last-good-config
 - Filter changes are logged for audit trail
 
-#### ObservationMappings (Read-Only) ✨ NEW in v1.0.10
-```yaml
-apiGroups: ["zen.kube-zen.io"]
-resources: ["observationmappings"]
-verbs: ["get", "list", "watch"]
-```
-**Rationale:**
-- Required for generic CRD adapter to discover mapping configurations
 - Read-only access prevents mapping tampering
 - Watches for changes to dynamically create/destroy informers for source CRDs
 - Enables "long tail" tool integration without code changes

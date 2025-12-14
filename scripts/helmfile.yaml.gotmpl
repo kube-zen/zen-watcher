@@ -266,10 +266,10 @@ releases:
             memory: {{ if eq $demoMinimal "true" }}256Mi{{ else }}512Mi{{ end }}
             cpu: {{ if eq $demoMinimal "true" }}250m{{ else }}500m{{ end }}
 
-  # Zen Watcher (from helm-charts repo)
+  # Zen Watcher (from local chart)
   - name: zen-watcher
     namespace: {{ $namespace }}
-    chart: kube-zen/zen-watcher
+    chart: ../deployments/helm/zen-watcher
     createNamespace: true
     needs: []
     values:
@@ -302,7 +302,7 @@ releases:
                 - path: /zen-watcher/metrics(/|$)(.*)
                   pathType: ImplementationSpecific
       - crd:
-          install: true
+          install: false
       - rbac:
           create: true
       - serviceAccount:

@@ -45,11 +45,6 @@ Zen-watcher is a security tool and therefore must operate under a comprehensive 
 - Invalid data skipped, not crashed
 - No code execution from ConfigMap data
 
-❌ **ObservationMapping CRDs**
-- JSONPath expressions sanitized
-- Mapping validation before informer creation
-- Errors isolated per mapping (don't crash adapter)
-
 ❌ **Ingester CRDs**
 - Validated before application
 - Invalid filters fall back to last-good-config
@@ -127,7 +122,6 @@ See [SECURITY_RBAC.md](SECURITY_RBAC.md) for detailed permission rationale.
 - Webhook payloads: JSON schema validation
 - ConfigMap data: Safe JSON parsing
 - CRD fields: Kubernetes validation via OpenAPI schema
-- ObservationMapping: JSONPath sanitization
 
 **Output Sanitization:**
 - No sensitive data in logs (passwords, tokens filtered)

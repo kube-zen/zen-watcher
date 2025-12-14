@@ -102,7 +102,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Version Sync:** Image and chart now use same version (1.0.0-alpha)
 - KEP status: draft → implementable
 - README: Clearer positioning and value proposition
-- SECURITY_RBAC.md: Added Ingester and ObservationMapping permissions
+- SECURITY_RBAC.md: Added Ingester permissions
 
 #### Fixed
 - Chart.yaml: Use `kubezen` (was `zubezen` in some places)
@@ -125,10 +125,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Added** comprehensive filter merge tests with 20+ test cases
 - **Added** last-good-config fallback for filter errors
 
-#### Generic CRD Integration
-- **Added** ObservationMapping CRD for custom CRD integration
-- **Implemented** CRDSourceAdapter for "long tail" tool support
-- **Added** JSONPath-based field mapping from source CRDs to Observations
 - **Enabled** zero-code integration of new security tools
 
 #### Cluster-Blind Design
@@ -176,7 +172,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 📦 Helm Chart (v1.0.10)
 - **Added** ingester_crd.yaml template
-- **Added** observationmapping_crd.yaml template
 - **Added** mock-data-job.yaml for automated demos
 - **Added** mock-kyverno-policy.yaml for non-blocking policy generation
 - **Updated** service.yaml with Prometheus scrape annotations

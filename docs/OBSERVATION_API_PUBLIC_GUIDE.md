@@ -230,7 +230,6 @@ metadata:
 - `zen.io/webhook-event: "<event-type>"` - Original webhook event type
 - `zen.io/webhook-id: "<delivery-id>"` - Webhook delivery ID for deduplication
 
-**See**: `docs/DYNAMIC_WEBHOOKS_WATCHER_INTEGRATION.md` for webhook-specific labeling conventions.
 
 ---
 
@@ -399,7 +398,6 @@ kubectl get observations -l zen.io/priority=high
 - `docs/OBSERVATION_CRD_API_AUDIT.md` - Detailed API analysis (internal)
 
 **Integration**:
-- `docs/DYNAMIC_WEBHOOKS_WATCHER_INTEGRATION.md` - Webhook integration contract
 - `examples/observations/` - Canonical Observation examples
 
 **KEP & Roadmap**:

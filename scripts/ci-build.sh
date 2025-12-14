@@ -6,6 +6,9 @@
 #
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/utils/common.sh"
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🔨 zen-watcher CI: Build & Push"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -27,18 +30,20 @@ echo "   Version: ${VERSION}"
 echo "   Image:   ${IMAGE}"
 echo ""
 
-# Build using Makefile
+# Build using Makefile with resource limits
 echo "🔨 Step 1: Building Docker Image"
+echo "   Using resource limits: 1 CPU, best-effort I/O, nice priority"
 echo "────────────────────────────────────────────────────"
-make docker-build IMAGE_TAG="${VERSION}"
+run_limited make docker-build IMAGE_TAG="${VERSION}"
 echo "  ✅ Image built: ${IMAGE}:${VERSION}"
 echo ""
 
-# Push image
+# Push image with resource limits
 echo "📤 Step 2: Pushing to Docker Hub"
+echo "   Using resource limits: 1 CPU, best-effort I/O, nice priority"
 echo "────────────────────────────────────────────────────"
-docker push "${IMAGE}:${VERSION}"
-docker push "${IMAGE}:latest"
+run_limited docker push "${IMAGE}:${VERSION}"
+run_limited docker push "${IMAGE}:latest"
 echo "  ✅ Image pushed: ${IMAGE}:${VERSION}"
 echo ""
 

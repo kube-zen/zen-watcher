@@ -61,8 +61,6 @@ spec:
   detectedAt: "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   details:
 ${details_json}
-status:
-  synced: false
 EOF
 }
 
@@ -89,46 +87,46 @@ create_observation "demo-trivy-medium-1" "trivy" "security" "medium" "vulnerabil
     version: "5.1.16"'
 
 # Create demo observations from Falco (runtime threats)
-create_observation "demo-falco-critical-1" "falco" "security" "critical" "runtime-threat" "Pod" "demo-insecure-pod" "demo-manifests" '    rule: "Privileged container started"
+create_observation "demo-falco-critical-1" "falco" "security" "critical" "runtime_threat" "Pod" "demo-insecure-pod" "demo-manifests" '    rule: "Privileged container started"
     priority: "Critical"
     output: "Container running in privileged mode"'
-create_observation "demo-falco-high-1" "falco" "security" "high" "runtime-threat" "Pod" "demo-insecure-pod" "demo-manifests" '    rule: "Sensitive file accessed"
+create_observation "demo-falco-high-1" "falco" "security" "high" "runtime_threat" "Pod" "demo-insecure-pod" "demo-manifests" '    rule: "Sensitive file accessed"
     priority: "High"
     output: "Access to /etc/shadow detected"'
-create_observation "demo-falco-high-2" "falco" "security" "high" "runtime-threat" "Pod" "demo-no-security-context" "demo-manifests" '    rule: "Unexpected network connection"
+create_observation "demo-falco-high-2" "falco" "security" "high" "runtime_threat" "Pod" "demo-no-security-context" "demo-manifests" '    rule: "Unexpected network connection"
     priority: "High"
     output: "Connection to external IP detected"'
 
 # Create demo observations from Kyverno (policy violations)
-create_observation "demo-kyverno-medium-1" "kyverno" "security" "medium" "policy-violation" "Pod" "demo-no-security-context" "demo-manifests" '    policy: "require-security-context"
+create_observation "demo-kyverno-medium-1" "kyverno" "security" "medium" "policy_violation" "Pod" "demo-no-security-context" "demo-manifests" '    policy: "require-security-context"
     rule: "requireSecurityContext"
     message: "Pod missing security context"'
-create_observation "demo-kyverno-medium-2" "kyverno" "security" "medium" "policy-violation" "Pod" "demo-insecure-pod" "demo-manifests" '    policy: "disallow-privileged"
+create_observation "demo-kyverno-medium-2" "kyverno" "security" "medium" "policy_violation" "Pod" "demo-insecure-pod" "demo-manifests" '    policy: "disallow-privileged"
     rule: "disallowPrivileged"
     message: "Privileged containers not allowed"'
-create_observation "demo-kyverno-low-1" "kyverno" "compliance" "low" "policy-violation" "Deployment" "demo-public-registry" "demo-manifests" '    policy: "require-resource-limits"
+create_observation "demo-kyverno-low-1" "kyverno" "compliance" "low" "policy_violation" "Deployment" "demo-public-registry" "demo-manifests" '    policy: "require-resource-limits"
     rule: "requireResourceLimits"
     message: "Missing resource limits"'
 
 # Create demo observations from Checkov (IaC scanning)
-create_observation "demo-checkov-high-1" "checkov" "security" "high" "iac-scan" "Pod" "demo-insecure-pod" "demo-manifests" '    check: "CKV_K8S_1"
+create_observation "demo-checkov-high-1" "checkov" "security" "high" "iac_scan" "Pod" "demo-insecure-pod" "demo-manifests" '    check: "CKV_K8S_1"
     guideline: "Ensure that the API Server pod specification file has permissions of 644 or more restrictive"'
-create_observation "demo-checkov-medium-1" "checkov" "security" "medium" "iac-scan" "Pod" "demo-no-security-context" "demo-manifests" '    check: "CKV_K8S_24"
+create_observation "demo-checkov-medium-1" "checkov" "security" "medium" "iac_scan" "Pod" "demo-no-security-context" "demo-manifests" '    check: "CKV_K8S_24"
     guideline: "Ensure that the Pod Security Policy is set"'
-create_observation "demo-checkov-medium-2" "checkov" "security" "medium" "iac-scan" "ServiceAccount" "demo-excessive-permissions" "demo-manifests" '    check: "CKV_K8S_14"
+create_observation "demo-checkov-medium-2" "checkov" "security" "medium" "iac_scan" "ServiceAccount" "demo-excessive-permissions" "demo-manifests" '    check: "CKV_K8S_14"
     guideline: "Ensure that the Service Account token is not mounted"'
 
 # Create demo observations from kube-bench (CIS compliance)
-create_observation "demo-kubebench-medium-1" "kube-bench" "compliance" "medium" "cis-benchmark" "Node" "demo-node" "" '    test: "1.2.1"
+create_observation "demo-kubebench-medium-1" "kube-bench" "compliance" "medium" "cis_benchmark" "Node" "demo-node" "" '    test: "1.2.1"
     description: "Ensure that the --anonymous-auth argument is set to false"'
-create_observation "demo-kubebench-low-1" "kube-bench" "compliance" "low" "cis-benchmark" "Node" "demo-node" "" '    test: "1.2.2"
+create_observation "demo-kubebench-low-1" "kube-bench" "compliance" "low" "cis_benchmark" "Node" "demo-node" "" '    test: "1.2.2"
     description: "Ensure that the --basic-auth-file argument is not set"'
 
 # Create demo observations from audit logs
-create_observation "demo-audit-info-1" "audit" "compliance" "info" "audit-event" "ServiceAccount" "demo-excessive-permissions" "demo-manifests" '    action: "create"
+create_observation "demo-audit-info-1" "audit" "compliance" "info" "audit_event" "ServiceAccount" "demo-excessive-permissions" "demo-manifests" '    action: "create"
     user: "system:serviceaccount:demo-manifests:demo-excessive-permissions"
     verb: "create"'
-create_observation "demo-audit-info-2" "audit" "compliance" "info" "audit-event" "ClusterRoleBinding" "demo-excessive-binding" "" '    action: "create"
+create_observation "demo-audit-info-2" "audit" "compliance" "info" "audit_event" "ClusterRoleBinding" "demo-excessive-binding" "" '    action: "create"
     user: "admin"
     verb: "create"'
 
@@ -174,15 +172,15 @@ zen_watcher_health_status{{cluster_id="demo"}} 1
 zen_watcher_events_total{{cluster_id="demo",category="security",source="trivy",event_type="vulnerability",severity="critical"}} 2
 zen_watcher_events_total{{cluster_id="demo",category="security",source="trivy",event_type="vulnerability",severity="high"}} 2
 zen_watcher_events_total{{cluster_id="demo",category="security",source="trivy",event_type="vulnerability",severity="medium"}} 1
-zen_watcher_events_total{{cluster_id="demo",category="security",source="falco",event_type="runtime-threat",severity="critical"}} 1
-zen_watcher_events_total{{cluster_id="demo",category="security",source="falco",event_type="runtime-threat",severity="high"}} 2
-zen_watcher_events_total{{cluster_id="demo",category="security",source="kyverno",event_type="policy-violation",severity="medium"}} 2
-zen_watcher_events_total{{cluster_id="demo",category="security",source="kyverno",event_type="policy-violation",severity="low"}} 1
-zen_watcher_events_total{{cluster_id="demo",category="security",source="checkov",event_type="iac-scan",severity="high"}} 1
-zen_watcher_events_total{{cluster_id="demo",category="security",source="checkov",event_type="iac-scan",severity="medium"}} 2
-zen_watcher_events_total{{cluster_id="demo",category="compliance",source="kube-bench",event_type="cis-benchmark",severity="medium"}} 1
-zen_watcher_events_total{{cluster_id="demo",category="compliance",source="kube-bench",event_type="cis-benchmark",severity="low"}} 1
-zen_watcher_events_total{{cluster_id="demo",category="compliance",source="audit",event_type="audit-event",severity="info"}} 2
+zen_watcher_events_total{{cluster_id="demo",category="security",source="falco",event_type="runtime_threat",severity="critical"}} 1
+zen_watcher_events_total{{cluster_id="demo",category="security",source="falco",event_type="runtime_threat",severity="high"}} 2
+zen_watcher_events_total{{cluster_id="demo",category="security",source="kyverno",event_type="policy_violation",severity="medium"}} 2
+zen_watcher_events_total{{cluster_id="demo",category="security",source="kyverno",event_type="policy_violation",severity="low"}} 1
+zen_watcher_events_total{{cluster_id="demo",category="security",source="checkov",event_type="iac_scan",severity="high"}} 1
+zen_watcher_events_total{{cluster_id="demo",category="security",source="checkov",event_type="iac_scan",severity="medium"}} 2
+zen_watcher_events_total{{cluster_id="demo",category="compliance",source="kube-bench",event_type="cis_benchmark",severity="medium"}} 1
+zen_watcher_events_total{{cluster_id="demo",category="compliance",source="kube-bench",event_type="cis_benchmark",severity="low"}} 1
+zen_watcher_events_total{{cluster_id="demo",category="compliance",source="audit",event_type="audit_event",severity="info"}} 2
 
 # HELP zen_watcher_active_events Currently active events
 # TYPE zen_watcher_active_events gauge
@@ -202,6 +200,9 @@ zen_watcher_watcher_status{{cluster_id="demo",watcher="kyverno"}} 1
 zen_watcher_watcher_status{{cluster_id="demo",watcher="checkov"}} 1
 zen_watcher_watcher_status{{cluster_id="demo",watcher="kube-bench"}} 1
 zen_watcher_watcher_status{{cluster_id="demo",watcher="audit"}} 1
+zen_watcher_watcher_status{{cluster_id="demo",watcher="cert-manager"}} 1
+zen_watcher_watcher_status{{cluster_id="demo",watcher="sealed-secrets"}} 1
+zen_watcher_watcher_status{{cluster_id="demo",watcher="kubernetes-events"}} 1
 """
         
         class Handler(BaseHTTPRequestHandler):
