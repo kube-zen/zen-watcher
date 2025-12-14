@@ -130,6 +130,43 @@ create_observation "demo-audit-info-2" "audit" "compliance" "info" "audit_event"
     user: "admin"
     verb: "create"'
 
+# Create demo observations from cert-manager
+create_observation "demo-cert-manager-warning-1" "cert-manager" "security" "medium" "cert_manager_event" "Certificate" "demo-cert" "demo-manifests" '    reason: "CertificateExpiring"
+    message: "Certificate expiring in 30 days"
+    issuer: "letsencrypt-prod"'
+create_observation "demo-cert-manager-info-1" "cert-manager" "operations" "low" "cert_manager_event" "CertificateRequest" "demo-cert-request" "demo-manifests" '    reason: "CertificateIssued"
+    message: "Certificate successfully issued"'
+
+# Create demo observations from sealed-secrets
+create_observation "demo-sealed-secrets-error-1" "sealed-secrets" "security" "high" "sealed_secrets_event" "SealedSecret" "demo-secret" "demo-manifests" '    reason: "DecryptionFailed"
+    message: "Failed to decrypt sealed secret"'
+create_observation "demo-sealed-secrets-info-1" "sealed-secrets" "operations" "low" "sealed_secrets_event" "SealedSecret" "demo-secret-2" "demo-manifests" '    reason: "SecretCreated"
+    message: "Secret successfully created from sealed secret"'
+
+# Create demo observations from kubernetes-events
+create_observation "demo-kubernetes-events-warning-1" "kubernetes-events" "operations" "medium" "kubernetes_event" "Pod" "demo-insecure-pod" "demo-manifests" '    reason: "Failed"
+    message: "Pod failed to start"
+    type: "Warning"'
+create_observation "demo-kubernetes-events-info-1" "kubernetes-events" "operations" "info" "kubernetes_event" "Deployment" "demo-public-registry" "demo-manifests" '    reason: "ScalingReplicaSet"
+    message: "Scaled up replica set"
+    type: "Normal"'
+
+# Create demo observations from prometheus
+create_observation "demo-prometheus-critical-1" "prometheus" "operations" "critical" "prometheus_alert" "Pod" "demo-insecure-pod" "demo-manifests" '    alert: "HighMemoryUsage"
+    message: "Memory usage above 90%"
+    severity: "critical"'
+create_observation "demo-prometheus-warning-1" "prometheus" "operations" "medium" "prometheus_alert" "Deployment" "demo-public-registry" "demo-manifests" '    alert: "HighCPUUsage"
+    message: "CPU usage above 80%"
+    severity: "warning"'
+
+# Create demo observations from opa-gatekeeper
+create_observation "demo-opa-violation-1" "opa-gatekeeper" "security" "high" "opa_violation" "Pod" "demo-insecure-pod" "demo-manifests" '    constraint: "K8sRequiredLabels"
+    message: "Pod missing required labels"
+    enforcementAction: "deny"'
+create_observation "demo-opa-violation-2" "opa-gatekeeper" "compliance" "medium" "opa_violation" "Deployment" "demo-public-registry" "demo-manifests" '    constraint: "K8sResourceLimits"
+    message: "Container missing resource limits"
+    enforcementAction: "dryrun"'
+
 log_success "Demo observations created"
 
 # Deploy demo manifests for Checkov to scan

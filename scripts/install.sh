@@ -167,6 +167,18 @@ if [ ! -f "${SCRIPT_DIR}/helmfile.yaml.gotmpl" ]; then
     exit 1
 fi
 
+# Ensure CRDs are properly annotated/labeled for Helm management before helmfile sync
+log_info "Preparing CRDs for Helm management..."
+if kubectl get crd ingesters.zen.kube-zen.io observations.zen.kube-zen.io >/dev/null 2>&1; then
+    kubectl annotate crd ingesters.zen.kube-zen.io observations.zen.kube-zen.io \
+        meta.helm.sh/release-name=zen-watcher \
+        meta.helm.sh/release-namespace="${NAMESPACE}" \
+        --overwrite >/dev/null 2>&1 || true
+    kubectl label crd ingesters.zen.kube-zen.io observations.zen.kube-zen.io \
+        app.kubernetes.io/managed-by=Helm \
+        --overwrite >/dev/null 2>&1 || true
+fi
+
 # Add Helm repositories
 log_info "Ensuring Helm repositories are available..."
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx 2>&1 | grep -v "already exists" > /dev/null || true
