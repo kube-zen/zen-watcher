@@ -167,19 +167,40 @@ if [ ! -f "${SCRIPT_DIR}/helmfile.yaml.gotmpl" ]; then
     exit 1
 fi
 
-# Ensure CRDs are properly handled before helmfile sync
-# Delete existing CRDs if they exist without proper Helm ownership to avoid conflicts
-log_info "Preparing CRDs for Helm management..."
-for crd in ingesters.zen.kube-zen.io observations.zen.kube-zen.io; do
-    if kubectl get crd "$crd" >/dev/null 2>&1; then
-        # Check if CRD has Helm ownership metadata
-        if ! kubectl get crd "$crd" -o jsonpath='{.metadata.labels.app\.kubernetes\.io/managed-by}' 2>/dev/null | grep -q "Helm"; then
-            log_info "Removing CRD $crd without Helm ownership to allow clean installation..."
-            kubectl delete crd "$crd" --ignore-not-found=true >/dev/null 2>&1 || true
-            sleep 1
+# Install CRDs manually before helmfile sync to avoid ownership conflicts
+log_info "Installing CRDs manually before helmfile sync..."
+REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$(cd "$(dirname "$0")/.." && pwd)")"
+CRD_DIR="${REPO_ROOT}/deployments/crds"
+if [ -d "$CRD_DIR" ]; then
+    for crd_file in "${CRD_DIR}"/*_crd.yaml; do
+        if [ -f "$crd_file" ]; then
+            crd_name=$(grep "^name:" "$crd_file" | head -1 | awk '{print $2}')
+            if [ -n "$crd_name" ]; then
+                # Delete existing CRD if it doesn't have Helm ownership
+                if kubectl get crd "$crd_name" >/dev/null 2>&1; then
+                    if ! kubectl get crd "$crd_name" -o jsonpath='{.metadata.labels.app\.kubernetes\.io/managed-by}' 2>/dev/null | grep -q "Helm"; then
+                        log_info "Removing CRD $crd_name without Helm ownership..."
+                        kubectl delete crd "$crd_name" --ignore-not-found=true >/dev/null 2>&1 || true
+                        sleep 1
+                    fi
+                fi
+                # Install CRD if it doesn't exist
+                if ! kubectl get crd "$crd_name" >/dev/null 2>&1; then
+                    kubectl apply -f "$crd_file" >/dev/null 2>&1 || true
+                    # Annotate/label for Helm management
+                    kubectl annotate crd "$crd_name" \
+                        meta.helm.sh/release-name=zen-watcher \
+                        meta.helm.sh/release-namespace="${NAMESPACE}" \
+                        --overwrite >/dev/null 2>&1 || true
+                    kubectl label crd "$crd_name" \
+                        app.kubernetes.io/managed-by=Helm \
+                        --overwrite >/dev/null 2>&1 || true
+                fi
+            fi
         fi
-    fi
-done
+    done
+    log_success "CRDs prepared for Helm management"
+fi
 
 # Add Helm repositories
 log_info "Ensuring Helm repositories are available..."
