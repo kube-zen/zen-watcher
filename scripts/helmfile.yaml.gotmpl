@@ -176,12 +176,6 @@ releases:
             promscrape.dropOriginalLabels: false
           vmServiceScrape:
             enabled: true
-                  - path: /victoriametrics/targets(/|$)(.*)
-                    pathType: ImplementationSpecific
-                  - path: /victoriametrics/vmui(/|$)(.*)
-                    pathType: ImplementationSpecific
-                  - path: /victoriametrics/health(/|$)(.*)
-                    pathType: ImplementationSpecific
 
   # Grafana (depends on VictoriaMetrics for datasource)
   - name: grafana
