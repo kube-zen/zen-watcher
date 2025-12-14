@@ -191,18 +191,32 @@ if [ -d "$CRD_DIR" ]; then
                     sleep 2
                 fi
                 # Install CRD using server-side apply with Helm field manager and force conflicts
-                kubectl apply --server-side --field-manager=helm --force-conflicts -f "$crd_file" >/dev/null 2>&1 || {
-                    log_warn "Failed to install CRD from $crd_file, continuing..."
-                    continue
-                }
-                # Annotate/label for Helm management
-                kubectl annotate crd "$crd_name" \
-                    meta.helm.sh/release-name=zen-watcher \
-                    meta.helm.sh/release-namespace="${NAMESPACE}" \
-                    --overwrite >/dev/null 2>&1 || true
-                kubectl label crd "$crd_name" \
-                    app.kubernetes.io/managed-by=Helm \
-                    --overwrite >/dev/null 2>&1 || true
+                if kubectl apply --server-side --field-manager=helm --force-conflicts -f "$crd_file" 2>&1 | tee /tmp/crd-install.log; then
+                    # Annotate/label for Helm management
+                    kubectl annotate crd "$crd_name" \
+                        meta.helm.sh/release-name=zen-watcher \
+                        meta.helm.sh/release-namespace="${NAMESPACE}" \
+                        --overwrite >/dev/null 2>&1 || true
+                    kubectl label crd "$crd_name" \
+                        app.kubernetes.io/managed-by=Helm \
+                        --overwrite >/dev/null 2>&1 || true
+                    log_info "Successfully installed CRD $crd_name"
+                else
+                    log_warn "Failed to install CRD from $crd_file, check /tmp/crd-install.log"
+                    # Try fallback: regular kubectl apply
+                    if kubectl apply -f "$crd_file" >/dev/null 2>&1; then
+                        kubectl annotate crd "$crd_name" \
+                            meta.helm.sh/release-name=zen-watcher \
+                            meta.helm.sh/release-namespace="${NAMESPACE}" \
+                            --overwrite >/dev/null 2>&1 || true
+                        kubectl label crd "$crd_name" \
+                            app.kubernetes.io/managed-by=Helm \
+                            --overwrite >/dev/null 2>&1 || true
+                        log_info "Installed CRD $crd_name using fallback method"
+                    else
+                        log_warn "All CRD installation methods failed for $crd_name, continuing..."
+                    fi
+                fi
             fi
         fi
     done
