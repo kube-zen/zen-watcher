@@ -194,7 +194,7 @@ if [ -d "$CRD_DIR" ]; then
                 TEMP_CRD_FILE="/tmp/$(basename "$crd_file")"
                 grep -v "kubectl.kubernetes.io/last-applied-configuration" "$crd_file" > "$TEMP_CRD_FILE" 2>/dev/null || cp "$crd_file" "$TEMP_CRD_FILE"
                 # Install CRD using server-side apply with Helm field manager
-                if kubectl apply --server-side --field-manager=helm --force-conflicts -f "$TEMP_CRD_FILE" >/dev/null 2>&1; then
+                if kubectl apply --server-side --field-manager=helm --force-conflicts -f "$TEMP_CRD_FILE" 2>&1 | tee /tmp/crd-install-${crd_name}.log; then
                     # Annotate/label for Helm management
                     kubectl annotate crd "$crd_name" \
                         meta.helm.sh/release-name=zen-watcher \
