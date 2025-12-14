@@ -217,8 +217,36 @@ PYEOF
                     # Fallback: copy file and hope Helm can handle it
                     cp "$crd_file" "$TEMP_CRD_FILE"
                 fi
-                # Install CRD using server-side apply with Helm field manager
-                if kubectl apply --server-side --field-manager=helm --force-conflicts -f "$TEMP_CRD_FILE" 2>&1 | tee /tmp/crd-install-${crd_name}.log; then
+                # Install CRD using kubectl create (avoids kubectl annotations) then annotate for Helm
+                CRD_INSTALL_SUCCESS=false
+                if kubectl create -f "$TEMP_CRD_FILE" >/dev/null 2>&1; then
+                    CRD_INSTALL_SUCCESS=true
+                elif kubectl apply --server-side --field-manager=helm --force-conflicts -f "$TEMP_CRD_FILE" >/dev/null 2>&1; then
+                    CRD_INSTALL_SUCCESS=true
+                fi
+                
+                if [ "$CRD_INSTALL_SUCCESS" = true ]; then
+                    # Wait for CRD to be ready
+                    sleep 2
+                    # Annotate/label for Helm management - retry if needed
+                    for i in {1..5}; do
+                        if kubectl annotate crd "$crd_name" \
+                            meta.helm.sh/release-name=zen-watcher \
+                            meta.helm.sh/release-namespace="${NAMESPACE}" \
+                            --overwrite >/dev/null 2>&1 && \
+                           kubectl label crd "$crd_name" \
+                            app.kubernetes.io/managed-by=Helm \
+                            --overwrite >/dev/null 2>&1; then
+                            log_info "Successfully installed and annotated CRD $crd_name"
+                            break
+                        fi
+                        sleep 1
+                    done
+                    rm -f "$TEMP_CRD_FILE"
+                else
+                    log_warn "CRD installation failed for $crd_name, will retry during helmfile sync"
+                    rm -f "$TEMP_CRD_FILE"
+                fi
                     # Annotate/label for Helm management
                     kubectl annotate crd "$crd_name" \
                         meta.helm.sh/release-name=zen-watcher \
