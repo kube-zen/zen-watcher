@@ -192,8 +192,13 @@ if [ -d "$CRD_DIR" ]; then
                 fi
                 # Create temporary CRD file without kubectl annotations
                 TEMP_CRD_FILE="/tmp/$(basename "$crd_file")"
-                # Use sed to remove kubectl annotation line without breaking YAML structure
-                sed '/kubectl\.kubernetes\.io\/last-applied-configuration/d' "$crd_file" > "$TEMP_CRD_FILE" 2>/dev/null || cp "$crd_file" "$TEMP_CRD_FILE"
+                # Use yq to properly remove kubectl annotation if available, otherwise use sed carefully
+                if command -v yq >/dev/null 2>&1; then
+                    yq eval 'del(.metadata.annotations."kubectl.kubernetes.io/last-applied-configuration")' "$crd_file" > "$TEMP_CRD_FILE" 2>/dev/null || cp "$crd_file" "$TEMP_CRD_FILE"
+                else
+                    # Use awk to remove the annotation line more carefully
+                    awk '/kubectl\.kubernetes\.io\/last-applied-configuration:/{getline; while(/^[[:space:]]+.*/ || /^[[:space:]]*$/){getline}}1' "$crd_file" > "$TEMP_CRD_FILE" 2>/dev/null || cp "$crd_file" "$TEMP_CRD_FILE"
+                fi
                 # Install CRD using server-side apply with Helm field manager
                 if kubectl apply --server-side --field-manager=helm --force-conflicts -f "$TEMP_CRD_FILE" 2>&1 | tee /tmp/crd-install-${crd_name}.log; then
                     # Annotate/label for Helm management
