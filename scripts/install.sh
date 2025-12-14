@@ -188,7 +188,14 @@ if [ -d "$CRD_DIR" ]; then
                 if kubectl get crd "$crd_name" >/dev/null 2>&1; then
                     log_info "Removing existing CRD $crd_name for clean reinstall..."
                     kubectl delete crd "$crd_name" --ignore-not-found=true >/dev/null 2>&1 || true
-                    sleep 2
+                    # Wait for CRD to be fully deleted
+                    for i in {1..30}; do
+                        if ! kubectl get crd "$crd_name" >/dev/null 2>&1; then
+                            break
+                        fi
+                        sleep 1
+                    done
+                    sleep 2  # Extra wait to ensure API server has processed deletion
                 fi
                 # Create temporary CRD file without kubectl annotations
                 TEMP_CRD_FILE="/tmp/$(basename "$crd_file")"
