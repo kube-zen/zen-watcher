@@ -188,10 +188,10 @@ if [ -d "$CRD_DIR" ]; then
                 if kubectl get crd "$crd_name" >/dev/null 2>&1; then
                     log_info "Reinstalling CRD $crd_name with Helm field manager..."
                     kubectl delete crd "$crd_name" --ignore-not-found=true >/dev/null 2>&1 || true
-                    sleep 1
+                    sleep 2
                 fi
-                # Install CRD using server-side apply with Helm field manager
-                kubectl apply --server-side --field-manager=helm -f "$crd_file" >/dev/null 2>&1 || {
+                # Install CRD using server-side apply with Helm field manager and force conflicts
+                kubectl apply --server-side --field-manager=helm --force-conflicts -f "$crd_file" >/dev/null 2>&1 || {
                     log_warn "Failed to install CRD from $crd_file, continuing..."
                     continue
                 }
