@@ -186,16 +186,33 @@ if [ -d "$CRD_DIR" ]; then
                 fi
                 # Install CRD if it doesn't exist
                 if ! kubectl get crd "$crd_name" >/dev/null 2>&1; then
-                    kubectl apply -f "$crd_file" >/dev/null 2>&1 && {
-                        # Annotate/label for Helm management
-                        kubectl annotate crd "$crd_name" \
-                            meta.helm.sh/release-name=zen-watcher \
-                            meta.helm.sh/release-namespace="${NAMESPACE}" \
-                            --overwrite >/dev/null 2>&1 || true
-                        kubectl label crd "$crd_name" \
-                            app.kubernetes.io/managed-by=Helm \
-                            --overwrite >/dev/null 2>&1 || true
-                    } || log_warn "Failed to install CRD from $crd_file, continuing..."
+                    # Use kubectl create instead of apply to avoid kubectl annotations
+                    kubectl create -f "$crd_file" >/dev/null 2>&1 || kubectl apply --server-side -f "$crd_file" >/dev/null 2>&1 || {
+                        log_warn "Failed to install CRD from $crd_file, continuing..."
+                        continue
+                    }
+                    # Annotate/label for Helm management
+                    kubectl annotate crd "$crd_name" \
+                        meta.helm.sh/release-name=zen-watcher \
+                        meta.helm.sh/release-namespace="${NAMESPACE}" \
+                        --overwrite >/dev/null 2>&1 || true
+                    kubectl label crd "$crd_name" \
+                        app.kubernetes.io/managed-by=Helm \
+                        --overwrite >/dev/null 2>&1 || true
+                    # Remove kubectl annotations that conflict with Helm
+                    kubectl annotate crd "$crd_name" \
+                        kubectl.kubernetes.io/last-applied-configuration- \
+                        --overwrite >/dev/null 2>&1 || true
+                else
+                    # CRD exists - ensure it has Helm annotations and remove kubectl annotations
+                    kubectl annotate crd "$crd_name" \
+                        meta.helm.sh/release-name=zen-watcher \
+                        meta.helm.sh/release-namespace="${NAMESPACE}" \
+                        kubectl.kubernetes.io/last-applied-configuration- \
+                        --overwrite >/dev/null 2>&1 || true
+                    kubectl label crd "$crd_name" \
+                        app.kubernetes.io/managed-by=Helm \
+                        --overwrite >/dev/null 2>&1 || true
                 fi
             fi
         fi
