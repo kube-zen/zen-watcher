@@ -184,14 +184,17 @@ if [ -d "$CRD_DIR" ]; then
                         sleep 1
                     fi
                 fi
-                # Delete and reinstall CRD with Helm field manager to avoid conflicts
+                # Delete existing CRD to ensure clean installation
                 if kubectl get crd "$crd_name" >/dev/null 2>&1; then
-                    log_info "Reinstalling CRD $crd_name with Helm field manager..."
+                    log_info "Removing existing CRD $crd_name for clean reinstall..."
                     kubectl delete crd "$crd_name" --ignore-not-found=true >/dev/null 2>&1 || true
                     sleep 2
                 fi
-                # Install CRD using server-side apply with Helm field manager and force conflicts
-                if kubectl apply --server-side --field-manager=helm --force-conflicts -f "$crd_file" 2>&1 | tee /tmp/crd-install.log; then
+                # Create temporary CRD file without kubectl annotations
+                TEMP_CRD_FILE="/tmp/$(basename "$crd_file")"
+                grep -v "kubectl.kubernetes.io/last-applied-configuration" "$crd_file" > "$TEMP_CRD_FILE" 2>/dev/null || cp "$crd_file" "$TEMP_CRD_FILE"
+                # Install CRD using server-side apply with Helm field manager
+                if kubectl apply --server-side --field-manager=helm --force-conflicts -f "$TEMP_CRD_FILE" >/dev/null 2>&1; then
                     # Annotate/label for Helm management
                     kubectl annotate crd "$crd_name" \
                         meta.helm.sh/release-name=zen-watcher \
@@ -201,11 +204,14 @@ if [ -d "$CRD_DIR" ]; then
                         app.kubernetes.io/managed-by=Helm \
                         --overwrite >/dev/null 2>&1 || true
                     log_info "Successfully installed CRD $crd_name"
+                    rm -f "$TEMP_CRD_FILE"
                 else
-                    log_warn "Failed to install CRD from $crd_file, check /tmp/crd-install.log"
-                    # Try fallback: regular kubectl apply
-                    if kubectl apply -f "$crd_file" >/dev/null 2>&1; then
+                    log_warn "Server-side apply failed for $crd_name, trying regular apply..."
+                    # Try fallback: regular kubectl apply (will add kubectl annotations, but we'll remove them)
+                    if kubectl apply -f "$TEMP_CRD_FILE" >/dev/null 2>&1; then
+                        # Remove kubectl annotations and add Helm annotations
                         kubectl annotate crd "$crd_name" \
+                            kubectl.kubernetes.io/last-applied-configuration- \
                             meta.helm.sh/release-name=zen-watcher \
                             meta.helm.sh/release-namespace="${NAMESPACE}" \
                             --overwrite >/dev/null 2>&1 || true
@@ -213,8 +219,10 @@ if [ -d "$CRD_DIR" ]; then
                             app.kubernetes.io/managed-by=Helm \
                             --overwrite >/dev/null 2>&1 || true
                         log_info "Installed CRD $crd_name using fallback method"
+                        rm -f "$TEMP_CRD_FILE"
                     else
                         log_warn "All CRD installation methods failed for $crd_name, continuing..."
+                        rm -f "$TEMP_CRD_FILE"
                     fi
                 fi
             fi
