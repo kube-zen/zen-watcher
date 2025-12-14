@@ -174,7 +174,7 @@ CRD_DIR="${REPO_ROOT}/deployments/crds"
 if [ -d "$CRD_DIR" ]; then
     for crd_file in "${CRD_DIR}"/*_crd.yaml; do
         if [ -f "$crd_file" ]; then
-            crd_name=$(grep "^name:" "$crd_file" | head -1 | awk '{print $2}')
+            crd_name=$(grep "^  name:" "$crd_file" | head -1 | awk '{print $2}' || grep "^name:" "$crd_file" | head -1 | awk '{print $2}')
             if [ -n "$crd_name" ]; then
                 # Delete existing CRD if it doesn't have Helm ownership
                 if kubectl get crd "$crd_name" >/dev/null 2>&1; then
@@ -186,20 +186,23 @@ if [ -d "$CRD_DIR" ]; then
                 fi
                 # Install CRD if it doesn't exist
                 if ! kubectl get crd "$crd_name" >/dev/null 2>&1; then
-                    kubectl apply -f "$crd_file" >/dev/null 2>&1 || true
-                    # Annotate/label for Helm management
-                    kubectl annotate crd "$crd_name" \
-                        meta.helm.sh/release-name=zen-watcher \
-                        meta.helm.sh/release-namespace="${NAMESPACE}" \
-                        --overwrite >/dev/null 2>&1 || true
-                    kubectl label crd "$crd_name" \
-                        app.kubernetes.io/managed-by=Helm \
-                        --overwrite >/dev/null 2>&1 || true
+                    kubectl apply -f "$crd_file" >/dev/null 2>&1 && {
+                        # Annotate/label for Helm management
+                        kubectl annotate crd "$crd_name" \
+                            meta.helm.sh/release-name=zen-watcher \
+                            meta.helm.sh/release-namespace="${NAMESPACE}" \
+                            --overwrite >/dev/null 2>&1 || true
+                        kubectl label crd "$crd_name" \
+                            app.kubernetes.io/managed-by=Helm \
+                            --overwrite >/dev/null 2>&1 || true
+                    } || log_warn "Failed to install CRD from $crd_file, continuing..."
                 fi
             fi
         fi
     done
     log_success "CRDs prepared for Helm management"
+else
+    log_warn "CRD directory not found: $CRD_DIR, skipping manual CRD installation"
 fi
 
 # Add Helm repositories
