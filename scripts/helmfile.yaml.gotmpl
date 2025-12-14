@@ -59,7 +59,6 @@ releases:
       - victoriametrics/victoriametrics-operator-crds
     installed: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
     wait: true
-    waitTimeout: 300s
     values:
       - nameOverride: vms
       - server:
@@ -203,7 +202,6 @@ releases:
       - victoriametrics/victoriametrics-single
     installed: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
     wait: true
-    waitTimeout: 300s
     values:
       - adminUser: zen
       - adminPassword: {{ $grafanaPassword }}
