@@ -265,6 +265,25 @@ spec:
                       description: 'For type ''saas'': Endpoint path or identifier
                         (managed by external system)'
                       type: string
+                    channel:
+                      description: 'Channel configuration for forwarding through zen-bridge (SaaS). When set, data flows through zen-bridge to zen-egress instead of directly to SaaS.'
+                      type: object
+                      properties:
+                        enabled:
+                          description: Enable channel forwarding through zen-bridge
+                          type: boolean
+                          default: true
+                        targetEgress:
+                          description: Target egress adapter name/ID for forwarding (optional, defaults to only registered egress if single, required if multiple egress adapters exist)
+                          type: string
+                        protocol:
+                          description: Protocol for channel communication (grpc, http, websocket)
+                          type: string
+                          enum:
+                          - grpc
+                          - http
+                          - websocket
+                          default: grpc
                     queueName:
                       description: 'For type ''queue'': Queue name or topic'
                       type: string
