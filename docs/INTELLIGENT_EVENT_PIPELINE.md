@@ -27,7 +27,7 @@ graph TD
     J --> D
     
     G --> K[OBSERVABILITY<br/>Prometheus metrics]
-    K --> L[CONTROL PLANE<br/>Dynamic processing order<br/>Auto-optimization]
+    K --> L[CONTROL PLANE<br/>Configurable processing order]
     L --> B
     
     style B fill:#fff3e0
@@ -200,7 +200,7 @@ If the event passes all stages, an `Observation` CRD is created in etcd.
 
 The system exposes comprehensive metrics that feed back into the control plane:
 
-**Key Metrics for Auto-Optimization**:
+**Key Metrics for Monitoring**:
 - `zen_watcher_filter_pass_rate{source}` - Filter effectiveness (0.0-1.0)
 - `zen_watcher_dedup_effectiveness{source}` - Dedup effectiveness (0.0-1.0)
 - `zen_watcher_low_severity_percent{source}` - Low severity ratio (0.0-1.0)
@@ -216,9 +216,9 @@ The system exposes comprehensive metrics that feed back into the control plane:
 
 The system actively monitors these metrics and adjusts behavior:
 
-1. **Dynamic Processing Order**: Switches between `filter_first` and `dedup_first` based on traffic patterns
+1. **Configurable Processing Order**: Choose `filter_first` or `dedup_first` based on workload patterns
 2. **Threshold Monitoring**: Alerts when observation rate, low severity ratio, or dedup effectiveness exceeds thresholds
-3. **Auto-Optimization**: Suggests and applies optimizations automatically when `autoOptimize: true`
+3. **Performance Metrics**: Monitor filter and dedup effectiveness to guide configuration decisions
 
 ---
 
@@ -226,7 +226,7 @@ The system actively monitors these metrics and adjusts behavior:
 
 ### Simple Configuration
 
-Enable auto-optimization with a single parameter:
+Configure processing order based on your workload:
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
@@ -236,30 +236,25 @@ metadata:
 spec:
   source: trivy
   processing:
-    order: auto          # Let system decide
-    autoOptimize: true  # Enable self-management
+    order: filter_first  # Use filter_first for high LOW severity, dedup_first for high duplicate rate
 ```
 
-### What Happens When You Set `autoOptimize: true`
+### Choosing the Right Processing Order
 
-When you set `autoOptimize: true` for a high-volume source like Falco:
+Select the processing order that best fits your workload patterns:
 
-1. **System monitors** the effectiveness of both content fingerprinting and rate limiting
-2. **System analyzes** real-time traffic patterns (LOW severity ratio, dedup effectiveness)
-3. **System dynamically switches** internal processing order to maximize noise reduction
-4. **System alerts** when thresholds are exceeded
-5. **System suggests** optimizations (filter rules, dedup windows, rate limits)
-6. **All without manual intervention**
+- **filter_first**: Use when you have high LOW severity (>70%) - filter early to reduce noise
+- **dedup_first**: Use when you have high duplicate rate (>50%) - dedupe early to reduce workload
 
 **Example Scenario**:
-- Falco events spike: 70% LOW severity
-- System automatically switches to `filter_first`
-- System suggests increasing `filter.minPriority` to 0.5
-- After applying suggestion: 85% noise reduction, CPU usage drops 40%
+- Falco events: 70% LOW severity
+- Configure `order: filter_first` to filter early
+- Adjust `filter.minPriority` to 0.5 to reduce noise further
+- Result: 85% noise reduction, CPU usage drops 40%
 
 ---
 
-## Complete Example: Trivy with Auto-Optimization
+## Complete Example: Trivy with Processing Order Configuration
 
 ### Initial State
 
@@ -271,8 +266,7 @@ metadata:
 spec:
   source: trivy
   processing:
-    order: auto
-    autoOptimize: true
+    order: filter_first
   thresholds:
     lowSeverityPercent:
       warning: 0.7
@@ -319,26 +313,17 @@ Shows:
 - Optimization suggestions
 - Past optimization impact
 
-### Enable Auto-Optimization
+### Configure Processing Order
 
-```bash
-zen-watcher-optimize --command=auto --enable
+Processing order is configured directly in the Ingester CRD:
+
+```yaml
+spec:
+  processing:
+    order: filter_first  # filter_first or dedup_first
 ```
 
-Enables auto-optimization for all sources with `autoOptimize: true`.
-
-### View Optimization History
-
-```bash
-zen-watcher-optimize --command=history --source=trivy
-```
-
-Shows:
-- Number of optimizations applied
-- Observations reduced
-- Reduction percentage
-- CPU savings
-- Most effective optimization
+Choose the order that best fits your workload patterns based on metrics.
 
 ---
 
@@ -363,12 +348,12 @@ Shows:
 
 ## Best Practices
 
-1. **Start with Auto-Optimization**: Enable `autoOptimize: true` and let the system learn your patterns
+1. **Choose Processing Order**: Select `filter_first` for high LOW severity, `dedup_first` for high duplicate rate
 2. **Set Thresholds**: Configure thresholds in Ingester for early warnings
-3. **Monitor Metrics**: Watch Prometheus metrics to track optimization effectiveness
-4. **Review Suggestions**: Use `analyze` command to review suggestions before applying
-5. **Tune Dedup Windows**: Use per-source windows for sources with retry patterns (e.g., cert-manager: 24h)
-6. **Adjust Rate Limits**: Increase `DEDUP_MAX_RATE_PER_SOURCE` for high-volume sources
+3. **Monitor Metrics**: Watch Prometheus metrics to track filter and dedup effectiveness
+4. **Tune Dedup Windows**: Use per-source windows for sources with retry patterns (e.g., cert-manager: 24h)
+5. **Adjust Rate Limits**: Increase `DEDUP_MAX_RATE_PER_SOURCE` for high-volume sources
+6. **Review Performance**: Use metrics to guide configuration adjustments
 
 ---
 
@@ -382,7 +367,7 @@ Shows:
 1. Review filter rules
 2. Consider increasing dedup window
 3. Check for source-specific issues (e.g., misconfigured scanner)
-4. Enable auto-optimization to let system suggest fixes
+4. Configure appropriate processing order based on workload patterns
 
 ### Low Dedup Effectiveness
 
@@ -399,7 +384,7 @@ Shows:
 **Symptoms**: `zen_watcher_low_severity_percent` > 0.70
 
 **Solutions**:
-1. Enable auto-optimization (system will switch to `filter_first`)
+1. Configure `order: filter_first` to filter early and reduce noise
 2. Apply filter suggestion (`filter.minPriority: 0.5`)
 3. Review source tool configuration (may be too noisy)
 
@@ -408,8 +393,7 @@ Shows:
 ## Related Documentation
 
 - [DEDUPLICATION.md](DEDUPLICATION.md) - Detailed deduplication documentation
-- [OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md) - CLI usage guide
-- [AUTO_OPTIMIZATION_COMPLETE.md](AUTO_OPTIMIZATION_COMPLETE.md) - Implementation details
+- [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Processing order configuration guide
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture overview
 - [OPERATIONS.md](OPERATIONS.md) - Operational guidance and monitoring
 
@@ -417,13 +401,13 @@ Shows:
 
 ## Summary
 
-Zen Watcher's Intelligent Event Pipeline is a **self-managing, adaptive system** that:
+Zen Watcher's Intelligent Event Pipeline provides:
 
-1. **Observes** its own performance via Prometheus metrics
-2. **Analyzes** traffic patterns (LOW severity ratio, dedup effectiveness)
-3. **Decides** optimal processing order dynamically
-4. **Optimizes** filter rules, dedup windows, and rate limits automatically
-5. **Maintains** high integrity while reducing noise
+1. **Configurable Processing Order**: Choose filter_first or dedup_first based on workload patterns
+2. **Comprehensive Metrics**: Monitor filter and dedup effectiveness via Prometheus metrics
+3. **Threshold Monitoring**: Alerts when observation rate, low severity ratio, or dedup effectiveness exceeds thresholds
+4. **Flexible Configuration**: Tune dedup windows, rate limits, and filter rules per source
+5. **High Integrity**: Maintains data integrity while reducing noise through filtering and deduplication
 
-**The intelligence isn't magic—it's driven by data.** The system observes its own performance and acts on those observations, keeping integrity high and noise low precisely.
+**The system is configurable and observable.** Use metrics to guide configuration decisions and optimize performance based on your specific workload patterns.
 

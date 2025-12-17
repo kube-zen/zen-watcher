@@ -17,7 +17,7 @@ approvers:
 
 ## Summary
 
-Zen Watcher is a Kubernetes operator that aggregates structured signals from security, compliance, and infrastructure tools into unified `Observation` CRDs. It provides a lightweight, standalone solution for security observability with intelligent filtering, deduplication, and auto-optimization.
+Zen Watcher is a Kubernetes operator that aggregates structured signals from security, compliance, and infrastructure tools into unified `Observation` CRDs. It provides a lightweight, standalone solution for security observability with intelligent filtering, deduplication, and configurable processing order.
 
 ## Motivation
 
@@ -37,12 +37,12 @@ Zen Watcher solves this by providing a single aggregation point that:
 
 1. **Unified Event Aggregation**: Single point for all security/compliance events
 2. **Zero Blast Radius**: Core component requires zero secrets, zero egress
-3. **Intelligent Processing**: Auto-optimization, filtering, deduplication
+3. **Intelligent Processing**: Configurable processing order, filtering, deduplication
 4. **Production Ready**: Minimal resource footprint, comprehensive observability
 
 ## Non-Goals
 
-- Remediation actions (handled by external controllers)
+- Action execution (handled by external controllers)
 - External system integrations (handled by sync controllers)
 - Long-term storage (uses TTL for cleanup)
 

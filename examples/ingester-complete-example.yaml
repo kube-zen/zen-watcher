@@ -33,7 +33,7 @@ spec:
     dedup:
       window: "1h"
       strategy: fingerprint  # Default - can be omitted
-    order: auto
+    # Note: order/optimization is commercial-only (not in OSS base)
   # Legacy dedup (backward compatibility)
   dedup:
     window: "1h"
@@ -148,7 +148,7 @@ spec:
     dedup:
       window: "10m"
       strategy: event-stream  # event-stream for noisy k8s events
-    order: auto
+    # Note: order/optimization is commercial-only (not in OSS base)
   # Legacy dedup (backward compatibility)
   dedup:
     window: "10m"

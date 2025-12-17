@@ -43,5 +43,4 @@ spec:
       - "spec.source"
       - "vuln-id"
   processing:
-    order: auto
-    autoOptimize: true
+    order: filter_first

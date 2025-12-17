@@ -23,7 +23,7 @@ spec:
     benchmark: "CIS Kubernetes Benchmark"
     check: "1.2.1"
     description: "Ensure that the --anonymous-auth argument is set to false"
-    remediation: "Set --anonymous-auth=false in kubelet configuration"
+    fix: "Set --anonymous-auth=false in kubelet configuration"
     status: "FAIL"
   detectedAt: "2025-12-10T12:00:00Z"
   ttlSecondsAfterCreation: 2592000  # 30 days

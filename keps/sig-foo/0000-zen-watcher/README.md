@@ -80,7 +80,7 @@ Modern Kubernetes clusters generate security, compliance, and operational events
 ### Non-Goals
 
 1. **Not a SIEM Replacement**: Focus on aggregation, not correlation/analysis (can feed into SIEMs)
-2. **Not a Remediation System**: Only collects events; remediation handled by separate controllers
+2. **Not a Remediation System**: Only collects events; actions handled by separate controllers
 3. **No External Data Storage**: Events stored only in Kubernetes etcd (CRDs)
 4. **No Outbound Traffic**: Zero egress from the cluster; no external API calls
 5. **No Vendor-Specific Integrations**: Generic CRD format that works with any consumer
@@ -93,7 +93,7 @@ Modern Kubernetes clusters generate security, compliance, and operational events
 
 1. **As a Security Engineer**, I want to see all security events (vulnerabilities, threats, violations) in one place so I can quickly assess cluster security posture.
 
-2. **As a Platform Engineer**, I want to correlate events across tools (e.g., vulnerability + runtime threat) so I can prioritize remediation efforts.
+2. **As a Platform Engineer**, I want to correlate events across tools (e.g., vulnerability + runtime threat) so I can prioritize response efforts.
 
 3. **As a DevOps Engineer**, I want to integrate security events into my existing Grafana dashboards without managing multiple integrations.
 

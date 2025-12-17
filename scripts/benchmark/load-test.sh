@@ -1,6 +1,5 @@
 #!/bin/bash
-# DEPRECATED: Use scripts/benchmark/stress-test.sh instead.
-# This script is kept temporarily for reference but is no longer maintained.
+# Use scripts/benchmark/stress-test.sh instead.
 #
 # Load test: Sustained performance under consistent load
 #

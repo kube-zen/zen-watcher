@@ -26,9 +26,8 @@ const (
 	ProcessingStrategyFilterFirst ProcessingStrategy = iota
 	// ProcessingStrategyDedupFirst processes dedup → filter → normalize → create
 	ProcessingStrategyDedupFirst
-	// ProcessingStrategyHybrid uses a hybrid approach based on event characteristics
-	ProcessingStrategyHybrid
 	// ProcessingStrategyAdaptive uses machine learning for dynamic strategy selection
+	// Note: Adaptive mode has been removed but kept for backward compatibility
 	ProcessingStrategyAdaptive
 )
 
@@ -39,8 +38,6 @@ func (ps ProcessingStrategy) String() string {
 		return "filter_first"
 	case ProcessingStrategyDedupFirst:
 		return "dedup_first"
-	case ProcessingStrategyHybrid:
-		return "hybrid"
 	case ProcessingStrategyAdaptive:
 		return "adaptive"
 	default:
@@ -112,10 +109,8 @@ func (sd *StrategyDecider) DetermineStrategy(
 		return sd.parseStrategy(config.Processing.Order)
 	}
 
-	// If auto-optimization is disabled, use default
-	if config != nil && !config.Processing.AutoOptimize {
-		return sd.getDefaultStrategy(config.Source)
-	}
+	// Note: Auto-optimization has been removed. This code path is no longer used.
+	// Processing order is now configured manually via config.Processing.Order
 
 	// If no metrics available, use default strategy
 	if metrics == nil {
@@ -134,17 +129,8 @@ func (sd *StrategyDecider) DetermineStrategy(
 		return ProcessingStrategyDedupFirst
 	}
 
-	// Rule 3: If high volume and moderate dedup, use hybrid
-	if metrics.EventsProcessed >= sd.config.AdaptiveThresholdVolume &&
-		metrics.DeduplicationRate > 0.3 && metrics.DeduplicationRate < 0.5 {
-		return ProcessingStrategyHybrid
-	}
-
-	// Rule 4: If very high volume and auto-optimize enabled, use adaptive
-	if config != nil && config.Processing.AutoOptimize &&
-		metrics.EventsProcessed >= sd.config.AdaptiveThresholdVolume*2 {
-		return ProcessingStrategyAdaptive
-	}
+	// Note: Auto-optimization and adaptive mode have been removed.
+	// Processing order is now configured manually via config.Processing.Order
 
 	// Default: Use source-specific default
 	return sd.getDefaultStrategy(config.Source)
@@ -157,8 +143,6 @@ func (sd *StrategyDecider) parseStrategy(strategy string) ProcessingStrategy {
 		return ProcessingStrategyFilterFirst
 	case "dedup_first":
 		return ProcessingStrategyDedupFirst
-	case "hybrid":
-		return ProcessingStrategyHybrid
 	case "adaptive":
 		return ProcessingStrategyAdaptive
 	default:
@@ -174,13 +158,13 @@ func (sd *StrategyDecider) getDefaultStrategy(source string) ProcessingStrategy 
 }
 
 // ShouldOptimize determines if optimization should be triggered based on metrics
+// Note: Auto-optimization has been removed. This function always returns false.
 func (sd *StrategyDecider) ShouldOptimize(
 	metrics *OptimizationMetrics,
 	config *generic.SourceConfig,
 ) bool {
-	if config == nil || !config.Processing.AutoOptimize {
-		return false
-	}
+	// Auto-optimization removed - always return false
+	return false
 
 	if metrics == nil {
 		return false

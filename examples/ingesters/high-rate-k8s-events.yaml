@@ -26,7 +26,6 @@ spec:
     optimization:
       enabled: true
       order: auto
-      autoOptimize: true
       analysisInterval: "5m"
       confidenceThreshold: 0.8
       thresholds:
@@ -53,11 +52,7 @@ spec:
     window: "30s"
     strategy: fingerprint
   optimization:
-    enabled: true
-    order: auto
-    autoOptimize: true
-    analysisInterval: "5m"
-    confidenceThreshold: 0.8
+    order: filter_first
     thresholds:
       observationsPerMinute:
         warning: 100

@@ -76,13 +76,9 @@ metadata:
       for matched lines","type":"string"}},"required":["regex"],"type":"object"},"type":"array"},"podSelector":{"description":"Pod
       selector (e.g., app=sealed-secrets)","type":"string"},"pollInterval":{"default":"1s","description":"Poll
       interval for checking new pods","type":"string"},"sinceSeconds":{"default":300,"description":"How
-      far back to read logs (seconds)","type":"integer"}},"type":"object"},"optimization":{"description":"Auto-optimization
-      configuration","properties":{"analysisInterval":{"default":"15m","description":"How
-      often to analyze performance and adjust optimization (e.g., ''15m'', ''30m'')","pattern":"^[0-9]+(ns|us|µs|ms|s|m|h)$","type":"string"},"autoOptimize":{"default":true,"description":"Allow
-      Zen Watcher to automatically optimize processing order based on metrics","type":"boolean"},"confidenceThreshold":{"default":0.7,"description":"Minimum
-      confidence (0.0-1.0) required for auto-optimization decisions","maximum":1,"minimum":0,"type":"number"},"enabled":{"default":true,"description":"Enable
-      auto-optimization for this ingester","type":"boolean"},"order":{"default":"auto","description":"Processing
-      order: auto (learn and optimize), filter_first, dedup_first, hybrid, or adaptive","enum":["auto","filter_first","dedup_first","hybrid","adaptive"],"type":"string"},"processing":{"additionalProperties":{"properties":{"action":{"description":"Action
+      far back to read logs (seconds)","type":"integer"}},"type":"object"},"optimization":{"description":"Processing
+      order configuration","properties":{"order":{"default":"filter_first","description":"Processing
+      order: filter_first or dedup_first","enum":["filter_first","dedup_first"],"type":"string"},"processing":{"additionalProperties":{"properties":{"action":{"description":"Action
       to take when threshold is exceeded: warn, alert, optimize","enum":["warn","alert","optimize"],"type":"string"},"critical":{"description":"Critical
       threshold value","type":"number"},"description":{"description":"Human-readable
       description of this threshold","type":"string"},"warning":{"description":"Warning
@@ -606,40 +602,14 @@ spec:
                     type: integer
                 type: object
               optimization:
-                description: Auto-optimization configuration
+                description: Processing order configuration
                 properties:
-                  analysisInterval:
-                    default: 15m
-                    description: How often to analyze performance and adjust optimization
-                      (e.g., '15m', '30m')
-                    pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
-                    type: string
-                  autoOptimize:
-                    default: true
-                    description: Allow Zen Watcher to automatically optimize processing
-                      order based on metrics
-                    type: boolean
-                  confidenceThreshold:
-                    default: 0.7
-                    description: Minimum confidence (0.0-1.0) required for auto-optimization
-                      decisions
-                    maximum: 1
-                    minimum: 0
-                    type: number
-                  enabled:
-                    default: true
-                    description: Enable auto-optimization for this ingester
-                    type: boolean
                   order:
-                    default: auto
-                    description: 'Processing order: auto (learn and optimize), filter_first,
-                      dedup_first, hybrid, or adaptive'
+                    default: filter_first
+                    description: 'Processing order: filter_first or dedup_first'
                     enum:
-                    - auto
                     - filter_first
                     - dedup_first
-                    - hybrid
-                    - adaptive
                     type: string
                   processing:
                     additionalProperties:
@@ -965,26 +935,10 @@ spec:
                   order:
                     description: 'Processing order: auto (learn and optimize), filter_first, or dedup_first'
                     enum:
-                    - auto
                     - filter_first
                     - dedup_first
-                    default: auto
+                    default: filter_first
                     type: string
-                  autoOptimize:
-                    default: true
-                    description: Allow Zen Watcher to automatically optimize processing order based on metrics
-                    type: boolean
-                  analysisInterval:
-                    default: 15m
-                    description: How often to analyze performance and adjust optimization (e.g., '15m', '30m')
-                    pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
-                    type: string
-                  confidenceThreshold:
-                    default: 0.7
-                    description: Minimum confidence (0.0-1.0) required for auto-optimization decisions
-                    maximum: 1
-                    minimum: 0
-                    type: number
                 type: object
               destinations:
                 description: List of destinations for observations from this ingester
@@ -1291,40 +1245,14 @@ spec:
                     type: integer
                 type: object
               optimization:
-                description: Auto-optimization configuration
+                description: Processing order configuration
                 properties:
-                  analysisInterval:
-                    default: 15m
-                    description: How often to analyze performance and adjust optimization
-                      (e.g., '15m', '30m')
-                    pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
-                    type: string
-                  autoOptimize:
-                    default: true
-                    description: Allow Zen Watcher to automatically optimize processing
-                      order based on metrics
-                    type: boolean
-                  confidenceThreshold:
-                    default: 0.7
-                    description: Minimum confidence (0.0-1.0) required for auto-optimization
-                      decisions
-                    maximum: 1
-                    minimum: 0
-                    type: number
-                  enabled:
-                    default: true
-                    description: Enable auto-optimization for this ingester
-                    type: boolean
                   order:
-                    default: auto
-                    description: 'Processing order: auto (learn and optimize), filter_first,
-                      dedup_first, hybrid, or adaptive'
+                    default: filter_first
+                    description: 'Processing order: filter_first or dedup_first'
                     enum:
-                    - auto
                     - filter_first
                     - dedup_first
-                    - hybrid
-                    - adaptive
                     type: string
                   processing:
                     additionalProperties:

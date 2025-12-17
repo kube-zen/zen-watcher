@@ -34,7 +34,7 @@ func DetermineOptimalOrder(source string, sourceConfig *generic.SourceConfig, me
 		return ProcessingOrder(sourceConfig.Processing.Order)
 	}
 
-	// Auto-optimization logic
+	// Use metrics-based rules if available
 	if metrics == nil {
 		return GetDefaultOrder(source)
 	}

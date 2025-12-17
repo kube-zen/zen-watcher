@@ -38,8 +38,8 @@ This document describes the validation guarantees provided by zen-watcher CRD sc
   - Valid values: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `UNKNOWN`
 
 - **`spec.optimization.order`** (optional, enum)
-  - Valid values: `auto`, `filter_first`, `dedup_first`, `hybrid`, `adaptive`
-  - Default: `auto`
+  - Valid values: `filter_first`, `dedup_first`
+  - Default: `filter_first`
 
 ### Observation CRD
 

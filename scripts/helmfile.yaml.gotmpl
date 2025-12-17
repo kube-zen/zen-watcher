@@ -264,6 +264,8 @@ releases:
           repository: {{ $imageRepo }}
           tag: {{ $imageTag }}
           pullPolicy: Always
+      - crds:
+          install: true  # Install CRDs via Helm for quick-demo
       - config:
           watchNamespace: {{ $namespace }}
           trivyNamespace: trivy-system

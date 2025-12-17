@@ -125,23 +125,17 @@ type DedupConfig struct {
 	MaxEventsPerWindow int      // For event-stream strategy
 }
 
-// ProcessingConfig holds processing order and optimization settings
+// ProcessingConfig holds processing order settings
 type ProcessingConfig struct {
-	Order               string
-	AutoOptimize        bool
-	AnalysisInterval    string
-	ConfidenceThreshold float64
+	Order string // filter_first or dedup_first
 }
 
-// OptimizationConfig holds auto-optimization configuration from spec.optimization
+// OptimizationConfig holds optimization configuration from spec.optimization
+// Note: Auto-optimization has been removed. Only manual order selection is supported.
 type OptimizationConfig struct {
-	Enabled             bool
-	Order               string // auto, filter_first, dedup_first, hybrid, adaptive
-	AutoOptimize        bool
-	AnalysisInterval    string
-	ConfidenceThreshold float64
-	Thresholds          *OptimizationThresholds
-	Processing          map[string]*ProcessingThreshold
+	Order      string // filter_first or dedup_first
+	Thresholds *OptimizationThresholds
+	Processing map[string]*ProcessingThreshold
 }
 
 // OptimizationThresholds holds optimization thresholds
@@ -664,14 +658,9 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 
 	// First, try spec.processing (canonical v1.1+ location)
 	if processing, ok := spec["processing"].(map[string]interface{}); ok {
-		// Extract processing-level config (order, optimization settings)
+		// Extract processing-level config (order only - auto-optimization removed)
 		config.Processing = &ProcessingConfig{
-			Order:        getString(processing, "order"),
-			AutoOptimize: getBool(processing, "autoOptimize"),
-		}
-		config.Processing.AnalysisInterval = getString(processing, "analysisInterval")
-		if threshold, ok := processing["confidenceThreshold"].(float64); ok {
-			config.Processing.ConfidenceThreshold = threshold
+			Order: getString(processing, "order"),
 		}
 
 		// Extract filter from processing.filter (canonical location)
@@ -738,18 +727,11 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 	}
 
 	// Extract optimization config (canonical)
+	// Note: Auto-optimization removed, only manual order selection supported
 	if optimization, ok := spec["optimization"].(map[string]interface{}); ok {
 		config.Optimization = &OptimizationConfig{
-			Enabled:             getBool(optimization, "enabled"),
-			Order:               getString(optimization, "order"),
-			AutoOptimize:        getBool(optimization, "autoOptimize"),
-			AnalysisInterval:    getString(optimization, "analysisInterval"),
-			ConfidenceThreshold: 0.7, // default
-			Processing:          make(map[string]*ProcessingThreshold),
-		}
-
-		if threshold, ok := optimization["confidenceThreshold"].(float64); ok {
-			config.Optimization.ConfidenceThreshold = threshold
+			Order:      getString(optimization, "order"),
+			Processing: make(map[string]*ProcessingThreshold),
 		}
 
 		// Extract thresholds

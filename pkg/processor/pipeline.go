@@ -32,19 +32,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// OptimizationStrategyProvider provides the current processing strategy for a source
-type OptimizationStrategyProvider interface {
-	GetCurrentStrategy(source string) string // Returns "filter_first", "dedup_first", or "auto"
-}
-
 // Processor processes RawEvents through the pipeline
 type Processor struct {
 	genericThresholdMonitor *monitoring.GenericThresholdMonitor
 	filter                  *filter.Filter
 	deduper                 *dedup.Deduper
 	observationCreator      *watcher.ObservationCreator
-	optimizationProvider    OptimizationStrategyProvider // Optional: provides current optimization strategy
-	metrics                 *metrics.Metrics             // Optional metrics
+	metrics                 *metrics.Metrics // Optional metrics
 }
 
 // NewProcessor creates a new event processor
@@ -68,14 +62,8 @@ func NewProcessorWithMetrics(
 		filter:                  filter,
 		deduper:                 deduper,
 		observationCreator:      observationCreator,
-		optimizationProvider:    nil, // Can be set via SetOptimizationProvider
 		metrics:                 m,
 	}
-}
-
-// SetOptimizationProvider sets the optimization strategy provider
-func (p *Processor) SetOptimizationProvider(provider OptimizationStrategyProvider) {
-	p.optimizationProvider = provider
 }
 
 // ProcessEvent processes a RawEvent through the canonical pipeline:
@@ -198,24 +186,20 @@ func (p *Processor) ProcessEvent(ctx context.Context, raw *generic.RawEvent, con
 
 // determineProcessingOrder determines the processing order based on config and optimization
 // Returns "filter_first" or "dedup_first" based on:
-// 1. Explicit config order (if set and not "auto")
-// 2. Current optimization strategy (if optimization provider is available)
-// 3. Default to "filter_first"
+// 1. Explicit config order (if set)
+// 2. Default to "filter_first"
+// Note: Auto-optimization has been removed. Only manual order selection is supported.
 func (p *Processor) determineProcessingOrder(raw *generic.RawEvent, config *generic.SourceConfig) string {
-	// Step 1: Check if order is explicitly set in config (non-auto)
-	if config != nil && config.Processing != nil && config.Processing.Order != "" && config.Processing.Order != "auto" {
-		return config.Processing.Order
-	}
-
-	// Step 2: If auto-optimization, get current strategy from optimization provider
-	if config != nil && config.Processing != nil && config.Processing.AutoOptimize && p.optimizationProvider != nil {
-		currentStrategy := p.optimizationProvider.GetCurrentStrategy(raw.Source)
-		if currentStrategy != "" && currentStrategy != "auto" {
-			return currentStrategy
+	// Check if order is explicitly set in config
+	if config != nil && config.Processing != nil && config.Processing.Order != "" {
+		order := config.Processing.Order
+		// Support filter_first and dedup_first only
+		if order == "filter_first" || order == "dedup_first" {
+			return order
 		}
 	}
 
-	// Step 3: Default to filter_first
+	// Default to filter_first
 	return "filter_first"
 }
 

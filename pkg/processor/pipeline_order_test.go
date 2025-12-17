@@ -65,15 +65,6 @@ func (m *mockNormalizer) Normalize(obs *unstructured.Unstructured) *unstructured
 	return obs
 }
 
-// mockOptimizationProvider provides strategy
-type mockOptimizationProvider struct {
-	strategy string
-}
-
-func (m *mockOptimizationProvider) GetCurrentStrategy(source string) string {
-	return m.strategy
-}
-
 // TestPipelineOrder_FilterFirst verifies filter_first order
 // This test ensures that when filter_first strategy is used:
 // 1. Filter is invoked before dedup
@@ -102,7 +93,6 @@ func TestPipelineOrder_FilterFirst(t *testing.T) {
 	)
 
 	proc := NewProcessor(f, deduper, creator)
-	proc.SetOptimizationProvider(&mockOptimizationProvider{strategy: "filter_first"})
 
 	rawEvent := &generic.RawEvent{
 		Source:    "test-source",
@@ -192,7 +182,6 @@ func TestPipelineOrder_DedupFirst(t *testing.T) {
 	)
 
 	proc := NewProcessor(f, deduper, creator)
-	proc.SetOptimizationProvider(&mockOptimizationProvider{strategy: "dedup_first"})
 
 	rawEvent := &generic.RawEvent{
 		Source:    "test-source",

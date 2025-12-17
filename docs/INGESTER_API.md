@@ -226,12 +226,8 @@ spec:
 
 If `spec.processing.dedup.strategy` is not set, the default `fingerprint` strategy is used, preserving existing behavior.
 - Both filter and dedup are **always applied** to every event
-- The optimization engine chooses which runs first based on traffic patterns:
-  - **`filter_first`**: Filter → Dedup → Normalize → Destinations
-  - **`dedup_first`**: Dedup → Filter → Normalize → Destinations
-  - **`auto`**: Automatically choose based on metrics (default)
-- Optimization scope: per source
-- Order can change at runtime without config changes (pure runtime behavior)
+- Order is implementation-defined (filter → dedup → normalize → destinations is typical)
+- **Note**: Optimization engine (auto-choosing filter_first vs dedup_first) is commercial-only and not part of OSS base Ingester CRD
 
 **Stage 2: Normalize**
 - Single normalization function
@@ -242,20 +238,14 @@ If `spec.processing.dedup.strategy` is not set, the default `fingerprint` strate
 - Fan-out to destinations[] from the normalized event
 - Each destination receives fully normalized data
 
-### Optimization Engine
+### Processing Order
 
-The optimization engine automatically chooses the optimal order (filter_first vs dedup_first) based on:
-- Traffic statistics per source
-- Filter effectiveness (how many events are filtered out)
-- Dedup effectiveness (how many duplicates are removed)
-- Low severity percentage
-- Observations per minute
+**OSS Base Behavior:**
+- Filter and dedup are both applied to every event
+- Order is implementation-defined (typically filter → dedup → normalize → destinations)
+- No optimization engine in OSS base
 
-**Key properties:**
-- Operates per source
-- Can flip between filter → dedup and dedup → filter at runtime without config changes
-- Driven only by traffic/metrics in zen-watcher; **no SaaS dependency**
-- Pure runtime behavior; no config changes required
+**Note**: Optimization engine (auto-choosing filter_first vs dedup_first based on traffic patterns) is a commercial feature and not part of OSS base Ingester CRD. See zen-platform docs for commercial optimization features.
 
 ## Destination Types
 

@@ -1,6 +1,5 @@
 # Example: Checkov via ConfigMap (using informer ingester)
-# NOTE: This replaces the deprecated 'cm' ingester type
-# ConfigMaps are now handled via ingester: informer with GVR
+# ConfigMaps are handled via ingester: informer with GVR
 apiVersion: zen.kube-zen.io/v1
 kind: Ingester
 metadata:
@@ -38,4 +37,3 @@ spec:
     strategy: fingerprint
   processing:
     order: auto
-    autoOptimize: true

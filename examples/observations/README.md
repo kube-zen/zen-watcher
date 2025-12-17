@@ -139,7 +139,7 @@
 - `spec.eventType` - Describes the event type (vulnerability, policy_violation, etc.)
 
 **Optional (Recommended)**:
-- `spec.resource` - Links to affected Kubernetes resource (enables remediation)
+- `spec.resource` - Links to affected Kubernetes resource (enables tracking)
 - `spec.details` - Stores tool-specific metadata (preserves context)
 - `spec.detectedAt` - Tracks when event occurred (vs when processed)
 - `spec.ttlSecondsAfterCreation` - Controls automatic cleanup (prevents etcd bloat)

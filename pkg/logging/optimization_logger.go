@@ -110,9 +110,9 @@ func (ol *OptimizationLogger) LogThresholdAlert(source, threshold string, value 
 		})
 }
 
-// LogAutoOptimization logs when auto-optimization is applied
+// LogAutoOptimization logs when optimization is applied
 func (ol *OptimizationLogger) LogAutoOptimization(source, action, reason string, expectedImpact string) {
-	logger.Info("Auto-optimization applied",
+	logger.Info("Optimization applied",
 		logger.Fields{
 			Component: "optimization",
 			Operation: "auto_optimization",

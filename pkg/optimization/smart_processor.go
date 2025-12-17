@@ -179,9 +179,7 @@ func (sp *SmartProcessor) ProcessEvent(
 		}
 		// Continue to create...
 
-	case ProcessingStrategyHybrid, ProcessingStrategyAdaptive:
-		// Hybrid or adaptive processing
-		// This would use more sophisticated logic
+	case ProcessingStrategyAdaptive:
 		if !filter.Allow(event) {
 			collector.RecordFiltered("adaptive_filter")
 			tracker.RecordEvent(time.Since(startTime))

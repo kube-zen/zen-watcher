@@ -828,7 +828,7 @@ resolution_template:
     - action: "Investigation"
       completed: true
       timestamp: "{{ .CommonAnnotations.timestamp }}"
-    - action: "Remediation"
+    - action: "Response"
       completed: true
       timestamp: "{{ .CommonAnnotations.timestamp }}"
   lessons_learned: "Key takeaways"

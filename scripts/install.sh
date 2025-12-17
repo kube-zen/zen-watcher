@@ -16,6 +16,8 @@
 #   --install-checkov          Install Checkov
 #   --install-kube-bench       Install kube-bench
 #   --no-docker-login          Don't use docker login credentials
+#   --offline                  Skip Helm repo updates (for air-gapped environments)
+#   --skip-repo-update         Skip Helm repo updates (repos must already exist)
 
 set -euo pipefail
 
@@ -33,6 +35,8 @@ INSTALL_CHECKOV=false
 INSTALL_KUBE_BENCH=false
 NO_DOCKER_LOGIN=false
 USE_EXISTING_CLUSTER=false
+OFFLINE_MODE=false
+SKIP_REPO_UPDATE=false
 
 for arg in "$@"; do
     case "$arg" in
@@ -59,6 +63,13 @@ for arg in "$@"; do
             ;;
         --use-existing|--use-existing-cluster)
             USE_EXISTING_CLUSTER=true
+            ;;
+        --offline)
+            OFFLINE_MODE=true
+            SKIP_REPO_UPDATE=true
+            ;;
+        --skip-repo-update)
+            SKIP_REPO_UPDATE=true
             ;;
         k3d|kind|minikube)
             PLATFORM="$arg"
@@ -157,8 +168,8 @@ export SKIP_MONITORING=${SKIP_MONITORING}
 export IMAGE_PULL_POLICY=$([ "$NO_DOCKER_LOGIN" = true ] && echo "Always" || echo "IfNotPresent")
 export ZEN_DEMO_MINIMAL="${ZEN_DEMO_MINIMAL:-false}"
 
-# Get repo root
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$(cd "$(dirname "$0")/.." && pwd)")"
+# Get repo root (calculate from script directory, not git - makes it work standalone)
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "$REPO_ROOT" || exit 1
 
 # Check if helmfile.yaml.gotmpl exists
@@ -168,25 +179,24 @@ if [ ! -f "${SCRIPT_DIR}/helmfile.yaml.gotmpl" ]; then
 fi
 
 # Install CRDs manually before helmfile sync to avoid ownership conflicts
-log_info "Installing CRDs manually before helmfile sync..."
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$(cd "$(dirname "$0")/.." && pwd)")"
+# NOTE: For quick-demo, CRDs are installed via Helm (crds.install: true in helmfile.yaml.gotmpl)
+# This manual installation is skipped when using Helm to avoid conflicts
+log_info "Skipping manual CRD installation - Helm will install CRDs via helmfile (crds.install: true)"
 CRD_DIR="${REPO_ROOT}/deployments/crds"
+# Manual CRD installation disabled - Helm installs CRDs via helmfile.yaml.gotmpl (crds.install: true)
+SKIP_MANUAL_CRD_INSTALL=true
+
+# Manual CRD installation is disabled - Helm installs CRDs via helmfile.yaml.gotmpl (crds.install: true)
+# However, we need to clean up any existing CRDs that don't have Helm ownership to avoid conflicts
+log_info "Cleaning up existing CRDs without Helm ownership..."
 if [ -d "$CRD_DIR" ]; then
     for crd_file in "${CRD_DIR}"/*_crd.yaml; do
         if [ -f "$crd_file" ]; then
             crd_name=$(grep "^  name:" "$crd_file" | head -1 | awk '{print $2}' || grep "^name:" "$crd_file" | head -1 | awk '{print $2}')
-            if [ -n "$crd_name" ]; then
-                # Delete existing CRD if it doesn't have Helm ownership
-                if kubectl get crd "$crd_name" >/dev/null 2>&1; then
-                    if ! kubectl get crd "$crd_name" -o jsonpath='{.metadata.labels.app\.kubernetes\.io/managed-by}' 2>/dev/null | grep -q "Helm"; then
-                        log_info "Removing CRD $crd_name without Helm ownership..."
-                        kubectl delete crd "$crd_name" --ignore-not-found=true >/dev/null 2>&1 || true
-                        sleep 1
-                    fi
-                fi
-                # Delete existing CRD to ensure clean installation
-                if kubectl get crd "$crd_name" >/dev/null 2>&1; then
-                    log_info "Removing existing CRD $crd_name for clean reinstall..."
+            if [ -n "$crd_name" ] && kubectl get crd "$crd_name" >/dev/null 2>&1; then
+                # Check if CRD has Helm ownership
+                if ! kubectl get crd "$crd_name" -o jsonpath='{.metadata.labels.app\.kubernetes\.io/managed-by}' 2>/dev/null | grep -q "Helm"; then
+                    log_info "Removing CRD $crd_name without Helm ownership (Helm will reinstall it)..."
                     kubectl delete crd "$crd_name" --ignore-not-found=true >/dev/null 2>&1 || true
                     # Wait for CRD to be fully deleted
                     for i in {1..30}; do
@@ -195,106 +205,45 @@ if [ -d "$CRD_DIR" ]; then
                         fi
                         sleep 1
                     done
-                    sleep 2  # Extra wait to ensure API server has processed deletion
-                fi
-                # Create temporary CRD file without kubectl annotations
-                TEMP_CRD_FILE="/tmp/$(basename "$crd_file")"
-                # Use Python to properly remove kubectl annotation (most reliable)
-                if command -v python3 >/dev/null 2>&1 && python3 -c "import yaml" 2>/dev/null; then
-                    python3 <<PYEOF
-import yaml
-import sys
-with open("$crd_file", 'r') as f:
-    data = yaml.safe_load(f)
-if 'metadata' in data and 'annotations' in data.get('metadata', {}):
-    data['metadata']['annotations'].pop('kubectl.kubernetes.io/last-applied-configuration', None)
-with open("$TEMP_CRD_FILE", 'w') as f:
-    yaml.dump(data, f, default_flow_style=False, sort_keys=False, allow_unicode=True)
-PYEOF
-                elif command -v yq >/dev/null 2>&1; then
-                    yq eval 'del(.metadata.annotations."kubectl.kubernetes.io/last-applied-configuration")' "$crd_file" > "$TEMP_CRD_FILE" 2>/dev/null || cp "$crd_file" "$TEMP_CRD_FILE"
-                else
-                    # Fallback: copy file and hope Helm can handle it
-                    cp "$crd_file" "$TEMP_CRD_FILE"
-                fi
-                # Install CRD using kubectl create (avoids kubectl annotations) then annotate for Helm
-                CRD_INSTALL_SUCCESS=false
-                if kubectl create -f "$TEMP_CRD_FILE" >/dev/null 2>&1; then
-                    CRD_INSTALL_SUCCESS=true
-                elif kubectl apply --server-side --field-manager=helm --force-conflicts -f "$TEMP_CRD_FILE" >/dev/null 2>&1; then
-                    CRD_INSTALL_SUCCESS=true
-                fi
-                
-                if [ "$CRD_INSTALL_SUCCESS" = true ]; then
-                    # Wait for CRD to be ready
-                    sleep 2
-                    # Annotate/label for Helm management - retry if needed
-                    for i in {1..5}; do
-                        if kubectl annotate crd "$crd_name" \
-                            meta.helm.sh/release-name=zen-watcher \
-                            meta.helm.sh/release-namespace="${NAMESPACE}" \
-                            --overwrite >/dev/null 2>&1 && \
-                           kubectl label crd "$crd_name" \
-                            app.kubernetes.io/managed-by=Helm \
-                            --overwrite >/dev/null 2>&1; then
-                            log_info "Successfully installed and annotated CRD $crd_name"
-                            break
-                        fi
-                        sleep 1
-                    done
-                    rm -f "$TEMP_CRD_FILE"
-                else
-                    log_warn "CRD installation failed for $crd_name, will retry during helmfile sync"
-                    rm -f "$TEMP_CRD_FILE"
-                fi
-                    # Annotate/label for Helm management
-                    kubectl annotate crd "$crd_name" \
-                        meta.helm.sh/release-name=zen-watcher \
-                        meta.helm.sh/release-namespace="${NAMESPACE}" \
-                        --overwrite >/dev/null 2>&1 || true
-                    kubectl label crd "$crd_name" \
-                        app.kubernetes.io/managed-by=Helm \
-                        --overwrite >/dev/null 2>&1 || true
-                    log_info "Successfully installed CRD $crd_name"
-                    rm -f "$TEMP_CRD_FILE"
-                else
-                    log_warn "Server-side apply failed for $crd_name, trying regular apply..."
-                    # Try fallback: regular kubectl apply (will add kubectl annotations, but we'll remove them)
-                    if kubectl apply -f "$TEMP_CRD_FILE" >/dev/null 2>&1; then
-                        # Remove kubectl annotations and add Helm annotations
-                        kubectl annotate crd "$crd_name" \
-                            kubectl.kubernetes.io/last-applied-configuration- \
-                            meta.helm.sh/release-name=zen-watcher \
-                            meta.helm.sh/release-namespace="${NAMESPACE}" \
-                            --overwrite >/dev/null 2>&1 || true
-                        kubectl label crd "$crd_name" \
-                            app.kubernetes.io/managed-by=Helm \
-                            --overwrite >/dev/null 2>&1 || true
-                        log_info "Installed CRD $crd_name using fallback method"
-                        rm -f "$TEMP_CRD_FILE"
-                    else
-                        log_warn "All CRD installation methods failed for $crd_name, continuing..."
-                        rm -f "$TEMP_CRD_FILE"
-                    fi
                 fi
             fi
         fi
     done
-    log_success "CRDs prepared for Helm management"
-else
-    log_warn "CRD directory not found: $CRD_DIR, skipping manual CRD installation"
 fi
 
+log_info "CRDs will be installed by Helm via helmfile (crds.install: true)"
+
 # Add Helm repositories
-log_info "Ensuring Helm repositories are available..."
-helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx 2>&1 | grep -v "already exists" > /dev/null || true
-helm repo add vm https://victoriametrics.github.io/helm-charts 2>&1 | grep -v "already exists" > /dev/null || true
-helm repo add grafana https://grafana.github.io/helm-charts 2>&1 | grep -v "already exists" > /dev/null || true
-helm repo add aqua https://aquasecurity.github.io/helm-charts 2>&1 | grep -v "already exists" > /dev/null || true
-helm repo add falcosecurity https://falcosecurity.github.io/charts 2>&1 | grep -v "already exists" > /dev/null || true
-helm repo add kyverno https://kyverno.github.io/kyverno/ 2>&1 | grep -v "already exists" > /dev/null || true
-helm repo add kube-zen https://kube-zen.github.io/helm-charts 2>&1 | grep -v "already exists" > /dev/null || true
-helm repo update > /dev/null 2>&1 || true
+if [ "$OFFLINE_MODE" = true ]; then
+    log_info "Offline mode: Skipping Helm repository setup (repos must be pre-configured)"
+    log_info "Required Helm repositories:"
+    log_info "  - ingress-nginx: https://kubernetes.github.io/ingress-nginx"
+    log_info "  - vm: https://victoriametrics.github.io/helm-charts"
+    log_info "  - grafana: https://grafana.github.io/helm-charts"
+    log_info "  - aqua: https://aquasecurity.github.io/helm-charts"
+    log_info "  - falcosecurity: https://falcosecurity.github.io/charts"
+    log_info "  - kyverno: https://kyverno.github.io/kyverno/"
+    log_info "  - kube-zen: https://kube-zen.github.io/helm-charts"
+else
+    log_info "Ensuring Helm repositories are available..."
+    helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx 2>&1 | grep -v "already exists" > /dev/null || true
+    helm repo add vm https://victoriametrics.github.io/helm-charts 2>&1 | grep -v "already exists" > /dev/null || true
+    helm repo add grafana https://grafana.github.io/helm-charts 2>&1 | grep -v "already exists" > /dev/null || true
+    helm repo add aqua https://aquasecurity.github.io/helm-charts 2>&1 | grep -v "already exists" > /dev/null || true
+    helm repo add falcosecurity https://falcosecurity.github.io/charts 2>&1 | grep -v "already exists" > /dev/null || true
+    helm repo add kyverno https://kyverno.github.io/kyverno/ 2>&1 | grep -v "already exists" > /dev/null || true
+    helm repo add kube-zen https://kube-zen.github.io/helm-charts 2>&1 | grep -v "already exists" > /dev/null || true
+    
+    # Update repos only if not skipped
+    if [ "$SKIP_REPO_UPDATE" = false ]; then
+        log_info "Updating Helm repositories..."
+        helm repo update > /dev/null 2>&1 || {
+            log_warn "Helm repo update failed (non-fatal, continuing with cached charts)"
+        }
+    else
+        log_info "Skipping Helm repo update (--skip-repo-update)"
+    fi
+fi
 
 # Run helmfile sync
 if helmfile -f "${SCRIPT_DIR}/helmfile.yaml.gotmpl" --quiet sync 2>&1 | tee /tmp/helmfile-sync.log; then

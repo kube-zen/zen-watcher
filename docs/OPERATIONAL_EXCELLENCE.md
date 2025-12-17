@@ -772,7 +772,7 @@ kubectl exec -n zen-system deployment/zen-watcher -- \
 2. Review if it's a real security issue or false positives
 3. Check if upstream tool misconfigured
 
-**Remediation**:
+**Response Actions**:
 - Adjust watcher frequency
 - Scale up resources
 - Tune upstream tool sensitivity
@@ -805,7 +805,7 @@ curl http://localhost:8080/metrics | grep memory
 kubectl get zenevents -n zen-system --no-headers | wc -l
 ```
 
-**Remediation**:
+**Response Actions**:
 - Increase memory limits
 - Implement event cleanup
 - Reduce watcher frequency

@@ -101,23 +101,10 @@ func (cli *OptimizeCLI) Apply(ctx context.Context, source string, suggestionInde
 
 // Auto enables auto-optimization for all sources
 func (cli *OptimizeCLI) Auto(ctx context.Context, enable bool) error {
-	action := "disable"
-	if enable {
-		action = "enable"
-	}
-
-	logger.Info("Auto-optimization toggle",
-		logger.Fields{
-			Component: "cli",
-			Operation: "auto",
-			Additional: map[string]interface{}{
-				"enable": enable,
-			},
-		})
-
-	fmt.Printf("Auto-optimization: %s\n", action)
-	fmt.Printf("(This would update Ingester CRDs to set autoOptimize=%v)\n", enable)
-
+	fmt.Printf("Auto-optimization has been removed.\n")
+	fmt.Printf("Configure processing order manually in Ingester CRD using spec.processing.order:\n")
+	fmt.Printf("  - filter_first: For high LOW severity (>70%%)\n")
+	fmt.Printf("  - dedup_first: For high duplicate rate (>50%%)\n")
 	return nil
 }
 

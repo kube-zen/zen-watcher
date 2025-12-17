@@ -110,7 +110,7 @@ Each alert includes:
 - **Labels**: Severity, component, source, category
 - **Annotations**: Human-readable summary, description, runbook link
 - **Escalation Policy**: Response time requirements
-- **Action Required**: Specific remediation steps
+- **Action Required**: Specific response steps
 
 ## 🚀 Deployment and Integration
 
@@ -204,7 +204,7 @@ sort | uniq -c | sort -nr
 ### Runbook Integration
 All alerts link to specific runbook sections in `SECURITY_INCIDENT_RESPONSE.md`:
 - Step-by-step investigation procedures
-- Common remediation actions
+- Common response actions
 - Validation steps
 - Documentation templates
 
@@ -246,7 +246,7 @@ Pre-built templates for:
 - **Mean Time to Detection (MTTD)**: Average time to detect security incidents
 - **Mean Time to Response (MTTR)**: Average time to respond to alerts
 - **Compliance Score**: Maintain >X% CIS benchmark compliance
-- **Vulnerability Remediation**: X% of critical vulnerabilities patched within SLA
+- **Vulnerability Response**: X% of critical vulnerabilities addressed within SLA
 
 ### Operational Metrics
 - **Tool Uptime**: >X% availability for all security tools

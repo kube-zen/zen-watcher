@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-This document reviews the current observability/metrics implementation in zen-watcher and identifies gaps, improvements, and recommendations for better monitoring of ingesters, filters, dedup, auto-optimization, mapping, and other critical components.
+This document reviews the current observability/metrics implementation in zen-watcher and identifies gaps, improvements, and recommendations for better monitoring of ingesters, filters, dedup, processing order, mapping, and other critical components.
 
 ## Current Metrics Coverage
 
@@ -86,12 +86,9 @@ This document reviews the current observability/metrics implementation in zen-wa
    - Dedup fingerprint generation latency
    - Dedup strategy performance comparison
 
-4. **Auto-Optimization Metrics**
-   - Optimization analysis duration
-   - Optimization suggestion quality score
-   - Optimization rollback events
-   - Optimization impact measurement (before/after comparison)
-   - Optimization decision latency
+4. **Processing Order Metrics**
+   - Current processing order per source
+   - Strategy performance metrics
 
 5. **Mapping/Normalization Metrics**
    - Field mapping transformation success/failure rates
@@ -186,7 +183,7 @@ zen_watcher_dedup_fingerprint_generation_duration_seconds{source, strategy} // H
 zen_watcher_dedup_strategy_performance_comparison{source, strategy, metric} // Gauge
 ```
 
-### Auto-Optimization Enhancement Metrics
+### Processing Order Metrics
 
 ```go
 // Optimization analysis
@@ -317,10 +314,9 @@ Based on these metrics, create dashboards for:
    - Cache utilization
    - Dedup decision rates
 
-4. **Auto-Optimization Dashboard**
-   - Strategy changes over time
-   - Optimization impact
-   - Confidence levels
+4. **Processing Order Dashboard**
+   - Current processing order per source
+   - Strategy performance comparison
 
 5. **Destination Delivery Dashboard**
    - Delivery success rates

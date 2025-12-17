@@ -54,12 +54,12 @@ Current approaches require:
 2. **Enable Config-Driven Integration**: Allow new sources to be added via CRD configuration without code changes
 3. **Provide Production-Grade Pipeline**: Filtering, deduplication, normalization, and TTL management
 4. **Maintain Zero Blast Radius**: Core component never holds secrets or makes outbound connections
-5. **Support Extensible Ecosystem**: Enable downstream consumers (alerting, SIEMs, remediation systems) via standard CRD interface
+5. **Support Extensible Ecosystem**: Enable downstream consumers (alerting, SIEMs, mesh systems) via standard CRD interface
 
 ### Non-Goals
 
 1. **Not a SIEM**: This proposal does not replace SIEM systems; it provides a Kubernetes-native aggregation layer
-2. **Not a Remediation System**: Observations are read-only; remediation is handled by separate controllers
+2. **Not a Remediation System**: Observations are read-only; actions are handled by separate controllers
 3. **Not a SaaS Service**: Core component is fully in-cluster; SaaS integration is optional and handled by separate sync controllers
 4. **Not a Replacement for Tool-Specific APIs**: Tools continue to expose their native APIs; this standard provides normalization
 
@@ -94,8 +94,8 @@ Current approaches require:
        ┌───────┴────────┐
        │                │
 ┌──────▼──────┐  ┌──────▼──────┐
-│ Sync        │  │ Remediation  │
-│ Controllers │  │ Controllers   │
+│ Sync        │  │ Action      │
+│ Controllers │  │ Controllers  │
 │ (zen-agent) │  │ (zen-agent)  │
 └─────────────┘  └──────────────┘
 ```
@@ -307,7 +307,7 @@ status:
 
 **⚠️ Partially Implemented**:
 - v2 CRD schema (defined but not yet implemented)
-- Advanced optimization features (per-source auto-optimization)
+- Advanced optimization features (deferred)
 
 **📋 Future Work**:
 - v1 → v2 migration path

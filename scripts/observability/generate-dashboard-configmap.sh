@@ -14,6 +14,7 @@ NAMESPACE="${1:-grafana}"
 DASHBOARD_NAME="${2:-}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Calculate repo root from script location (scripts/observability/ -> repo root)
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DASHBOARD_DIR="${REPO_ROOT}/config/dashboards"
 

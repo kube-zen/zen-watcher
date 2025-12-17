@@ -23,7 +23,7 @@ zen-watcher/
 │   ├── manager/                  # Watcher management
 │   ├── metrics/                  # Prometheus metrics
 │   ├── models/                   # Data models
-│   ├── remediations/             # Remediation templates
+│   ├── actions/                  # Action templates
 │   ├── types/                    # CRD types & client
 │   ├── watcher/                  # Source watchers
 │   └── writer/                   # CRD writer
@@ -61,8 +61,9 @@ zen-watcher/
 │   ├── loki-promtail-config.yaml # Loki config
 │   └── README.md                 # Examples guide
 │
-├── hack/                         # Scripts and utilities
-│   └── (development scripts)     # Build, test, deploy scripts
+├── scripts/lint/                 # Lint and validation scripts
+│   ├── check-branding.sh         # Check for forbidden compatibility labels
+│   └── check-no-github-actions.sh # Guardrail for GitHub Actions
 │
 ├── .github.disabled/             # Disabled GitHub workflows (per guardrails)
 │   └── workflows/                # Disabled GitHub Actions workflows

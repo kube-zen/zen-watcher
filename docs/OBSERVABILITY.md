@@ -57,11 +57,11 @@ kubectl exec -n zen-system zen-watcher-0 -- curl -s http://localhost:8080/metric
   - Decision values: `create`, `drop`
   - Example: `zen_watcher_dedup_decisions_total{strategy="event-stream",source="k8s-events",decision="drop"}`
 
-### Auto-Optimization Metrics
+### Processing Order Metrics
 
 #### Current Strategy
 - **`zen_watcher_optimization_current_strategy{source="<source>"}`**
-  - Current processing strategy per source
+  - Current processing order per source (filter_first, dedup_first)
   - Type: Gauge
   - Values: `1` = filter_first, `2` = dedup_first
   - Labels: `source`
@@ -175,11 +175,11 @@ scrape_configs:
         target_label: pod
 ```
 
-## Interpreting Auto-Optimization Metrics
+## Interpreting Processing Order Metrics
 
 ### Strategy Selection
 
-The optimization engine selects `filter_first` or `dedup_first` based on:
+Choose `filter_first` or `dedup_first` based on:
 
 1. **Low Severity Percentage** (`zen_watcher_low_severity_percent`)
    - If > 70% → `filter_first` (filter out noise early)

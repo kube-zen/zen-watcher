@@ -105,7 +105,7 @@ This guide provides actionable runbooks for responding to security alerts genera
    - Evaluate if vulnerability is remotely exploitable
    - Determine if affected service is internet-facing
 
-**Remediation Options**:
+**Response Actions**:
 1. **Image update** (preferred):
    ```bash
    # Update to patched version
@@ -141,7 +141,7 @@ This guide provides actionable runbooks for responding to security alerts genera
 
 **Documentation Requirements**:
 - CVE tracking ticket
-- Remediation timeline
+- Response timeline
 - Risk assessment
 - Validation results
 
@@ -170,7 +170,7 @@ This guide provides actionable runbooks for responding to security alerts genera
    kubectl get configmap kube-apiserver-$(hostname) -n kube-system -o yaml
    ```
 
-**Common Remediation Steps**:
+**Common Response Steps**:
 
 **Test 1.1.1** (API server configuration):
 ```bash
@@ -359,7 +359,7 @@ checkov -d . --check <check-id>
    kubectl get clusterrolebindings | grep "<username>"
    ```
 
-**Common Remediation**:
+**Common Response Actions**:
 1. **Revoke inappropriate permissions**:
    ```bash
    kubectl delete clusterrolebinding <inappropriate-binding>
@@ -435,7 +435,7 @@ kubectl describe policyreport <report-name>
 kubectl get clusterpolicies -o yaml
 ```
 
-**Remediation**:
+**Response Actions**:
 1. **Update policy if too restrictive**:
    ```bash
    kubectl patch clusterpolicy <policy-name> --type='merge' -p='{"spec":{"rules":[{"name":"rule-name","match":{"any":[{"resources":{"kinds":["Pod"]}}]}}]}}'
@@ -604,7 +604,7 @@ kubectl get clusterpolicies -o yaml
 | HH:MM | Detection | Zen Watcher |
 | HH:MM | Investigation started | Response team |
 | HH:MM | Containment action | Security team |
-| HH:MM | Remediation completed | Engineering |
+| HH:MM | Response actions completed | Engineering |
 
 ## Root Cause Analysis
 [Detailed explanation of what happened and why]
@@ -617,7 +617,7 @@ kubectl get clusterpolicies -o yaml
 ## Actions Taken
 1. [Immediate containment steps]
 2. [Investigation steps]
-3. [Remediation actions]
+3. [Response actions]
 4. [Communication actions]
 
 ## Lessons Learned

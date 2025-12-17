@@ -11,7 +11,7 @@ Trivy vulnerability scanner using informer adapter to watch VulnerabilityReport 
 - Informer-based ingestion
 - Filter by priority (minPriority: 0.3)
 - Deduplication with 1h window
-- Auto-optimization enabled
+- Processing order: filter_first
 - Security domain normalization
 
 ### kyverno-informer.yaml
@@ -30,7 +30,7 @@ Kube-bench compliance reports using informer adapter to watch ConfigMaps.
 - Informer-based ingestion (ConfigMaps via GVR)
 - Compliance domain normalization
 - 24h deduplication window
-- Auto-optimization enabled
+- Processing order: filter_first
 
 ### high-rate-k8s-events.yaml
 High-rate Kubernetes events using k8s-events adapter.
@@ -46,14 +46,14 @@ High-rate Kubernetes events using k8s-events adapter.
 
 All examples follow the canonical pipeline order:
 ```
-source → (filter | dedup, ordered dynamically by optimization) → normalize → destinations[]
+source → (filter | dedup, order configured via spec.processing.order) → normalize → destinations[]
 ```
 
 ### Processing Fields
 
 - **`spec.filters`**: Filter configuration (minPriority, namespaces, etc.)
 - **`spec.deduplication`**: Deduplication configuration (window, strategy)
-- **`spec.optimization`**: Auto-optimization configuration (order, autoOptimize, thresholds)
+- **`spec.optimization`**: Processing order configuration (order: filter_first or dedup_first)
 - **`spec.destinations[].mapping`**: Normalization configuration (domain, type, priority mapping)
 
 ### Optimization

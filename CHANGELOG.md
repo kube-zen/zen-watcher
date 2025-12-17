@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 **Core Features:**
 - **Ingester v1**: Complete Ingester CRD with informer/webhook/logs/k8s-events support
 - **Canonical Pipeline**: Enforced pipeline order `source → (filter | dedup) → normalize → destinations[]`
-- **Auto-Optimization**: Dynamic filter_first/dedup_first strategy selection per source
+- **Configurable Processing Order**: Manual selection of filter_first or dedup_first strategies per source
 - **Filter Expressions (v1.1)**: Expression-based filtering with AND/OR/NOT, comparisons, macros
 - **Plugin Hooks**: Compile-time hooks for extending pipeline (post-normalization, pre-CRD write)
 - Multi-source event aggregation (Trivy, Falco, Kyverno, Checkov, Kube-bench, Audit logs)
@@ -60,7 +60,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Known Limitations / Not in This Release
 
 - **Dedup Strategy v1.1**: Pluggable dedup strategies (deferred to post-alpha)
-- **Auto-Optimization v1.1**: Adaptive optimization beyond static thresholds (deferred to post-alpha)
 - **Observations Taxonomy**: Standardized field mappings for common tools (deferred to post-alpha)
 - **Advanced Tooling Polish**: Unified CLI suite (deferred to post-alpha)
 

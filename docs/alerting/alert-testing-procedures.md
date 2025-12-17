@@ -199,7 +199,7 @@ zenwatcher list-resolved-alerts --since 1h --environment staging
 #### Integration Validation
 - [ ] Incident management system integration works
 - [ ] Dashboard links in alerts are functional
-- [ ] Auto-remediation triggers are tested
+- [ ] Auto-response triggers are tested
 - [ ] Maintenance mode handling is verified
 - [ ] Alert correlation rules are working
 

@@ -16,7 +16,7 @@ Robusta is a Kubernetes observability and automation platform. This playbook sho
 - `spec.category`: Event category (security, compliance, performance, operations, cost)
 - `spec.severity`: Severity level (critical, high, medium, low, info)
 - `spec.eventType`: Type of event
-- `spec.resource`: Affected Kubernetes resource (for remediation)
+- `spec.resource`: Affected Kubernetes resource (for tracking)
 - `spec.details`: Tool-specific details (for context)
 
 ## Configuration
@@ -54,7 +54,7 @@ spec:
 
 ## Example Robusta Policies
 
-### Policy: Auto-Remediate Critical Security Issues
+### Policy: Handle Critical Security Issues
 
 ```yaml
 apiVersion: actions.robusta.dev/v1
@@ -72,7 +72,7 @@ spec:
         image: busybox
         command: |
           echo "Critical security issue detected: {{ event.spec.eventType }}"
-          # Add remediation logic here
+          # Add response action logic here
 ```
 
 ### Policy: Notify on Compliance Violations

@@ -149,10 +149,8 @@ type DedupConfig struct {
 	Config             map[string]interface{} // Strategy-specific configuration
 }
 
-// ProcessingConfig holds processing order and optimization settings (W33 - v1.1)
+// ProcessingConfig holds processing order settings (W33 - v1.1)
+// Note: Auto-optimization has been removed. Only manual order selection (filter_first, dedup_first) is supported.
 type ProcessingConfig struct {
-	Order               string // filter_first, dedup_first, auto
-	AutoOptimize        bool
-	AnalysisInterval    string
-	ConfidenceThreshold float64
+	Order string // filter_first or dedup_first
 }

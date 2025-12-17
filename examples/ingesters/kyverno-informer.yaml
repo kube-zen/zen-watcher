@@ -26,7 +26,6 @@ spec:
     optimization:
       enabled: true
       order: filter_first
-      autoOptimize: true
   
   # Backward compatibility fields (maps to processing.*)
   filters:
@@ -39,9 +38,7 @@ spec:
     window: "2h"
     strategy: fingerprint
   optimization:
-    enabled: true
     order: filter_first
-    autoOptimize: true
   destinations:
     - type: crd
       value: observations

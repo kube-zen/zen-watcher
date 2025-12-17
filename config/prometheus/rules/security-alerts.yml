@@ -152,7 +152,7 @@ spec:
         description: "Trivy found {{$value}} high severity vulnerabilities/min. EventType: {{$labels.eventType}}"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#high-vulnerabilities"
         escalation_policy: "high-24h"
-        action_required: "Plan remediation for high severity vulnerabilities"
+        action_required: "Plan response for high severity vulnerabilities"
         
     # Falco High Priority Events
     - alert: FalcoHighPriorityEvent
@@ -258,7 +258,7 @@ spec:
         description: "Trivy found {{$value}} medium severity vulnerabilities/min. EventType: {{$labels.eventType}}"
         runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#medium-vulnerabilities"
         escalation_policy: "medium-1w"
-        action_required: "Plan remediation for multiple medium severity vulnerabilities"
+        action_required: "Plan response for multiple medium severity vulnerabilities"
         
     # Security Tool Single Outage
     - alert: SecurityToolOffline

@@ -27,7 +27,8 @@ YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+# Calculate repo root from script location (scripts/lint/ -> repo root)
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 echo "Checking for GitHub Actions workflows..."
 

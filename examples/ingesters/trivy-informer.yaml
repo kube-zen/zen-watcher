@@ -27,7 +27,6 @@ spec:
     optimization:
       enabled: true
       order: auto
-      autoOptimize: true
       analysisInterval: "15m"
       confidenceThreshold: 0.7
   
@@ -43,11 +42,7 @@ spec:
     window: "1h"
     strategy: fingerprint
   optimization:
-    enabled: true
-    order: auto
-    autoOptimize: true
-    analysisInterval: "15m"
-    confidenceThreshold: 0.7
+    order: filter_first
   destinations:
     - type: crd
       value: observations

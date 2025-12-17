@@ -36,7 +36,6 @@ spec:
     optimization:
       enabled: true
       order: auto
-      autoOptimize: true
       analysisInterval: "15m"
       confidenceThreshold: 0.7
       thresholds:

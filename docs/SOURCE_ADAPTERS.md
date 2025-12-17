@@ -225,7 +225,7 @@ spec:
 
 ### Complete Configuration Example
 
-Here's a full example with all optional features including auto-optimization, thresholds, and warnings:
+Here's a full example with all optional features including processing order, thresholds, and warnings:
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
@@ -310,12 +310,9 @@ spec:
       - from: "$.pod"
         to: "pod_name"
   
-  # Processing order and auto-optimization
+  # Processing order configuration
   processing:
-    order: auto  # auto, filter_first, dedup_first, hybrid, or adaptive
-    autoOptimize: true  # Enable automatic optimization
-    analysisInterval: "15m"  # How often to analyze and optimize (default: 5m)
-    confidenceThreshold: 0.7  # Minimum confidence for auto-changes (0.0-1.0, default: 0.7)
+    order: filter_first  # filter_first or dedup_first
   
   # Thresholds for monitoring and alerts
   thresholds:
@@ -338,45 +335,28 @@ spec:
 
 ---
 
-## Auto-Optimization
+## Processing Order Configuration
 
-Zen Watcher includes an intelligent auto-optimization system that learns from your cluster patterns and automatically adjusts processing order and filters.
-
-### How Auto-Optimization Works
-
-1. **Metrics Analysis**: Continuously analyzes metrics to understand event patterns
-2. **Pattern Detection**: Identifies optimization opportunities (high LOW severity, duplicates, etc.)
-3. **Automatic Adjustment**: Dynamically adjusts processing order and filter settings
-4. **Impact Tracking**: Measures and reports optimization effectiveness
+Zen Watcher supports configurable processing order to optimize performance based on your workload patterns.
 
 ### Processing Order Modes
 
-Zen Watcher supports five processing order modes:
+Zen Watcher supports two processing order modes:
 
 | Mode | Description | When to Use |
 |------|-------------|-------------|
-| **auto** | Automatically learns and optimizes | **Recommended** - Let Zen Watcher decide based on metrics |
 | **filter_first** | Filter → Normalize → Dedup → Create | High LOW severity (>70%), many events to filter |
 | **dedup_first** | Dedup → Filter → Normalize → Create | High duplicate rate (>50%), retry patterns |
-| **hybrid** | Dynamic combination based on event characteristics | Variable workload patterns, mixed event types |
-| **adaptive** | Machine learning-based continuous adaptation | Very high volume, complex workloads requiring continuous learning |
 
-**Auto Mode Logic:**
-- If LOW severity > 70% → Uses `filter_first`
-- If dedup effectiveness > 50% → Uses `dedup_first`
-- If very high volume + auto-optimize enabled → Uses `adaptive`
-- Otherwise → Uses source-specific default or `hybrid`
-
-### Enabling Auto-Optimization
+### Configuring Processing Order
 
 ```yaml
 spec:
   processing:
-    order: auto
-    autoOptimize: true  # Enable automatic optimization
+    order: filter_first  # filter_first or dedup_first
 ```
 
-When enabled, Zen Watcher will:
+When configured, Zen Watcher will:
 - Monitor metrics continuously
 - Adjust processing order based on patterns
 - Generate optimization suggestions
@@ -390,17 +370,9 @@ Zen Watcher provides CLI commands for optimization management:
 # Analyze optimization opportunities
 zen-watcher-optimize --command=analyze --source=trivy
 
-# Enable auto-optimization globally
-zen-watcher-optimize --command=auto --enable
-
-# View optimization history
-zen-watcher-optimize --command=history --source=trivy
-
-# List all sources and their optimization status
-zen-watcher-optimize --command=list
-```
-
-See [docs/OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md) for complete CLI documentation.
+# Configure processing order globally
+# Processing order can be configured directly in the Ingester CRD
+# See the processing.order field in the examples above
 
 ---
 
@@ -489,8 +461,7 @@ spec:
   source: trivy
   ingester: informer
   processing:
-    order: auto
-    autoOptimize: true
+    order: filter_first
   thresholds:
     observationsPerMinute:
       warning: 100
@@ -513,14 +484,13 @@ spec:
 
 ## Best Practices
 
-### 1. Start with Auto-Optimization
+### 1. Choose Appropriate Processing Order
 
-Enable auto-optimization and let Zen Watcher learn your patterns:
+Select the processing order that best fits your workload:
 
 ```yaml
 processing:
-  order: auto
-  autoOptimize: true
+  order: filter_first  # Use filter_first for high LOW severity, dedup_first for high duplicate rate
 ```
 
 ### 2. Set Reasonable Thresholds
@@ -540,16 +510,19 @@ Watch Prometheus metrics to track optimization effectiveness:
 - `zen_watcher_low_severity_percent{source}` - LOW severity ratio
 - `zen_watcher_observations_per_minute{source}` - Observation rate
 
-### 4. Review Optimization Suggestions
+### 4. Monitor Performance Metrics
 
-Use CLI commands to review and apply optimization suggestions:
+Monitor Prometheus metrics to understand your workload patterns and adjust processing order accordingly:
 
 ```bash
-# Analyze and see suggestions
-zen-watcher-optimize --command=analyze --source=trivy
+# Check filter effectiveness
+zen_watcher_filter_pass_rate{source="trivy"}
 
-# Apply a specific suggestion
-zen-watcher-optimize --command=apply --source=trivy --suggestion=1
+# Check dedup effectiveness  
+zen_watcher_dedup_effectiveness{source="trivy"}
+
+# Check observation rate
+zen_watcher_observations_per_minute{source="trivy"}
 ```
 
 ### 5. Configure Alert Rules
@@ -567,7 +540,7 @@ groups:
           summary: "High observation rate detected"
 ```
 
-See [docs/OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md) and [docs/AUTO_OPTIMIZATION_COMPLETE.md](AUTO_OPTIMIZATION_COMPLETE.md) for complete documentation.
+See the examples above for processing order configuration.
 
 ---
 

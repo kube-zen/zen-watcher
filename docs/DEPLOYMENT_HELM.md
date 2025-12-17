@@ -8,6 +8,22 @@ This guide covers deploying zen-watcher using Helm, the recommended installation
 - Helm 3.8+
 - kubectl configured to access your cluster
 
+### Helm Repositories
+
+When using the installation scripts (`scripts/install.sh` or `scripts/quick-demo.sh`), the following Helm repositories are automatically added:
+
+| Repository | URL | Purpose |
+|------------|-----|---------|
+| `ingress-nginx` | https://kubernetes.github.io/ingress-nginx | Ingress controller |
+| `vm` | https://victoriametrics.github.io/helm-charts | VictoriaMetrics (observability) |
+| `grafana` | https://grafana.github.io/helm-charts | Grafana dashboards |
+| `aqua` | https://aquasecurity.github.io/helm-charts | Trivy scanner |
+| `falcosecurity` | https://falcosecurity.github.io/charts | Falco runtime security |
+| `kyverno` | https://kyverno.github.io/kyverno/ | Kyverno policy engine |
+| `kube-zen` | https://kube-zen.github.io/helm-charts | Zen Watcher chart (optional) |
+
+**Note:** For air-gapped environments, use the `--offline` flag to skip repository setup. Repositories must be pre-configured in that case.
+
 ## Quick Start
 
 ### Install from Local Chart
@@ -132,6 +148,60 @@ helm install zen-watcher ./deployments/helm/zen-watcher \
   --set image.repository=my-registry/zen-watcher \
   --set image.tag=1.0.0-custom
 ```
+
+## Air-Gapped / Offline Deployment
+
+For environments without internet access, zen-watcher supports offline installation.
+
+### Using Installation Scripts
+
+The installation scripts (`scripts/install.sh` and `scripts/quick-demo.sh`) support offline mode:
+
+```bash
+# Skip Helm repository setup (repos must be pre-configured)
+./scripts/install.sh k3d --offline
+
+# Or skip only repo updates (repos already exist)
+./scripts/install.sh k3d --skip-repo-update
+```
+
+### Pre-Configuring Helm Repositories
+
+Before running in offline mode, ensure all required Helm repositories are added locally:
+
+```bash
+# Add all required repositories
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo add vm https://victoriametrics.github.io/helm-charts
+helm repo add grafana https://grafana.github.io/helm-charts
+helm repo add aqua https://aquasecurity.github.io/helm-charts
+helm repo add falcosecurity https://falcosecurity.github.io/charts
+helm repo add kyverno https://kyverno.github.io/kyverno/
+helm repo add kube-zen https://kube-zen.github.io/helm-charts
+
+# Update repositories (do this on a machine with internet access)
+helm repo update
+
+# Package charts for offline use (optional)
+helm package ingress-nginx/ingress-nginx
+helm package vm/victoria-metrics-operator-crds
+# ... package other charts as needed
+```
+
+### Manual Installation (No Scripts)
+
+For complete offline control, install zen-watcher directly from the local chart:
+
+```bash
+# Install zen-watcher (no external dependencies)
+helm install zen-watcher ./deployments/helm/zen-watcher \
+  --namespace zen-system \
+  --create-namespace \
+  --set image.repository=your-registry/zen-watcher \
+  --set image.tag=1.0.0-alpha
+```
+
+**Note:** The zen-watcher Helm chart itself has no external dependencies. All required charts are bundled or can be installed separately.
 
 ## Upgrading
 

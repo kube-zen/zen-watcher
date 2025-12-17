@@ -1,6 +1,6 @@
 # Example: Kube-Bench CIS benchmark reports
 # Uses informer to watch Kube-Bench scan results stored in ConfigMaps
-# NOTE: This replaces the deprecated 'cm' ingester type
+# Uses informer to watch Kube-Bench scan results stored in ConfigMaps
 apiVersion: zen.kube-zen.io/v1
 kind: Ingester
 metadata:
@@ -40,4 +40,3 @@ spec:
       - "test_id"
   processing:
     order: auto
-    autoOptimize: true

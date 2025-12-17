@@ -29,6 +29,10 @@ GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Calculate repo root from script location (scripts/lint/ -> repo root)
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+
 # Forbidden phrases (case-insensitive)
 FORBIDDEN_PATTERNS=(
   "bridge-compatible"
@@ -42,9 +46,9 @@ FORBIDDEN_PATTERNS=(
   "hooks compatible"
 )
 
-# Directories to scan
+# Directories to scan (relative to repo root)
 SCAN_DIRS=(
-  "."
+  "${REPO_ROOT}"
 )
 
 # Files to exclude
@@ -55,7 +59,7 @@ EXCLUDE_PATTERNS=(
   "bin"
   "build"
   "coverage.out"
-  "hack/check-branding.sh"  # Exclude self
+  "scripts/lint/check-branding.sh"  # Exclude self
 )
 
 # Track if any matches found
@@ -93,7 +97,7 @@ for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
         fi
       fi
     fi
-  done < <(find "${SCAN_DIRS[@]}" -type f "${EXCLUDE_ARGS[@]}" 2>/dev/null || true)
+  done < <(cd "${REPO_ROOT}" && find "${SCAN_DIRS[@]}" -type f "${EXCLUDE_ARGS[@]}" 2>/dev/null || true)
 done
 
 # Report results

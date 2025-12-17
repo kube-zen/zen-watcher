@@ -22,6 +22,8 @@
 #   --install-kube-bench                   # Install kube-bench
 #   --skip-monitoring                      # Skip observability stack
 #   --no-docker-login                      # Don't use docker login credentials
+#   --offline                              # Skip Helm repo updates (for air-gapped environments)
+#   --skip-repo-update                     # Skip Helm repo updates (repos must already exist)
 
 set -euo pipefail
 
@@ -59,7 +61,7 @@ for arg in "$@"; do
             SKIP_MONITORING=true
             INSTALL_ARGS+=("$arg")
             ;;
-        --install-trivy|--install-falco|--install-kyverno|--install-checkov|--install-kube-bench|--no-docker-login)
+        --install-trivy|--install-falco|--install-kyverno|--install-checkov|--install-kube-bench|--no-docker-login|--offline|--skip-repo-update)
             INSTALL_ARGS+=("$arg")
             ;;
         k3d|kind|minikube)

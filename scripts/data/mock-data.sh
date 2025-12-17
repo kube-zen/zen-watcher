@@ -171,7 +171,14 @@ log_success "Demo observations created"
 
 # Deploy demo manifests for Checkov to scan
 log_step "Deploying demo manifests for Checkov scanning..."
-kubectl apply -f config/demo-manifests/ -n demo-manifests 2>/dev/null || echo "⚠ Demo manifests already exist or not found"
+# Calculate repo root from script location (scripts/data/ -> repo root)
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
+DEMO_MANIFESTS_DIR="${REPO_ROOT}/config/demo-manifests"
+if [ -d "$DEMO_MANIFESTS_DIR" ]; then
+    kubectl apply -f "${DEMO_MANIFESTS_DIR}/" -n demo-manifests 2>/dev/null || echo "⚠ Demo manifests already exist or not found"
+else
+    log_warn "Demo manifests directory not found: $DEMO_MANIFESTS_DIR (skipping)"
+fi
 
 # Deploy a mock metrics server that exposes Prometheus metrics
 log_step "Deploying mock metrics server..."

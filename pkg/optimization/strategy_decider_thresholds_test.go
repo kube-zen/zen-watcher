@@ -21,12 +21,13 @@ import (
 )
 
 // TestStrategyDecider_ThresholdsMatchDocumentation verifies that thresholds
-// used in StrategyDecider match those documented in AUTO_OPTIMIZATION_STATUS.md
+// used in StrategyDecider match documented thresholds
+// Note: Auto-optimization removed, but thresholds are still used for manual guidance
 func TestStrategyDecider_ThresholdsMatchDocumentation(t *testing.T) {
 	sd := NewStrategyDecider()
 	config := sd.config
 
-	// According to AUTO_OPTIMIZATION_STATUS.md and INTELLIGENT_EVENT_PIPELINE.md:
+	// According to documented thresholds:
 	// - filter_first threshold: LOW severity > 70%
 	// - dedup_first threshold: dedup effectiveness > 50%
 
@@ -60,7 +61,7 @@ func TestStrategyDecider_HighLowSeverityTriggersFilterFirst(t *testing.T) {
 	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
 		Processing: &generic.ProcessingConfig{
-			AutoOptimize: true,
+			Order: "", // No explicit order
 		},
 	}
 
@@ -85,7 +86,7 @@ func TestStrategyDecider_HighDedupEffectivenessTriggersDedupFirst(t *testing.T) 
 	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
 		Processing: &generic.ProcessingConfig{
-			AutoOptimize: true,
+			Order: "", // No explicit order
 		},
 	}
 
@@ -102,7 +103,7 @@ func TestStrategyDecider_ThresholdBoundaryConditions(t *testing.T) {
 	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
 		Processing: &generic.ProcessingConfig{
-			AutoOptimize: true,
+			Order: "", // No explicit order
 		},
 	}
 

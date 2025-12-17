@@ -194,9 +194,9 @@ func (a *Advisor) logSummary(opportunities []Opportunity, suggestions []Suggesti
 		})
 }
 
-// ApplySuggestion applies a suggestion (for auto-optimization)
+// ApplySuggestion applies a suggestion
 func (a *Advisor) ApplySuggestion(ctx context.Context, suggestion Suggestion) error {
-	logger.Info("Auto-optimization: applying suggestion",
+	logger.Info("Applying suggestion",
 		logger.Fields{
 			Component: "advisor",
 			Operation: "apply_suggestion",

@@ -319,13 +319,13 @@ sync-crd-to-chart:
 ## check-branding: Check for forbidden executor-specific compatibility labels
 check-branding:
 	@echo "$(GREEN)Checking for executor-specific compatibility labels...$(NC)"
-	@./hack/check-branding.sh
+	@./scripts/lint/check-branding.sh
 	@echo "$(GREEN)✅ Branding check passed$(NC)"
 
 ## check-no-github-actions: Guardrail to prevent GitHub Actions workflows
 check-no-github-actions:
 	@echo "$(GREEN)Checking for GitHub Actions workflows...$(NC)"
-	@./hack/check-no-github-actions.sh
+	@./scripts/lint/check-no-github-actions.sh
 
 ## zen-demo-up: Create zen-demo k3d cluster for e2e validation
 zen-demo-up:
@@ -367,11 +367,21 @@ zen-demo-build-push:
 ## zen-demo-deploy-watcher: Deploy watcher CRDs and deployment to zen-demo
 zen-demo-deploy-watcher:
 	@echo "$(GREEN)Deploying zen-watcher to zen-demo...$(NC)"
-	@./hack/zen-demo-deploy-watcher.sh || \
-		(echo "$(YELLOW)⚠️  Deploy script failed, trying direct Helm install...$(NC)"; \
-		 IMAGE_TAG=$$(git rev-parse --short HEAD 2>/dev/null || echo "latest"); \
-		 CLUSTER_NAME=$${ZEN_DEMO_CLUSTER_NAME:-zen-demo}; \
-		 NAMESPACE=$${ZEN_DEMO_NAMESPACE:-zen-system}; \
+	@IMAGE_TAG=$$(git rev-parse --short HEAD 2>/dev/null || echo "latest"); \
+	 CLUSTER_NAME=$${ZEN_DEMO_CLUSTER_NAME:-zen-demo}; \
+	 NAMESPACE=$${ZEN_DEMO_NAMESPACE:-zen-system}; \
+	 export ZEN_CLUSTER_NAME=$$CLUSTER_NAME; \
+	 export ZEN_NAMESPACE=$$NAMESPACE; \
+	 export ZEN_WATCHER_IMAGE=kubezen/zen-watcher:zen-demo-$$IMAGE_TAG; \
+	 export SKIP_MONITORING=true; \
+	 export INSTALL_TRIVY=false; \
+	 export INSTALL_FALCO=false; \
+	 export INSTALL_KYVERNO=false; \
+	 export INSTALL_CHECKOV=false; \
+	 export INSTALL_KUBE_BENCH=false; \
+	 export USE_EXISTING_CLUSTER=true; \
+	 ./scripts/install.sh k3d --skip-monitoring --use-existing-cluster || \
+		(echo "$(YELLOW)⚠️  Install script failed, trying direct Helm install...$(NC)"; \
 		 KUBECONFIG=$${HOME}/.config/k3d/kubeconfig-$$CLUSTER_NAME.yaml; \
 		 helm --kubeconfig=$$KUBECONFIG --kube-context=k3d-$$CLUSTER_NAME upgrade --install zen-watcher deployments/helm/zen-watcher \
 		   --namespace $$NAMESPACE --create-namespace \

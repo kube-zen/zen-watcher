@@ -33,7 +33,7 @@ func TestStrategyDecider_DetermineStrategy_FilterFirst(t *testing.T) {
 	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
 		Processing: &generic.ProcessingConfig{
-			AutoOptimize: true,
+			Order: "", // No explicit order - will use default
 		},
 	}
 
@@ -56,7 +56,7 @@ func TestStrategyDecider_DetermineStrategy_DedupFirst(t *testing.T) {
 	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
 		Processing: &generic.ProcessingConfig{
-			AutoOptimize: true,
+			Order: "", // No explicit order - will use default
 		},
 	}
 
@@ -66,51 +66,8 @@ func TestStrategyDecider_DetermineStrategy_DedupFirst(t *testing.T) {
 	}
 }
 
-func TestStrategyDecider_DetermineStrategy_Hybrid(t *testing.T) {
-	sd := NewStrategyDecider()
-
-	metrics := &OptimizationMetrics{
-		Source:             "test-source",
-		EventsProcessed:    150, // High volume
-		LowSeverityPercent: 0.4,
-		DeduplicationRate:  0.4, // Moderate dedup (30-50%)
-	}
-
-	sourceConfig := &generic.SourceConfig{
-		Source: "test-source",
-		Processing: &generic.ProcessingConfig{
-			AutoOptimize: true,
-		},
-	}
-
-	strategy := sd.DetermineStrategy(metrics, sourceConfig)
-	if strategy != ProcessingStrategyHybrid {
-		t.Errorf("Expected hybrid strategy for high volume and moderate dedup, got %s", strategy.String())
-	}
-}
-
-func TestStrategyDecider_DetermineStrategy_Adaptive(t *testing.T) {
-	sd := NewStrategyDecider()
-
-	metrics := &OptimizationMetrics{
-		Source:             "test-source",
-		EventsProcessed:    250, // Very high volume (2x threshold)
-		LowSeverityPercent: 0.4,
-		DeduplicationRate:  0.3,
-	}
-
-	sourceConfig := &generic.SourceConfig{
-		Source: "test-source",
-		Processing: &generic.ProcessingConfig{
-			AutoOptimize: true,
-		},
-	}
-
-	strategy := sd.DetermineStrategy(metrics, sourceConfig)
-	if strategy != ProcessingStrategyAdaptive {
-		t.Errorf("Expected adaptive strategy for very high volume, got %s", strategy.String())
-	}
-}
+// TestStrategyDecider_DetermineStrategy_Adaptive removed - adaptive mode no longer supported
+// Auto-optimization has been removed. Processing order is now configured manually.
 
 func TestStrategyDecider_DetermineStrategy_NoMetrics(t *testing.T) {
 	sd := NewStrategyDecider()
@@ -118,7 +75,7 @@ func TestStrategyDecider_DetermineStrategy_NoMetrics(t *testing.T) {
 	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
 		Processing: &generic.ProcessingConfig{
-			AutoOptimize: true,
+			Order: "", // No explicit order - will use default
 		},
 	}
 
@@ -161,7 +118,7 @@ func TestStrategyDecider_ShouldOptimize_ThresholdsExceeded(t *testing.T) {
 	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
 		Processing: &generic.ProcessingConfig{
-			AutoOptimize: true,
+			Order: "", // No explicit order
 		},
 		// Note: Thresholds are now in generic.ThresholdsConfig, not ProcessingConfig
 		Thresholds: &generic.ThresholdsConfig{
@@ -172,9 +129,10 @@ func TestStrategyDecider_ShouldOptimize_ThresholdsExceeded(t *testing.T) {
 		},
 	}
 
+	// Auto-optimization removed - ShouldOptimize always returns false
 	shouldOptimize := sd.ShouldOptimize(metrics, sourceConfig)
-	if !shouldOptimize {
-		t.Error("Expected ShouldOptimize to return true when thresholds exceeded")
+	if shouldOptimize {
+		t.Error("Expected ShouldOptimize to return false (auto-optimization removed)")
 	}
 }
 
@@ -189,12 +147,13 @@ func TestStrategyDecider_ShouldOptimize_AutoOptimizeDisabled(t *testing.T) {
 	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",
 		Processing: &generic.ProcessingConfig{
-			AutoOptimize: false, // Disabled
+			Order: "filter_first", // Manual order selection
 		},
 	}
 
+	// Auto-optimization removed - ShouldOptimize always returns false
 	shouldOptimize := sd.ShouldOptimize(metrics, sourceConfig)
 	if shouldOptimize {
-		t.Error("Expected ShouldOptimize to return false when auto-optimize is disabled")
+		t.Error("Expected ShouldOptimize to return false (auto-optimization removed)")
 	}
 }

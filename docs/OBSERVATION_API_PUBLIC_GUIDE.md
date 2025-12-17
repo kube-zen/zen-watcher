@@ -138,7 +138,7 @@ resource:
   namespace: string   # Resource namespace (preserved for RBAC/multi-tenancy)
 ```
 
-**Use Case**: Links the Observation to a specific Kubernetes resource for remediation or tracking.
+**Use Case**: Links the Observation to a specific Kubernetes resource for tracking and correlation.
 
 **Note**: `namespace` is intentionally preserved to support granular RBAC policies and multi-tenancy controls.
 

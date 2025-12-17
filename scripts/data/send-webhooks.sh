@@ -273,7 +273,7 @@ create_kubebench_configmap() {
     local name=$1
     local test_number=$2
     local test_desc=$3
-    local remediation=$4
+    local fix_guidance=$4
     local section=${5:-"1"}
     local namespace=${6:-"kube-bench"}
     
@@ -304,7 +304,7 @@ data:
                 {
                   "test_number": "${test_number}",
                   "test_desc": "${test_desc}",
-                  "remediation": "${remediation}",
+                  "remediation": "${fix_guidance}",
                   "status": "FAIL",
                   "scored": true
                 }

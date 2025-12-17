@@ -35,8 +35,8 @@ else
     export KUBECONFIG="${HOME}/.kube/config"
 fi
 
-# Get repo root
-REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$(cd "$(dirname "$0")/../.." && pwd)")"
+# Get repo root (calculate from script directory, not git - makes it work standalone)
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 DASHBOARD_DIR="${REPO_ROOT}/config/dashboards"
 
 log_step "Importing Grafana dashboards..."

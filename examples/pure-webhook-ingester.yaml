@@ -69,10 +69,8 @@ spec:
     optimization:
       enabled: true
       order: filter_first
-      autoOptimize: false
   
-  # Deprecated: Use spec.processing.* instead
-  # but new examples should use spec.processing.* as the primary form
+  # Legacy format: Use spec.processing.* instead for new configurations
   filters:
     enabled: true
     minPriority: 0.4
@@ -83,4 +81,3 @@ spec:
   optimization:
     enabled: true
     order: filter_first
-    autoOptimize: false

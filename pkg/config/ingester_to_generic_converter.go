@@ -106,12 +106,10 @@ func ConvertIngesterConfigToGeneric(ingesterConfig *IngesterConfig) *generic.Sou
 	}
 
 	// Convert processing config (W33 - v1.1)
+	// Note: Auto-optimization removed, only manual order selection supported
 	if ingesterConfig.Processing != nil {
 		config.Processing = &generic.ProcessingConfig{
-			Order:               ingesterConfig.Processing.Order,
-			AutoOptimize:        ingesterConfig.Processing.AutoOptimize,
-			AnalysisInterval:    ingesterConfig.Processing.AnalysisInterval,
-			ConfidenceThreshold: ingesterConfig.Processing.ConfidenceThreshold,
+			Order: ingesterConfig.Processing.Order,
 		}
 	}
 

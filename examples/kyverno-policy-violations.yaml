@@ -40,4 +40,3 @@ spec:
       - "rule-name"
   processing:
     order: filter_first
-    autoOptimize: true

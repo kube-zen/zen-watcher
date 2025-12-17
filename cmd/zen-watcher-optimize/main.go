@@ -27,10 +27,10 @@ import (
 
 func main() {
 	var (
-		command    = flag.String("command", "", "Command to execute: analyze, apply, auto, history, list")
+		command    = flag.String("command", "", "DEPRECATED: Auto-optimization CLI removed. Use Ingester CRD to configure processing order.")
 		source     = flag.String("source", "", "Source name (required for analyze, apply, history)")
 		suggestion = flag.Int("suggestion", 0, "Suggestion index (required for apply)")
-		enable     = flag.Bool("enable", false, "Enable auto-optimization (for auto command)")
+		enable     = flag.Bool("enable", false, "DEPRECATED: Auto-optimization has been removed")
 		logLevel   = flag.String("log-level", "INFO", "Log level")
 	)
 	flag.Parse()
@@ -107,13 +107,13 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Commands:\n")
 		fmt.Fprintf(os.Stderr, "  analyze    - Analyze optimization opportunities for a source\n")
 		fmt.Fprintf(os.Stderr, "  apply      - Apply a suggestion by index\n")
-		fmt.Fprintf(os.Stderr, "  auto       - Enable/disable auto-optimization\n")
+		fmt.Fprintf(os.Stderr, "  auto       - DEPRECATED: Auto-optimization removed. Configure processing order in Ingester CRD.\n")
 		fmt.Fprintf(os.Stderr, "  history    - Show optimization history for a source\n")
 		fmt.Fprintf(os.Stderr, "  list       - List all sources and their optimization status\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
 		fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=analyze --source=<source-name>\n")
 		fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=apply --source=<source-name> --suggestion=1\n")
-		fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=auto --enable\n")
+		fmt.Fprintf(os.Stderr, "  DEPRECATED: Use Ingester CRD spec.processing.order instead\n")
 		fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=history --source=<source-name>\n")
 		fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=list\n")
 		os.Exit(1)

@@ -23,7 +23,6 @@ spec:
   optimization:
     enabled: true
     order: auto
-    autoOptimize: true
   destinations:
     - type: crd
       value: observations

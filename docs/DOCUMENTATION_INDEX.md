@@ -14,7 +14,7 @@ Complete guide to all Zen Watcher documentation files.
    - Quick start guide (4 minutes to working system)
    - YAML-only source creation
    - Ingester CRD
-   - Auto-optimization overview
+   - Processing order configuration
    - Configuration reference
    - Usage examples
 
@@ -61,7 +61,7 @@ Complete guide to all Zen Watcher documentation files.
    - YAML-only source creation (no code needed!)
    - All 4 input methods: logs, webhooks, ConfigMaps, CRDs
    - Ingester CRD documentation
-   - Auto-optimization configuration
+   - Processing order configuration
    - Thresholds and warnings
    - Processing order control
    - Best practices and examples
@@ -90,21 +90,13 @@ Complete guide to all Zen Watcher documentation files.
     - Tool-specific mappings
     - Normalization in processing pipeline
 
-### Auto-Optimization
+### Processing Order Configuration
 
-11. **[OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md)** - Auto-optimization usage guide ⭐ **NEW**
-    - CLI commands (analyze, apply, auto, history, list)
-    - Configuration via Ingester
-    - Processing order logic
-    - Metrics and alerts
+11. **[SOURCE_ADAPTERS.md#processing-order-configuration](SOURCE_ADAPTERS.md)** - Processing order configuration guide
+    - filter_first and dedup_first modes
+    - Configuration via Ingester CRD
+    - When to use each mode
     - Best practices
-    - Examples
-
-12. **[DASHBOARD_OPTIMIZATION_UPDATES.md](DASHBOARD_OPTIMIZATION_UPDATES.md)** - Dashboard updates
-    - Optimization insights panels
-    - Source efficiency metrics
-    - Auto-optimization status
-    - Grafana dashboard configuration
 
 ### Alerting & Incident Response
 
@@ -118,7 +110,7 @@ Complete guide to all Zen Watcher documentation files.
     - Falco runtime threat response
     - Critical vulnerability handling
     - CIS benchmark compliance failures
-    - IaC security issue remediation
+    - IaC security issue investigation
     - Suspicious audit activity investigation
 
 15. **[alerting/alerting-integration-guide.md](alerting/alerting-integration-guide.md)** - Alerting integration guide ⭐ **NEW**
@@ -340,7 +332,7 @@ Complete guide to all Zen Watcher documentation files.
 **Adding a new source?**
 1. [README.md#adding-new-sources-just-yaml](../README.md) - YAML-only guide
 2. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Complete configuration guide
-3. [OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md) - Auto-optimization setup
+3. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Processing order configuration
 
 **Daily operations?**
 1. [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Best practices
@@ -358,7 +350,7 @@ Complete guide to all Zen Watcher documentation files.
 1. [README.md#configuration](../README.md#configuration) - Environment variables
 2. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Ingester CRD
 3. [FILTERING.md](FILTERING.md) - Source-level filtering
-4. [OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md) - Auto-optimization
+4. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Processing order configuration
 
 **Security?**
 1. [SECURITY.md](SECURITY.md) - Security policy
@@ -397,12 +389,10 @@ Complete guide to all Zen Watcher documentation files.
 - **[SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md)** - Complete guide with all 4 input methods ⭐
 - **[INTEGRATIONS.md](INTEGRATIONS.md)** - Integration examples
 
-### Auto-Optimization
+### Processing Order
 
-- **[INTELLIGENT_EVENT_PIPELINE.md](INTELLIGENT_EVENT_PIPELINE.md)** - Complete guide to the intelligent event integrity system ⭐
-- **[OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md)** - Usage guide and CLI commands ⭐
-- **[SOURCE_ADAPTERS.md#auto-optimization](SOURCE_ADAPTERS.md)** - Configuration
-- **[DASHBOARD_OPTIMIZATION_UPDATES.md](DASHBOARD_OPTIMIZATION_UPDATES.md)** - Dashboard setup
+- **[SOURCE_ADAPTERS.md#processing-order-configuration](SOURCE_ADAPTERS.md)** - Processing order configuration guide
+- **[INTELLIGENT_EVENT_PIPELINE.md](INTELLIGENT_EVENT_PIPELINE.md)** - Event pipeline architecture
 
 ### Thresholds & Warnings
 
@@ -478,7 +468,7 @@ Complete guide to all Zen Watcher documentation files.
 | Getting Started | [README.md](../README.md) |
 | 5-min Setup | [QUICK_START.md](../QUICK_START.md) |
 | Add New Source (YAML-only) | [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) ⭐ |
-| Auto-Optimization | [OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md) ⭐ |
+| Processing Order | [SOURCE_ADAPTERS.md#processing-order-configuration](SOURCE_ADAPTERS.md) ⭐ |
 | Thresholds & Warnings | [SOURCE_ADAPTERS.md#thresholds](SOURCE_ADAPTERS.md) ⭐ |
 | Helm Install | [README.md#installation](../README.md#installation) / [Helm Charts](https://github.com/kube-zen/helm-charts) |
 | Filtering | [FILTERING.md](FILTERING.md) |
@@ -512,7 +502,7 @@ Complete guide to all Zen Watcher documentation files.
 
 - ✅ **9 Sources Documentation** - Added cert-manager, sealed-secrets, and Kubernetes Events
 - ✅ **YAML-Only Source Creation** - No code needed to add sources
-- ✅ **Auto-Optimization Guide** - Complete optimization documentation
+- ✅ **Processing Order Configuration** - Guide to filter_first and dedup_first modes
 - ✅ **Thresholds & Warnings** - Comprehensive threshold configuration
 - ✅ **Ingester CRD** - Complete CRD documentation
 - ✅ **4 Input Methods** - Logs, webhooks, ConfigMaps, CRDs all documented
@@ -532,7 +522,7 @@ See [CHANGELOG.md](../CHANGELOG.md) for complete version history and updates.
 ### Adding a New Source
 1. [README.md#adding-new-sources](../README.md) - Quick YAML example
 2. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Complete guide
-3. [OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md) - Enable auto-optimization
+3. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Configure processing order
 
 ### Operators
 1. [README.md#installation](../README.md#installation) - Installation
@@ -555,7 +545,7 @@ See [CHANGELOG.md](../CHANGELOG.md) for complete version history and updates.
 2. **Use QUICK_START.md** - For fast deployment in 5 minutes
 3. **Bookmark this INDEX** - Quick access to all 50+ documentation files
 4. **Check SOURCE_ADAPTERS.md** - For adding new sources with just YAML
-5. **Read OPTIMIZATION_USAGE.md** - For auto-optimization setup
+5. **Read SOURCE_ADAPTERS.md** - For processing order configuration
 6. **Check examples/** - Learn from working configurations
 7. **Read OPERATIONAL_EXCELLENCE** - Production best practices
 

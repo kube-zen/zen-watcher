@@ -39,4 +39,3 @@ spec:
       - "message"
   processing:
     order: auto
-    autoOptimize: true

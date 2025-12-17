@@ -344,7 +344,7 @@ After validating examples:
 
 1. **Customize for your use case**: Modify examples to match your specific requirements.
 2. **Monitor metrics**: Set up Prometheus/Grafana to monitor zen-watcher performance.
-3. **Review optimization**: Enable auto-optimization and monitor strategy changes.
+3. **Review processing order**: Configure processing order and monitor performance metrics.
 4. **Scale testing**: Test with higher event volumes to validate performance.
 
 ## References

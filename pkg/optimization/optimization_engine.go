@@ -145,9 +145,14 @@ func (oe *OptimizationEngine) runOptimizationCycle(ctx context.Context) {
 	allConfigs := oe.sourceConfigLoader.GetAllSourceConfigs()
 
 	for source, sourceConfig := range allConfigs {
-		if sourceConfig == nil || !sourceConfig.Processing.AutoOptimize {
-			continue // Skip sources without auto-optimization enabled
+		// Note: Auto-optimization has been removed.
+		// This optimization loop is no longer active.
+		// Processing order is now configured manually via config.Processing.Order
+		if sourceConfig == nil {
+			continue
 		}
+		// Skip all sources since auto-optimization is disabled
+		continue
 
 		// Get current metrics for this source
 		metrics := oe.smartProcessor.GetSourceMetrics(source)
@@ -198,25 +203,9 @@ func (oe *OptimizationEngine) applyOptimization(
 		return
 	}
 
-	// Calculate confidence based on metrics
-	confidence := oe.calculateConfidence(metrics, sourceConfig)
-
-	// Only apply if confidence exceeds threshold
-	if confidence < sourceConfig.Processing.ConfidenceThreshold {
-		logger.Debug("Optimization skipped due to low confidence",
-			logger.Fields{
-				Component: "optimization",
-				Operation: "optimization_skipped",
-				Source:    source,
-				Additional: map[string]interface{}{
-					"confidence":        confidence,
-					"threshold":         sourceConfig.Processing.ConfidenceThreshold,
-					"proposed_strategy": newStrategy.String(),
-				},
-			})
-		RecordDecision("strategy_change", "skipped_low_confidence", source, time.Since(startTime), confidence)
-		return
-	}
+	// Note: Auto-optimization removed. Confidence threshold checking removed.
+	// Processing order is now configured manually via config.Processing.Order
+	confidence := 1.0 // Always proceed since auto-optimization is removed
 
 	// Record decision
 	decision := OptimizationDecision{
@@ -322,9 +311,6 @@ func (oe *OptimizationEngine) generateReason(
 			return "High deduplication effectiveness (>50%), deduplicating first to remove duplicates early"
 		}
 		return "Dedup-first strategy selected based on current metrics"
-
-	case ProcessingStrategyHybrid:
-		return "Hybrid strategy selected for variable workload patterns"
 
 	case ProcessingStrategyAdaptive:
 		return "Adaptive strategy selected for high-volume, complex workload"

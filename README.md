@@ -11,6 +11,17 @@ Zen Watcher is an open-source Kubernetes operator that aggregates structured sig
 
 ## 🚀 Quick Start
 
+### Prerequisites
+
+- Kubernetes 1.26+
+- Helm 3.8+ (for Helm installation)
+- kubectl configured to access your cluster
+
+**Helm Repositories:** When using installation scripts, the following repositories are automatically added:
+- `ingress-nginx`, `vm`, `grafana`, `aqua`, `falcosecurity`, `kyverno`, `kube-zen`
+
+For air-gapped environments, use `--offline` flag (see [DEPLOYMENT_HELM.md](docs/DEPLOYMENT_HELM.md)).
+
 ### Install via Helm
 
 ```bash
@@ -108,8 +119,7 @@ See [docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md) for complete examples.
 - **SHA-256 content fingerprinting**: Accurate duplicate detection
 - **Per-source token bucket rate limiting**: Prevents one noisy tool from overwhelming the system
 - **Time-bucketed aggregation**: Collapses repeating events within configurable windows
-- **Dynamic processing order**: System automatically switches between `filter_first` and `dedup_first` based on real-time traffic patterns
-- **Per-Source Auto-Optimization**: Intelligent system that learns from metrics and automatically optimizes processing strategies
+- **Configurable processing order**: Choose `filter_first` or `dedup_first` based on your workload patterns
 
 **Result**: <100ms CPU spikes and minimal etcd churn—even under firehose conditions
 

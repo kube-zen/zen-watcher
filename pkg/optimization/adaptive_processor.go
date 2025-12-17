@@ -52,10 +52,10 @@ func NewAdaptiveProcessor(
 }
 
 // ShouldAdapt determines if adaptation should be performed
+// Note: Auto-optimization has been removed. This function always returns false.
 func (ap *AdaptiveProcessor) ShouldAdapt() bool {
-	if !ap.config.Processing.AutoOptimize {
-		return false
-	}
+	// Auto-optimization removed - always return false
+	return false
 
 	// Don't adapt too frequently
 	if time.Since(ap.lastAdaptation) < ap.adaptationWindow {

@@ -49,19 +49,17 @@ This document outlines the Grafana dashboard updates needed to display optimizat
 - **Type**: Gauge
 - **Description**: Shows percentage of LOW severity observations
 
-### 3. Auto-Optimization Status Panel
+### 3. Processing Order Status Panel
 
 **Location**: New panel in Executive Dashboard
 
 **Metrics**:
 - Processing order per source (from Ingester)
-- Auto-optimization enabled status
-- Last optimization timestamp
+- Current strategy (filter_first, dedup_first)
 
 **Visualization**: Table showing:
-- Currently applied optimizations
-- Next scheduled analysis
-- Total savings (observations reduced)
+- Current processing order per source
+- Strategy performance metrics
 
 ### 4. Threshold Alerts Panel
 
@@ -85,10 +83,9 @@ Add new row with:
    - Past optimizations impact
    - Resource savings
 
-2. **Auto-Optimization Status Panel**
-   - Enabled sources
-   - Current processing orders
-   - Last optimization time
+2. **Processing Order Status Panel**
+   - Current processing orders per source
+   - Strategy performance metrics
 
 ### Operations Dashboard (`zen-watcher-operations.json`)
 

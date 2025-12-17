@@ -88,12 +88,8 @@ type FilterConfig struct {
 
 // OptimizationConfig represents optimization configuration
 type OptimizationConfig struct {
-	Enabled             bool                    `json:"enabled,omitempty" yaml:"enabled,omitempty"`
-	Order               string                  `json:"order,omitempty" yaml:"order,omitempty"`
-	AutoOptimize        bool                    `json:"autoOptimize,omitempty" yaml:"autoOptimize,omitempty"`
-	AnalysisInterval    string                  `json:"analysisInterval,omitempty" yaml:"analysisInterval,omitempty"`
-	ConfidenceThreshold *float64                `json:"confidenceThreshold,omitempty" yaml:"confidenceThreshold,omitempty"`
-	Thresholds          *OptimizationThresholds `json:"thresholds,omitempty" yaml:"thresholds,omitempty"`
+	Order      string                  `json:"order,omitempty" yaml:"order,omitempty"`
+	Thresholds *OptimizationThresholds `json:"thresholds,omitempty" yaml:"thresholds,omitempty"`
 }
 
 // OptimizationThresholds holds optimization thresholds
@@ -111,10 +107,7 @@ type ThresholdRange struct {
 
 // ProcessingConfig represents processing configuration
 type ProcessingConfig struct {
-	Order               string   `json:"order,omitempty" yaml:"order,omitempty"`
-	AutoOptimize        bool     `json:"autoOptimize,omitempty" yaml:"autoOptimize,omitempty"`
-	AnalysisInterval    string   `json:"analysisInterval,omitempty" yaml:"analysisInterval,omitempty"`
-	ConfidenceThreshold *float64 `json:"confidenceThreshold,omitempty" yaml:"confidenceThreshold,omitempty"`
+	Order string `json:"order,omitempty" yaml:"order,omitempty"` // filter_first or dedup_first
 }
 
 // InformerConfig represents informer-specific configuration
