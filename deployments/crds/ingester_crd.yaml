@@ -154,85 +154,6 @@ spec:
     schema:
       openAPIV3Schema:
         properties:
-          status:
-            description: Runtime state (activePath, health signals, lastFailover, metering)
-            properties:
-              activePath:
-                description: Current active path (direct or bridge)
-                enum:
-                - direct
-                - bridge
-                type: string
-              directHealth:
-                description: Direct path health (healthy, degraded, unreachable)
-                enum:
-                - healthy
-                - degraded
-                - unreachable
-                type: string
-              bridgeHealth:
-                description: Bridge path health (healthy, degraded, failed)
-                enum:
-                - healthy
-                - degraded
-                - failed
-                type: string
-              lastFailover:
-                description: Timestamp of last failover event (RFC3339 format)
-                type: string
-                format: date-time
-              bytesRouted:
-                description: Bytes routed via each path (metering)
-                properties:
-                  direct:
-                    description: Bytes routed via direct path
-                    type: integer
-                    minimum: 0
-                  bridge:
-                    description: Bytes routed via bridge path (premium, metered)
-                    type: integer
-                    minimum: 0
-                type: object
-              destinations:
-                description: Per-destination status (independent routing/health per destination)
-                items:
-                  properties:
-                    name:
-                      description: Destination name (from spec.destinations[].name)
-                      type: string
-                    activePath:
-                      description: Current active path for this destination
-                      enum:
-                      - direct
-                      - bridge
-                      type: string
-                    directHealth:
-                      description: Direct path health for this destination
-                      enum:
-                      - healthy
-                      - degraded
-                      - unreachable
-                      type: string
-                    bridgeHealth:
-                      description: Bridge path health for this destination
-                      enum:
-                      - healthy
-                      - degraded
-                      - failed
-                      type: string
-                    bytesRouted:
-                      description: Bytes routed via each path for this destination
-                      properties:
-                        direct:
-                          type: integer
-                          minimum: 0
-                        bridge:
-                          type: integer
-                          minimum: 0
-                      type: object
-                  type: object
-                type: array
-            type: object
           spec:
             properties:
               deduplication:
@@ -340,22 +261,8 @@ spec:
                       description: 'For type ''saas'': Endpoint path or identifier
                         (managed by external system)'
                       type: string
-                    endpoints:
-                      description: Endpoint configuration for direct and bridge paths
-                      type: object
-                      properties:
-                        direct:
-                          description: Direct egress endpoint URL (for direct path, ingester→egress)
-                          type: string
-                          format: uri
-                        bridge:
-                          description: Bridge endpoint URLs (for bridge path, via SaaS bridge)
-                          items:
-                            type: string
-                            format: uri
-                          type: array
                     channel:
-                      description: 'Channel configuration for forwarding through zen-bridge (SaaS). When set, data flows through zen-bridge to zen-egress instead of directly to SaaS. DEPRECATED: Use endpoints.bridge instead.'
+                      description: 'Channel configuration for forwarding through zen-bridge (SaaS). When set, data flows through zen-bridge to zen-egress instead of directly to SaaS.'
                       type: object
                       properties:
                         enabled:
@@ -837,26 +744,6 @@ spec:
                     pattern: ^[0-9]+(ns|us|µs|ms|s|m|h|d)$
                     type: string
                 type: object
-              routing:
-                description: Routing preferences for event forwarding (Direct vs Bridge paths)
-                properties:
-                  preferred:
-                    description: Preferred path - direct (free, ingester→egress direct) or bridge (premium, via SaaS bridge for firewall traversal)
-                    enum:
-                    - direct
-                    - bridge
-                    default: direct
-                    type: string
-                  fallback:
-                    description: Enable fallback to bridge if direct path fails
-                    default: false
-                    type: boolean
-                  bridgeRegions:
-                    description: Bridge regions to use for fallback (if bridge is used)
-                    items:
-                      type: string
-                    type: array
-                type: object
               webhook:
                 description: Webhook adapter configuration
                 properties:
@@ -959,85 +846,6 @@ spec:
     schema:
       openAPIV3Schema:
         properties:
-          status:
-            description: Runtime state (activePath, health signals, lastFailover, metering)
-            properties:
-              activePath:
-                description: Current active path (direct or bridge)
-                enum:
-                - direct
-                - bridge
-                type: string
-              directHealth:
-                description: Direct path health (healthy, degraded, unreachable)
-                enum:
-                - healthy
-                - degraded
-                - unreachable
-                type: string
-              bridgeHealth:
-                description: Bridge path health (healthy, degraded, failed)
-                enum:
-                - healthy
-                - degraded
-                - failed
-                type: string
-              lastFailover:
-                description: Timestamp of last failover event (RFC3339 format)
-                type: string
-                format: date-time
-              bytesRouted:
-                description: Bytes routed via each path (metering)
-                properties:
-                  direct:
-                    description: Bytes routed via direct path
-                    type: integer
-                    minimum: 0
-                  bridge:
-                    description: Bytes routed via bridge path (premium, metered)
-                    type: integer
-                    minimum: 0
-                type: object
-              destinations:
-                description: Per-destination status (independent routing/health per destination)
-                items:
-                  properties:
-                    name:
-                      description: Destination name (from spec.destinations[].name)
-                      type: string
-                    activePath:
-                      description: Current active path for this destination
-                      enum:
-                      - direct
-                      - bridge
-                      type: string
-                    directHealth:
-                      description: Direct path health for this destination
-                      enum:
-                      - healthy
-                      - degraded
-                      - unreachable
-                      type: string
-                    bridgeHealth:
-                      description: Bridge path health for this destination
-                      enum:
-                      - healthy
-                      - degraded
-                      - failed
-                      type: string
-                    bytesRouted:
-                      description: Bytes routed via each path for this destination
-                      properties:
-                        direct:
-                          type: integer
-                          minimum: 0
-                        bridge:
-                          type: integer
-                          minimum: 0
-                      type: object
-                  type: object
-                type: array
-            type: object
           spec:
             properties:
               deduplication:
@@ -1578,26 +1386,6 @@ spec:
                     description: Minimum allowed TTL as duration string
                     pattern: ^[0-9]+(ns|us|µs|ms|s|m|h|d)$
                     type: string
-                type: object
-              routing:
-                description: Routing preferences for event forwarding (Direct vs Bridge paths)
-                properties:
-                  preferred:
-                    description: Preferred path - direct (free, ingester→egress direct) or bridge (premium, via SaaS bridge for firewall traversal)
-                    enum:
-                    - direct
-                    - bridge
-                    default: direct
-                    type: string
-                  fallback:
-                    description: Enable fallback to bridge if direct path fails
-                    default: false
-                    type: boolean
-                  bridgeRegions:
-                    description: Bridge regions to use for fallback (if bridge is used)
-                    items:
-                      type: string
-                    type: array
                 type: object
               webhook:
                 description: Webhook adapter configuration
