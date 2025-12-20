@@ -136,7 +136,7 @@ See [docs/INTELLIGENT_EVENT_PIPELINE.md](docs/INTELLIGENT_EVENT_PIPELINE.md) for
 
 - Non-privileged containers
 - Read-only filesystem
-- Minimal footprint (~31MB image, <10m CPU, <50MB RAM)
+- Minimal footprint (~29MB image, <10m CPU, <50MB RAM)
 - Horizontal Pod Autoscaling (HPA) support
 - NetworkPolicy and PodSecurity support
 - RBAC with minimal required permissions
