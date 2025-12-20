@@ -645,7 +645,7 @@ securityContext:
 **Image Security:**
 - Based on `gcr.io/distroless/static:nonroot`
 - No shell, no package manager
-- Minimal attack surface (~31MB)
+- Minimal attack surface (~29MB)
 - No writable filesystem
 - Non-root user
 
