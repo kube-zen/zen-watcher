@@ -4,6 +4,7 @@ FROM golang:1.23-alpine AS builder
 # Install build dependencies
 # git: Required for go mod download with private repos
 # ca-certificates: Required for HTTPS connections during build
+# Note: tzdata removed from final image (not needed - no LoadLocation calls)
 RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /build
@@ -49,13 +50,15 @@ RUN ls -lh zen-watcher
 # Base image: ~2MB (vs Alpine ~5MB)
 # Contains: ca-certificates, /etc/passwd
 # No shell, no package manager, minimal CVE exposure
-# Note: Timezone data not included - not needed (no LoadLocation calls in code)
+# Note: Timezone data removed - not needed (no LoadLocation calls in code)
 FROM gcr.io/distroless/static:nonroot
 
 # Copy CA certificates (required for HTTPS/TLS)
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # Copy compiled binary
+# Note: Timezone data (/usr/share/zoneinfo) removed - saves ~2MB
+# Code uses time.Now(), time.Parse() but not time.LoadLocation()
 COPY --from=builder /build/zen-watcher /zen-watcher
 
 # Use non-root user (uid=65532, gid=65532)
@@ -82,3 +85,4 @@ LABEL org.opencontainers.image.version="${VERSION}"
 LABEL org.opencontainers.image.source="https://github.com/kube-zen/zen-watcher"
 LABEL org.opencontainers.image.licenses="Apache-2.0"
 LABEL org.opencontainers.image.vendor="kube-zen"
+
