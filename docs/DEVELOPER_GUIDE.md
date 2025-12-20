@@ -725,7 +725,7 @@ docker push kubezen/zen-watcher:1.0.0-alpha
 **Dockerfile optimization:**
 - Multi-stage build (builder + distroless)
 - Uses `golang:1.23-alpine` for small builder image
-- Final image based on `gcr.io/distroless/static:nonroot` (~15MB)
+- Final image based on `gcr.io/distroless/static:nonroot` (~31MB)
 - No shell, no package manager in final image
 
 ### Deployment
