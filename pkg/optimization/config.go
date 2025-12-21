@@ -33,10 +33,8 @@ type OptimizationConfig struct {
 	MaxLatencies      int           // Default: 1000 latency measurements
 	AggregationWindow time.Duration // Default: 10 minutes
 
-	// Adaptive processor settings
-	LearningRate     float64       // Default: 0.1
-	AdaptationWindow time.Duration // Default: 15 minutes
-	CooldownPeriod   time.Duration // Default: 5 minutes (hysteresis)
+	// Optimization cooldown settings
+	CooldownPeriod time.Duration // Default: 5 minutes (hysteresis)
 
 	// Confidence calculation thresholds
 	MinEventsForConfidence int64   // Default: 100
@@ -59,8 +57,6 @@ func DefaultOptimizationConfig() *OptimizationConfig {
 		MaxHistorySize:                   100,
 		MaxLatencies:                     1000,
 		AggregationWindow:                10 * time.Minute,
-		LearningRate:                     0.1,
-		AdaptationWindow:                 15 * time.Minute,
 		CooldownPeriod:                   5 * time.Minute,
 		MinEventsForConfidence:           100,
 		HighDedupRate:                    0.7,

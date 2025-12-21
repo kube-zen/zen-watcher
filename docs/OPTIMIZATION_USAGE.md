@@ -4,7 +4,7 @@
 
 Zen Watcher supports configurable processing order to optimize performance based on your workload patterns. You can choose between `filter_first` or `dedup_first` modes.
 
-**Note:** Auto-optimization has been removed. Processing order must be configured manually via the Ingester CRD.
+Processing order is configured manually via the Ingester CRD.
 
 ## Processing Order Modes
 

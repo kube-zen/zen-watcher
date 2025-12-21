@@ -127,7 +127,7 @@ spec:
 
 ### `logs`
 
-Use for log-based ingestion (placeholder for future implementation).
+Use for log-based ingestion.
 
 ### `k8s-events`
 

@@ -71,7 +71,6 @@ type FieldMapping struct {
 type DeduplicationConfig struct {
 	Enabled       *bool    `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	Fields        []string `json:"fields,omitempty" yaml:"fields,omitempty"`
-	LearningRate  *float64 `json:"learningRate,omitempty" yaml:"learningRate,omitempty"`
 	MinChange     *float64 `json:"minChange,omitempty" yaml:"minChange,omitempty"`
 	Strategy      string   `json:"strategy,omitempty" yaml:"strategy,omitempty"`
 	Window        string   `json:"window,omitempty" yaml:"window,omitempty"`

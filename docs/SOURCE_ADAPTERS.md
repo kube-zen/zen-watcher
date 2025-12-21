@@ -270,7 +270,6 @@ spec:
     window: "1h"
     strategy: fingerprint  # fingerprint, key, or hybrid
     minChange: 0.05  # Minimum change threshold (5%)
-    learningRate: 0.1  # Learning rate for dedup (0.0-1.0)
     fields:  # Fields to use (for key/hybrid strategies)
       - cve
       - resource.name
@@ -765,9 +764,30 @@ func (a *CustomWebhookAdapter) Stop() {
 }
 ```
 
-### Pattern 3: ConfigMap Polling Adapter (Batch Sources)
+### Pattern 3: ConfigMap Watching via Informer Adapter
 
-For tools that write results to ConfigMaps (e.g., kube-bench, Checkov):
+For tools that write results to ConfigMaps (e.g., kube-bench, Checkov), use the `informer` adapter to watch ConfigMaps:
+
+**Note**: ConfigMaps are not a separate source type. They're watched using the `informer` adapter with `gvr: {group: "", version: "v1", resource: "configmaps"}`.
+
+Example Ingester configuration:
+```yaml
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: kube-bench-ingester
+spec:
+  source: kube-bench
+  ingester: informer  # Use informer adapter
+  informer:
+    gvr:
+      group: ""
+      version: "v1"
+      resource: "configmaps"
+    labelSelector: "app=kube-bench"
+```
+
+For custom adapters (advanced use case):
 
 ```go
 type KubecostAdapter struct {

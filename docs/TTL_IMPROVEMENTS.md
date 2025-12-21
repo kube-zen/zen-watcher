@@ -117,9 +117,9 @@ The field mapper supports multiple TTL formats:
 - **Seconds**: `"604800"` (7 days)
 - **Go duration**: `"168h"`, `"7d"` (parsed by `time.ParseDuration`)
 
-## Comparison: Old vs New Approach
+## Deletion Approaches
 
-### Old Approach (Sequential Deletion)
+### Sequential Deletion Approach
 ```bash
 kubectl delete observations -l stress-test=true
 # Result: 12+ hours for 10,000 observations

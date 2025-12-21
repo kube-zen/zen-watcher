@@ -185,7 +185,7 @@ status:
   - **Rationale**: Remove hard-coded branding from API surface for vendor-neutrality (see ``)
   - **Migration**: New CRD group with conversion webhook or migration tooling
   - **Deprecation**: `zen.kube-zen.io` served alongside new group for 2+ release cycles
-  - **Old → New Mapping**: `zen.kube-zen.io/v1` → `observations.kubernetes.io/v2` (or similar)
+  - **Mapping**: `zen.kube-zen.io/v1` → `observations.kubernetes.io/v2` (or similar)
 - **Label Prefix Migration**: `zen.io/*` → neutral prefix (e.g., `observations.io/*` or `watcher.io/*`)
   - **Rationale**: Remove branding from label conventions
   - **Migration**: Support both prefixes during transition

@@ -365,8 +365,9 @@ Zen Watcher uses a **modular, scalable architecture** with clear separation of c
    - Kubernetes audit events
    - Implemented in `pkg/watcher/webhook_processor.go`
 
-3. **ConfigMap-Based (Batch Sources)**: Periodic polling (5-minute interval)
-   - Kube-bench reports
+3. **Informer-Based**: Watch any Kubernetes resource (CRDs, ConfigMaps, Pods, etc.)
+   - Kube-bench reports (via ConfigMap informer)
+   - Any custom CRD
    - Checkov reports
    - Implemented in `pkg/watcher/configmap_poller.go`
 

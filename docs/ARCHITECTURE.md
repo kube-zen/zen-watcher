@@ -171,10 +171,11 @@ Zen Watcher uses a **modular, scalable architecture** following Kubernetes best 
 - **Benefits**: Immediate event delivery, no polling overhead
 - **Implementation**: `pkg/watcher/webhook_processor.go`
 
-**3. ConfigMap-Based (Batch Sources) - Periodic**
-- **Kube-bench**: ConfigMap polling (5-minute interval)
-- **Checkov**: ConfigMap polling (5-minute interval)
-- **Note**: These tools don't emit CRDs, so polling is appropriate
+**3. Informer-Based (Any Kubernetes Resource)**
+- **Kube-bench**: Watch ConfigMaps via informer
+- **Checkov**: Watch ConfigMaps via informer
+- **Any CRD**: Watch custom resources via informer
+- **Note**: ConfigMaps are not a separate source type - they're watched using the `informer` adapter
 
 #### Modular Processor Architecture
 
@@ -190,9 +191,9 @@ Each event source type has a dedicated processor that **normalizes events** and 
   - Creates Observation structure
   - Calls `ObservationCreator.CreateObservation()` (centralized flow)
 
-- **ConfigMapPoller**: Handles batch sources (Kube-bench, Checkov)
-  - Polls ConfigMaps periodically
-  - Parses JSON results
+- **InformerAdapter**: Handles any Kubernetes resource (CRDs, ConfigMaps, Pods, etc.)
+  - Watches resources via Kubernetes informers
+  - Extracts data from resource events
   - Calls `ObservationCreator.CreateObservation()` (centralized flow)
 
 **All processors share the same centralized ObservationCreator**, ensuring:
@@ -439,24 +440,30 @@ Extract fail results from scope field
 Create Observation with category=security
 ```
 
-#### B. ConfigMap-Based Sources (Pull Model)
-**Kube-bench:**
+#### B. Informer-Based Sources (Watch Model)
+**Kube-bench (via ConfigMap informer):**
 ```
 ConfigMap with app=kube-bench label
+  ↓
+InformerAdapter watches ConfigMaps
   ↓
 Parse JSON, extract FAIL results
   ↓
 Create Observation with category=compliance
 ```
 
-**Checkov:**
+**Checkov (via ConfigMap informer):**
 ```
 ConfigMap with app=checkov label
+  ↓
+InformerAdapter watches ConfigMaps
   ↓
 Parse JSON, extract failed_checks[]
   ↓
 Create Observation with category=security
 ```
+
+**Note**: ConfigMaps are not a separate source type. They're watched using the `informer` adapter with `gvr: {group: "", version: "v1", resource: "configmaps"}`.
 
 #### C. Webhook-Based Sources (Push Model)
 **Falco:**
@@ -483,7 +490,7 @@ Create Observation with category=compliance
 
 ### 2. Event Processing Pipeline
 
-All events from any source (informer, webhook, ConfigMap) flow through the same centralized processing pipeline:
+All events from any source (informer, webhook, logs, k8s-events) flow through the same centralized processing pipeline:
 
 ```mermaid
 graph LR

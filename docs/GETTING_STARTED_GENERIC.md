@@ -163,9 +163,11 @@ You should see `Observation` CRDs being created in the `zen-system` namespace.
 
 ## Adding More Sources
 
-### Example: ConfigMap-Based Source
+### Example: Watching ConfigMaps via Informer Adapter
 
-This example shows how to configure a source that watches ConfigMaps (useful for tools like kube-bench that write results to ConfigMaps):
+This example shows how to configure a source that watches ConfigMaps using the informer adapter (useful for tools like kube-bench that write results to ConfigMaps):
+
+**Note**: ConfigMaps are not a separate source type. They're watched using the `informer` adapter.
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
