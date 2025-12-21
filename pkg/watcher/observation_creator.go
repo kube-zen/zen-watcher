@@ -637,11 +637,31 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 	if ttlSecondsStr := os.Getenv("OBSERVATION_TTL_SECONDS"); ttlSecondsStr != "" {
 		if ttlSeconds, err := strconv.ParseInt(ttlSecondsStr, 10, 64); err == nil && ttlSeconds > 0 {
 			defaultTTLSeconds = ttlSeconds
+		} else {
+			logger.Warn("Failed to parse OBSERVATION_TTL_SECONDS, using default",
+				logger.Fields{
+					Component: "watcher",
+					Operation: "ttl_parsing",
+					Error:     err,
+					Additional: map[string]interface{}{
+						"value": ttlSecondsStr,
+					},
+				})
 		}
 	} else if ttlDaysStr := os.Getenv("OBSERVATION_TTL_DAYS"); ttlDaysStr != "" {
 		// Fallback to days (for backward compatibility)
 		if ttlDays, err := strconv.Atoi(ttlDaysStr); err == nil && ttlDays > 0 {
 			defaultTTLSeconds = int64(ttlDays) * 24 * 60 * 60
+		} else {
+			logger.Warn("Failed to parse OBSERVATION_TTL_DAYS, using default",
+				logger.Fields{
+					Component: "watcher",
+					Operation: "ttl_parsing",
+					Error:     err,
+					Additional: map[string]interface{}{
+						"value": ttlDaysStr,
+					},
+				})
 		}
 	}
 
@@ -684,10 +704,10 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 	unstructured.SetNestedMap(observation.Object, spec, "spec")
 }
 
-// recordEventAttempted records that an event was attempted
-func (oc *ObservationCreator) recordEventAttempted(source string) {
+// getOrCreateSourceCounters gets or creates source counters, returns nil if metrics disabled
+func (oc *ObservationCreator) getOrCreateSourceCounters(source string) *sourceCounters {
 	if oc.optimizationMetrics == nil {
-		return
+		return nil
 	}
 	oc.optimizationMetrics.countersMu.Lock()
 	defer oc.optimizationMetrics.countersMu.Unlock()
@@ -701,77 +721,49 @@ func (oc *ObservationCreator) recordEventAttempted(source string) {
 			lastUpdate: time.Now(),
 		}
 	}
-	oc.optimizationMetrics.sourceCounters[source].attempted++
+	return oc.optimizationMetrics.sourceCounters[source]
+}
+
+// recordEventAttempted records that an event was attempted
+func (oc *ObservationCreator) recordEventAttempted(source string) {
+	counters := oc.getOrCreateSourceCounters(source)
+	if counters != nil {
+		counters.attempted++
+	}
 }
 
 // recordEventFiltered records that an event was filtered
 func (oc *ObservationCreator) recordEventFiltered(source, reason string) {
-	if oc.optimizationMetrics == nil {
-		return
+	counters := oc.getOrCreateSourceCounters(source)
+	if counters != nil {
+		counters.filtered++
 	}
-	oc.optimizationMetrics.countersMu.Lock()
-	defer oc.optimizationMetrics.countersMu.Unlock()
-
-	if oc.optimizationMetrics.sourceCounters == nil {
-		oc.optimizationMetrics.sourceCounters = make(map[string]*sourceCounters)
-	}
-
-	if _, exists := oc.optimizationMetrics.sourceCounters[source]; !exists {
-		oc.optimizationMetrics.sourceCounters[source] = &sourceCounters{
-			lastUpdate: time.Now(),
-		}
-	}
-	oc.optimizationMetrics.sourceCounters[source].filtered++
 }
 
 // recordEventDeduped records that an event was deduplicated
 func (oc *ObservationCreator) recordEventDeduped(source string) {
-	if oc.optimizationMetrics == nil {
-		return
+	counters := oc.getOrCreateSourceCounters(source)
+	if counters != nil {
+		counters.deduped++
 	}
-	oc.optimizationMetrics.countersMu.Lock()
-	defer oc.optimizationMetrics.countersMu.Unlock()
-
-	if oc.optimizationMetrics.sourceCounters == nil {
-		oc.optimizationMetrics.sourceCounters = make(map[string]*sourceCounters)
-	}
-
-	if _, exists := oc.optimizationMetrics.sourceCounters[source]; !exists {
-		oc.optimizationMetrics.sourceCounters[source] = &sourceCounters{
-			lastUpdate: time.Now(),
-		}
-	}
-	oc.optimizationMetrics.sourceCounters[source].deduped++
 }
 
 // recordEventCreated records that an event was created
 func (oc *ObservationCreator) recordEventCreated(source, severity string) {
-	if oc.optimizationMetrics == nil {
-		return
-	}
-	oc.optimizationMetrics.countersMu.Lock()
-	defer oc.optimizationMetrics.countersMu.Unlock()
+	counters := oc.getOrCreateSourceCounters(source)
+	if counters != nil {
+		counters.created++
+		counters.totalCount++
 
-	if oc.optimizationMetrics.sourceCounters == nil {
-		oc.optimizationMetrics.sourceCounters = make(map[string]*sourceCounters)
-	}
-
-	if _, exists := oc.optimizationMetrics.sourceCounters[source]; !exists {
-		oc.optimizationMetrics.sourceCounters[source] = &sourceCounters{
-			lastUpdate: time.Now(),
+		// Track low severity
+		severityLower := strings.ToLower(severity)
+		if severityLower == "low" || severityLower == "info" {
+			counters.lowSeverity++
 		}
 	}
-	oc.optimizationMetrics.sourceCounters[source].created++
-	oc.optimizationMetrics.sourceCounters[source].totalCount++
 
-	// Track low severity
-	severityLower := strings.ToLower(severity)
-	if severityLower == "low" || severityLower == "info" {
-		oc.optimizationMetrics.sourceCounters[source].lowSeverity++
-	}
-
-	// Update severity distribution
-	if oc.optimizationMetrics.SeverityDistribution != nil {
+	// Update severity distribution (separate from counters)
+	if oc.optimizationMetrics != nil && oc.optimizationMetrics.SeverityDistribution != nil {
 		oc.optimizationMetrics.SeverityDistribution.WithLabelValues(source, strings.ToUpper(severity)).Inc()
 	}
 }

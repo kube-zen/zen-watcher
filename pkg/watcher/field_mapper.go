@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
+	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -127,6 +128,17 @@ func (fm *FieldMapper) ApplyTTLMapping(
 	// Supports formats: "1w", "3d", "24h", "5m", "300" (seconds)
 	ttlSeconds, err := parseTTLToSeconds(ttlStr)
 	if err != nil {
+		logger.Warn("Failed to parse TTL value",
+			logger.Fields{
+				Component: "watcher",
+				Operation: "ttl_parsing",
+				Error:     err,
+				Additional: map[string]interface{}{
+					"ttl_string": ttlStr,
+					"from_field": mapping.From,
+					"to_field":   mapping.To,
+				},
+			})
 		return 0, fmt.Errorf("invalid TTL format '%s': %w", ttlStr, err)
 	}
 

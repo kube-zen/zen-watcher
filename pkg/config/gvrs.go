@@ -15,8 +15,9 @@
 package config
 
 import (
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"os"
+
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // DefaultAPIGroup is the default API group used for zen-watcher resources.
