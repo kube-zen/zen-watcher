@@ -17,6 +17,8 @@ package sdk
 import (
 	"fmt"
 	"regexp"
+
+	"github.com/kube-zen/zen-watcher/pkg/config"
 )
 
 // ValidationError represents a validation error
@@ -36,8 +38,10 @@ func ValidateIngester(ingester *Ingester) error {
 	}
 
 	// Validate APIVersion
-	if ingester.APIVersion != "zen.kube-zen.io/v1" && ingester.APIVersion != "zen.kube-zen.io/v1alpha1" {
-		return &ValidationError{Field: "apiVersion", Message: "must be zen.kube-zen.io/v1 or zen.kube-zen.io/v1alpha1"}
+	expectedV1 := fmt.Sprintf("%s/v1", config.DefaultAPIGroup)
+	expectedV1Alpha1 := fmt.Sprintf("%s/v1alpha1", config.DefaultAPIGroup)
+	if ingester.APIVersion != expectedV1 && ingester.APIVersion != expectedV1Alpha1 {
+		return &ValidationError{Field: "apiVersion", Message: fmt.Sprintf("must be %s or %s", expectedV1, expectedV1Alpha1)}
 	}
 
 	// Validate Kind
@@ -113,8 +117,9 @@ func ValidateObservation(obs *Observation) error {
 	}
 
 	// Validate APIVersion
-	if obs.APIVersion != "zen.kube-zen.io/v1" {
-		return &ValidationError{Field: "apiVersion", Message: "must be zen.kube-zen.io/v1"}
+	expectedV1 := fmt.Sprintf("%s/v1", config.DefaultAPIGroup)
+	if obs.APIVersion != expectedV1 {
+		return &ValidationError{Field: "apiVersion", Message: fmt.Sprintf("must be %s", expectedV1)}
 	}
 
 	// Validate Kind

@@ -29,4 +29,21 @@ const (
 	// DefaultTTLMaxSeconds is the maximum TTL in seconds (1 year)
 	// Prevents indefinite retention
 	DefaultTTLMaxSeconds int64 = 365 * 24 * 60 * 60
+
+	// Performance degradation detection thresholds
+	// MaxProcessingLatencyMs is the maximum acceptable processing latency in milliseconds
+	// If latency exceeds this, performance degradation is detected
+	MaxProcessingLatencyMs = 1000 // 1 second
+
+	// MinEventsForDegradationCheck is the minimum number of events required before
+	// checking for performance degradation
+	MinEventsForDegradationCheck = 100
+
+	// MinDeduplicationRate is the minimum acceptable deduplication rate
+	// Below this rate, performance degradation is detected
+	MinDeduplicationRate = 0.1 // 10%
+
+	// MinFilterEffectiveness is the minimum acceptable filter effectiveness
+	// Below this effectiveness, performance degradation is detected
+	MinFilterEffectiveness = 0.05 // 5%
 )

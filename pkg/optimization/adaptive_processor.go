@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
+	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 )
 
@@ -61,17 +62,17 @@ func (ap *AdaptiveProcessor) ShouldAdapt() bool {
 // detectPerformanceDegradation detects if performance has degraded
 func (ap *AdaptiveProcessor) detectPerformanceDegradation(metrics *OptimizationMetrics) bool {
 	// Check if latency has increased significantly
-	if metrics.ProcessingLatency > 1000 { // > 1 second
+	if metrics.ProcessingLatency > config.MaxProcessingLatencyMs {
 		return true
 	}
 
 	// Check if dedup effectiveness has dropped
-	if metrics.DeduplicationRate < 0.1 && metrics.EventsProcessed > 100 {
+	if metrics.DeduplicationRate < config.MinDeduplicationRate && metrics.EventsProcessed > config.MinEventsForDegradationCheck {
 		return true
 	}
 
 	// Check if filter effectiveness is very low
-	if metrics.FilterEffectiveness < 0.05 && metrics.EventsProcessed > 100 {
+	if metrics.FilterEffectiveness < config.MinFilterEffectiveness && metrics.EventsProcessed > config.MinEventsForDegradationCheck {
 		return true
 	}
 
