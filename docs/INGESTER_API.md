@@ -66,14 +66,15 @@ spec:
 
 ### `informer`
 
-Use for Kubernetes resources (CRDs, ConfigMaps, Pods, etc.) that you want to watch.
+Use for Kubernetes resources (CRDs, ConfigMaps, Events, Pods, etc.) that you want to watch.
 
 **When to use:**
+- Watching custom CRDs for events (Trivy, Kyverno, cert-manager, etc.)
 - Watching ConfigMaps for batch scan results (Checkov, Kube-Bench, etc.)
-- Watching custom CRDs for events
+- Watching native Kubernetes Events
 - Watching any Kubernetes resource for changes
 
-**Example:**
+**Example 1: Watching ConfigMaps**
 ```yaml
 spec:
   source: checkov
@@ -85,6 +86,38 @@ spec:
       resource: "configmaps"
     labelSelector: "app=checkov"
     resyncPeriod: "30m"
+  destinations:
+    - type: crd
+      value: observations
+```
+
+**Example 2: Watching Kubernetes Events**
+```yaml
+spec:
+  source: kubernetes-events
+  ingester: informer
+  informer:
+    gvr:
+      group: ""
+      version: "v1"
+      resource: "events"
+    namespace: ""         # Empty = watch all namespaces
+    resyncPeriod: "0"     # Watch-only, no periodic resync
+  destinations:
+    - type: crd
+      value: observations
+```
+
+**Example 3: Watching Custom CRDs**
+```yaml
+spec:
+  source: trivy
+  ingester: informer
+  informer:
+    gvr:
+      group: "aquasecurity.github.io"
+      version: "v1alpha1"
+      resource: "vulnerabilityreports"
   destinations:
     - type: crd
       value: observations
@@ -129,13 +162,13 @@ spec:
 
 Use for log-based ingestion (placeholder for future implementation).
 
-### `k8s-events`
+### `k8s-events` (Legacy)
 
-Use for Kubernetes native events.
+**Note**: The `k8s-events` ingester type is still supported for backward compatibility, but it's recommended to use the `informer` adapter instead (see Example 2 above). The informer adapter provides the same functionality with more flexibility.
 
 **When to use:**
-- Watching Kubernetes events for specific object kinds
-- Monitoring cluster-level events
+- Legacy configurations that already use `k8s-events`
+- When you need the built-in security filtering provided by `K8sEventsAdapter`
 
 **Example:**
 ```yaml
@@ -150,6 +183,8 @@ spec:
     - type: crd
       value: observations
 ```
+
+**Recommended**: Use `ingester: informer` with `gvr: {resource: "events"}` instead (see Example 2 in the `informer` section above).
 
 ## Processing Pipeline
 

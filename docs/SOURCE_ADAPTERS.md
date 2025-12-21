@@ -8,8 +8,7 @@ This guide explains how to add support for new event sources to Zen Watcher. The
 
 1. **🔍 Logs** - Monitor pod logs with regex patterns
 2. **📡 Webhooks** - Receive HTTP webhooks from external tools
-3. **🗂️ ConfigMaps** - Watch ConfigMaps via informer adapter
-4. **📋 CRDs (Informers)** - Watch Kubernetes Custom Resource Definitions
+3. **📋 CRDs (Informers)** - Watch Kubernetes resources (CRDs, ConfigMaps, Events, Pods, etc.)
 
 ### Quick Example: Adding a Source from Logs
 
@@ -82,7 +81,7 @@ See [Generic Source Configuration](#generic-source-configuration-via-yaml) secti
 
 ## Generic Source Configuration (Via YAML)
 
-**No code required!** Zen Watcher supports four input methods that can all be configured using the `Ingester` CRD:
+**No code required!** Zen Watcher supports three input methods that can all be configured using the `Ingester` CRD:
 
 ### Input Methods Overview
 
@@ -90,9 +89,7 @@ See [Generic Source Configuration](#generic-source-configuration-via-yaml) secti
 |--------|----------|-------------------|
 | **Logs** | Monitor pod logs, parse log lines with regex | `ingester: logs` |
 | **Webhooks** | Receive HTTP webhooks from external tools | `ingester: webhook` |
-| **ConfigMaps** | Watch ConfigMaps via informer adapter | `ingester: informer` with `gvr: {resource: "configmaps"}` |
-| **CRDs (Informers)** | Watch Kubernetes Custom Resource Definitions | `ingester: informer` |
-| **K8s Events** | Native Kubernetes Events API | `ingester: k8s-events` |
+| **CRDs (Informers)** | Watch Kubernetes resources (CRDs, ConfigMaps, Events, etc.) | `ingester: informer` |
 
 ### Method 1: Logs Adapter
 
@@ -162,41 +159,11 @@ spec:
 - Buffers events for processing
 - Supports bearer token or basic auth (optional)
 
-### Method 3: Watching ConfigMaps via Informer Adapter
+### Method 3: CRD/Informer Adapter
 
-Watch ConfigMaps for batch scan results using the informer adapter:
+Watch Kubernetes resources (CRDs, ConfigMaps, Events, Pods, etc.) using the informer adapter:
 
-```yaml
-apiVersion: zen.kube-zen.io/v1alpha1
-kind: Ingester
-metadata:
-  name: checkov-source
-  namespace: zen-system
-spec:
-  source: checkov
-  ingester: informer
-  informer:
-    gvr:
-      group: ""           # Empty for core resources
-      version: "v1"
-      resource: "configmaps"
-    namespace: checkov
-    labelSelector: app=checkov
-  normalization:
-    domain: security
-    type: iac_vulnerability
-```
-
-**How it works:**
-- Uses Kubernetes informer to watch ConfigMaps matching the label selector
-- Automatically detects ConfigMap changes
-- Extracts data from ConfigMap keys
-- Parses JSON and creates Observations
-- Event-driven (no polling needed)
-
-### Method 4: CRD/Informer Adapter
-
-Watch Kubernetes Custom Resource Definitions:
+**Example 1: Watching Custom CRDs**
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
@@ -220,11 +187,63 @@ spec:
     type: certificate_status
 ```
 
+**Example 2: Watching ConfigMaps**
+
+Watch ConfigMaps for batch scan results (e.g., Checkov, Kube-Bench):
+
+```yaml
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: checkov-source
+  namespace: zen-system
+spec:
+  source: checkov
+  ingester: informer
+  informer:
+    gvr:
+      group: ""           # Empty for core resources
+      version: "v1"
+      resource: "configmaps"
+    namespace: checkov
+    labelSelector: app=checkov
+  normalization:
+    domain: security
+    type: iac_vulnerability
+```
+
+**Example 3: Watching Kubernetes Events**
+
+Watch native Kubernetes Events:
+
+```yaml
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: k8s-events-source
+  namespace: zen-system
+spec:
+  source: kubernetes-events
+  ingester: informer
+  informer:
+    gvr:
+      group: ""           # Empty for core resources
+      version: "v1"
+      resource: "events"
+    namespace: ""         # Empty = watch all namespaces
+    labelSelector: ""      # Optional: filter by labels
+    resyncPeriod: "0"      # Watch-only, no periodic resync (events are ephemeral)
+  normalization:
+    domain: security
+    type: kubernetes_event
+```
+
 **How it works:**
-- Creates a Kubernetes informer for the specified CRD
+- Creates a Kubernetes informer for the specified resource (CRD, ConfigMap, Event, etc.)
 - Watches for Create/Update/Delete events
 - Real-time processing (no polling)
 - Automatically handles reconnection and resync
+- Supports any Kubernetes resource via GVR (GroupVersionResource)
 
 ### Complete Configuration Example
 
@@ -769,28 +788,7 @@ func (a *CustomWebhookAdapter) Stop() {
 
 ### Pattern 3: Watching ConfigMaps via Informer Adapter
 
-For tools that write results to ConfigMaps (e.g., kube-bench, Checkov), configure an Ingester with the informer adapter:
-
-```yaml
-apiVersion: zen.kube-zen.io/v1alpha1
-kind: Ingester
-metadata:
-  name: kube-bench-source
-  namespace: zen-system
-spec:
-  source: kube-bench
-  ingester: informer
-  informer:
-    gvr:
-      group: ""
-      version: "v1"
-      resource: "configmaps"
-    namespace: kube-bench
-    labelSelector: app=kube-bench
-  normalization:
-    domain: security
-    type: compliance_check
-```
+For tools that write results to ConfigMaps (e.g., kube-bench, Checkov), use the informer adapter with `gvr: {resource: "configmaps"}`. See [Method 3: CRD/Informer Adapter](#method-3-crdinformer-adapter) above for complete example.
 
 func (a *KubecostAdapter) Stop() {
     // Cleanup if needed
