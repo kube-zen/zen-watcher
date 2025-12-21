@@ -10,11 +10,13 @@
 
 ## Executive Summary
 
-This document identifies technical debt, potential bugs, hardcoded values, and code quality issues in zen-watcher that should be addressed before creating a PoC for the Generic GC KEP.
+This document identifies technical debt, potential bugs, hardcoded values, and code quality issues in zen-watcher that should be addressed to improve code quality and maintainability.
+
+**Note**: zen-watcher has a working built-in GC (`pkg/gc/collector.go`) - this is NOT tech debt. The Generic GC project (`zen-gc`) is a separate, future project and is unrelated to this analysis.
 
 **Priority Levels**:
-- 🔴 **Critical**: Must fix before PoC
-- 🟡 **High**: Should fix before PoC
+- 🔴 **Critical**: Must fix before OSS release
+- 🟡 **High**: Should fix before OSS release
 - 🟢 **Medium**: Fix in next iteration
 - ⚪ **Low**: Nice to have
 
