@@ -205,13 +205,25 @@ func (p *Processor) determineProcessingOrder(raw *generic.RawEvent, config *gene
 
 // createMinimalObservation creates a minimal Observation structure for filter/dedup
 // This does NOT perform normalization - that happens after filter/dedup
+// However, we need to extract basic fields (like severity) from raw data so filters can work
 func (p *Processor) createMinimalObservation(raw *generic.RawEvent, config *generic.SourceConfig) *unstructured.Unstructured {
+	// Extract severity from raw data if available (for filtering)
+	severity := "MEDIUM" // Default
+	if raw.RawData != nil {
+		if sev, ok := raw.RawData["severity"].(string); ok && sev != "" {
+			severity = strings.ToUpper(sev)
+		} else if sev, ok := raw.RawData["priority"].(string); ok && sev != "" {
+			// Some sources use "priority" instead of "severity"
+			severity = strings.ToUpper(sev)
+		}
+	}
+
 	// Create a minimal event structure with just source and raw data
 	// This is sufficient for filter/dedup operations
 	event := &watcher.Event{
 		Source:   raw.Source,
 		Category: "security",  // Default, will be normalized later
-		Severity: "MEDIUM",    // Default, will be normalized later
+		Severity: severity,    // Extract from raw data for filtering
 		Details:  raw.RawData, // Preserve all raw data
 	}
 

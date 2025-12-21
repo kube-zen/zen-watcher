@@ -28,13 +28,15 @@ import (
 
 func TestObservationCreator_CreateObservation(t *testing.T) {
 	scheme := runtime.NewScheme()
-	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme)
-
 	observationGVR := schema.GroupVersionResource{
 		Group:    "zen.kube-zen.io",
 		Version:  "v1",
 		Resource: "observations",
 	}
+	// Register observations resource for List operations
+	dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{
+		observationGVR: "ObservationList",
+	})
 
 	creator := NewObservationCreator(
 		dynamicClient,
@@ -73,13 +75,17 @@ func TestObservationCreator_CreateObservation(t *testing.T) {
 		t.Fatalf("CreateObservation() error = %v, want nil", err)
 	}
 
-	// Verify observation was created
-	created, err := dynamicClient.Resource(observationGVR).Namespace("default").Get(
-		ctx, observation.GetName(), metav1.GetOptions{})
+	// Verify observation was created - list and find it since name is generated
+	list, err := dynamicClient.Resource(observationGVR).Namespace("default").List(ctx, metav1.ListOptions{})
 	if err != nil {
-		t.Fatalf("Failed to get created observation: %v", err)
+		t.Fatalf("Failed to list observations: %v", err)
 	}
 
+	if len(list.Items) == 0 {
+		t.Fatal("Expected at least one observation to be created")
+	}
+
+	created := &list.Items[0]
 	if created.GetName() == "" {
 		t.Error("Observation name should be generated")
 	}
@@ -151,13 +157,15 @@ func TestObservationCreator_CreateObservation_AlreadyExists(t *testing.T) {
 
 func TestObservationCreator_CreateObservation_WithDedup(t *testing.T) {
 	scheme := runtime.NewScheme()
-	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme)
-
 	observationGVR := schema.GroupVersionResource{
 		Group:    "zen.kube-zen.io",
 		Version:  "v1",
 		Resource: "observations",
 	}
+	// Register observations resource for List operations
+	dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{
+		observationGVR: "ObservationList",
+	})
 
 	creator := NewObservationCreator(
 		dynamicClient,

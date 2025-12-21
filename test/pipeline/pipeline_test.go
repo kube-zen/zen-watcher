@@ -35,7 +35,15 @@ import (
 func setupTestEnv(t *testing.T) dynamic.Interface {
 	t.Helper()
 	scheme := runtime.NewScheme()
-	return dynamicfake.NewSimpleDynamicClient(scheme)
+	observationGVR := schema.GroupVersionResource{
+		Group:    "zen.kube-zen.io",
+		Version:  "v1",
+		Resource: "observations",
+	}
+	// Register observations resource for List operations
+	return dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{
+		observationGVR: "ObservationList",
+	})
 }
 
 // setupPipeline creates a complete pipeline with fake clients

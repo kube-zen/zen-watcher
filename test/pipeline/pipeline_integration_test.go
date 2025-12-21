@@ -28,6 +28,9 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
+// setupTestEnv is defined in pipeline_test.go - using it here
+var _ = setupTestEnv
+
 // TestPipelineIntegration_FullFlow_FilterFirst tests complete pipeline with filter_first strategy
 func TestPipelineIntegration_FullFlow_FilterFirst(t *testing.T) {
 	dynamicClient := setupTestEnv(t)
