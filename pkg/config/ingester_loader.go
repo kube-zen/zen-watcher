@@ -37,6 +37,14 @@ type IngesterConfig struct {
 	Dedup         *DedupConfig
 	Processing    *ProcessingConfig
 	Optimization  *OptimizationConfig
+	Destinations  []DestinationConfig // Destination GVR configuration
+}
+
+// DestinationConfig holds destination GVR configuration
+type DestinationConfig struct {
+	Type  string                      // "crd"
+	Value string                      // Resource name (e.g., "observations")
+	GVR   schema.GroupVersionResource // Resolved GVR
 }
 
 // InformerConfig holds informer-specific configuration
@@ -529,6 +537,75 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 		return nil
 	}
 
+	// Extract destinations and resolve GVRs
+	config.Destinations = make([]DestinationConfig, 0, len(destinations))
+	for _, dest := range destinations {
+		if destMap, ok := dest.(map[string]interface{}); ok {
+			destType := getString(destMap, "type")
+			destValue := getString(destMap, "value")
+
+			if destType == "crd" {
+				var gvr schema.GroupVersionResource
+
+				// Check if full GVR is specified
+				if gvrMap, ok := destMap["gvr"].(map[string]interface{}); ok {
+					group := getString(gvrMap, "group")
+					version := getString(gvrMap, "version")
+					resource := getString(gvrMap, "resource")
+
+					if version != "" && resource != "" {
+						// Use specified GVR
+						gvr = schema.GroupVersionResource{
+							Group:    group,
+							Version:  version,
+							Resource: resource,
+						}
+					} else if destValue != "" {
+						// Fallback to resolving from value
+						gvr = ResolveDestinationGVR(destValue)
+					} else {
+						logger.Warn("Destination has neither gvr nor value",
+							logger.Fields{
+								Component: "config",
+								Operation: "ingester_convert",
+								Source:    source,
+							})
+						continue
+					}
+				} else if destValue != "" {
+					// Resolve GVR from destination value
+					gvr = ResolveDestinationGVR(destValue)
+				} else {
+					logger.Warn("Destination has neither gvr nor value",
+						logger.Fields{
+							Component: "config",
+							Operation: "ingester_convert",
+							Source:    source,
+						})
+					continue
+				}
+
+				config.Destinations = append(config.Destinations, DestinationConfig{
+					Type:  destType,
+					Value: destValue,
+					GVR:   gvr,
+				})
+			}
+		}
+	}
+
+	// Ensure at least one destination was extracted
+	if len(config.Destinations) == 0 {
+		logger.Warn("No valid CRD destinations found",
+			logger.Fields{
+				Component: "config",
+				Operation: "ingester_convert",
+				Namespace: u.GetNamespace(),
+				Source:    source,
+			})
+		return nil
+	}
+
 	// Extract informer config
 	if informer, ok := spec["informer"].(map[string]interface{}); ok {
 		config.Informer = &InformerConfig{}
@@ -829,4 +906,23 @@ func getSpecKeys(spec map[string]interface{}) []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// ResolveDestinationGVR resolves a GVR from a destination value.
+// For "observations", returns the Observation GVR.
+// For other values, defaults to zen.kube-zen.io/v1/{value}.
+func ResolveDestinationGVR(value string) schema.GroupVersionResource {
+	if value == "observations" {
+		return schema.GroupVersionResource{
+			Group:    "zen.kube-zen.io",
+			Version:  "v1",
+			Resource: "observations",
+		}
+	}
+	// Default to zen.kube-zen.io/v1/{value} for custom resources
+	return schema.GroupVersionResource{
+		Group:    "zen.kube-zen.io",
+		Version:  "v1",
+		Resource: value,
+	}
 }

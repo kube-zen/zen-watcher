@@ -1,0 +1,26 @@
+# Example: Write events to ConfigMap (core Kubernetes resource)
+# This demonstrates using GVR to write to any Kubernetes resource
+# Note: zen-watcher has no special-case code - ConfigMaps are treated like any other resource
+apiVersion: zen.kube-zen.io/v1
+kind: Ingester
+metadata:
+  name: falco-configmap-destination
+  namespace: zen-system
+spec:
+  source: falco
+  ingester: webhook
+  webhook:
+    path: "/ingest/falco"
+  destinations:
+    - type: crd
+      gvr:
+        group: ""           # Empty string for core resources
+        version: "v1"
+        resource: "configmaps"
+  filters:
+    minSeverity: HIGH
+  deduplication:
+    enabled: true
+    window: "1h"
+    strategy: "fingerprint"
+

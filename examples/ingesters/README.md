@@ -68,14 +68,41 @@ Set `spec.optimization.order: auto` to enable automatic optimization, or specify
 
 ## Destination Policy (zen-watcher 1.0.0-alpha)
 
-All examples use the official OSS destination:
+All examples use `type: crd` destinations. zen-watcher is completely generic and supports writing to any GVR.
+
+**Example - Observations (community example):**
 ```yaml
 destinations:
   - type: crd
-    value: observations
+    value: observations  # Writes to zen.kube-zen.io/v1/observations
 ```
 
-**Note**: zen-watcher OSS 1.0.0-alpha only supports `type: crd` with `value: observations`. For external sinks (webhooks, queues, SaaS), use external agents (kubewatch, robusta) that watch Observations CRDs, or use zen-bridge (platform component) for SaaS integration.
+**Example - ConfigMap (core resource):**
+```yaml
+destinations:
+  - type: crd
+    gvr:
+      group: ""
+      version: "v1"
+      resource: "configmaps"
+```
+
+**Example - Custom CRD:**
+```yaml
+destinations:
+  - type: crd
+    gvr:
+      group: "your.group.com"
+      version: "v1"
+      resource: "yourresource"
+```
+
+**Important**: 
+- zen-watcher has **no special-case code** for observations, ConfigMaps, or any resource
+- Observations is kept as a useful community example CRD with dashboards
+- ConfigMaps are shown as an example of writing to core resources
+- The code works identically for any GVR you specify
+- For external sinks (webhooks, queues, SaaS), use external agents (kubewatch, robusta) that watch CRDs, or use zen-bridge (platform component) for SaaS integration
 
 ## How to Apply Examples
 

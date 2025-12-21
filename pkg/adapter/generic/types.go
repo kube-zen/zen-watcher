@@ -108,8 +108,10 @@ type NormalizationConfig struct {
 
 // FieldMapping maps fields from raw data
 type FieldMapping struct {
-	From string // JSONPath
-	To   string // Label or field name
+	From           string            // JSONPath (optional if constant is set)
+	To             string            // Label or field name
+	Constant       string            // Constant value (if set, overrides From)
+	StaticMappings map[string]string // Static value mappings (source value -> target value)
 }
 
 // ThresholdsConfig for threshold monitoring

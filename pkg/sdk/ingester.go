@@ -44,7 +44,8 @@ type IngesterSpec struct {
 // Destination represents a destination configuration
 type Destination struct {
 	Type    string                `json:"type" yaml:"type"`
-	Value   string                `json:"value" yaml:"value"`
+	Value   string                `json:"value,omitempty" yaml:"value,omitempty"` // Used if GVR is not specified
+	GVR     *GVRConfig            `json:"gvr,omitempty" yaml:"gvr,omitempty"`     // Full GVR specification (takes precedence over value)
 	Mapping *NormalizationMapping `json:"mapping,omitempty" yaml:"mapping,omitempty"`
 }
 

@@ -161,8 +161,10 @@ The Ingester CRD defines:
 - Check zen-watcher logs for errors
 
 **Observations not created:**
-- Verify destination is `type: crd, value: observations`
+- Verify destination is `type: crd` with a valid `value` (e.g., "observations" or any custom CRD name)
+- Check that the target CRD exists: `kubectl get crd {value}.zen.kube-zen.io` (or check the GVR)
 - Check Ingester status: `kubectl describe ingester <name> -n <namespace>`
+- **Note**: zen-watcher supports writing to any GVR. For `value: observations`, it uses `zen.kube-zen.io/v1/observations`. For other values, it uses `zen.kube-zen.io/v1/{value}`.
 
 ## Related Documentation
 

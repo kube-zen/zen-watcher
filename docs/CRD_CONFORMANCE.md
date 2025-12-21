@@ -20,7 +20,9 @@ This document describes the validation guarantees provided by zen-watcher CRD sc
   - Each destination must have:
     - `type` (required, enum): `crd` (only valid value)
     - `value` (required, string, pattern: `^[a-z0-9-]+$`)
-  - For `type: crd`, `value` should be `observations`
+  - For `type: crd`, `value` can be any resource name matching `^[a-z0-9-]+$`
+  - Default behavior: `value: observations` writes to `zen.kube-zen.io/v1/observations`
+  - For other values, writes to `zen.kube-zen.io/v1/{value}` (the target CRD must exist)
 
 - **`spec.deduplication.window`** (optional, string)
   - Pattern: `^[0-9]+(ns|us|µs|ms|s|m|h)$`
@@ -73,8 +75,9 @@ The following must be validated at runtime (not in CRD schema):
    - Error: "Resource not found" or "API group not available"
 
 2. **Destination reachability**: When `spec.destinations[].type: crd`, the destination CRD must exist
-   - Validation: Check if Observation CRD exists
-   - Error: "Destination CRD not found"
+   - Validation: Check if the target CRD exists (for `value: observations`, checks Observation CRD; for other values, checks `zen.kube-zen.io/v1/{value}`)
+   - Error: "Destination CRD not found" or "GVR not available"
+   - **Implementation Note**: zen-watcher supports writing to any GVR. The target CRD must exist and zen-watcher must have create permissions.
 
 3. **Normalization config completeness**: Field mappings must reference valid JSONPath expressions
    - Validation: Attempt to extract fields using JSONPath

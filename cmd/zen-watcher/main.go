@@ -37,6 +37,7 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/scaling"
 	"github.com/kube-zen/zen-watcher/pkg/server"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 // Version, Commit, and BuildDate are set via ldflags during build
@@ -192,6 +193,23 @@ func main() {
 	// Create Ingester store and informer for Ingester CRD support
 	ingesterStore := config.NewIngesterStore()
 	ingesterInformer := config.NewIngesterInformer(ingesterStore, clients.Dynamic)
+
+	// Set up GVR resolver for dynamic destination GVR support
+	// The resolver looks up the destination GVR from the ingester config store
+	observationCreator.SetGVRResolver(func(source string) schema.GroupVersionResource {
+		// Get ingester config by source
+		ingesterConfig, exists := ingesterStore.GetBySource(source)
+		if exists && ingesterConfig != nil && len(ingesterConfig.Destinations) > 0 {
+			// Use first CRD destination's GVR
+			for _, dest := range ingesterConfig.Destinations {
+				if dest.Type == "crd" {
+					return dest.GVR
+				}
+			}
+		}
+		// Fallback to default observations GVR
+		return gvrs.Observations
+	})
 
 	// Create HTTP server (handles Falco and Audit webhooks)
 	httpServer := server.NewServerWithIngester(

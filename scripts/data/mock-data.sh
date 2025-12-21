@@ -25,6 +25,28 @@ kubectl create namespace demo-manifests 2>/dev/null || true
 
 log_step "Creating demo Observation CRDs..."
 
+# Helper function to deploy with retry
+deploy_with_retry() {
+    local file="$1"
+    local retries=3
+    local delay=10
+    
+    for i in $(seq 1 $retries); do
+        if kubectl apply -f "$file" 2>/dev/null; then
+            return 0
+        else
+            if [ $i -lt $retries ]; then
+                log_warn "Attempt $i failed, retrying in $delay seconds..."
+                sleep $delay
+                delay=$((delay * 2))
+            fi
+        fi
+    done
+    
+    log_error "Failed to apply $file after $retries attempts"
+    return 1
+}
+
 # Helper function to create Observation CRD
 create_observation() {
     local name=$1
@@ -37,7 +59,8 @@ create_observation() {
     local resource_ns=$8
     local details_json=$9
     
-    cat <<EOF | kubectl apply -f -
+    local tmp_file=$(mktemp)
+    cat <<EOF > "$tmp_file"
 apiVersion: zen.kube-zen.io/v1
 kind: Observation
 metadata:
@@ -62,6 +85,8 @@ spec:
   details:
 ${details_json}
 EOF
+    deploy_with_retry "$tmp_file"
+    rm -f "$tmp_file"
 }
 
 # Create demo observations from Trivy (vulnerabilities)

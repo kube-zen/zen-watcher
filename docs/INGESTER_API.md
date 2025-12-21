@@ -16,13 +16,20 @@ Observations is one default destination. You can also use tools like KubeWatch, 
 
 ## Default Behavior
 
-By default, `type: crd` with `value: observations` writes Observation CRDs. This is the classic zen-watcher OSS behavior.
+By default, `type: crd` with `value: observations` writes to the Observation CRD (`zen.kube-zen.io/v1/observations`). This is a common example, but zen-watcher is completely generic and can write to any GVR.
+
+**Important**: zen-watcher has no special-case code. Observations is just a useful community example CRD with dashboards. You can write to any CRD or core resource (ConfigMaps, Secrets, etc.) using the `gvr` field.
 
 ```yaml
 spec:
   destinations:
     - type: crd
-      value: observations
+      value: observations  # Example: Observation CRD
+      # OR use gvr for any resource:
+      # gvr:
+      #   group: "your.group.com"
+      #   version: "v1"
+      #   resource: "yourresource"
 ```
 
 ## Alternative Destinations
@@ -251,26 +258,67 @@ If `spec.processing.dedup.strategy` is not set, the default `fingerprint` strate
 
 ### `type: crd` (Official OSS Destination - zen-watcher 1.0.0-alpha)
 
-Write Observation CRDs. This is the **only official destination** supported in zen-watcher OSS 1.0.0-alpha.
+Write to **any Kubernetes resource** (CRD or core resource). zen-watcher is completely generic and supports writing to any GVR (GroupVersionResource).
+
+**Important**: zen-watcher has **no special-case code** for any resource type. Observations and ConfigMaps are just examples in documentation - the code works identically for any GVR.
 
 **Required:**
-- `value`: CRD resource name (must be "observations")
+- Either `value` (resource name) or `gvr` (full GVR specification)
 
-**Example:**
+**GVR Resolution:**
+- If `gvr` is specified, uses that GVR directly
+- If only `value` is specified:
+  - For `value: observations`, writes to `zen.kube-zen.io/v1/observations` (Observation CRD - community example)
+  - For other values, defaults to `zen.kube-zen.io/v1/{value}` (custom CRD)
+- The target resource must exist in the cluster and zen-watcher must have permissions to create it
+
+**Example - Observations (community example CRD):**
 ```yaml
 destinations:
   - type: crd
-    value: observations
+    value: observations  # Writes to zen.kube-zen.io/v1/observations
 ```
+
+**Example - ConfigMap (core resource example):**
+```yaml
+destinations:
+  - type: crd
+    gvr:
+      group: ""           # Empty string for core resources
+      version: "v1"
+      resource: "configmaps"
+```
+
+**Example - Custom CRD (any CRD you define):**
+```yaml
+destinations:
+  - type: crd
+    gvr:
+      group: "security.example.com"
+      version: "v1"
+      resource: "securityevents"
+```
+
+**Example - Using value for custom CRD:**
+```yaml
+destinations:
+  - type: crd
+    value: myevents  # Writes to zen.kube-zen.io/v1/myevents
+```
+
+**Note**: 
+- When `gvr` is specified, it takes precedence over `value`
+- The code is completely generic - no special handling for observations, ConfigMaps, or any other resource
+- Observations CRD is kept as a useful community example with dashboards, but the code treats it like any other CRD
 
 **OSS Policy (zen-watcher 1.0.0-alpha):**
 - zen-watcher is a core engine only; no external egress
-- Only `type: crd, value: observations` is officially supported
+- `type: crd` destinations support any GVR (not just observations)
 - Community is free to build sinks, but they are out-of-tree
-- Recommended: Use kubewatch, robusta, or external agents to sync Observations to external systems
+- Recommended: Use kubewatch, robusta, or external agents to sync CRDs to external systems
 - External sync is out of scope for zen-watcher; users should rely on:
   - ZenHooks SaaS (via zen-bridge), or
-  - External tools (kubewatch, robusta, etc.) to export Observations
+  - External tools (kubewatch, robusta, etc.) to export CRDs
 
 ### Other Destination Types (Not Supported in OSS)
 

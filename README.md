@@ -109,7 +109,12 @@ spec:
     window: "1h"
   destinations:
     - type: crd
-      value: observations
+      value: observations  # Example: writes to zen.kube-zen.io/v1/observations
+      # OR use gvr to write to any resource:
+      # gvr:
+      #   group: "your.group.com"
+      #   version: "v1"
+      #   resource: "yourresource"
 ```
 
 See [docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md) for complete examples.

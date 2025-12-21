@@ -313,7 +313,12 @@ echo ""
 # Cleanup option
 if [ "$NON_INTERACTIVE" = true ]; then
     log_step "Cleaning up test observations (non-interactive mode)..."
-    $KUBECTL_CMD delete observations -n "$NAMESPACE" -l stress-test=true --ignore-not-found=true &>/dev/null || true
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    if [ -f "${SCRIPT_DIR}/../cleanup/fast-observation-cleanup.sh" ]; then
+        "${SCRIPT_DIR}/../cleanup/fast-observation-cleanup.sh" "$NAMESPACE" "stress-test=true" || true
+    else
+        $KUBECTL_CMD delete observations -n "$NAMESPACE" -l stress-test=true --ignore-not-found=true &>/dev/null || true
+    fi
     log_success "Cleanup complete!"
 else
     if [ -t 0 ]; then
@@ -321,7 +326,12 @@ else
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             log_step "Deleting test observations..."
-            $KUBECTL_CMD delete observations -n "$NAMESPACE" -l stress-test=true --ignore-not-found=true
+            SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+            if [ -f "${SCRIPT_DIR}/../cleanup/fast-observation-cleanup.sh" ]; then
+                "${SCRIPT_DIR}/../cleanup/fast-observation-cleanup.sh" "$NAMESPACE" "stress-test=true" || true
+            else
+                $KUBECTL_CMD delete observations -n "$NAMESPACE" -l stress-test=true --ignore-not-found=true || true
+            fi
             log_success "Cleanup complete!"
         else
             log_info "Test observations retained (labeled with stress-test=true)"

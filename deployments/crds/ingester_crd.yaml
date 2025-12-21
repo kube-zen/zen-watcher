@@ -226,9 +226,25 @@ spec:
                       description: Optional name for this destination (for reference)
                       type: string
                     value:
-                      description: 'For type ''crd'': CRD resource name (e.g., ''observations'')'
+                      description: 'For type ''crd'': CRD resource name (e.g., ''observations''). Used if gvr is not specified.'
                       pattern: ^[a-z0-9-]+$
                       type: string
+                    gvr:
+                      description: 'For type ''crd'': Full GVR (GroupVersionResource) specification. If specified, overrides value.'
+                      properties:
+                        group:
+                          description: API group (e.g., zen.kube-zen.io, or empty string for core resources like configmaps)
+                          type: string
+                        version:
+                          description: API version (e.g., v1, v1alpha1)
+                          type: string
+                        resource:
+                          description: Resource name (e.g., observations, configmaps, secrets)
+                          type: string
+                      required:
+                      - version
+                      - resource
+                      type: object
                     url:
                       description: 'For type ''webhook'': HTTP URL to POST events
                         to'
@@ -950,9 +966,25 @@ spec:
                       - crd
                       type: string
                     value:
-                      description: 'For type ''crd'': CRD resource name (e.g., ''observations'')'
+                      description: 'For type ''crd'': CRD resource name (e.g., ''observations''). Used if gvr is not specified.'
                       pattern: ^[a-z0-9-]+$
                       type: string
+                    gvr:
+                      description: 'For type ''crd'': Full GVR (GroupVersionResource) specification. If specified, overrides value.'
+                      properties:
+                        group:
+                          description: API group (e.g., zen.kube-zen.io, or empty string for core resources like configmaps)
+                          type: string
+                        version:
+                          description: API version (e.g., v1, v1alpha1)
+                          type: string
+                        resource:
+                          description: Resource name (e.g., observations, configmaps, secrets)
+                          type: string
+                      required:
+                      - version
+                      - resource
+                      type: object
                     mapping:
                       description: Normalization and mapping configuration (optional)
                       properties:

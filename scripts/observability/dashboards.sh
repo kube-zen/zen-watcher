@@ -43,11 +43,36 @@ log_step "Importing Grafana dashboards..."
 
 # Wait for Grafana API - check in grafana namespace
 GRAFANA_NAMESPACE="${GRAFANA_NAMESPACE:-grafana}"
+
+# Wait for Grafana API to be ready
+wait_for_grafana_api() {
+    local retries=30
+    local delay=10
+    
+    log_step "Waiting for Grafana API to be ready..."
+    for i in $(seq 1 $retries); do
+        if kubectl exec -n "$GRAFANA_NAMESPACE" deployment/grafana -- curl -s localhost:3000/api/health >/dev/null 2>&1; then
+            log_success "Grafana API is ready!"
+            return 0
+        fi
+        log_info "Waiting for Grafana API... attempt $i/$retries"
+        sleep $delay
+    done
+    
+    log_warn "Timeout waiting for Grafana API"
+    return 1
+}
+
 GRAFANA_POD=$(kubectl get pod -n "$GRAFANA_NAMESPACE" -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
 if [ -z "$GRAFANA_POD" ]; then
     log_warn "Grafana pod not found in namespace $GRAFANA_NAMESPACE, skipping dashboard import"
     exit 0
 fi
+
+# Wait for Grafana API before proceeding
+wait_for_grafana_api || {
+    log_warn "Grafana API not ready, but continuing with dashboard import..."
+}
 
 # Get Grafana admin password and username
 GRAFANA_PASSWORD=$(kubectl get secret -n "$GRAFANA_NAMESPACE" grafana -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null || echo "admin")

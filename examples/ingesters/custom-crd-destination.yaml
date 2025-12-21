@@ -1,0 +1,26 @@
+# Example: Write events to a custom CRD
+# This demonstrates zen-watcher's generic GVR support - works with any CRD you define
+# No special-case code - your CRD is treated the same as observations or ConfigMaps
+apiVersion: zen.kube-zen.io/v1
+kind: Ingester
+metadata:
+  name: falco-custom-crd-destination
+  namespace: zen-system
+spec:
+  source: falco
+  ingester: webhook
+  webhook:
+    path: "/ingest/falco"
+  destinations:
+    - type: crd
+      gvr:
+        group: "security.example.com"  # Your custom API group
+        version: "v1"
+        resource: "securityevents"      # Your custom resource
+  filters:
+    minSeverity: HIGH
+  deduplication:
+    enabled: true
+    window: "1h"
+    strategy: "fingerprint"
+

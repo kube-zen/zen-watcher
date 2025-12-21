@@ -168,7 +168,12 @@ echo ""
 
 # Cleanup
 log_step "Cleaning up test observations..."
-kubectl delete observations -n "$NAMESPACE" -l benchmark=true --ignore-not-found=true &>/dev/null || true
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "${SCRIPT_DIR}/../cleanup/fast-observation-cleanup.sh" ]; then
+    "${SCRIPT_DIR}/../cleanup/fast-observation-cleanup.sh" "$NAMESPACE" "benchmark=true" &>/dev/null || true
+else
+    kubectl delete observations -n "$NAMESPACE" -l benchmark=true --ignore-not-found=true &>/dev/null || true
+fi
 
 log_success "Benchmark complete!"
 

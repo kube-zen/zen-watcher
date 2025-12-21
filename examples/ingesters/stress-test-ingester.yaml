@@ -1,0 +1,96 @@
+# Stress Test Ingester Configuration
+#
+# This ingester is designed for stress testing with:
+# - Rate-limited observation creation (stays under Kubernetes API server limits)
+# - Short TTL for automatic cleanup (no manual deletion needed)
+# - Configurable observation rate and TTL
+#
+# Usage:
+#   kubectl apply -f examples/ingesters/stress-test-ingester.yaml
+#
+# Then send webhooks to: http://zen-watcher:8080/stress-test
+#
+# To clean up:
+#   kubectl delete ingester stress-test-ingester -n zen-system
+
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: stress-test-ingester
+  namespace: zen-system
+spec:
+  source: stress-test
+  ingester: webhook
+  webhook:
+    path: /stress-test
+    auth:
+      type: none
+  
+  # Observation template with TTL configuration
+  observationTemplate:
+    # Static TTL for all observations (short for stress tests)
+    ttl: "5m"  # Auto-cleanup after 5 minutes
+    
+    # OR use dynamic TTL based on severity (example):
+    # fieldMapping:
+    #   - from: severity
+    #     to: ttl
+    #     staticMappings:
+    #       CRITICAL: "3w"  # Keep critical for 3 weeks
+    #       HIGH: "2w"      # Keep high for 2 weeks
+    #       MEDIUM: "1w"    # Keep medium for 1 week
+    #       LOW: "3d"       # Keep low for 3 days
+  
+  # Rate limiting to stay under Kubernetes API server limits (~5 QPS writes)
+  rateLimit:
+    enabled: true
+    observationsPerMinute: 100  # ~1.67 QPS (well under 5 QPS limit)
+    burst: 10                   # Allow small bursts
+  
+  # Destinations
+  destinations:
+    - type: crd
+      value: observations
+  
+  # Optional: Filter configuration
+  filters:
+    enabled: false  # Don't filter during stress tests
+  
+  # Optional: Deduplication
+  deduplication:
+    enabled: false  # Disable deduplication for stress tests to maximize load
+
+---
+# Example: Stress test with severity-based TTL
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: stress-test-severity-ttl
+  namespace: zen-system
+spec:
+  source: stress-test-severity
+  ingester: webhook
+  webhook:
+    path: /stress-test-severity
+  
+  # Dynamic TTL based on severity
+  observationTemplate:
+    fieldMapping:
+      - from: severity
+        to: ttlSecondsAfterCreation
+        staticMappings:
+          CRITICAL: "1814400"  # 3 weeks in seconds
+          HIGH: "1209600"       # 2 weeks in seconds
+          MEDIUM: "604800"      # 1 week in seconds
+          LOW: "259200"         # 3 days in seconds
+          INFO: "86400"         # 1 day in seconds
+  
+  rateLimit:
+    enabled: true
+    observationsPerMinute: 50
+    burst: 5
+  
+  destinations:
+    - type: crd
+      value: observations
+
