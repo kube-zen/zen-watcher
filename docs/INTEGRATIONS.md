@@ -326,12 +326,55 @@ factory := dynamicinformer.NewFilteredDynamicSharedInformerFactory(
 
 Filter Observations by source, severity, or category:
 
+**Using kubectl:**
+```bash
+# Filter by category: security
+kubectl get observations -A -o json | \
+  jq '.items[] | select(.spec.category == "security")'
+
+# Filter by category: compliance
+kubectl get observations -A -o json | \
+  jq '.items[] | select(.spec.category == "compliance")'
+
+# Filter by category: cost
+kubectl get observations -A -o json | \
+  jq '.items[] | select(.spec.category == "cost")'
+
+# Filter by category: performance
+kubectl get observations -A -o json | \
+  jq '.items[] | select(.spec.category == "performance")'
+
+# Filter by category: operations
+kubectl get observations -A -o json | \
+  jq '.items[] | select(.spec.category == "operations")'
+
+# Filter by category and severity
+kubectl get observations -A -o json | \
+  jq '.items[] | select(.spec.category == "security" and .spec.severity == "CRITICAL")'
+```
+
+**Using Go informer:**
 ```go
 informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
     AddFunc: func(obj interface{}) {
         obs := obj.(*unstructured.Unstructured)
         
         // Extract fields
+        category, _, _ := unstructured.NestedString(obs.Object, "spec", "category")
+        severity, _, _ := unstructured.NestedString(obs.Object, "spec", "severity")
+        source, _, _ := unstructured.NestedString(obs.Object, "spec", "source")
+        
+        // Filter by category
+        if category != "security" {
+            return // Skip non-security events
+        }
+        
+        // Filter by severity
+        if severity != "CRITICAL" && severity != "HIGH" {
+            return // Skip low/medium severity
+        }
+        
+        // Process observation
         source, _, _ := unstructured.NestedString(obs.Object, "spec", "source")
         severity, _, _ := unstructured.NestedString(obs.Object, "spec", "severity")
         category, _, _ := unstructured.NestedString(obs.Object, "spec", "category")

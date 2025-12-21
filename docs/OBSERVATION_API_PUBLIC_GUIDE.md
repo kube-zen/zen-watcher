@@ -385,8 +385,36 @@ informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 
 **kubectl**:
 ```bash
+# Watch all observations
 kubectl get observations -w
-kubectl get observations -l zen.io/priority=high
+
+# Filter by category: security
+kubectl get observations -A -o json | \
+  jq '.items[] | select(.spec.category == "security")'
+
+# Filter by category: compliance
+kubectl get observations -A -o json | \
+  jq '.items[] | select(.spec.category == "compliance")'
+
+# Filter by category: cost
+kubectl get observations -A -o json | \
+  jq '.items[] | select(.spec.category == "cost")'
+
+# Filter by category: performance
+kubectl get observations -A -o json | \
+  jq '.items[] | select(.spec.category == "performance")'
+
+# Filter by category: operations
+kubectl get observations -A -o json | \
+  jq '.items[] | select(.spec.category == "operations")'
+
+# Filter by category and severity (e.g., critical security events)
+kubectl get observations -A -o json | \
+  jq '.items[] | select(.spec.category == "security" and .spec.severity == "CRITICAL")'
+
+# Count observations by category
+kubectl get observations -A -o json | \
+  jq -r '.items[] | .spec.category' | sort | uniq -c
 ```
 
 ---

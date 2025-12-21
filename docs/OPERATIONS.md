@@ -23,21 +23,70 @@ curl http://localhost:8080/metrics | grep zen_watcher_informer_cache_synced
 
 ### View Observations
 
+**Observation Categories:**
+Observations are classified into five categories:
+- **`security`** - Security-related events (vulnerabilities, threats, policy violations)
+- **`compliance`** - Compliance-related events (audit findings, policy checks)
+- **`performance`** - Performance-related events (latency spikes, resource exhaustion)
+- **`operations`** - Operations-related events (pod crashes, deployment failures)
+- **`cost`** - Cost/efficiency-related events (resource waste, unused resources)
+
+**Note**: Category is stored in `spec.category` and is displayed as a column in `kubectl get observations`. To filter by category, use `jq` or `jsonpath` (category is not a label).
+
 ```bash
-# All observations
+# All observations (Category column is shown by default)
 kubectl get observations -A
 
-# By source
+# View with custom columns including category
+kubectl get observations -A -o custom-columns=\
+NAME:.metadata.name,\
+SOURCE:.spec.source,\
+CATEGORY:.spec.category,\
+SEVERITY:.spec.severity,\
+EVENT_TYPE:.spec.eventType,\
+AGE:.metadata.creationTimestamp
+
+# By source (using label selector)
 kubectl get observations -A -l source=trivy
 
-# By severity
+# By severity (using label selector)
 kubectl get observations -A -l severity=CRITICAL
+
+# By category: security (using jq - category is in spec.category, not a label)
+kubectl get observations -A -o json | jq '.items[] | select(.spec.category == "security")'
+
+# By category: compliance
+kubectl get observations -A -o json | jq '.items[] | select(.spec.category == "compliance")'
+
+# By category: cost
+kubectl get observations -A -o json | jq '.items[] | select(.spec.category == "cost")'
+
+# By category: performance
+kubectl get observations -A -o json | jq '.items[] | select(.spec.category == "performance")'
+
+# By category: operations
+kubectl get observations -A -o json | jq '.items[] | select(.spec.category == "operations")'
+
+# By category and severity (e.g., critical security events)
+kubectl get observations -A -o json | jq '.items[] | select(.spec.category == "security" and .spec.severity == "CRITICAL")'
+
+# By category and source (e.g., security events from Trivy)
+kubectl get observations -A -o json | jq '.items[] | select(.spec.category == "security" and .spec.source == "trivy")'
 
 # Watch live
 kubectl get observations -A --watch
 
 # Count by source
 kubectl get observations -A -o json | jq -r '.items[] | .spec.source' | sort | uniq -c
+
+# Count by category
+kubectl get observations -A -o json | jq -r '.items[] | .spec.category' | sort | uniq -c
+
+# Count by category and severity
+kubectl get observations -A -o json | jq -r '.items[] | "\(.spec.category):\(.spec.severity)"' | sort | uniq -c
+
+# Count by category and source
+kubectl get observations -A -o json | jq -r '.items[] | "\(.spec.category):\(.spec.source)"' | sort | uniq -c
 ```
 
 ### Check Metrics

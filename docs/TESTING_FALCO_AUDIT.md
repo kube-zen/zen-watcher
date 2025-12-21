@@ -212,7 +212,14 @@ sleep 10
 kubectl get observations -n zen-system
 
 # View details
+# Display observations with category
 kubectl get observations -n zen-system -o json | jq -r '.items[] | "\(.metadata.name) | Source: \(.spec.source) | Category: \(.spec.category) | Severity: \(.spec.severity)"'
+
+# Filter by category: security
+kubectl get observations -n zen-system -o json | jq '.items[] | select(.spec.category == "security")'
+
+# Filter by category: compliance
+kubectl get observations -n zen-system -o json | jq '.items[] | select(.spec.category == "compliance")'
 
 # Filter by source
 kubectl get observations -n zen-system -o json | jq '.items[] | select(.spec.source == "falco")'

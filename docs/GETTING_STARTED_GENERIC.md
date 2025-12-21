@@ -217,6 +217,34 @@ kubectl get observations -n zen-system -o json | \
 kubectl get observations -n zen-system -o json | \
   jq '.items[] | select(.spec.source == "kubernetes-events")'
 
+# Filter by category: security
+kubectl get observations -n zen-system -o json | \
+  jq '.items[] | select(.spec.category == "security")'
+
+# Filter by category: compliance
+kubectl get observations -n zen-system -o json | \
+  jq '.items[] | select(.spec.category == "compliance")'
+
+# Filter by category: cost
+kubectl get observations -n zen-system -o json | \
+  jq '.items[] | select(.spec.category == "cost")'
+
+# Filter by category: performance
+kubectl get observations -n zen-system -o json | \
+  jq '.items[] | select(.spec.category == "performance")'
+
+# Filter by category: operations
+kubectl get observations -n zen-system -o json | \
+  jq '.items[] | select(.spec.category == "operations")'
+
+# Filter by category and severity (e.g., critical security events)
+kubectl get observations -n zen-system -o json | \
+  jq '.items[] | select(.spec.category == "security" and .spec.severity == "CRITICAL")'
+
+# Count by category
+kubectl get observations -n zen-system -o json | \
+  jq -r '.items[] | .spec.category' | sort | uniq -c
+
 # Watch for new observations
 kubectl get observations -n zen-system --watch
 ```
