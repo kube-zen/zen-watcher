@@ -26,4 +26,5 @@ type DynamicFilterRule struct {
 // Used by the optimization system
 type FilterConfigAdvanced struct {
 	DynamicRules []DynamicFilterRule
+	LearningRate float64
 }

@@ -245,7 +245,7 @@ curl -X POST http://localhost:8080/falco/webhook \
   -d '{"priority":"Critical","rule":"Test","output":"Test alert"}'
 ```
 
-### ConfigMap Adapters Not Creating Observations
+### ConfigMap Sources Not Creating Observations
 
 **Issue:** Checkov or KubeBench observations not appearing
 
@@ -255,13 +255,13 @@ kubectl get configmap -n checkov -l app=checkov
 kubectl get configmap -n kube-bench -l app=kube-bench
 ```
 
-**Check 2: Polling happened?**
+**Check 2: Informer is watching ConfigMaps?**
 ```bash
-# ConfigMap adapters poll every 5 minutes
-kubectl logs -n zen-system deployment/zen-watcher | grep -E "Checking ConfigMap|checkov|kube-bench"
+# Check if informer is detecting ConfigMap changes
+kubectl logs -n zen-system deployment/zen-watcher | grep -E "ConfigMap|checkov|kube-bench"
 ```
 
-**Workaround: Force immediate poll**
+**Check 3: Verify Ingester configuration**
 ```bash
 # Restart zen-watcher to trigger immediate poll
 kubectl delete pod -n zen-system -l app.kubernetes.io/name=zen-watcher
@@ -329,8 +329,7 @@ resources:
 
 replicas: 1
 
-# Increase polling interval for ConfigMap adapters
-# (requires code change in adapters.go)
+# ConfigMap watching is event-driven via informers (no polling interval needed)
 ```
 
 ## 🔄 Backup & Recovery
@@ -432,7 +431,7 @@ kubectl scale deployment zen-watcher -n zen-system --replicas=1
 **Downtime Impact:**
 - CRD-based adapters: Events queued by Kubernetes, processed on restart
 - Webhook adapters: Webhook senders will retry or fail (check source tool retry config)
-- ConfigMap adapters: Next poll cycle processes accumulated results
+- ConfigMap sources: Events queued by Kubernetes informer, processed on restart
 
 ## 📝 Logs & Debugging
 

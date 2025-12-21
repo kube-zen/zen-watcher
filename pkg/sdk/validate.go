@@ -205,6 +205,13 @@ func validateDeduplication(dedup *DeduplicationConfig) error {
 		}
 	}
 
+	if dedup.LearningRate != nil {
+		lr := *dedup.LearningRate
+		if lr < 0 || lr > 1 {
+			return &ValidationError{Field: "spec.deduplication.learningRate", Message: "must be between 0.0 and 1.0"}
+		}
+	}
+
 	if dedup.MinChange != nil {
 		mc := *dedup.MinChange
 		if mc < 0 || mc > 1 {

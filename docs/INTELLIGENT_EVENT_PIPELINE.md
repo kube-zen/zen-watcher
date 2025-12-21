@@ -46,7 +46,7 @@ Events arrive from four input methods:
 
 1. **CRD Informers** (Real-time): Trivy, Kyverno, cert-manager
 2. **Webhooks** (Push): Falco, Kubernetes Audit
-3. **ConfigMaps** (Poll): Checkov, KubeBench
+3. **ConfigMaps** (Informer): Checkov, KubeBench
 4. **Logs** (Stream): sealed-secrets, custom tools
 
 All events flow into the same centralized processing pipeline.

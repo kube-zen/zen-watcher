@@ -8,7 +8,8 @@ metadata:
       configuration for this ingester","properties":{"adaptive":{"default":false,"description":"Enable
       adaptive deduplication that adjusts based on patterns","type":"boolean"},"enabled":{"default":true,"description":"Controls
       whether deduplication is enabled (default: true)","type":"boolean"},"fields":{"description":"Fields
-      to use for deduplication key (only used if strategy=key or hybrid)","items":{"type":"string"},"type":"array"},"minChange":{"default":0.05,"description":"Minimum
+      to use for deduplication key (only used if strategy=key or hybrid)","items":{"type":"string"},"type":"array"},"learningRate":{"default":0.1,"description":"Learning
+      rate for adaptive deduplication (0.0-1.0)","maximum":1,"minimum":0,"type":"number"},"minChange":{"default":0.05,"description":"Minimum
       change threshold (0.0-1.0) to trigger adaptation","maximum":1,"minimum":0,"type":"number"},"strategy":{"default":"fingerprint","description":"Deduplication
       strategy: fingerprint (content-based), key (field-based), hybrid, or adaptive","enum":["fingerprint","key","hybrid","adaptive"],"type":"string"},"window":{"description":"Deduplication
       window as duration string (e.g., ''24h'', ''1h30m'')","pattern":"^[0-9]+(ns|us|µs|ms|s|m|h)$","type":"string"},"windowSeconds":{"description":"Deduplication
@@ -169,6 +170,12 @@ spec:
                     items:
                       type: string
                     type: array
+                  learningRate:
+                    default: 0.1
+                    description: Deduplication learning rate (0.0-1.0)
+                    maximum: 1
+                    minimum: 0
+                    type: number
                   minChange:
                     default: 0.05
                     description: Minimum change threshold (0.0-1.0)
@@ -865,6 +872,12 @@ spec:
                     items:
                       type: string
                     type: array
+                  learningRate:
+                    default: 0.1
+                    description: Deduplication learning rate (0.0-1.0)
+                    maximum: 1
+                    minimum: 0
+                    type: number
                   minChange:
                     default: 0.05
                     description: Minimum change threshold (0.0-1.0)

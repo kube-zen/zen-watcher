@@ -143,7 +143,7 @@ See `scripts/benchmark/` for benchmark scripts:
 |---------------|---------|-------------|---------------|-------|
 | **Trivy VulnerabilityReports** | 1.5m | 1.2MB | 2-3 | Low churn |
 | **Kyverno PolicyReports** | 2.0m | 1.5MB | 3-5 | Medium churn |
-| **Kube-bench ConfigMaps** | 0.5m | 0.3MB | 0.5 | Very low churn (polling) |
+| **Kube-bench ConfigMaps** | 0.5m | 0.3MB | 0.5 | Very low churn (informer) |
 
 **Total Informer Overhead** (6 informers):
 - CPU: ~8m average (2m base + 6m informers)

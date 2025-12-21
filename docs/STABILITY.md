@@ -31,7 +31,7 @@ Zen-watcher is designed for production use with high availability, reliability, 
 - Automatic garbage collection of old Observations (7-day TTL default)
 
 **CPU Efficiency:**
-- Event-driven architecture (no busy polling except ConfigMap adapters)
+- Event-driven architecture (all adapters use informers or webhooks)
 - Efficient informer caching reduces API server load
 - Background goroutines for non-critical operations (GC, cleanup)
 
@@ -195,7 +195,7 @@ resources:
     cpu: 250m
 ```
 
-**Increase ConfigMap Poll Interval:**
+**ConfigMap Watching:**
 ```go
 // In adapters.go
 interval: 10 * time.Minute  // Default: 5 minutes
@@ -203,7 +203,7 @@ interval: 10 * time.Minute  // Default: 5 minutes
 
 ## 🚨 Known Limitations & Workarounds
 
-### 1. ConfigMap Adapter Delay
+### 1. ConfigMap Source Delay
 
 **Issue:** Checkov and kube-bench use 5-minute polling interval  
 **Impact:** New ConfigMap results take up to 5 minutes to appear  

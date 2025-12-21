@@ -157,7 +157,7 @@ return fmt.Errorf("failed to create CRD %s: %w", cc.gvr.Resource, err)
 ### 🔴 Critical: Unreachable Code
 
 
-**Issue**: Code after early return is unreachable (removed):
+**Issue**: Code after early return is unreachable:
     // ... more unreachable code
 }
 ```
@@ -435,7 +435,7 @@ These are documented limitations or future features, not tech debt:
 
 **Current State** (After Cleanup):
 - ✅ Hardcoded values: 0 (all configurable via `config` package)
-- ✅ Unreachable code: 0 (removed)
+- ✅ Unreachable code: 0
 - ✅ Missing validations: 0 (critical paths validated)
 - ✅ Code duplication: Minimal (refactored)
 - ⚪ Test coverage: Can be improved incrementally (not blocking)
@@ -453,7 +453,7 @@ These are documented limitations or future features, not tech debt:
 
 zen-watcher is in excellent shape with **zero tech debt**. All identified issues have been addressed:
 
-1. ✅ **Critical**: Removed unreachable code and extracted hardcoded API group
+1. ✅ **Critical**: Fixed unreachable code and extracted hardcoded API group
 2. ✅ **High**: Added validations and improved error handling  
 3. ✅ **Medium**: Extracted magic numbers to constants and refactored duplications
 

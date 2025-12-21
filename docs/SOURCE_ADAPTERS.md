@@ -8,7 +8,7 @@ This guide explains how to add support for new event sources to Zen Watcher. The
 
 1. **🔍 Logs** - Monitor pod logs with regex patterns
 2. **📡 Webhooks** - Receive HTTP webhooks from external tools
-3. **🗂️ ConfigMaps** - Poll ConfigMaps for batch results
+3. **🗂️ ConfigMaps** - Watch ConfigMaps via informer adapter
 4. **📋 CRDs (Informers)** - Watch Kubernetes Custom Resource Definitions
 
 ### Quick Example: Adding a Source from Logs
@@ -90,7 +90,7 @@ See [Generic Source Configuration](#generic-source-configuration-via-yaml) secti
 |--------|----------|-------------------|
 | **Logs** | Monitor pod logs, parse log lines with regex | `ingester: logs` |
 | **Webhooks** | Receive HTTP webhooks from external tools | `ingester: webhook` |
-| **ConfigMaps** | Poll ConfigMaps for batch scan results | `ingester: cm` |
+| **ConfigMaps** | Watch ConfigMaps via informer adapter | `ingester: informer` with `gvr: {resource: "configmaps"}` |
 | **CRDs (Informers)** | Watch Kubernetes Custom Resource Definitions | `ingester: informer` |
 | **K8s Events** | Native Kubernetes Events API | `ingester: k8s-events` |
 
@@ -162,9 +162,9 @@ spec:
 - Buffers events for processing
 - Supports bearer token or basic auth (optional)
 
-### Method 3: ConfigMap Adapter
+### Method 3: Watching ConfigMaps via Informer Adapter
 
-Poll ConfigMaps for batch scan results:
+Watch ConfigMaps for batch scan results using the informer adapter:
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
@@ -174,22 +174,25 @@ metadata:
   namespace: zen-system
 spec:
   source: checkov
-  ingester: cm
-  configmap:
+  ingester: informer
+  informer:
+    gvr:
+      group: ""           # Empty for core resources
+      version: "v1"
+      resource: "configmaps"
     namespace: checkov
     labelSelector: app=checkov
-    pollInterval: "5m"
-    jsonPath: "$.results[*]"  # Optional: extract nested data
   normalization:
     domain: security
     type: iac_vulnerability
 ```
 
 **How it works:**
-- Periodically polls ConfigMaps matching the label selector
+- Uses Kubernetes informer to watch ConfigMaps matching the label selector
+- Automatically detects ConfigMap changes
 - Extracts data from ConfigMap keys
 - Parses JSON and creates Observations
-- Configurable poll interval (default: 5 minutes)
+- Event-driven (no polling needed)
 
 ### Method 4: CRD/Informer Adapter
 
@@ -764,77 +767,30 @@ func (a *CustomWebhookAdapter) Stop() {
 }
 ```
 
-### Pattern 3: ConfigMap Watching via Informer Adapter
+### Pattern 3: Watching ConfigMaps via Informer Adapter
 
-For tools that write results to ConfigMaps (e.g., kube-bench, Checkov), use the `informer` adapter to watch ConfigMaps:
+For tools that write results to ConfigMaps (e.g., kube-bench, Checkov), configure an Ingester with the informer adapter:
 
-**Note**: ConfigMaps are not a separate source type. They're watched using the `informer` adapter with `gvr: {group: "", version: "v1", resource: "configmaps"}`.
-
-Example Ingester configuration:
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
 kind: Ingester
 metadata:
-  name: kube-bench-ingester
+  name: kube-bench-source
+  namespace: zen-system
 spec:
   source: kube-bench
-  ingester: informer  # Use informer adapter
+  ingester: informer
   informer:
     gvr:
       group: ""
       version: "v1"
       resource: "configmaps"
-    labelSelector: "app=kube-bench"
+    namespace: kube-bench
+    labelSelector: app=kube-bench
+  normalization:
+    domain: security
+    type: compliance_check
 ```
-
-For custom adapters (advanced use case):
-
-```go
-type KubecostAdapter struct {
-    client    kubernetes.Interface
-    namespace string
-    interval  time.Duration
-}
-
-func (a *KubecostAdapter) Name() string {
-    return "kubecost"
-}
-
-func (a *KubecostAdapter) Run(ctx context.Context, out chan<- *Event) error {
-    ticker := time.NewTicker(a.interval)
-    defer ticker.Stop()
-    
-    for {
-        select {
-        case <-ctx.Done():
-            return ctx.Err()
-        case <-ticker.C:
-            events := a.pollCostReports(ctx)
-            for _, event := range events {
-                select {
-                case out <- event:
-                case <-ctx.Done():
-                    return ctx.Err()
-                }
-            }
-        }
-    }
-}
-
-func (a *KubecostAdapter) pollCostReports(ctx context.Context) []*Event {
-    cm, err := a.client.CoreV1().ConfigMaps(a.namespace).
-        Get(ctx, "kubecost-report", metav1.GetOptions{})
-    if err != nil {
-        // Log error, return empty
-        return nil
-    }
-    
-    var events []*Event
-    // Parse ConfigMap data and normalize to Events
-    // ...
-    
-    return events
-}
 
 func (a *KubecostAdapter) Stop() {
     // Cleanup if needed

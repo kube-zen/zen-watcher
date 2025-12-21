@@ -39,13 +39,15 @@ go build -o ingester-migrate ./cmd/ingester-migrate
 4. **Preserves other fields**: All other fields (deduplication, filters, optimization, etc.) remain unchanged
 5. **Adds warnings**: Comments in output for breaking changes or manual review needed
 
-### Supported Destinations
+### Breaking Changes
 
-**v1 supports CRD destinations only:**
-- `type: crd` - Write to any Kubernetes CRD or core resource (ConfigMaps, Secrets, etc.)
+**Non-CRD destinations are not supported in v1:**
+- `type: webhook` - Use external controller to watch Observations
+- `type: saas` - Use external controller to watch Observations
+- `type: queue` - Use external controller to watch Observations
 
-**For webhook/SaaS/queue destinations:**
-1. Configure Ingester with CRD destination (e.g., `observations`)
+**Migration strategy for non-CRD destinations:**
+1. Migrate Ingester to v1 with CRD destination
 2. Deploy external controller (kubewatch, Robusta, etc.) to watch Observations and forward to webhook/SaaS/queue
 
 ## Migration Workflow
@@ -148,7 +150,7 @@ The Ingester CRD defines:
 - Review and adjust if needed
 
 **"Destination type 'webhook' is not supported":**
-- Only CRD destinations are supported
+- Non-CRD destinations are not supported
 - Deploy external controller to watch Observations and forward to webhook
 
 ### After Migration
