@@ -403,7 +403,6 @@ func main() {
 	var haDedupOptimizer *optimization.HADedupOptimizer
 	var haScalingCoordinator *scaling.HPACoordinator
 	var haLoadBalancer *balancer.LoadBalancer
-	var haCacheManager *optimization.AdaptiveCacheManager
 	var haMetrics *metrics.HAMetrics
 
 	if haConfig.IsHAEnabled() {
@@ -462,22 +461,8 @@ func main() {
 				})
 		}
 
-		// Initialize Adaptive Cache Manager
-		if haConfig.CacheOptimization.Enabled {
-			deduper := observationCreator.GetDeduper()
-			if deduper != nil {
-				initialSize := 10000 // Default, will be adjusted
-				haCacheManager = optimization.NewAdaptiveCacheManager(&haConfig.CacheOptimization, initialSize)
-				if haCacheManager != nil {
-					haCacheManager.Start(2 * time.Minute) // Adjust every 2 minutes
-					log.Info("HA adaptive cache manager started",
-						logger.Fields{
-							Component: "main",
-							Operation: "ha_cache_init",
-						})
-				}
-			}
-		}
+		// Cache optimization is handled by the deduper itself
+		// No separate adaptive cache manager needed
 
 		// Start metrics collection loop for HA components
 		if haScalingCoordinator != nil || haLoadBalancer != nil {
@@ -527,12 +512,7 @@ func main() {
 						// Update HTTP server HA status
 						httpServer.UpdateHAStatus(cpuUsage, memoryUsage, eventsPerSec, 0.0, queueDepth)
 
-						// Update cache manager metrics
-						if haCacheManager != nil {
-							cacheHitRate := 0.0 // TODO: Calculate from deduper
-							gcFrequency := 0.0  // TODO: Calculate GC frequency
-							haCacheManager.UpdateMetrics(eventsPerSec, cacheHitRate, gcFrequency)
-						}
+						// Cache metrics are handled by the deduper itself
 
 						// Update HA dedup optimizer with events
 						if haDedupOptimizer != nil {
@@ -551,14 +531,7 @@ func main() {
 							systemMetrics.SetQueueDepth(queueDepth)
 						}
 
-						// Update adaptive cache size
-						if haCacheManager != nil {
-							targetSize := haCacheManager.GetTargetSize()
-							deduper := observationCreator.GetDeduper()
-							if deduper != nil {
-								deduper.SetMaxSize(targetSize)
-							}
-						}
+						// Cache size is managed by the deduper itself
 
 					case <-ctx.Done():
 						return

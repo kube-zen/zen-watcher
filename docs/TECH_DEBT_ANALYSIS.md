@@ -98,8 +98,6 @@ MaxTTLSeconds = 365 * 24 * 60 * 60 // 1 year maximum
 
 ### 🟢 Medium: Other Magic Numbers
 
-- `pkg/optimization/adaptive_processor.go:84`: `1000` (latency threshold)
-- `pkg/optimization/adaptive_processor.go:89`: `0.1`, `100` (dedup thresholds)
 - `pkg/gc/collector.go:41`: `GCListChunkSize = 500` (should be configurable)
 
 ---
@@ -158,18 +156,8 @@ return fmt.Errorf("failed to create CRD %s: %w", cc.gvr.Resource, err)
 
 ### 🔴 Critical: Unreachable Code
 
-**File**: `pkg/optimization/adaptive_processor.go:61-78`
 
-**Issue**: Code after early return is unreachable:
-```go
-func (ap *AdaptiveProcessor) ShouldAdapt() bool {
-    // Auto-optimization removed - always return false
-    return false
-
-    // Don't adapt too frequently  <-- UNREACHABLE
-    if time.Since(ap.lastAdaptation) < ap.adaptationWindow {
-        return false
-    }
+**Issue**: Code after early return is unreachable (removed):
     // ... more unreachable code
 }
 ```
@@ -417,7 +405,7 @@ gvr := schema.GroupVersionResource{
 
 ### ✅ Completed (All Critical/High Items)
 
-1. ✅ **Remove unreachable code** (adaptive_processor.go, optimization_engine.go, strategy_decider.go)
+1. ✅ **Remove unreachable code** (optimization_engine.go, strategy_decider.go)
 2. ✅ **Extract hardcoded API group** to configuration
 3. ✅ **Add GVR validation** (group, version, resource format)
 4. ✅ **Fix error handling** (add context, log warnings)
@@ -437,7 +425,6 @@ gvr := schema.GroupVersionResource{
 
 These are documented limitations or future features, not tech debt:
 
-1. **Adaptive processing features** - TODOs in `adaptive_processor.go` are for future adaptive filtering/deduplication features. Current code works correctly.
 2. **Response time tracking** - TODO in `system_metrics.go` is a placeholder for future feature. Current metrics work correctly.
 3. **Test coverage expansion** - Can be improved incrementally
 4. **Performance optimizations** - Optional improvements, not blockers
@@ -471,7 +458,7 @@ zen-watcher is in excellent shape with **zero tech debt**. All identified issues
 3. ✅ **Medium**: Extracted magic numbers to constants and refactored duplications
 
 **Remaining Items** (Not Tech Debt):
-- TODOs in `adaptive_processor.go` and `system_metrics.go` are for **future features**, not bugs or debt
+- TODOs in `system_metrics.go` are for **future features**, not bugs or debt
 - Test coverage can be improved incrementally but is not blocking
 - Performance optimizations are optional enhancements
 

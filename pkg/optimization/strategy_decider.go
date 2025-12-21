@@ -26,9 +26,6 @@ const (
 	ProcessingStrategyFilterFirst ProcessingStrategy = iota
 	// ProcessingStrategyDedupFirst processes dedup → filter → normalize → create
 	ProcessingStrategyDedupFirst
-	// ProcessingStrategyAdaptive uses machine learning for dynamic strategy selection
-	// Note: Adaptive mode has been removed but kept for backward compatibility
-	ProcessingStrategyAdaptive
 )
 
 // String returns the string representation of the processing strategy
@@ -38,8 +35,6 @@ func (ps ProcessingStrategy) String() string {
 		return "filter_first"
 	case ProcessingStrategyDedupFirst:
 		return "dedup_first"
-	case ProcessingStrategyAdaptive:
-		return "adaptive"
 	default:
 		return "filter_first"
 	}
@@ -143,8 +138,6 @@ func (sd *StrategyDecider) parseStrategy(strategy string) ProcessingStrategy {
 		return ProcessingStrategyFilterFirst
 	case "dedup_first":
 		return ProcessingStrategyDedupFirst
-	case "adaptive":
-		return ProcessingStrategyAdaptive
 	default:
 		return ProcessingStrategyFilterFirst
 	}

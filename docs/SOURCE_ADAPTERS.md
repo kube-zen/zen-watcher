@@ -255,8 +255,6 @@ spec:
     includeTypes:
       - error
       - warning
-    adaptiveEnabled: true  # Enable adaptive filtering with learning
-    learningRate: 0.1  # Learning rate for adaptive adjustments (0.0-1.0)
     dynamicRules:  # Dynamic filter rules with conditions
       - id: high-volume-filter
         priority: 100
@@ -270,10 +268,9 @@ spec:
   # Deduplication
   dedup:
     window: "1h"
-    strategy: fingerprint  # fingerprint, key, hybrid, or adaptive
-    adaptive: true  # Enable adaptive deduplication
-    minChange: 0.05  # Minimum change threshold to trigger adaptation (5%)
-    learningRate: 0.1  # Learning rate for adaptive dedup (0.0-1.0)
+    strategy: fingerprint  # fingerprint, key, or hybrid
+    minChange: 0.05  # Minimum change threshold (5%)
+    learningRate: 0.1  # Learning rate for dedup (0.0-1.0)
     fields:  # Fields to use (for key/hybrid strategies)
       - cve
       - resource.name
@@ -289,7 +286,6 @@ spec:
   rateLimit:
     maxPerMinute: 100
     burst: 200
-    adaptive: true  # Enable adaptive rate limiting
     cooldownPeriod: "5m"  # Cooldown after adjustments
     targets:  # Per-severity or per-type rate limit targets
       LOW: 100

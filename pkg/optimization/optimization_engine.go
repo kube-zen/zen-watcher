@@ -288,9 +288,6 @@ func (oe *OptimizationEngine) generateReason(
 		}
 		return "Dedup-first strategy selected based on current metrics"
 
-	case ProcessingStrategyAdaptive:
-		return "Adaptive strategy selected for high-volume, complex workload"
-
 	default:
 		return "Strategy change based on optimization analysis"
 	}

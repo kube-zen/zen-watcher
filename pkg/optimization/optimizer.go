@@ -26,7 +26,6 @@ type Optimizer struct {
 	engine             *OptimizationEngine
 	smartProcessor     *SmartProcessor
 	stateManager       *OptimizationStateManager
-	adaptiveProcessors map[string]*AdaptiveProcessor
 	sourceConfigLoader interface {
 		GetSourceConfig(source string) *generic.SourceConfig
 		GetAllSourceConfigs() map[string]*generic.SourceConfig
@@ -61,7 +60,6 @@ func NewOptimizerWithProcessor(
 		engine:             engine,
 		smartProcessor:     smartProcessor,
 		stateManager:       stateManager,
-		adaptiveProcessors: make(map[string]*AdaptiveProcessor),
 		sourceConfigLoader: sourceConfigLoader,
 	}
 }
@@ -89,52 +87,6 @@ func (o *Optimizer) GetStateManager() *OptimizationStateManager {
 // GetEngine returns the optimization engine
 func (o *Optimizer) GetEngine() *OptimizationEngine {
 	return o.engine
-}
-
-// GetOrCreateAdaptiveProcessor gets or creates an adaptive processor for a source
-func (o *Optimizer) GetOrCreateAdaptiveProcessor(source string) *AdaptiveProcessor {
-	o.mu.Lock()
-	defer o.mu.Unlock()
-
-	if processor, exists := o.adaptiveProcessors[source]; exists {
-		return processor
-	}
-
-	var sourceConfig *generic.SourceConfig
-	if o.sourceConfigLoader != nil {
-		sourceConfig = o.sourceConfigLoader.GetSourceConfig(source)
-	}
-
-	if sourceConfig == nil {
-		return nil
-	}
-
-	metricsCollector := o.smartProcessor.GetOrCreateMetricsCollector(source)
-	performanceTracker := o.smartProcessor.GetOrCreatePerformanceTracker(source)
-
-	processor := NewAdaptiveProcessor(
-		source,
-		sourceConfig,
-		metricsCollector,
-		performanceTracker,
-	)
-
-	o.adaptiveProcessors[source] = processor
-	return processor
-}
-
-// TriggerAdaptation triggers adaptation for a specific source
-func (o *Optimizer) TriggerAdaptation(source string) error {
-	processor := o.GetOrCreateAdaptiveProcessor(source)
-	if processor == nil {
-		return nil // Source not configured for optimization
-	}
-
-	if !processor.ShouldAdapt() {
-		return nil // Not ready for adaptation
-	}
-
-	return processor.Adapt()
 }
 
 // GetOptimizationStatus returns optimization status for a source

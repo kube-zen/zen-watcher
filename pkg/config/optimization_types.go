@@ -15,7 +15,6 @@
 package config
 
 // DynamicFilterRule represents a dynamically adjustable filter rule
-// Used by the optimization system for adaptive filtering
 type DynamicFilterRule struct {
 	Expression string
 	Enabled    bool
@@ -23,10 +22,9 @@ type DynamicFilterRule struct {
 	Source     string
 }
 
-// FilterConfigAdvanced represents advanced filter configuration with adaptive features
+// FilterConfigAdvanced represents advanced filter configuration
 // Used by the optimization system
 type FilterConfigAdvanced struct {
-	DynamicRules    []DynamicFilterRule
-	AdaptiveEnabled bool
-	LearningRate    float64
+	DynamicRules []DynamicFilterRule
+	LearningRate float64
 }

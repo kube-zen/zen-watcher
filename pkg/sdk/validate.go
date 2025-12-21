@@ -199,10 +199,9 @@ func validateDeduplication(dedup *DeduplicationConfig) error {
 			"fingerprint": true,
 			"key":         true,
 			"hybrid":      true,
-			"adaptive":    true,
 		}
 		if !validStrategies[dedup.Strategy] {
-			return &ValidationError{Field: "spec.deduplication.strategy", Message: fmt.Sprintf("must be one of: fingerprint, key, hybrid, adaptive (got: %s)", dedup.Strategy)}
+			return &ValidationError{Field: "spec.deduplication.strategy", Message: fmt.Sprintf("must be one of: fingerprint, key, hybrid (got: %s)", dedup.Strategy)}
 		}
 	}
 

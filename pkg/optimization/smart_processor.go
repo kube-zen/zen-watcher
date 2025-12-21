@@ -20,7 +20,6 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
-	"github.com/kube-zen/zen-watcher/pkg/config"
 )
 
 // RawEvent represents a raw event from a source
@@ -33,7 +32,6 @@ type RawEvent struct {
 // SmartProcessor processes events using intelligent optimization strategies
 type SmartProcessor struct {
 	strategyDecider     *StrategyDecider
-	adaptiveFilters     map[string]*AdaptiveFilter
 	metricsCollectors   map[string]*PerSourceMetricsCollector
 	performanceTrackers map[string]*PerformanceTracker
 	mu                  sync.RWMutex // Protects maps from concurrent access
@@ -43,31 +41,9 @@ type SmartProcessor struct {
 func NewSmartProcessor() *SmartProcessor {
 	return &SmartProcessor{
 		strategyDecider:     NewStrategyDecider(),
-		adaptiveFilters:     make(map[string]*AdaptiveFilter),
 		metricsCollectors:   make(map[string]*PerSourceMetricsCollector),
 		performanceTrackers: make(map[string]*PerformanceTracker),
 	}
-}
-
-// GetOrCreateAdaptiveFilter gets or creates an adaptive filter for a source
-func (sp *SmartProcessor) GetOrCreateAdaptiveFilter(source string, filterConfig config.FilterConfigAdvanced) *AdaptiveFilter {
-	sp.mu.RLock()
-	if filter, exists := sp.adaptiveFilters[source]; exists {
-		sp.mu.RUnlock()
-		return filter
-	}
-	sp.mu.RUnlock()
-
-	sp.mu.Lock()
-	defer sp.mu.Unlock()
-	// Double-check after acquiring write lock
-	if filter, exists := sp.adaptiveFilters[source]; exists {
-		return filter
-	}
-
-	filter := NewAdaptiveFilter(source, filterConfig)
-	sp.adaptiveFilters[source] = filter
-	return filter
 }
 
 // GetOrCreateMetricsCollector gets or creates a metrics collector for a source
@@ -137,56 +113,13 @@ func (sp *SmartProcessor) ProcessEvent(
 	// Get components for this source
 	collector := sp.GetOrCreateMetricsCollector(raw.Source)
 	tracker := sp.GetOrCreatePerformanceTracker(raw.Source)
-	// Note: Filter configuration is handled via Processing config, not a separate Filter field
-	// Create a default/empty filter config since SourceConfig doesn't have a Filter field
-	var filterConfig config.FilterConfigAdvanced
-	filter := sp.GetOrCreateAdaptiveFilter(raw.Source, filterConfig)
 
 	// Determine optimal strategy
 	strategy := sp.DetermineOptimalStrategy(raw, sourceConfig)
 	tracker.RecordStrategyDecision(raw.Source, strategy)
 
-	// Convert raw event to Event for filtering
-	event := &Event{
-		Source:    raw.Source,
-		RawData:   raw.RawData,
-		Priority:  0.5, // Would be extracted from raw data
-		Severity:  "",  // Would be extracted from raw data
-		Category:  "",  // Would be extracted from raw data
-		Namespace: "",  // Would be extracted from raw data
-		Type:      "",  // Would be extracted from raw data
-	}
-
-	// Apply filtering based on strategy
-	switch strategy {
-	case ProcessingStrategyFilterFirst:
-		// Filter first, then dedup
-		if !filter.Allow(event) {
-			collector.RecordFiltered("adaptive_filter")
-			tracker.RecordEvent(time.Since(startTime))
-			return nil
-		}
-		// Continue to dedup and create...
-
-	case ProcessingStrategyDedupFirst:
-		// Dedup first, then filter
-		// Dedup check would happen first...
-		// Then filter...
-		if !filter.Allow(event) {
-			collector.RecordFiltered("adaptive_filter")
-			tracker.RecordEvent(time.Since(startTime))
-			return nil
-		}
-		// Continue to create...
-
-	case ProcessingStrategyAdaptive:
-		if !filter.Allow(event) {
-			collector.RecordFiltered("adaptive_filter")
-			tracker.RecordEvent(time.Since(startTime))
-			return nil
-		}
-		// Continue to create...
-	}
+	// Note: Actual filtering and deduplication are handled by the processor pipeline,
+	// not by SmartProcessor. This function is for metrics collection only.
 
 	// Record processing metrics
 	processingTime := time.Since(startTime)

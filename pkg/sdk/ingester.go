@@ -69,7 +69,6 @@ type FieldMapping struct {
 
 // DeduplicationConfig represents deduplication configuration
 type DeduplicationConfig struct {
-	Adaptive      bool     `json:"adaptive,omitempty" yaml:"adaptive,omitempty"`
 	Enabled       *bool    `json:"enabled,omitempty" yaml:"enabled,omitempty"`
 	Fields        []string `json:"fields,omitempty" yaml:"fields,omitempty"`
 	LearningRate  *float64 `json:"learningRate,omitempty" yaml:"learningRate,omitempty"`

@@ -29,7 +29,7 @@ This document describes the validation guarantees provided by zen-watcher CRD sc
   - Example: `24h`, `1h30m`, `300s`
 
 - **`spec.deduplication.strategy`** (optional, enum)
-  - Valid values: `fingerprint`, `key`, `hybrid`, `adaptive`
+  - Valid values: `fingerprint`, `key`, `hybrid`
   - Default: `fingerprint`
 
 - **`spec.filters.minPriority`** (optional, number)

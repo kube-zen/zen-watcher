@@ -112,7 +112,6 @@ type Metrics struct {
 	// Optimization decision metrics
 	OptimizationDecisions  *prometheus.CounterVec // Optimization decisions made
 	StrategyChanges        *prometheus.CounterVec // Processing strategy changes
-	AdaptiveAdjustments    *prometheus.CounterVec // Adaptive adjustments applied
 	OptimizationConfidence *prometheus.GaugeVec   // Confidence level of optimizations
 	CurrentStrategy        *prometheus.GaugeVec   // Current strategy per source (1=filter_first, 2=dedup_first)
 	PipelineErrors         *prometheus.CounterVec // Pipeline errors by stage
@@ -717,14 +716,6 @@ func NewMetrics() *Metrics {
 		[]string{"source", "old_strategy", "new_strategy"},
 	)
 
-	adaptiveAdjustments := prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "zen_watcher_optimization_adaptive_adjustments_total",
-			Help: "Total number of adaptive adjustments applied",
-		},
-		[]string{"source", "adjustment_type"},
-	)
-
 	optimizationConfidence := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "zen_watcher_optimization_confidence",
@@ -775,7 +766,6 @@ func NewMetrics() *Metrics {
 	// Register optimization decision metrics
 	prometheus.MustRegister(optimizationDecisions)
 	prometheus.MustRegister(strategyChanges)
-	prometheus.MustRegister(adaptiveAdjustments)
 	prometheus.MustRegister(optimizationConfidence)
 	prometheus.MustRegister(currentStrategy)
 	prometheus.MustRegister(pipelineErrors)
@@ -873,7 +863,6 @@ func NewMetrics() *Metrics {
 		// Optimization decision metrics
 		OptimizationDecisions:  optimizationDecisions,
 		StrategyChanges:        strategyChanges,
-		AdaptiveAdjustments:    adaptiveAdjustments,
 		OptimizationConfidence: optimizationConfidence,
 		CurrentStrategy:        currentStrategy,
 		PipelineErrors:         pipelineErrors,
