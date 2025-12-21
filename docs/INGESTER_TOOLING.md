@@ -101,7 +101,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.23'
+          go-version: '1.24'
       - name: Build linter
         run: |
           cd zen-watcher

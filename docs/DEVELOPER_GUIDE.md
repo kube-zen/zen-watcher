@@ -1,7 +1,7 @@
 # Zen Watcher Developer Guide
 
 **Version:** 1.0.0-alpha  
-**Go Version:** 1.23+ (tested on 1.23 and 1.24)  
+**Go Version:** 1.24+ (tested on 1.24)  
 **License:** Apache 2.0
 
 ---
@@ -23,7 +23,7 @@
 
 ### Prerequisites
 
-- **Go 1.23+** installed (tested on 1.23 and 1.24)
+- **Go 1.24+** installed (tested on 1.24)
 - **Docker or Podman** for building images
 - **kubectl** for Kubernetes access
 - **Kubernetes cluster 1.28+** (any distribution)
@@ -724,7 +724,7 @@ docker push kubezen/zen-watcher:1.0.0-alpha
 
 **Dockerfile optimization:**
 - Multi-stage build (builder + distroless)
-- Uses `golang:1.23-alpine` for small builder image
+- Uses `golang:1.24-alpine` for small builder image
 - Final image based on `gcr.io/distroless/static:nonroot` (~29MB)
 - No shell, no package manager in final image
 

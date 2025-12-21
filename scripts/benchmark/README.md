@@ -37,14 +37,14 @@ KUBECTL_CONTEXT=par-dev-eks-1 \
 
 **File:** `stress-test.go`
 
-A high-performance Go program that creates observations in parallel using the Kubernetes client. Requires Go 1.23+ to build.
+A high-performance Go program that creates observations in parallel using the Kubernetes client. Requires Go 1.24+ to build.
 
 **Build (using Docker):**
 ```bash
 cd scripts/benchmark
 docker run --rm -v "$(pwd):/work" -w /work \
   -v "$HOME/.kube:/root/.kube:ro" \
-  kubezen/go:1.23-alpine \
+  kubezen/go:1.24-alpine \
   sh -c "go mod init stress-test && \
          go get k8s.io/client-go@v0.28.15 k8s.io/apimachinery@v0.28.15 && \
          go mod tidy && \

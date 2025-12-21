@@ -27,7 +27,7 @@ IMAGE_NAME=my-registry/zen-watcher make image
 ### Build Details
 
 The Dockerfile uses:
-- **Base image**: `golang:1.23-alpine` (builder stage)
+- **Base image**: `golang:1.24-alpine` (builder stage)
 - **Final image**: `gcr.io/distroless/static:nonroot` (minimal, secure)
 - **Build args**: `VERSION`, `COMMIT`, `BUILD_DATE`
 

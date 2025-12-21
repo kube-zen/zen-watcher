@@ -1,7 +1,7 @@
 # Zen Watcher
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Go Version](https://img.shields.io/badge/Go-1.23+-00ADD8?logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?logo=go)](https://go.dev/)
 
 > **Kubernetes Observation Collector: Turn Any Signal into a CRD**
 
@@ -211,5 +211,5 @@ Apache License 2.0 - See [LICENSE](LICENSE) for details.
 **Repository:** [github.com/kube-zen/zen-watcher](https://github.com/kube-zen/zen-watcher)  
 **Helm Charts:** [github.com/kube-zen/helm-charts](https://github.com/kube-zen/helm-charts)  
 **Version:** 1.0.0-alpha  
-**Go Version:** 1.23+ (tested on 1.23 and 1.24)  
+**Go Version:** 1.24+ (tested on 1.24)  
 **Kubernetes:** Client libs v0.28.15 (tested on clusters 1.26+)

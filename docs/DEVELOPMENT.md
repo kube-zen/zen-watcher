@@ -7,7 +7,7 @@ This guide covers setting up a development environment for zen-watcher with all 
 ## Prerequisites
 
 ### Required
-- **Go 1.23+** - [Download](https://go.dev/dl/) (tested on 1.23 and 1.24)
+- **Go 1.24+** - [Download](https://go.dev/dl/) (tested on 1.24)
 - **Docker or Podman** - [Docker Install](https://docs.docker.com/get-docker/) | [Podman Install](https://podman.io/getting-started/installation)
 - **kubectl** - [Install](https://kubernetes.io/docs/tasks/tools/)
 - **Git** - Version control
