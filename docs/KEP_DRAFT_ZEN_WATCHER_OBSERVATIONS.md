@@ -324,7 +324,7 @@ status:
 - `docs/OBSERVATION_CRD_API_AUDIT.md` - API analysis and future improvements
 - `CONTRIBUTING.md` - Quality bar and standards
 
-**Historical Reference**:
+**Reference**:
 - ` - Expert analysis (late 2024/early 2025)
 - ` - Stress testing analysis
 
