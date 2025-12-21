@@ -11,18 +11,21 @@
 
 ## Solution: TTL-Based Auto-Cleanup (Kubernetes Native)
 
-### 1. TTL Controller Implementation
+### 1. Garbage Collector (Built-in)
 
-**File**: `internal/controllers/ttl_controller.go`
+**File**: `pkg/gc/collector.go`
 
-A Kubernetes controller that automatically deletes observations when their TTL expires:
+zen-watcher includes a built-in garbage collector that automatically deletes observations when their TTL expires:
 
-- Watches all Observation CRDs via informer
-- Checks `spec.ttlSecondsAfterCreation` field
+- Periodically scans Observation CRDs (default: every 1 hour)
+- Checks `spec.ttlSecondsAfterCreation` field (Kubernetes native style, like Jobs)
 - Deletes expired observations automatically
-- Avoids API server throttling by spreading deletions over time
+- Respects API server rate limits with chunking and timeouts
+- Uses `spec.ttlSecondsAfterCreation` field (not annotations) - aligned with Kubernetes Job TTL pattern
 
-**Usage**: The controller runs automatically when zen-watcher is deployed. No manual configuration needed.
+**Usage**: The GC runs automatically when zen-watcher is deployed. No manual configuration needed.
+
+**Alternative**: You can use `k8s-ttl-controller` instead if you prefer annotation-based TTL, but zen-watcher's built-in GC uses the spec field (more aligned with Kubernetes patterns like Jobs).
 
 ### 2. Enhanced Field Mapping with TTL Support
 
@@ -135,16 +138,14 @@ spec:
 ## Implementation Status
 
 ✅ **Completed**:
-- TTL controller implementation
+- Built-in garbage collector (uses `spec.ttlSecondsAfterCreation` field)
 - Enhanced field mapping with constant and static mappings
 - Field mapper with TTL parsing
 - Sustainable stress test script
 - Stress test ingester examples
+- Prometheus metrics for GC (deletions, errors, duration)
 
-⏳ **Future Enhancements**:
-- Ingester CRD schema update to support `observationTemplate.ttl` and `observationTemplate.fieldMapping` (requires CRD update)
-- Integration of field mapper into observation creator
-- Metrics for TTL controller (deletions, errors)
+**Note**: zen-watcher uses `spec.ttlSecondsAfterCreation` (field-based, like Kubernetes Jobs) rather than annotations. This is more aligned with Kubernetes native patterns. If you prefer to use `k8s-ttl-controller` (annotation-based), you can disable zen-watcher's GC and use annotations instead.
 
 ## Testing
 
