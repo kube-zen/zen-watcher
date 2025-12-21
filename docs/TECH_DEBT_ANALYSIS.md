@@ -1,8 +1,10 @@
 # Technical Debt Analysis - zen-watcher
 
 **Date**: 2025-12-21  
-**Purpose**: Comprehensive analysis of technical debt, bugs, hardcoded values, and code quality issues  
-**Status**: Pre-PoC Review
+**Purpose**: Comprehensive analysis of technical debt, bugs, hardcoded values, and code quality issues in zen-watcher  
+**Status**: Pre-OSS Release Review
+
+**Note**: This analysis focuses on actual issues in zen-watcher's codebase. zen-watcher has a working built-in GC (not tech debt). The Generic GC project (`zen-gc`) is a separate, future project and is not related to this analysis.
 
 ---
 
@@ -446,7 +448,7 @@ gvr := schema.GroupVersionResource{
 - Code duplication: ~3 patterns
 - Missing tests: Multiple areas
 
-**Target State** (Post-PoC):
+**Target State** (Post-Cleanup):
 - Hardcoded values: 0 (all configurable)
 - Unreachable code: 0
 - Missing validations: 0 (critical paths)
