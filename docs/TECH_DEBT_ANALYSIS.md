@@ -415,7 +415,7 @@ gvr := schema.GroupVersionResource{
 
 ## Priority Action Items
 
-### Before PoC (Critical/High)
+### ✅ Completed (All Critical/High Items)
 
 1. ✅ **Remove unreachable code** (adaptive_processor.go, optimization_engine.go, strategy_decider.go)
 2. ✅ **Extract hardcoded API group** to configuration
@@ -423,8 +423,8 @@ gvr := schema.GroupVersionResource{
 4. ✅ **Fix error handling** (add context, log warnings)
 5. ✅ **Document configuration precedence**
 6. ✅ **Add input validation** for user-provided GVRs and field paths
-
-### ✅ Completed (All Critical/High Items)
+7. ✅ **Extract magic numbers** to constants (performance thresholds)
+8. ✅ **Fix hardcoded API versions** in validation (use configurable API group)
 
 1. ✅ **Extract hardcoded API group** - Now uses configurable `config.DefaultAPIGroup`
 2. ✅ **Extract magic numbers to constants** - Performance thresholds moved to `pkg/config/constants.go`
