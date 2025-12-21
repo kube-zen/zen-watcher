@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/internal/informers"
+	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -79,11 +80,7 @@ func NewClients() (*Clients, error) {
 // NewGVRs returns the GroupVersionResource definitions
 func NewGVRs() *GVRs {
 	return &GVRs{
-		Observations: schema.GroupVersionResource{
-			Group:    "zen.kube-zen.io",
-			Version:  "v1",
-			Resource: "observations",
-		},
+		Observations: config.ObservationsGVR(),
 		PolicyReport: schema.GroupVersionResource{
 			Group:    "wgpolicyk8s.io",
 			Version:  "v1alpha2",

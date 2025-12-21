@@ -66,18 +66,22 @@ func (cc *CRDCreator) CreateCRD(ctx context.Context, observation *unstructured.U
 
 	if err != nil {
 		errorType := classifyError(err)
-		cc.logger.Error("Failed to create CRD",
+		cc.logger.Error("Failed to create resource",
 			logger.Fields{
 				Component: "watcher",
 				Operation: "crd_create",
 				Error:     err,
 				Additional: map[string]interface{}{
 					"gvr":        cc.gvr.String(),
+					"group":      cc.gvr.Group,
+					"version":    cc.gvr.Version,
+					"resource":   cc.gvr.Resource,
 					"namespace":  namespace,
 					"error_type": errorType,
 				},
 			})
-		return fmt.Errorf("failed to create CRD %s: %w", cc.gvr.Resource, err)
+		return fmt.Errorf("failed to create resource %s/%s/%s in namespace %s: %w",
+			cc.gvr.Group, cc.gvr.Version, cc.gvr.Resource, namespace, err)
 	}
 
 	cc.logger.Debug("Created CRD successfully",

@@ -15,12 +15,7 @@ import (
 	"k8s.io/client-go/tools/cache"
 )
 
-// IngesterGVR is the GroupVersionResource for Ingester CRDs
-var IngesterGVR = schema.GroupVersionResource{
-	Group:    "zen.kube-zen.io",
-	Version:  "v1alpha1",
-	Resource: "ingesters",
-}
+// IngesterGVR is defined in gvrs.go to use configurable API group
 
 // IngesterConfig represents the compiled configuration from an Ingester CRD
 type IngesterConfig struct {
@@ -554,6 +549,22 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 					resource := getString(gvrMap, "resource")
 
 					if version != "" && resource != "" {
+						// Validate GVR before using
+						if err := ValidateGVRConfig(group, version, resource); err != nil {
+							logger.Warn("Invalid GVR in destination configuration",
+								logger.Fields{
+									Component: "config",
+									Operation: "ingester_convert",
+									Source:    source,
+									Error:     err,
+									Additional: map[string]interface{}{
+										"group":    group,
+										"version":  version,
+										"resource": resource,
+									},
+								})
+							continue
+						}
 						// Use specified GVR
 						gvr = schema.GroupVersionResource{
 							Group:    group,
@@ -671,7 +682,7 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 		} else if sinceSeconds, ok := logs["sinceSeconds"].(float64); ok {
 			config.Logs.SinceSeconds = int(sinceSeconds)
 		} else {
-			config.Logs.SinceSeconds = 300 // Default 5 minutes
+			config.Logs.SinceSeconds = DefaultLogsSinceSeconds
 		}
 		// Extract patterns
 		if patterns, ok := logs["patterns"].([]interface{}); ok {
@@ -908,21 +919,4 @@ func getSpecKeys(spec map[string]interface{}) []string {
 	return keys
 }
 
-// ResolveDestinationGVR resolves a GVR from a destination value.
-// For "observations", returns the Observation GVR.
-// For other values, defaults to zen.kube-zen.io/v1/{value}.
-func ResolveDestinationGVR(value string) schema.GroupVersionResource {
-	if value == "observations" {
-		return schema.GroupVersionResource{
-			Group:    "zen.kube-zen.io",
-			Version:  "v1",
-			Resource: "observations",
-		}
-	}
-	// Default to zen.kube-zen.io/v1/{value} for custom resources
-	return schema.GroupVersionResource{
-		Group:    "zen.kube-zen.io",
-		Version:  "v1",
-		Resource: value,
-	}
-}
+// ResolveDestinationGVR is now defined in gvrs.go to use configurable API group

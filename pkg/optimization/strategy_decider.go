@@ -165,27 +165,4 @@ func (sd *StrategyDecider) ShouldOptimize(
 ) bool {
 	// Auto-optimization removed - always return false
 	return false
-
-	if metrics == nil {
-		return false
-	}
-
-	// Trigger optimization if thresholds are exceeded
-	// Thresholds are in config.Thresholds, not config.Processing.Thresholds
-	if config.Thresholds == nil {
-		return false
-	}
-
-	// Check observationsPerMinute threshold
-	if config.Thresholds.ObservationsPerMinute != nil {
-		if metrics.ObservationsPerMinute >= float64(config.Thresholds.ObservationsPerMinute.Warning) {
-			return true
-		}
-	}
-
-	// Note: lowSeverityPercent and dedupEffectiveness thresholds would need to be
-	// added to ThresholdsConfig if needed. For now, we use the default optimization
-	// logic based on the metrics available.
-
-	return false
 }

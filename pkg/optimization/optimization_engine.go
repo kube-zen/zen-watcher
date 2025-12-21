@@ -144,36 +144,12 @@ func (oe *OptimizationEngine) runOptimizationCycle(ctx context.Context) {
 
 	allConfigs := oe.sourceConfigLoader.GetAllSourceConfigs()
 
-	for source, sourceConfig := range allConfigs {
-		// Note: Auto-optimization has been removed.
-		// This optimization loop is no longer active.
-		// Processing order is now configured manually via config.Processing.Order
-		if sourceConfig == nil {
-			continue
-		}
-		// Skip all sources since auto-optimization is disabled
+	// Note: Auto-optimization has been removed.
+	// This optimization loop is no longer active.
+	// Processing order is now configured manually via config.Processing.Order
+	// Skip all sources since auto-optimization is disabled
+	for range allConfigs {
 		continue
-
-		// Get current metrics for this source
-		metrics := oe.smartProcessor.GetSourceMetrics(source)
-		if metrics == nil {
-			continue // No metrics available yet
-		}
-
-		// Check if optimization should be triggered
-		strategyDecider := NewStrategyDecider()
-		if !strategyDecider.ShouldOptimize(metrics, sourceConfig) {
-			continue // Thresholds not exceeded
-		}
-
-		// Determine optimal strategy
-		currentStrategy := strategyDecider.DetermineStrategy(metrics, sourceConfig)
-		state := oe.stateManager.GetState(source)
-
-		// Check if strategy change is needed
-		if state.CurrentStrategy != currentStrategy.String() {
-			oe.applyOptimization(source, sourceConfig, currentStrategy, metrics)
-		}
 	}
 }
 

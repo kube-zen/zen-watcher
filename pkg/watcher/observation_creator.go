@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
+	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
@@ -160,8 +161,8 @@ func NewObservationCreatorWithOptimization(
 			windowSeconds = w
 		}
 	}
-	// Get max cache size from env, default 10000
-	maxSize := 10000
+	// Get max cache size from env, default from config constants
+	maxSize := config.DefaultDedupMaxSize
 	if sizeStr := os.Getenv("DEDUP_MAX_SIZE"); sizeStr != "" {
 		if s, err := strconv.Atoi(sizeStr); err == nil && s > 0 {
 			maxSize = s
@@ -628,11 +629,9 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 	// Convert from days (OBSERVATION_TTL_DAYS) or use OBSERVATION_TTL_SECONDS if set
 	var defaultTTLSeconds int64 = 7 * 24 * 60 * 60 // Default: 7 days in seconds
 
-	// TTL validation bounds
-	const (
-		MinTTLSeconds = 60                 // 1 minute minimum (prevents immediate deletion)
-		MaxTTLSeconds = 365 * 24 * 60 * 60 // 1 year maximum (prevents indefinite retention)
-	)
+	// TTL validation bounds (use config constants)
+	MinTTLSeconds := config.DefaultTTLMinSeconds
+	MaxTTLSeconds := config.DefaultTTLMaxSeconds
 
 	// Check for seconds first (more precise)
 	if ttlSecondsStr := os.Getenv("OBSERVATION_TTL_SECONDS"); ttlSecondsStr != "" {

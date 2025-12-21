@@ -56,26 +56,6 @@ func NewAdaptiveProcessor(
 func (ap *AdaptiveProcessor) ShouldAdapt() bool {
 	// Auto-optimization removed - always return false
 	return false
-
-	// Don't adapt too frequently
-	if time.Since(ap.lastAdaptation) < ap.adaptationWindow {
-		return false
-	}
-
-	// Get current metrics
-	metrics := ap.metricsCollector.GetOptimizationMetrics()
-	if metrics == nil {
-		return false
-	}
-
-	// Adapt if performance degradation detected
-	if ap.detectPerformanceDegradation(metrics) {
-		return true
-	}
-
-	// Adapt if thresholds exceeded
-	strategyDecider := NewStrategyDecider()
-	return strategyDecider.ShouldOptimize(metrics, ap.config)
 }
 
 // detectPerformanceDegradation detects if performance has degraded
