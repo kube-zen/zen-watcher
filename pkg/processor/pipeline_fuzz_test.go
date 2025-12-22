@@ -54,15 +54,17 @@ func FuzzProcessEvent(f *testing.F) {
 		}
 
 		// Setup processor
-		dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
-		filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
-		f := filter.NewFilter(filterConfig)
-		deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 		observationGVR := schema.GroupVersionResource{
 			Group:    "zen.kube-zen.io",
 			Version:  "v1",
 			Resource: "observations",
 		}
+		dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, map[schema.GroupVersionResource]string{
+			observationGVR: "ObservationList",
+		})
+		filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
+		f := filter.NewFilter(filterConfig)
+		deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 		creator := watcher.NewObservationCreator(
 			dynamicClient,
 			observationGVR,
@@ -120,15 +122,17 @@ func FuzzProcessEvent_ExtremeSizes(f *testing.F) {
 		eventData["data"] = make([]byte, size)
 
 		// Setup processor
-		dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
-		filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
-		filter := filter.NewFilter(filterConfig)
-		deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 		observationGVR := schema.GroupVersionResource{
 			Group:    "zen.kube-zen.io",
 			Version:  "v1",
 			Resource: "observations",
 		}
+		dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, map[schema.GroupVersionResource]string{
+			observationGVR: "ObservationList",
+		})
+		filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
+		filter := filter.NewFilter(filterConfig)
+		deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 		creator := watcher.NewObservationCreator(
 			dynamicClient,
 			observationGVR,
@@ -176,15 +180,17 @@ func FuzzProcessEvent_HighCardinalityLabels(f *testing.F) {
 		eventData["labels"] = labels
 
 		// Setup processor
-		dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
-		filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
-		filter := filter.NewFilter(filterConfig)
-		deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 		observationGVR := schema.GroupVersionResource{
 			Group:    "zen.kube-zen.io",
 			Version:  "v1",
 			Resource: "observations",
 		}
+		dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, map[schema.GroupVersionResource]string{
+			observationGVR: "ObservationList",
+		})
+		filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
+		filter := filter.NewFilter(filterConfig)
+		deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 		creator := watcher.NewObservationCreator(
 			dynamicClient,
 			observationGVR,

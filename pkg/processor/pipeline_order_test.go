@@ -70,17 +70,19 @@ func (m *mockNormalizer) Normalize(obs *unstructured.Unstructured) *unstructured
 // 1. Filter is invoked before dedup
 // 2. Normalization runs only after both filter and dedup
 func TestPipelineOrder_FilterFirst(t *testing.T) {
-	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
-
-	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
-	f := filter.NewFilter(filterConfig)
-	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
-
 	observationGVR := schema.GroupVersionResource{
 		Group:    "zen.kube-zen.io",
 		Version:  "v1",
 		Resource: "observations",
 	}
+	dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, map[schema.GroupVersionResource]string{
+		observationGVR: "ObservationList",
+	})
+
+	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
+	f := filter.NewFilter(filterConfig)
+	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+
 	creator := watcher.NewObservationCreator(
 		dynamicClient,
 		observationGVR,
@@ -159,17 +161,19 @@ func TestPipelineOrder_FilterFirst(t *testing.T) {
 // 1. Dedup is invoked before filter
 // 2. Normalization runs only after both dedup and filter
 func TestPipelineOrder_DedupFirst(t *testing.T) {
-	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
-
-	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
-	f := filter.NewFilter(filterConfig)
-	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
-
 	observationGVR := schema.GroupVersionResource{
 		Group:    "zen.kube-zen.io",
 		Version:  "v1",
 		Resource: "observations",
 	}
+	dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, map[schema.GroupVersionResource]string{
+		observationGVR: "ObservationList",
+	})
+
+	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
+	f := filter.NewFilter(filterConfig)
+	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+
 	creator := watcher.NewObservationCreator(
 		dynamicClient,
 		observationGVR,
@@ -242,17 +246,19 @@ func TestPipelineOrder_NormalizationAfterFilterDedup(t *testing.T) {
 	// We verify this by checking that normalized observations have the correct structure
 	// that can only exist after filter/dedup processing
 
-	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
-
-	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
-	f := filter.NewFilter(filterConfig)
-	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
-
 	observationGVR := schema.GroupVersionResource{
 		Group:    "zen.kube-zen.io",
 		Version:  "v1",
 		Resource: "observations",
 	}
+	dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, map[schema.GroupVersionResource]string{
+		observationGVR: "ObservationList",
+	})
+
+	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
+	f := filter.NewFilter(filterConfig)
+	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+
 	creator := watcher.NewObservationCreator(
 		dynamicClient,
 		observationGVR,
@@ -328,18 +334,20 @@ func TestObservationCreator_NoFilterDedupReRun(t *testing.T) {
 	// This test verifies that ObservationCreator.CreateObservation does not
 	// re-determine order or re-run filter/dedup
 
-	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
+	observationGVR := schema.GroupVersionResource{
+		Group:    "zen.kube-zen.io",
+		Version:  "v1",
+		Resource: "observations",
+	}
+	dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, map[schema.GroupVersionResource]string{
+		observationGVR: "ObservationList",
+	})
 
 	// Create filter and deduper with call tracking
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
 	_ = dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000 (unused in this test)
 
-	observationGVR := schema.GroupVersionResource{
-		Group:    "zen.kube-zen.io",
-		Version:  "v1",
-		Resource: "observations",
-	}
 	creator := watcher.NewObservationCreator(
 		dynamicClient,
 		observationGVR,

@@ -31,17 +31,19 @@ import (
 
 // setupBenchmarkProcessor creates a processor for benchmarking
 func setupBenchmarkProcessor() (*Processor, dynamic.Interface) {
-	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
-
-	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
-	f := filter.NewFilter(filterConfig)
-	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
-
 	observationGVR := schema.GroupVersionResource{
 		Group:    "zen.kube-zen.io",
 		Version:  "v1",
 		Resource: "observations",
 	}
+	dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, map[schema.GroupVersionResource]string{
+		observationGVR: "ObservationList",
+	})
+
+	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
+	f := filter.NewFilter(filterConfig)
+	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+
 	// Create observation creator with nil metrics for benchmarking
 	creator := watcher.NewObservationCreator(
 		dynamicClient,

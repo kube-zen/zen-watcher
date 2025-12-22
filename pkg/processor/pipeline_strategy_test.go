@@ -32,7 +32,14 @@ import (
 // setupTestProcessor creates a processor with test dependencies
 func setupTestProcessor(t *testing.T) (*Processor, dynamic.Interface) {
 	t.Helper()
-	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme.Scheme)
+	observationGVR := schema.GroupVersionResource{
+		Group:    "zen.kube-zen.io",
+		Version:  "v1",
+		Resource: "observations",
+	}
+	dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme.Scheme, map[schema.GroupVersionResource]string{
+		observationGVR: "ObservationList",
+	})
 
 	filterConfig := &filter.FilterConfig{
 		Sources: make(map[string]filter.SourceFilter),
@@ -41,12 +48,6 @@ func setupTestProcessor(t *testing.T) (*Processor, dynamic.Interface) {
 
 	deduper := dedup.NewDeduper(60, 10000)
 	defer deduper.Stop()
-
-	observationGVR := schema.GroupVersionResource{
-		Group:    "zen.kube-zen.io",
-		Version:  "v1",
-		Resource: "observations",
-	}
 
 	creator := watcher.NewObservationCreator(
 		dynamicClient,
