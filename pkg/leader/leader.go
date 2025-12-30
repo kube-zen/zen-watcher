@@ -21,7 +21,6 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/logger"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )
