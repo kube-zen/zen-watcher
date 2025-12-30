@@ -1,13 +1,14 @@
-# Leader Election with zen-lead
+# Leader Election with zen-sdk
 
-zen-watcher supports leader election using **zen-lead**, an annotation-based leader election solution for components that don't use controller-runtime.
+zen-watcher supports leader election using **zen-sdk/pkg/leader**, the same approach as zen-flow and zen-lock.
 
 ## Overview
 
-zen-watcher uses **zen-lead** (not zen-sdk) because:
-- ✅ zen-watcher doesn't use controller-runtime
-- ✅ zen-lead works with any Kubernetes workload via annotations
-- ✅ No code changes required - just add annotations to your Deployment
+zen-watcher uses **zen-sdk/pkg/leader** (controller-runtime Manager) for leader election:
+- ✅ Consistent approach across all Zen tools
+- ✅ Uses controller-runtime Manager (only for leader election, not reconciliation)
+- ✅ Same API as zen-flow and zen-lock
+- ✅ Standard Kubernetes Lease API
 
 ## Architecture
 
@@ -24,26 +25,7 @@ zen-watcher uses **zen-lead** (not zen-sdk) because:
 
 ## Setup
 
-### Step 1: Install zen-lead Controller
-
-```bash
-kubectl apply -f https://github.com/kube-zen/zen-lead/releases/latest/download/install.yaml
-```
-
-### Step 2: Create LeaderPolicy
-
-```yaml
-apiVersion: coordination.kube-zen.io/v1alpha1
-kind: LeaderPolicy
-metadata:
-  name: zen-watcher-leader
-spec:
-  leaseDurationSeconds: 15
-  identityStrategy: pod
-  followerMode: standby
-```
-
-### Step 3: Annotate zen-watcher Deployment
+### Step 1: Configure zen-watcher Deployment
 
 ```yaml
 apiVersion: apps/v1
@@ -53,10 +35,6 @@ metadata:
 spec:
   replicas: 3
   template:
-    metadata:
-      annotations:
-        zen-lead/pool: zen-watcher-leader
-        zen-lead/join: "true"
     spec:
       containers:
       - name: zen-watcher
@@ -70,14 +48,14 @@ spec:
               fieldPath: metadata.namespace
 ```
 
-### Step 4: Verify Leader Status
+### Step 2: Verify Leader Status
 
 ```bash
-# Check which pod is the leader
-kubectl get pods -l app=zen-watcher -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.annotations.zen-lead/role}{"\n"}{end}'
+# Check Lease resource (created automatically by controller-runtime)
+kubectl get lease zen-watcher-leader-election -n <namespace> -o yaml
 
-# Check LeaderPolicy status
-kubectl get leaderpolicy zen-watcher-leader -o yaml
+# Check which pod holds the lease
+kubectl get lease zen-watcher-leader-election -n <namespace> -o jsonpath='{.spec.holderIdentity}'
 ```
 
 ## Behavior
@@ -92,11 +70,11 @@ kubectl get leaderpolicy zen-watcher-leader -o yaml
 - ✅ Serves webhooks (Falco, Audit)
 
 **Follower Pods:**
-- ❌ Do NOT run informer-based watchers
-- ❌ Do NOT run GenericOrchestrator
-- ❌ Do NOT run IngesterInformer
-- ❌ Do NOT run garbage collector
-- ✅ Serve webhooks (Falco, Audit) - load-balanced
+- ❌ Do NOT run informer-based watchers (waits for leader election)
+- ❌ Do NOT run GenericOrchestrator (waits for leader election)
+- ❌ Do NOT run IngesterInformer (waits for leader election)
+- ❌ Do NOT run garbage collector (waits for leader election)
+- ✅ Serve webhooks (Falco, Audit) - load-balanced (run immediately)
 
 ### Without Leader Election (`ENABLE_LEADER_ELECTION=false` or unset)
 
@@ -127,40 +105,36 @@ kubectl get leaderpolicy zen-watcher-leader -o yaml
 ### Environment Variables
 
 - `ENABLE_LEADER_ELECTION`: Set to `"true"` to enable leader election
-- `POD_NAMESPACE`: Namespace of the pod (required for leader checking)
-- `HOSTNAME`: Pod name (automatically set by Kubernetes)
-- `LEADER_CHECK_INTERVAL`: Interval for checking leader status (default: 5s)
+- `POD_NAMESPACE`: Namespace of the pod (required for leader election)
 
-### LeaderPolicy Configuration
+### Leader Election Configuration
 
-```yaml
-spec:
-  leaseDurationSeconds: 15      # How long leader holds the lock
-  renewDeadlineSeconds: 10      # Time to renew before losing leadership
-  retryPeriodSeconds: 2          # How often to retry acquiring leadership
-  identityStrategy: pod         # Use pod name/UID for identity
-  followerMode: standby         # Followers stay running (standby)
-```
+Leader election uses controller-runtime Manager with zen-sdk/pkg/leader:
+- **Lease Duration**: 15 seconds (default)
+- **Renew Deadline**: 10 seconds (default)
+- **Retry Period**: 2 seconds (default)
+- **Lease Name**: `zen-watcher-leader-election`
+
+These are configured via `zen-sdk/pkg/leader` and match zen-flow and zen-lock.
 
 ## Troubleshooting
 
 ### Pod Not Becoming Leader
 
-1. **Check annotations:**
+1. **Check Lease resource:**
    ```bash
-   kubectl get pod <pod-name> -o jsonpath='{.metadata.annotations}'
+   kubectl get lease zen-watcher-leader-election -n <namespace> -o yaml
    ```
-   Should include `zen-lead/pool` and `zen-lead/join: "true"`
+   Verify `spec.holderIdentity` matches your pod name
 
-2. **Check LeaderPolicy:**
+2. **Check leader election manager logs:**
    ```bash
-   kubectl get leaderpolicy zen-watcher-leader -o yaml
+   kubectl logs <pod-name> | grep -i leader
    ```
-   Verify `status.phase` is `Stable` and `status.currentHolder` is set
 
-3. **Check zen-lead controller:**
+3. **Verify environment variables:**
    ```bash
-   kubectl get pods -n <zen-lead-namespace> -l app=zen-lead
+   kubectl exec <pod-name> -- env | grep -E "(ENABLE_LEADER_ELECTION|POD_NAMESPACE)"
    ```
 
 ### Components Not Starting
@@ -179,26 +153,32 @@ spec:
 
 If you're currently running zen-watcher as a single replica:
 
-1. **Deploy zen-lead controller** (one-time)
-2. **Create LeaderPolicy** (one-time)
-3. **Update Deployment:**
-   - Add annotations (`zen-lead/pool`, `zen-lead/join`)
+1. **Update Deployment:**
    - Add `ENABLE_LEADER_ELECTION=true` environment variable
+   - Add `POD_NAMESPACE` environment variable
    - Increase replicas to 3
-4. **Verify:** Check that only one pod is leader and components are running correctly
+2. **Verify:** Check that only one pod is leader and components are running correctly
 
-## Comparison with zen-sdk
+## Implementation Details
 
-| Feature | zen-watcher | zen-flow/zen-lock |
-|---------|-------------|-------------------|
-| **Framework** | client-go | controller-runtime |
-| **Leader Election** | zen-lead (annotations) | zen-sdk/pkg/leader (library) |
-| **Approach** | Annotation-based | Code integration |
-| **Use Case** | Non-controller-runtime apps | Controller-runtime apps |
+zen-watcher uses **controller-runtime Manager** purely for leader election:
+- Manager is created with leader election enabled via `zen-sdk/pkg/leader`
+- Manager's `Elected()` channel is used to gate leader-only components
+- No controllers are registered with the Manager (we use client-go directly)
+- This allows zen-watcher to use the same leader election approach as zen-flow/zen-lock
+
+**Architecture:**
+```
+zen-watcher (client-go)
+  ├── controller-runtime Manager (leader election only)
+  │   └── Uses zen-sdk/pkg/leader
+  ├── client-go clients (business logic)
+  └── Leader-only components wait for Manager.Elected() channel
+```
 
 ---
 
 **See also:**
-- [zen-lead Documentation](https://github.com/kube-zen/zen-lead)
+- [zen-sdk Documentation](https://github.com/kube-zen/zen-sdk)
 - [SCALING.md](SCALING.md) - Scaling options for zen-watcher
 
