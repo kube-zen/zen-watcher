@@ -29,6 +29,7 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/dispatcher"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/gc"
+	"github.com/kube-zen/zen-watcher/pkg/leader"
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/optimization"
@@ -167,6 +168,31 @@ func main() {
 	// Create processor for GenericOrchestrator (uses same filter, deduper, and observationCreator)
 	deduper := observationCreator.GetDeduper()
 	proc := processor.NewProcessorWithMetrics(filterInstance, deduper, observationCreator, m)
+
+	// Initialize leader checker (for zen-lead annotation-based leader election)
+	var leaderChecker *leader.Checker
+	enableLeaderElection := os.Getenv("ENABLE_LEADER_ELECTION") == "true"
+	if enableLeaderElection {
+		var err error
+		leaderChecker, err = leader.NewChecker(clients.Standard)
+		if err != nil {
+			log.Warn("Failed to initialize leader checker, continuing without leader election",
+				logger.Fields{
+					Component: "main",
+					Operation: "leader_init",
+					Error:     err,
+				})
+		} else {
+			log.Info("Leader election enabled via zen-lead",
+				logger.Fields{
+					Component: "main",
+					Operation: "leader_init",
+					Additional: map[string]interface{}{
+						"leader_election": "zen-lead",
+					},
+				})
+		}
+	}
 
 	// Create informer manager for generic adapters
 	informerManager := informers.NewManager(informers.Config{
@@ -313,9 +339,53 @@ func main() {
 	}()
 
 	// Start GenericOrchestrator for dynamic Ingester CRD-based adapter management
+	// Only start if leader election is disabled OR if we are the leader
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		if enableLeaderElection && leaderChecker != nil {
+			// Check if we are the leader before starting informer-based components
+			isLeader, err := leaderChecker.IsLeader(ctx)
+			if err != nil {
+				log.Error("Failed to check leader status for GenericOrchestrator",
+					logger.Fields{
+						Component: "main",
+						Operation: "leader_check",
+						Error:     err,
+					})
+				return
+			}
+			if !isLeader {
+				log.Info("Not the leader, skipping GenericOrchestrator (informer-based sources)",
+					logger.Fields{
+						Component: "main",
+						Operation: "generic_orchestrator",
+						Additional: map[string]interface{}{
+							"reason": "not_leader",
+						},
+					})
+				// Watch for leader changes and start when we become leader
+				go leaderChecker.WatchLeader(ctx, func(isLeader bool) {
+					if isLeader {
+						log.Info("Became leader, starting GenericOrchestrator",
+							logger.Fields{
+								Component: "main",
+								Operation: "generic_orchestrator",
+							})
+						if err := genericOrchestrator.Start(ctx); err != nil {
+							log.Error("GenericOrchestrator stopped",
+								logger.Fields{
+									Component: "main",
+									Operation: "generic_orchestrator",
+									Error:     err,
+								})
+						}
+					}
+				})
+				return
+			}
+		}
+		// Start GenericOrchestrator (either no leader election or we are the leader)
 		if err := genericOrchestrator.Start(ctx); err != nil {
 			log.Error("GenericOrchestrator stopped",
 				logger.Fields{
@@ -384,6 +454,7 @@ func main() {
 	// }()
 
 	// Create and start garbage collector
+	// Only start if leader election is disabled OR if we are the leader
 	gcCollector := gc.NewCollector(
 		clients.Dynamic,
 		gvrs.Observations,
@@ -395,6 +466,42 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		if enableLeaderElection && leaderChecker != nil {
+			// Check if we are the leader before starting GC
+			isLeader, err := leaderChecker.IsLeader(ctx)
+			if err != nil {
+				log.Error("Failed to check leader status for GC",
+					logger.Fields{
+						Component: "main",
+						Operation: "leader_check",
+						Error:     err,
+					})
+				return
+			}
+			if !isLeader {
+				log.Info("Not the leader, skipping garbage collector",
+					logger.Fields{
+						Component: "main",
+						Operation: "gc",
+						Additional: map[string]interface{}{
+							"reason": "not_leader",
+						},
+					})
+				// Watch for leader changes and start when we become leader
+				go leaderChecker.WatchLeader(ctx, func(isLeader bool) {
+					if isLeader {
+						log.Info("Became leader, starting garbage collector",
+							logger.Fields{
+								Component: "main",
+								Operation: "gc",
+							})
+						gcCollector.Start(ctx)
+					}
+				})
+				return
+			}
+		}
+		// Start GC (either no leader election or we are the leader)
 		gcCollector.Start(ctx)
 	}()
 
