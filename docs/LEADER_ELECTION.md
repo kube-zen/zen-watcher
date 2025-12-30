@@ -33,19 +33,19 @@ kind: Deployment
 metadata:
   name: zen-watcher
 spec:
-  replicas: 3
+  replicas: 2  # Default: 2 replicas for HA (leader election mandatory)
   template:
     spec:
       containers:
       - name: zen-watcher
         image: kubezen/zen-watcher:latest
         env:
-        - name: ENABLE_LEADER_ELECTION
-          value: "true"
         - name: POD_NAMESPACE
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
+        # Leader election is mandatory and always enabled (via zen-sdk/pkg/leader)
+        # No ENABLE_LEADER_ELECTION env var needed
 ```
 
 ### Step 2: Verify Leader Status
@@ -60,7 +60,7 @@ kubectl get lease zen-watcher-leader-election -n <namespace> -o jsonpath='{.spec
 
 ## Behavior
 
-### With Leader Election Enabled (`ENABLE_LEADER_ELECTION=true`)
+**Leader election is mandatory and always enabled** (via zen-sdk/pkg/leader).
 
 **Leader Pod:**
 - ✅ Runs informer-based watchers (PolicyReports, VulnerabilityReports)
@@ -76,11 +76,7 @@ kubectl get lease zen-watcher-leader-election -n <namespace> -o jsonpath='{.spec
 - ❌ Do NOT run garbage collector (waits for leader election)
 - ✅ Serve webhooks (Falco, Audit) - load-balanced (run immediately)
 
-### Without Leader Election (`ENABLE_LEADER_ELECTION=false` or unset)
-
-**All Pods:**
-- ✅ Run all components (single-replica behavior)
-- ✅ Serve webhooks
+**Note:** For single-replica deployments, set `replicas: 1`. Leader election is still enabled but only one pod exists.
 
 ## Benefits
 
@@ -104,8 +100,8 @@ kubectl get lease zen-watcher-leader-election -n <namespace> -o jsonpath='{.spec
 
 ### Environment Variables
 
-- `ENABLE_LEADER_ELECTION`: Set to `"true"` to enable leader election
-- `POD_NAMESPACE`: Namespace of the pod (required for leader election)
+- `POD_NAMESPACE`: Namespace of the pod (required for leader election, set via Downward API)
+- **Note:** Leader election is mandatory and always enabled. No `ENABLE_LEADER_ELECTION` env var needed.
 
 ### Leader Election Configuration
 
@@ -134,7 +130,7 @@ These are configured via `zen-sdk/pkg/leader` and match zen-flow and zen-lock.
 
 3. **Verify environment variables:**
    ```bash
-   kubectl exec <pod-name> -- env | grep -E "(ENABLE_LEADER_ELECTION|POD_NAMESPACE)"
+   kubectl exec <pod-name> -- env | grep -E "POD_NAMESPACE"
    ```
 
 ### Components Not Starting
@@ -146,7 +142,7 @@ These are configured via `zen-sdk/pkg/leader` and match zen-flow and zen-lock.
 
 2. **Verify environment variables:**
    ```bash
-   kubectl exec <pod-name> -- env | grep -E "(ENABLE_LEADER_ELECTION|POD_NAMESPACE|HOSTNAME)"
+   kubectl exec <pod-name> -- env | grep -E "(POD_NAMESPACE|HOSTNAME)"
    ```
 
 ## Migration from Single-Replica
@@ -154,9 +150,9 @@ These are configured via `zen-sdk/pkg/leader` and match zen-flow and zen-lock.
 If you're currently running zen-watcher as a single replica:
 
 1. **Update Deployment:**
-   - Add `ENABLE_LEADER_ELECTION=true` environment variable
-   - Add `POD_NAMESPACE` environment variable
-   - Increase replicas to 3
+   - Add `POD_NAMESPACE` environment variable (via Downward API)
+   - Increase replicas to 2 (or more) for HA
+   - Leader election is automatically enabled (mandatory)
 2. **Verify:** Check that only one pod is leader and components are running correctly
 
 ## Implementation Details

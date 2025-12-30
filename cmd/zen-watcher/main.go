@@ -15,11 +15,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
 	"time"
 
+	"github.com/kube-zen/zen-sdk/pkg/leader"
 	"github.com/kube-zen/zen-watcher/internal/informers"
 	"github.com/kube-zen/zen-watcher/internal/kubernetes"
 	"github.com/kube-zen/zen-watcher/internal/lifecycle"
@@ -43,7 +45,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-	"github.com/kube-zen/zen-sdk/pkg/leader"
 )
 
 // Version, Commit, and BuildDate are set via ldflags during build
@@ -183,56 +184,54 @@ func main() {
 	deduper := observationCreator.GetDeduper()
 	proc := processor.NewProcessorWithMetrics(filterInstance, deduper, observationCreator, m)
 
-	// Setup leader election using zen-sdk (controller-runtime Manager for leader election only)
-	enableLeaderElection := os.Getenv("ENABLE_LEADER_ELECTION") == "true"
-	var leaderManager ctrl.Manager
-	var leaderElectedCh <-chan struct{}
-	if enableLeaderElection {
-		namespace := os.Getenv("POD_NAMESPACE")
-		if namespace == "" {
-			// Try to read from service account namespace
-			if data, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
-				namespace = string(data)
-			}
-		}
-
-		leaderOpts := leader.Options{
-			LeaseName: "zen-watcher-leader-election",
-			Enable:    true,
-			Namespace: namespace,
-		}
-
-		mgrOpts := ctrl.Options{
-			Scheme: scheme,
-			Metrics: metricsserver.Options{
-				BindAddress: "0", // Disable metrics server (we have our own)
-			},
-		}
-		mgrOpts = leader.ManagerOptions(mgrOpts, leaderOpts)
-
-		var err error
-		leaderManager, err = ctrl.NewManager(clients.Config, mgrOpts)
-		if err != nil {
-			log.Fatal("Failed to create leader election manager",
-				logger.Fields{
-					Component: "main",
-					Operation: "leader_manager_init",
-					Error:     err,
-				})
-		}
-
-		leaderElectedCh = leaderManager.Elected()
-
-		log.Info("Leader election enabled via zen-sdk",
+	// Get namespace for leader election (required, hard-fail if missing)
+	namespace, err := leader.RequirePodNamespace()
+	if err != nil {
+		log.Fatal("Failed to determine pod namespace for leader election",
 			logger.Fields{
 				Component: "main",
 				Operation: "leader_init",
-				Additional: map[string]interface{}{
-					"leader_election": "zen-sdk/pkg/leader",
-					"lease_name":      leaderOpts.LeaseName,
-				},
+				Error:     err,
 			})
 	}
+
+	// Apply REST config defaults (via zen-sdk helper)
+	leader.ApplyRestConfigDefaults(clients.Config)
+
+	// Setup mandatory leader election (always enabled for HA safety)
+	leaderElectionID := "zen-watcher-leader-election"
+	mgrOpts := ctrl.Options{
+		Scheme: scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: "0", // Disable metrics server (we have our own)
+		},
+	}
+	leader.ApplyRequiredLeaderElection(&mgrOpts, "zen-watcher", namespace, leaderElectionID)
+
+	var leaderManager ctrl.Manager
+	var err error
+	leaderManager, err = ctrl.NewManager(clients.Config, mgrOpts)
+	if err != nil {
+		log.Fatal("Failed to create leader election manager",
+			logger.Fields{
+				Component: "main",
+				Operation: "leader_manager_init",
+				Error:     err,
+			})
+	}
+
+	leaderElectedCh := leaderManager.Elected()
+
+	log.Info("Leader election enabled via zen-sdk (mandatory for HA)",
+		logger.Fields{
+			Component: "main",
+			Operation: "leader_init",
+			Additional: map[string]interface{}{
+				"leader_election": "zen-sdk/pkg/leader",
+				"lease_name":      leaderElectionID,
+				"namespace":       namespace,
+			},
+		})
 
 	// Create informer manager for generic adapters
 	informerManager := informers.NewManager(informers.Config{
@@ -379,30 +378,27 @@ func main() {
 	}()
 
 	// Start GenericOrchestrator for dynamic Ingester CRD-based adapter management
-	// Only start if leader election is disabled OR if we are the leader
-	// With controller-runtime Manager, we wait for leader election before starting
+	// Wait for leader election (mandatory - Manager only calls on leader)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		// Wait for leader election if enabled
-		if enableLeaderElection && leaderElectedCh != nil {
-			log.Info("Waiting for leader election before starting GenericOrchestrator",
+		// Wait for leader election (mandatory for HA)
+		log.Info("Waiting for leader election before starting GenericOrchestrator",
+			logger.Fields{
+				Component: "main",
+				Operation: "generic_orchestrator",
+			})
+		select {
+		case <-leaderElectedCh:
+			log.Info("Elected as leader, starting GenericOrchestrator",
 				logger.Fields{
 					Component: "main",
 					Operation: "generic_orchestrator",
 				})
-			select {
-			case <-leaderElectedCh:
-				log.Info("Elected as leader, starting GenericOrchestrator",
-					logger.Fields{
-						Component: "main",
-						Operation: "generic_orchestrator",
-					})
-			case <-ctx.Done():
-				return
-			}
+		case <-ctx.Done():
+			return
 		}
-		// Start GenericOrchestrator (either no leader election or we are the leader)
+		// Start GenericOrchestrator (we are the leader)
 		if err := genericOrchestrator.Start(ctx); err != nil {
 			log.Error("GenericOrchestrator stopped",
 				logger.Fields{
@@ -471,8 +467,7 @@ func main() {
 	// }()
 
 	// Create and start garbage collector
-	// Only start if leader election is disabled OR if we are the leader
-	// With controller-runtime Manager, we wait for leader election before starting
+	// Wait for leader election (mandatory - Manager only calls on leader)
 	gcCollector := gc.NewCollector(
 		clients.Dynamic,
 		gvrs.Observations,
@@ -484,25 +479,23 @@ func main() {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		// Wait for leader election if enabled
-		if enableLeaderElection && leaderElectedCh != nil {
-			log.Info("Waiting for leader election before starting garbage collector",
+		// Wait for leader election (mandatory for HA)
+		log.Info("Waiting for leader election before starting garbage collector",
+			logger.Fields{
+				Component: "main",
+				Operation: "gc",
+			})
+		select {
+		case <-leaderElectedCh:
+			log.Info("Elected as leader, starting garbage collector",
 				logger.Fields{
 					Component: "main",
 					Operation: "gc",
 				})
-			select {
-			case <-leaderElectedCh:
-				log.Info("Elected as leader, starting garbage collector",
-					logger.Fields{
-						Component: "main",
-						Operation: "gc",
-					})
-			case <-ctx.Done():
-				return
-			}
+		case <-ctx.Done():
+			return
 		}
-		// Start GC (either no leader election or we are the leader)
+		// Start GC (we are the leader)
 		gcCollector.Start(ctx)
 	}()
 
