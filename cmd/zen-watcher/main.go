@@ -190,14 +190,9 @@ func main() {
 	deduper := observationCreator.GetDeduper()
 	proc := processor.NewProcessorWithMetrics(filterInstance, deduper, observationCreator, m)
 
-	// Check if leader election is enabled (default: true, can be disabled via --enable-leader-election=false flag)
-	// Note: zen-watcher uses env var for consistency, but flag parsing could be added if needed
-	enableLeaderElectionEnv := os.Getenv("ENABLE_LEADER_ELECTION")
-	enableLeaderElection := enableLeaderElectionEnv != "false" && enableLeaderElectionEnv != "0"
-
 	// Get namespace for leader election (required if enabled)
 	var namespace string
-	if enableLeaderElection {
+	if *enableLeaderElection {
 		var err error
 		namespace, err = leader.RequirePodNamespace()
 		if err != nil {
