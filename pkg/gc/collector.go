@@ -24,6 +24,7 @@ import (
 
 	"github.com/kube-zen/zen-watcher/pkg/logger"
 	"github.com/prometheus/client_golang/prometheus"
+	sdkttl "github.com/kube-zen/zen-sdk/pkg/gc/ttl"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -418,20 +419,23 @@ func (gc *Collector) collectAllNamespaces(ctx context.Context) (int, error) {
 // shouldDeleteObservation determines if an Observation should be deleted
 // Priority: 1) spec.ttlSecondsAfterCreation, 2) default TTL
 // Returns (shouldDelete, reason)
+// Now uses zen-sdk/pkg/gc/ttl for TTL evaluation
 func (gc *Collector) shouldDeleteObservation(obs unstructured.Unstructured, defaultCutoffTime time.Time) (bool, string) {
-	createdTime := obs.GetCreationTimestamp().Time
-	now := time.Now()
-
 	// 1. Check spec.ttlSecondsAfterCreation (Kubernetes native style - highest priority)
 	if ttlVal, found, _ := unstructured.NestedInt64(obs.Object, "spec", "ttlSecondsAfterCreation"); found && ttlVal > 0 {
-		cutoffTime := createdTime.Add(time.Duration(ttlVal) * time.Second)
-		if now.After(cutoffTime) {
+		// Use zen-sdk ttl package
+		spec := &sdkttl.Spec{
+			SecondsAfterCreation: &ttlVal,
+		}
+		expired, err := sdkttl.IsExpired(&obs, spec)
+		if err == nil && expired {
 			return true, "ttl_spec"
 		}
 		return false, ""
 	}
 
 	// 2. Use default TTL based on creation timestamp (fallback)
+	createdTime := obs.GetCreationTimestamp().Time
 	if createdTime.Before(defaultCutoffTime) {
 		return true, "ttl_default"
 	}

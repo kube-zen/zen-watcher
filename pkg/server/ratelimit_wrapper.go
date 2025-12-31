@@ -86,7 +86,7 @@ func (rl *PerKeyRateLimiter) cleanup() {
 // RateLimitMiddleware wraps a handler with rate limiting.
 func (rl *PerKeyRateLimiter) RateLimitMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		key := getClientKey(r)
+		key := getClientIP(r)
 		if !rl.Allow(key) {
 			logger.Warn("Rate limit exceeded",
 				logger.Fields{
