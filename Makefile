@@ -450,3 +450,9 @@ check-crd-drift:
 		exit 1; \
 	fi
 
+
+check:
+	@scripts/ci/check.sh
+
+test-race:
+	@go test -v -race -timeout=15m ./...
