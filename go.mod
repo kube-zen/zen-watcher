@@ -5,7 +5,7 @@ go 1.24
 toolchain go1.24.0
 
 require (
-	github.com/kube-zen/zen-sdk v0.0.0-20251231020410-f6e4bc8c2fc3
+	github.com/kube-zen/zen-sdk v0.1.0-alpha
 	github.com/prometheus/client_golang v1.19.1
 	github.com/prometheus/common v0.55.0
 	github.com/shirou/gopsutil/v3 v3.24.5
