@@ -232,7 +232,7 @@ func main() {
 				Operation: "leader_init",
 			})
 	} else {
-		log.Warning("Leader election disabled - running without HA (split-brain risk if multiple replicas)",
+		log.Info("Leader election disabled - running without HA (split-brain risk if multiple replicas)",
 			logger.Fields{
 				Component: "main",
 				Operation: "leader_init",
