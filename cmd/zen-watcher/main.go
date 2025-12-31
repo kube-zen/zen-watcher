@@ -18,10 +18,12 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
 	"github.com/kube-zen/zen-sdk/pkg/leader"
+	"github.com/kube-zen/zen-sdk/pkg/zenlead"
 	"github.com/kube-zen/zen-watcher/internal/informers"
 	"github.com/kube-zen/zen-watcher/internal/kubernetes"
 	"github.com/kube-zen/zen-watcher/internal/lifecycle"
@@ -67,8 +69,9 @@ func init() {
 }
 
 var (
-	leaderElectionID     = flag.String("leader-election-id", "zen-watcher-leader-election", "The ID for leader election. Must be unique per controller instance in the same namespace.")
-	enableLeaderElection = flag.Bool("enable-leader-election", true, "Enable leader election for controller HA (default: true). Set to false if you don't want HA or want zen-lead to handle HA instead.")
+	leaderElectionMode      = flag.String("leader-election-mode", "builtin", "Leader election mode: builtin (default), zenlead, or disabled")
+	leaderElectionID        = flag.String("leader-election-id", "", "The ID for leader election (default: zen-watcher-leader-election). Required for builtin mode.")
+	leaderElectionLeaseName = flag.String("leader-election-lease-name", "", "The LeaderGroup CRD name (required for zenlead mode)")
 )
 
 func main() {
@@ -191,66 +194,136 @@ func main() {
 	deduper := observationCreator.GetDeduper()
 	proc := processor.NewProcessorWithMetrics(filterInstance, deduper, observationCreator, m)
 
-	// Get namespace for leader election (required if enabled)
-	var namespace string
-	if *enableLeaderElection {
-		var err error
-		namespace, err = leader.RequirePodNamespace()
-		if err != nil {
-			log.Fatal("Failed to determine pod namespace for leader election",
-				logger.Fields{
-					Component: "main",
-					Operation: "leader_init",
-					Error:     err,
-				})
-		}
-	} else {
-		// Still try to get namespace for other purposes, but don't fail if missing
-		namespace, _ = leader.RequirePodNamespace()
-		if namespace == "" {
-			namespace = "default" // Fallback
-		}
+	// Get namespace (required for leader election)
+	namespace, err := leader.RequirePodNamespace()
+	if err != nil {
+		log.Fatal("Failed to determine pod namespace",
+			logger.Fields{
+				Component: "main",
+				Operation: "namespace_init",
+				Error:     err,
+			})
 	}
 
 	// Apply REST config defaults (via zen-sdk helper)
-	leader.ApplyRestConfigDefaults(clients.Config)
+	zenlead.ControllerRuntimeDefaults(clients.Config)
 
 	// Setup controller-runtime manager
-	mgrOpts := ctrl.Options{
+	baseOpts := ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
 			BindAddress: "0", // Disable metrics server (we have our own)
 		},
+		HealthProbeBindAddress: ":8081", // Health probes on separate port
 	}
 
-	// Apply leader election (enabled by default, but can be disabled via --enable-leader-election=false)
-	leader.ApplyLeaderElection(&mgrOpts, "zen-watcher", namespace, *leaderElectionID, *enableLeaderElection)
-	if *enableLeaderElection {
-		log.Info("Leader election enabled for controller HA",
+	// Configure leader election using zenlead package (Profiles B/C)
+	var leConfig zenlead.LeaderElectionConfig
+
+	// Determine election ID (default if not provided)
+	electionID := *leaderElectionID
+	if electionID == "" {
+		electionID = "zen-watcher-leader-election"
+	}
+
+	// Configure based on mode
+	switch *leaderElectionMode {
+	case "builtin":
+		leConfig = zenlead.LeaderElectionConfig{
+			Mode:       zenlead.BuiltIn,
+			ElectionID: electionID,
+			Namespace:  namespace,
+		}
+		log.Info("Leader election mode: builtin (Profile B)",
 			logger.Fields{
 				Component: "main",
 				Operation: "leader_init",
 			})
-	} else {
-		log.Info("Leader election disabled - running without HA (split-brain risk if multiple replicas)",
-			logger.Fields{
-				Component: "main",
-				Operation: "leader_init",
-			})
-	}
-
-	var leaderManager ctrl.Manager
-	var leaderElectedCh <-chan struct{}
-	if *enableLeaderElection {
-		leaderManager, err = ctrl.NewManager(clients.Config, mgrOpts)
-		if err != nil {
-			log.Fatal("Failed to create leader election manager",
+	case "zenlead":
+		if *leaderElectionLeaseName == "" {
+			log.Fatal("--leader-election-lease-name is required when --leader-election-mode=zenlead",
 				logger.Fields{
 					Component: "main",
-					Operation: "leader_manager_init",
-					Error:     err,
+					Operation: "leader_init",
 				})
 		}
+		leConfig = zenlead.LeaderElectionConfig{
+			Mode:       zenlead.ZenLeadManaged,
+			LeaseName:  *leaderElectionLeaseName,
+			Namespace:  namespace,
+		}
+		log.Info("Leader election mode: zenlead managed (Profile C)",
+			logger.Fields{
+				Component: "main",
+				Operation: "leader_init",
+				Additional: map[string]interface{}{
+					"leaseName": *leaderElectionLeaseName,
+				},
+			})
+	case "disabled":
+		leConfig = zenlead.LeaderElectionConfig{
+			Mode: zenlead.Disabled,
+		}
+		log.Info("Leader election disabled - single replica only (unsafe if replicas > 1)",
+			logger.Fields{
+				Component: "main",
+				Operation: "leader_init",
+			})
+	default:
+		log.Fatal("Invalid --leader-election-mode",
+			logger.Fields{
+				Component: "main",
+				Operation: "leader_init",
+				Additional: map[string]interface{}{
+					"mode":  *leaderElectionMode,
+					"valid": []string{"builtin", "zenlead", "disabled"},
+				},
+			})
+	}
+
+	// Prepare manager options with leader election
+	mgrOpts, err := zenlead.PrepareManagerOptions(baseOpts, leConfig)
+	if err != nil {
+		log.Fatal("Failed to prepare manager options",
+			logger.Fields{
+				Component: "main",
+				Operation: "leader_init",
+				Error:     err,
+			})
+	}
+
+	// Get replica count from environment (set by Helm/Kubernetes)
+	replicaCount := 1
+	if rcStr := os.Getenv("REPLICA_COUNT"); rcStr != "" {
+		if rc, err := strconv.Atoi(rcStr); err == nil {
+			replicaCount = rc
+		}
+	}
+
+	// Enforce safe HA configuration
+	if err := zenlead.EnforceSafeHA(replicaCount, mgrOpts.LeaderElection); err != nil {
+		log.Fatal("Unsafe HA configuration",
+			logger.Fields{
+				Component: "main",
+				Operation: "leader_init",
+				Error:     err,
+			})
+	}
+
+	// Always create manager (leader election is configured via options)
+	leaderManager, err := ctrl.NewManager(clients.Config, mgrOpts)
+	if err != nil {
+		log.Fatal("Failed to create leader election manager",
+			logger.Fields{
+				Component: "main",
+				Operation: "leader_manager_init",
+				Error:     err,
+			})
+	}
+
+	// Get elected channel (always available, but only signals when leader election is enabled)
+	var leaderElectedCh <-chan struct{}
+	if mgrOpts.LeaderElection {
 		leaderElectedCh = leaderManager.Elected()
 	} else {
 		// No leader election - create a channel that's immediately ready
