@@ -65,7 +65,14 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 }
 
+var (
+	leaderElectionID     = flag.String("leader-election-id", "zen-watcher-leader-election", "The ID for leader election. Must be unique per controller instance in the same namespace.")
+	enableLeaderElection = flag.Bool("enable-leader-election", true, "Enable leader election for controller HA (default: true). Set to false if you don't want HA or want zen-lead to handle HA instead.")
+)
+
 func main() {
+	flag.Parse()
+
 	// Initialize structured logger
 	logLevel := os.Getenv("LOG_LEVEL")
 	if logLevel == "" {
@@ -183,8 +190,10 @@ func main() {
 	deduper := observationCreator.GetDeduper()
 	proc := processor.NewProcessorWithMetrics(filterInstance, deduper, observationCreator, m)
 
-	// Check if leader election is enabled (default: true, can be disabled via ENABLE_LEADER_ELECTION=false env var)
-	enableLeaderElection := os.Getenv("ENABLE_LEADER_ELECTION") != "false"
+	// Check if leader election is enabled (default: true, can be disabled via --enable-leader-election=false flag)
+	// Note: zen-watcher uses env var for consistency, but flag parsing could be added if needed
+	enableLeaderElectionEnv := os.Getenv("ENABLE_LEADER_ELECTION")
+	enableLeaderElection := enableLeaderElectionEnv != "false" && enableLeaderElectionEnv != "0"
 
 	// Get namespace for leader election (required if enabled)
 	var namespace string
@@ -211,7 +220,6 @@ func main() {
 	leader.ApplyRestConfigDefaults(clients.Config)
 
 	// Setup controller-runtime manager
-	leaderElectionID := "zen-watcher-leader-election"
 	mgrOpts := ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
@@ -219,9 +227,9 @@ func main() {
 		},
 	}
 
-	// Apply leader election (enabled by default, but can be disabled via ENABLE_LEADER_ELECTION=false)
-	leader.ApplyLeaderElection(&mgrOpts, "zen-watcher", namespace, leaderElectionID, enableLeaderElection)
-	if enableLeaderElection {
+	// Apply leader election (enabled by default, but can be disabled via --enable-leader-election=false)
+	leader.ApplyLeaderElection(&mgrOpts, "zen-watcher", namespace, *leaderElectionID, *enableLeaderElection)
+	if *enableLeaderElection {
 		log.Info("Leader election enabled for controller HA",
 			logger.Fields{
 				Component: "main",
@@ -237,7 +245,7 @@ func main() {
 
 	var leaderManager ctrl.Manager
 	var leaderElectedCh <-chan struct{}
-	if enableLeaderElection {
+	if *enableLeaderElection {
 		leaderManager, err = ctrl.NewManager(clients.Config, mgrOpts)
 		if err != nil {
 			log.Fatal("Failed to create leader election manager",
