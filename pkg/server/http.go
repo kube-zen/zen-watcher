@@ -42,7 +42,7 @@ type Server struct {
 	webhookMetrics  *prometheus.CounterVec
 	webhookDropped  *prometheus.CounterVec
 	auth            *WebhookAuth
-	rateLimiter     *RateLimiter
+	rateLimiter     *PerKeyRateLimiter
 	haConfig        *config.HAConfig
 	haStatus        *HAStatus
 	haStatusMu      sync.RWMutex
@@ -91,7 +91,7 @@ func NewServerWithIngester(
 			maxRequests = parsed
 		}
 	}
-	rateLimiter := NewRateLimiter(maxRequests, 1*time.Minute)
+	rateLimiter := NewPerKeyRateLimiter(maxRequests, 1*time.Minute)
 
 	// Load HA configuration
 	haConfig := config.LoadHAConfig()
