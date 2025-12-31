@@ -282,7 +282,7 @@ func main() {
 	}
 
 	// Prepare manager options with leader election
-	mgrOpts, err := zenlead.PrepareManagerOptions(baseOpts, leConfig)
+		mgrOpts, err := zenlead.PrepareManagerOptions(&baseOpts, &leConfig)
 	if err != nil {
 		log.Fatal("Failed to prepare manager options",
 			logger.Fields{

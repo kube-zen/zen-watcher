@@ -8,13 +8,18 @@ RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /build
 
+# Copy zen-sdk first (needed for replace directive in go.mod)
+# Build context should be from parent directory (zen/)
+COPY zen-sdk /build/../zen-sdk
+
 # Copy go.mod and go.sum first for better layer caching
 # This allows Docker to cache dependencies if code changes but deps don't
-COPY go.mod go.sum* ./
+COPY zen-watcher/go.mod zen-watcher/go.sum* ./
+
 RUN go mod download
 
 # Copy source code (needed for go mod tidy to work correctly)
-COPY . .
+COPY zen-watcher/ .
 
 # Run go mod tidy to ensure all dependencies are resolved
 RUN go mod tidy && go mod verify
