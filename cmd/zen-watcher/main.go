@@ -183,21 +183,34 @@ func main() {
 	deduper := observationCreator.GetDeduper()
 	proc := processor.NewProcessorWithMetrics(filterInstance, deduper, observationCreator, m)
 
-	// Get namespace for leader election (required, hard-fail if missing)
-	namespace, err := leader.RequirePodNamespace()
-	if err != nil {
-		log.Fatal("Failed to determine pod namespace for leader election",
-			logger.Fields{
-				Component: "main",
-				Operation: "leader_init",
-				Error:     err,
-			})
+	// Check if leader election is enabled (default: true, can be disabled via ENABLE_LEADER_ELECTION=false env var)
+	enableLeaderElection := os.Getenv("ENABLE_LEADER_ELECTION") != "false"
+
+	// Get namespace for leader election (required if enabled)
+	var namespace string
+	if enableLeaderElection {
+		var err error
+		namespace, err = leader.RequirePodNamespace()
+		if err != nil {
+			log.Fatal("Failed to determine pod namespace for leader election",
+				logger.Fields{
+					Component: "main",
+					Operation: "leader_init",
+					Error:     err,
+				})
+		}
+	} else {
+		// Still try to get namespace for other purposes, but don't fail if missing
+		namespace, _ = leader.RequirePodNamespace()
+		if namespace == "" {
+			namespace = "default" // Fallback
+		}
 	}
 
 	// Apply REST config defaults (via zen-sdk helper)
 	leader.ApplyRestConfigDefaults(clients.Config)
 
-	// Setup mandatory leader election (always enabled for HA safety)
+	// Setup controller-runtime manager
 	leaderElectionID := "zen-watcher-leader-election"
 	mgrOpts := ctrl.Options{
 		Scheme: scheme,
@@ -205,32 +218,42 @@ func main() {
 			BindAddress: "0", // Disable metrics server (we have our own)
 		},
 	}
-	leader.ApplyRequiredLeaderElection(&mgrOpts, "zen-watcher", namespace, leaderElectionID)
 
-	var leaderManager ctrl.Manager
-	var err error
-	leaderManager, err = ctrl.NewManager(clients.Config, mgrOpts)
-	if err != nil {
-		log.Fatal("Failed to create leader election manager",
+	// Apply leader election (enabled by default, but can be disabled via ENABLE_LEADER_ELECTION=false)
+	leader.ApplyLeaderElection(&mgrOpts, "zen-watcher", namespace, leaderElectionID, enableLeaderElection)
+	if enableLeaderElection {
+		log.Info("Leader election enabled for controller HA",
 			logger.Fields{
 				Component: "main",
-				Operation: "leader_manager_init",
-				Error:     err,
+				Operation: "leader_init",
+			})
+	} else {
+		log.Warning("Leader election disabled - running without HA (split-brain risk if multiple replicas)",
+			logger.Fields{
+				Component: "main",
+				Operation: "leader_init",
 			})
 	}
 
-	leaderElectedCh := leaderManager.Elected()
-
-	log.Info("Leader election enabled via zen-sdk (mandatory for HA)",
-		logger.Fields{
-			Component: "main",
-			Operation: "leader_init",
-			Additional: map[string]interface{}{
-				"leader_election": "zen-sdk/pkg/leader",
-				"lease_name":      leaderElectionID,
-				"namespace":       namespace,
-			},
-		})
+	var leaderManager ctrl.Manager
+	var leaderElectedCh <-chan struct{}
+	if enableLeaderElection {
+		leaderManager, err = ctrl.NewManager(clients.Config, mgrOpts)
+		if err != nil {
+			log.Fatal("Failed to create leader election manager",
+				logger.Fields{
+					Component: "main",
+					Operation: "leader_manager_init",
+					Error:     err,
+				})
+		}
+		leaderElectedCh = leaderManager.Elected()
+	} else {
+		// No leader election - create a channel that's immediately ready
+		ch := make(chan struct{})
+		close(ch)
+		leaderElectedCh = ch
+	}
 
 	// Create informer manager for generic adapters
 	informerManager := informers.NewManager(informers.Config{
