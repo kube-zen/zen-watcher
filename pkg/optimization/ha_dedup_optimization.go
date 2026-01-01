@@ -129,7 +129,6 @@ func (ta *TrafficAnalyzer) UpdateWindow() {
 	newWindow := ta.GetOptimalWindow()
 
 	ta.windowMu.Lock()
-	oldWindow := ta.currentWindow
 	ta.currentWindow = newWindow
 	ta.windowMu.Unlock()
 
@@ -145,11 +144,6 @@ func (ta *TrafficAnalyzer) UpdateWindow() {
 		ta.windowHistory = ta.windowHistory[len(ta.windowHistory)-100:]
 	}
 	ta.historyMu.Unlock()
-
-	// Log window change if significant
-	if oldWindow != 0 && (newWindow != oldWindow) {
-		// Window changed - this will be logged by the caller
-	}
 }
 
 // GetCurrentWindow returns the current dedup window

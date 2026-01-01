@@ -446,7 +446,39 @@ func (ii *IngesterInformer) onDelete(obj interface{}) {
 		})
 }
 
-// ConvertToIngesterConfig converts an unstructured Ingester CRD to IngesterConfig
+// ConvertToIngesterConfigs converts an unstructured Ingester CRD to one or more IngesterConfigs
+// If spec.sources[] is present, returns one config per source.
+// Otherwise, returns a single config using legacy spec.source/spec.ingester fields.
+func (ii *IngesterInformer) ConvertToIngesterConfigs(u *unstructured.Unstructured) []*IngesterConfig {
+	spec, ok := u.Object["spec"].(map[string]interface{})
+	if !ok {
+		logger.Warn("Ingester CRD missing spec",
+			logger.Fields{
+				Component: "config",
+				Operation: "ingester_convert",
+				Namespace: u.GetNamespace(),
+				Additional: map[string]interface{}{
+					"name": u.GetName(),
+				},
+			})
+		return nil
+	}
+
+	// Check for multi-source configuration
+	if sources, ok := spec["sources"].([]interface{}); ok && len(sources) > 0 {
+		return ii.convertMultiSourceIngester(u, spec, sources)
+	}
+
+	// Legacy single-source mode
+	config := ii.convertLegacyIngester(u, spec)
+	if config == nil {
+		return nil
+	}
+	return []*IngesterConfig{config}
+}
+
+// ConvertToIngesterConfig converts an unstructured Ingester CRD to IngesterConfig (legacy single-source)
+// Deprecated: Use ConvertToIngesterConfigs for multi-source support
 func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured) *IngesterConfig {
 	spec, ok := u.Object["spec"].(map[string]interface{})
 	if !ok {
@@ -873,6 +905,723 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 		}
 
 		// Extract processing thresholds
+		if processing, ok := optimization["processing"].(map[string]interface{}); ok {
+			for key, val := range processing {
+				if pMap, ok := val.(map[string]interface{}); ok {
+					pt := &ProcessingThreshold{
+						Action:      getString(pMap, "action"),
+						Description: getString(pMap, "description"),
+					}
+					if w, ok := pMap["warning"].(float64); ok {
+						pt.Warning = w
+					}
+					if c, ok := pMap["critical"].(float64); ok {
+						pt.Critical = c
+					}
+					config.Optimization.Processing[key] = pt
+				}
+			}
+		}
+	}
+
+	return config
+}
+
+// convertMultiSourceIngester converts a multi-source Ingester CRD to multiple IngesterConfigs
+func (ii *IngesterInformer) convertMultiSourceIngester(u *unstructured.Unstructured, spec map[string]interface{}, sources []interface{}) []*IngesterConfig {
+	namespace := u.GetNamespace()
+	name := u.GetName()
+	var configs []*IngesterConfig
+
+	// Extract shared fields (destinations, processing, etc.)
+	sharedConfig := ii.extractSharedConfig(spec, namespace, name)
+	if sharedConfig == nil {
+		return nil
+	}
+
+	for idx, sourceItem := range sources {
+		sourceMap, ok := sourceItem.(map[string]interface{})
+		if !ok {
+			logger.Warn("Invalid source entry in spec.sources",
+				logger.Fields{
+					Component: "config",
+					Operation: "ingester_convert",
+					Namespace: namespace,
+					Additional: map[string]interface{}{
+						"name":       name,
+						"index":      idx,
+						"source_type": fmt.Sprintf("%T", sourceItem),
+					},
+				})
+			continue
+		}
+
+		// Extract source name and type
+		sourceName := getString(sourceMap, "name")
+		sourceType := getString(sourceMap, "type")
+		if sourceName == "" || sourceType == "" {
+			logger.Warn("Source missing name or type",
+				logger.Fields{
+					Component: "config",
+					Operation: "ingester_convert",
+					Namespace: namespace,
+					Additional: map[string]interface{}{
+						"name":       name,
+						"index":      idx,
+						"sourceName": sourceName,
+						"sourceType": sourceType,
+					},
+				})
+			continue
+		}
+
+		// Create config for this source
+		config := &IngesterConfig{
+			Namespace:     namespace,
+			Name:          name,
+			Source:        fmt.Sprintf("%s/%s/%s", namespace, name, sourceName), // Unique source identifier
+			Ingester:      sourceType, // informer, logs, webhook
+			Destinations:  sharedConfig.Destinations,
+			Normalization: sharedConfig.Normalization,
+			Filter:        sharedConfig.Filter,
+			Dedup:         sharedConfig.Dedup,
+			Processing:    sharedConfig.Processing,
+			Optimization:  sharedConfig.Optimization,
+		}
+
+		// Extract source-specific config
+		switch sourceType {
+		case "informer":
+			if informer, ok := sourceMap["informer"].(map[string]interface{}); ok {
+				config.Informer = &InformerConfig{}
+				if gvr, ok := informer["gvr"].(map[string]interface{}); ok {
+					config.Informer.GVR = GVRConfig{
+						Group:    getString(gvr, "group"),
+						Version:  getString(gvr, "version"),
+						Resource: getString(gvr, "resource"),
+					}
+				}
+				config.Informer.Namespace = getString(informer, "namespace")
+				config.Informer.LabelSelector = getString(informer, "labelSelector")
+				config.Informer.ResyncPeriod = getString(informer, "resyncPeriod")
+			}
+		case "logs":
+			if logs, ok := sourceMap["logs"].(map[string]interface{}); ok {
+				config.Logs = &LogsConfig{
+					PodSelector:  getString(logs, "podSelector"),
+					Container:    getString(logs, "container"),
+					PollInterval: getString(logs, "pollInterval"),
+				}
+				if config.Logs.PollInterval == "" {
+					config.Logs.PollInterval = "1s"
+				}
+				if sinceSeconds, ok := logs["sinceSeconds"].(int); ok {
+					config.Logs.SinceSeconds = sinceSeconds
+				} else if sinceSeconds, ok := logs["sinceSeconds"].(float64); ok {
+					config.Logs.SinceSeconds = int(sinceSeconds)
+				} else {
+					config.Logs.SinceSeconds = DefaultLogsSinceSeconds
+				}
+				if patterns, ok := logs["patterns"].([]interface{}); ok {
+					for _, p := range patterns {
+						if patternMap, ok := p.(map[string]interface{}); ok {
+							pattern := LogPattern{
+								Regex: getString(patternMap, "regex"),
+								Type:  getString(patternMap, "type"),
+							}
+							if priority, ok := patternMap["priority"].(float64); ok {
+								pattern.Priority = priority
+							}
+							config.Logs.Patterns = append(config.Logs.Patterns, pattern)
+						}
+					}
+				}
+			}
+		case "webhook":
+			if webhook, ok := sourceMap["webhook"].(map[string]interface{}); ok {
+				config.Webhook = &WebhookConfig{
+					Path: getString(webhook, "path"),
+				}
+				if auth, ok := webhook["auth"].(map[string]interface{}); ok {
+					config.Webhook.Auth = &AuthConfig{
+						Type:      getString(auth, "type"),
+						SecretRef: getString(auth, "secretRef"),
+					}
+				}
+				if rateLimit, ok := webhook["rateLimit"].(map[string]interface{}); ok {
+					if rpm, ok := rateLimit["requestsPerMinute"].(int); ok {
+						config.Webhook.RateLimit = &RateLimitConfig{
+							RequestsPerMinute: rpm,
+						}
+					}
+				}
+			}
+		default:
+			logger.Warn("Unknown source type",
+				logger.Fields{
+					Component: "config",
+					Operation: "ingester_convert",
+					Namespace: namespace,
+					Additional: map[string]interface{}{
+						"name":       name,
+						"sourceName": sourceName,
+						"sourceType": sourceType,
+					},
+				})
+			continue
+		}
+
+		// Validate config has required fields
+		if len(config.Destinations) == 0 {
+			logger.Warn("Source has no valid destinations",
+				logger.Fields{
+					Component: "config",
+					Operation: "ingester_convert",
+					Namespace: namespace,
+					Additional: map[string]interface{}{
+						"name":       name,
+						"sourceName": sourceName,
+						"sourceType": sourceType,
+					},
+				})
+			continue
+		}
+
+		configs = append(configs, config)
+	}
+
+	return configs
+}
+
+// convertLegacyIngester converts a legacy single-source Ingester CRD to IngesterConfig
+func (ii *IngesterInformer) convertLegacyIngester(u *unstructured.Unstructured, spec map[string]interface{}) *IngesterConfig {
+	config := &IngesterConfig{
+		Namespace: u.GetNamespace(),
+		Name:      u.GetName(),
+	}
+
+	// Extract source (required field)
+	source, sourceOk := spec["source"].(string)
+	if !sourceOk || source == "" {
+		logger.Warn("Ingester CRD missing required field: source",
+			logger.Fields{
+				Component: "config",
+				Operation: "ingester_convert",
+				Namespace: u.GetNamespace(),
+				Additional: map[string]interface{}{
+					"name": u.GetName(),
+				},
+			})
+		return nil
+	}
+	config.Source = source
+
+	// Extract ingester type (required field)
+	ingester, ingesterOk := spec["ingester"].(string)
+	if !ingesterOk || ingester == "" {
+		logger.Warn("Ingester CRD missing required field: ingester",
+			logger.Fields{
+				Component: "config",
+				Operation: "ingester_convert",
+				Namespace: u.GetNamespace(),
+				Source:    source,
+				Additional: map[string]interface{}{
+					"name": u.GetName(),
+				},
+			})
+		return nil
+	}
+	config.Ingester = ingester
+
+	// Extract destinations (required field) - reuse existing logic
+	destinations, destinationsOk := spec["destinations"].([]interface{})
+	if !destinationsOk || len(destinations) == 0 {
+		logger.Warn("Ingester CRD missing required field: destinations",
+			logger.Fields{
+				Component: "config",
+				Operation: "ingester_convert",
+				Namespace: u.GetNamespace(),
+				Source:    source,
+				Additional: map[string]interface{}{
+					"name":     u.GetName(),
+					"ingester": ingester,
+				},
+			})
+		return nil
+	}
+
+	// Extract destinations and resolve GVRs (reuse existing logic from ConvertToIngesterConfig)
+	config.Destinations = make([]DestinationConfig, 0, len(destinations))
+	for _, dest := range destinations {
+		if destMap, ok := dest.(map[string]interface{}); ok {
+			destType := getString(destMap, "type")
+			destValue := getString(destMap, "value")
+
+			if destType == "crd" {
+				var gvr schema.GroupVersionResource
+
+				// Check if full GVR is specified
+				if gvrMap, ok := destMap["gvr"].(map[string]interface{}); ok {
+					group := getString(gvrMap, "group")
+					version := getString(gvrMap, "version")
+					resource := getString(gvrMap, "resource")
+
+					if version != "" && resource != "" {
+						// Validate GVR before using
+						if err := ValidateGVRConfig(group, version, resource); err != nil {
+							logger.Warn("Invalid GVR in destination configuration",
+								logger.Fields{
+									Component: "config",
+									Operation: "ingester_convert",
+									Source:    source,
+									Error:     err,
+									Additional: map[string]interface{}{
+										"group":    group,
+										"version":  version,
+										"resource": resource,
+									},
+								})
+							continue
+						}
+						// Use specified GVR
+						gvr = schema.GroupVersionResource{
+							Group:    group,
+							Version:  version,
+							Resource: resource,
+						}
+					} else if destValue != "" {
+						// Fallback to resolving from value
+						gvr = ResolveDestinationGVR(destValue)
+					} else {
+						logger.Warn("Destination has neither gvr nor value",
+							logger.Fields{
+								Component: "config",
+								Operation: "ingester_convert",
+								Source:    source,
+							})
+						continue
+					}
+				} else if destValue != "" {
+					// Resolve GVR from destination value
+					gvr = ResolveDestinationGVR(destValue)
+				} else {
+					logger.Warn("Destination has neither gvr nor value",
+						logger.Fields{
+							Component: "config",
+							Operation: "ingester_convert",
+							Source:    source,
+						})
+					continue
+				}
+
+				config.Destinations = append(config.Destinations, DestinationConfig{
+					Type:  destType,
+					Value: destValue,
+					GVR:   gvr,
+				})
+			}
+		}
+	}
+
+	// Ensure at least one destination was extracted
+	if len(config.Destinations) == 0 {
+		logger.Warn("No valid CRD destinations found",
+			logger.Fields{
+				Component: "config",
+				Operation: "ingester_convert",
+				Namespace: u.GetNamespace(),
+				Source:    source,
+			})
+		return nil
+	}
+
+	// Extract other configs (informer, webhook, logs, etc.) - reuse existing logic
+	// This is handled by the rest of ConvertToIngesterConfig, so we'll call it
+	// But we need to extract shared config first, so let's create extractSharedConfig
+	sharedConfig := ii.extractSharedConfig(spec, u.GetNamespace(), u.GetName())
+	if sharedConfig != nil {
+		config.Normalization = sharedConfig.Normalization
+		config.Filter = sharedConfig.Filter
+		config.Dedup = sharedConfig.Dedup
+		config.Processing = sharedConfig.Processing
+		config.Optimization = sharedConfig.Optimization
+	}
+
+	// Extract informer config
+	if informer, ok := spec["informer"].(map[string]interface{}); ok {
+		config.Informer = &InformerConfig{}
+		if gvr, ok := informer["gvr"].(map[string]interface{}); ok {
+			config.Informer.GVR = GVRConfig{
+				Group:    getString(gvr, "group"),
+				Version:  getString(gvr, "version"),
+				Resource: getString(gvr, "resource"),
+			}
+		}
+		config.Informer.Namespace = getString(informer, "namespace")
+		config.Informer.LabelSelector = getString(informer, "labelSelector")
+		config.Informer.ResyncPeriod = getString(informer, "resyncPeriod")
+	}
+
+	// Extract webhook config
+	if webhook, ok := spec["webhook"].(map[string]interface{}); ok {
+		config.Webhook = &WebhookConfig{
+			Path: getString(webhook, "path"),
+		}
+		if auth, ok := webhook["auth"].(map[string]interface{}); ok {
+			config.Webhook.Auth = &AuthConfig{
+				Type:      getString(auth, "type"),
+				SecretRef: getString(auth, "secretRef"),
+			}
+		}
+		if rateLimit, ok := webhook["rateLimit"].(map[string]interface{}); ok {
+			if rpm, ok := rateLimit["requestsPerMinute"].(int); ok {
+				config.Webhook.RateLimit = &RateLimitConfig{
+					RequestsPerMinute: rpm,
+				}
+			}
+		}
+	}
+
+	// Extract logs config
+	if logs, ok := spec["logs"].(map[string]interface{}); ok {
+		config.Logs = &LogsConfig{
+			PodSelector:  getString(logs, "podSelector"),
+			Container:    getString(logs, "container"),
+			PollInterval: getString(logs, "pollInterval"),
+		}
+		// Default poll interval if not set
+		if config.Logs.PollInterval == "" {
+			config.Logs.PollInterval = "1s"
+		}
+		// Default sinceSeconds if not set
+		if sinceSeconds, ok := logs["sinceSeconds"].(int); ok {
+			config.Logs.SinceSeconds = sinceSeconds
+		} else if sinceSeconds, ok := logs["sinceSeconds"].(float64); ok {
+			config.Logs.SinceSeconds = int(sinceSeconds)
+		} else {
+			config.Logs.SinceSeconds = DefaultLogsSinceSeconds
+		}
+		// Extract patterns
+		if patterns, ok := logs["patterns"].([]interface{}); ok {
+			for _, p := range patterns {
+				if patternMap, ok := p.(map[string]interface{}); ok {
+					pattern := LogPattern{
+						Regex: getString(patternMap, "regex"),
+						Type:  getString(patternMap, "type"),
+					}
+					if priority, ok := patternMap["priority"].(float64); ok {
+						pattern.Priority = priority
+					}
+					config.Logs.Patterns = append(config.Logs.Patterns, pattern)
+				}
+			}
+		}
+	}
+
+	return config
+}
+
+// extractSharedConfig extracts shared configuration fields (destinations, processing, etc.)
+// that are common to all sources in a multi-source Ingester
+func (ii *IngesterInformer) extractSharedConfig(spec map[string]interface{}, namespace, name string) *IngesterConfig {
+	config := &IngesterConfig{
+		Namespace: namespace,
+		Name:      name,
+	}
+
+	// Extract destinations (required field)
+	destinations, destinationsOk := spec["destinations"].([]interface{})
+	if !destinationsOk || len(destinations) == 0 {
+		logger.Warn("Ingester CRD missing required field: destinations",
+			logger.Fields{
+				Component: "config",
+				Operation: "ingester_convert",
+				Namespace: namespace,
+				Additional: map[string]interface{}{
+					"name": name,
+				},
+			})
+		return nil
+	}
+
+	// Extract destinations and resolve GVRs
+	config.Destinations = make([]DestinationConfig, 0, len(destinations))
+	for _, dest := range destinations {
+		if destMap, ok := dest.(map[string]interface{}); ok {
+			destType := getString(destMap, "type")
+			destValue := getString(destMap, "value")
+
+			if destType == "crd" {
+				var gvr schema.GroupVersionResource
+
+				// Check if full GVR is specified
+				if gvrMap, ok := destMap["gvr"].(map[string]interface{}); ok {
+					group := getString(gvrMap, "group")
+					version := getString(gvrMap, "version")
+					resource := getString(gvrMap, "resource")
+
+					if version != "" && resource != "" {
+						// Validate GVR before using
+						if err := ValidateGVRConfig(group, version, resource); err != nil {
+							logger.Warn("Invalid GVR in destination configuration",
+								logger.Fields{
+									Component: "config",
+									Operation: "ingester_convert",
+									Error:     err,
+									Additional: map[string]interface{}{
+										"group":    group,
+										"version":  version,
+										"resource": resource,
+									},
+								})
+							continue
+						}
+						// Use specified GVR
+						gvr = schema.GroupVersionResource{
+							Group:    group,
+							Version:  version,
+							Resource: resource,
+						}
+					} else if destValue != "" {
+						// Fallback to resolving from value
+						gvr = ResolveDestinationGVR(destValue)
+					} else {
+						logger.Warn("Destination has neither gvr nor value",
+							logger.Fields{
+								Component: "config",
+								Operation: "ingester_convert",
+							})
+						continue
+					}
+				} else if destValue != "" {
+					// Resolve GVR from destination value
+					gvr = ResolveDestinationGVR(destValue)
+				} else {
+					logger.Warn("Destination has neither gvr nor value",
+						logger.Fields{
+							Component: "config",
+							Operation: "ingester_convert",
+						})
+					continue
+				}
+
+				config.Destinations = append(config.Destinations, DestinationConfig{
+					Type:  destType,
+					Value: destValue,
+					GVR:   gvr,
+				})
+			}
+		}
+	}
+
+	// Ensure at least one destination was extracted
+	if len(config.Destinations) == 0 {
+		logger.Warn("No valid CRD destinations found",
+			logger.Fields{
+				Component: "config",
+				Operation: "ingester_convert",
+				Namespace: namespace,
+			})
+		return nil
+	}
+
+	// Extract normalization config
+	if norm, ok := spec["normalization"].(map[string]interface{}); ok {
+		config.Normalization = &NormalizationConfig{
+			Domain:   getString(norm, "domain"),
+			Type:     getString(norm, "type"),
+			Priority: make(map[string]float64),
+		}
+		if priority, ok := norm["priority"].(map[string]interface{}); ok {
+			for k, v := range priority {
+				if f, ok := v.(float64); ok {
+					config.Normalization.Priority[k] = f
+				}
+			}
+		}
+		if fieldMapping, ok := norm["fieldMapping"].([]interface{}); ok {
+			for _, fm := range fieldMapping {
+				if fmMap, ok := fm.(map[string]interface{}); ok {
+					config.Normalization.FieldMapping = append(config.Normalization.FieldMapping, FieldMapping{
+						From:      getString(fmMap, "from"),
+						To:        getString(fmMap, "to"),
+						Transform: getString(fmMap, "transform"),
+					})
+				}
+			}
+		}
+	}
+
+	// Extract dedup and filter configs (reuse existing logic from ConvertToIngesterConfig)
+	var dedupConfig *DedupConfig
+	var filterConfig *FilterConfig
+
+	// First, try spec.processing (canonical v1.1+ location)
+	if processing, ok := spec["processing"].(map[string]interface{}); ok {
+		// Extract processing-level config (order only)
+		config.Processing = &ProcessingConfig{
+			Order: getString(processing, "order"),
+		}
+
+		// Extract filter from processing.filter (canonical location)
+		if filter, ok := processing["filter"].(map[string]interface{}); ok {
+			filterConfig = &FilterConfig{}
+			// Check for expression (v1.1 feature)
+			if expression, ok := filter["expression"].(string); ok && expression != "" {
+				filterConfig.Expression = expression
+			}
+			// Legacy fields (only used if expression is not set)
+			if minPriority, ok := filter["minPriority"].(float64); ok {
+				filterConfig.MinPriority = minPriority
+			}
+			if includeNS, ok := filter["includeNamespaces"].([]interface{}); ok {
+				for _, ns := range includeNS {
+					if nsStr, ok := ns.(string); ok {
+						filterConfig.IncludeNamespaces = append(filterConfig.IncludeNamespaces, nsStr)
+					}
+				}
+			}
+			if excludeNS, ok := filter["excludeNamespaces"].([]interface{}); ok {
+				for _, ns := range excludeNS {
+					if nsStr, ok := ns.(string); ok {
+						filterConfig.ExcludeNamespaces = append(filterConfig.ExcludeNamespaces, nsStr)
+					}
+				}
+			}
+		}
+
+		// Extract dedup from processing.dedup (canonical location)
+		if dedup, ok := processing["dedup"].(map[string]interface{}); ok {
+			dedupConfig = &DedupConfig{
+				Enabled: true, // Default enabled
+			}
+			if enabled, ok := dedup["enabled"].(bool); ok {
+				dedupConfig.Enabled = enabled
+			}
+			dedupConfig.Window = getString(dedup, "window")
+			dedupConfig.Strategy = getString(dedup, "strategy")
+			if dedupConfig.Strategy == "" {
+				dedupConfig.Strategy = "fingerprint" // Default strategy
+			}
+			if fields, ok := dedup["fields"].([]interface{}); ok {
+				for _, f := range fields {
+					if fStr, ok := f.(string); ok {
+						dedupConfig.Fields = append(dedupConfig.Fields, fStr)
+					}
+				}
+			}
+			if maxEvents, ok := dedup["maxEventsPerWindow"].(float64); ok {
+				dedupConfig.MaxEventsPerWindow = int(maxEvents)
+			}
+		}
+	}
+
+	// Fallback to legacy locations
+	if dedupConfig == nil {
+		if dedup, ok := spec["deduplication"].(map[string]interface{}); ok {
+			dedupConfig = &DedupConfig{
+				Enabled: getBool(dedup, "enabled"),
+			}
+			dedupConfig.Window = getString(dedup, "window")
+			dedupConfig.Strategy = getString(dedup, "strategy")
+			if dedupConfig.Strategy == "" {
+				dedupConfig.Strategy = "fingerprint"
+			}
+			if fields, ok := dedup["fields"].([]interface{}); ok {
+				for _, f := range fields {
+					if fStr, ok := f.(string); ok {
+						dedupConfig.Fields = append(dedupConfig.Fields, fStr)
+					}
+				}
+			}
+		}
+	}
+	if filterConfig == nil {
+		if filter, ok := spec["filters"].(map[string]interface{}); ok {
+			filterConfig = &FilterConfig{}
+			if expression, ok := filter["expression"].(string); ok && expression != "" {
+				filterConfig.Expression = expression
+			}
+			if minPriority, ok := filter["minPriority"].(float64); ok {
+				filterConfig.MinPriority = minPriority
+			}
+			if includeNS, ok := filter["includeNamespaces"].([]interface{}); ok {
+				for _, ns := range includeNS {
+					if nsStr, ok := ns.(string); ok {
+						filterConfig.IncludeNamespaces = append(filterConfig.IncludeNamespaces, nsStr)
+					}
+				}
+			}
+			if excludeNS, ok := filter["excludeNamespaces"].([]interface{}); ok {
+				for _, ns := range excludeNS {
+					if nsStr, ok := ns.(string); ok {
+						filterConfig.ExcludeNamespaces = append(filterConfig.ExcludeNamespaces, nsStr)
+					}
+				}
+			}
+		}
+	}
+
+	config.Dedup = dedupConfig
+	config.Filter = filterConfig
+
+	// Extract optimization config (reuse existing logic)
+	if optimization, ok := spec["optimization"].(map[string]interface{}); ok {
+		config.Optimization = &OptimizationConfig{
+			Order:      getString(optimization, "order"),
+			Processing: make(map[string]*ProcessingThreshold),
+		}
+
+		// Extract thresholds
+		if thresholds, ok := optimization["thresholds"].(map[string]interface{}); ok {
+			config.Optimization.Thresholds = &OptimizationThresholds{}
+
+			if dedupEff, ok := thresholds["dedupEffectiveness"].(map[string]interface{}); ok {
+				config.Optimization.Thresholds.DedupEffectiveness = &ThresholdRange{}
+				if w, ok := dedupEff["warning"].(float64); ok {
+					config.Optimization.Thresholds.DedupEffectiveness.Warning = w
+				}
+				if c, ok := dedupEff["critical"].(float64); ok {
+					config.Optimization.Thresholds.DedupEffectiveness.Critical = c
+				}
+			}
+
+			if lowSev, ok := thresholds["lowSeverityPercent"].(map[string]interface{}); ok {
+				config.Optimization.Thresholds.LowSeverityPercent = &ThresholdRange{}
+				if w, ok := lowSev["warning"].(float64); ok {
+					config.Optimization.Thresholds.LowSeverityPercent.Warning = w
+				}
+				if c, ok := lowSev["critical"].(float64); ok {
+					config.Optimization.Thresholds.LowSeverityPercent.Critical = c
+				}
+			}
+
+			if obsPerMin, ok := thresholds["observationsPerMinute"].(map[string]interface{}); ok {
+				config.Optimization.Thresholds.ObservationsPerMinute = &ThresholdRange{}
+				if w, ok := obsPerMin["warning"].(float64); ok {
+					config.Optimization.Thresholds.ObservationsPerMinute.Warning = w
+				}
+				if c, ok := obsPerMin["critical"].(float64); ok {
+					config.Optimization.Thresholds.ObservationsPerMinute.Critical = c
+				}
+			}
+
+			if custom, ok := thresholds["custom"].([]interface{}); ok {
+				for _, c := range custom {
+					if cMap, ok := c.(map[string]interface{}); ok {
+						ct := CustomThreshold{
+							Name:     getString(cMap, "name"),
+							Field:    getString(cMap, "field"),
+							Operator: getString(cMap, "operator"),
+							Value:    getString(cMap, "value"),
+							Message:  getString(cMap, "message"),
+						}
+						config.Optimization.Thresholds.Custom = append(config.Optimization.Thresholds.Custom, ct)
+					}
+				}
+			}
+		}
+
 		if processing, ok := optimization["processing"].(map[string]interface{}); ok {
 			for key, val := range processing {
 				if pMap, ok := val.(map[string]interface{}); ok {

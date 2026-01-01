@@ -16,6 +16,7 @@ package orchestrator
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -45,6 +46,8 @@ type GenericOrchestrator struct {
 	// Track last event timestamp per source
 	lastEventTimestamp map[string]time.Time
 	lastEventMu        sync.RWMutex
+	// Status updater for tracking source status
+	statusUpdater      *IngesterStatusUpdater
 }
 
 // NewGenericOrchestrator creates a new generic adapter orchestrator
@@ -89,6 +92,7 @@ func NewGenericOrchestratorWithMetrics(
 		enableBatching:     enableBatching,
 		metrics:            m,
 		lastEventTimestamp: make(map[string]time.Time),
+		statusUpdater:      NewIngesterStatusUpdater(dynClient),
 	}
 }
 
@@ -105,6 +109,9 @@ func (o *GenericOrchestrator) Start(ctx context.Context) error {
 
 	// Watch for changes
 	go o.watchConfigChanges(ctx)
+
+	// Start status update loop
+	go o.statusUpdateLoop(ctx)
 
 	return nil
 }
@@ -147,12 +154,12 @@ func (o *GenericOrchestrator) reloadAdapters() {
 
 	// Start/update adapters for each config
 	for _, item := range configs.Items {
-		// Convert Ingester CRD to IngesterConfig
+		// Convert Ingester CRD to IngesterConfig(s) - supports multi-source
 		// Create IngesterInformer instance to access conversion method
 		store := config.NewIngesterStore()
 		ii := config.NewIngesterInformer(store, o.dynClient)
-		ingesterConfig := ii.ConvertToIngesterConfig(&item)
-		if ingesterConfig == nil {
+		ingesterConfigs := ii.ConvertToIngesterConfigs(&item)
+		if len(ingesterConfigs) == 0 {
 			logger.Warn("Failed to convert Ingester CRD",
 				logger.Fields{
 					Component: "orchestrator",
@@ -165,116 +172,137 @@ func (o *GenericOrchestrator) reloadAdapters() {
 			continue
 		}
 
-		// Convert IngesterConfig to generic.SourceConfig
-		genericConfig := config.ConvertIngesterConfigToGeneric(ingesterConfig)
-		if genericConfig == nil {
-			if o.metrics != nil {
-				o.metrics.IngestersConfigErrors.WithLabelValues(ingesterConfig.Source, "convert_to_generic_failed").Inc()
-			}
-			logger.Warn("Failed to convert IngesterConfig to generic.SourceConfig",
-				logger.Fields{
-					Component: "orchestrator",
-					Operation: "convert_to_generic",
-					Source:    ingesterConfig.Source,
-				})
-			continue
-		}
-
-		source := genericConfig.Source
-		activeSources[source] = true
-
-		// Update ingester active status
-		if o.metrics != nil {
-			o.metrics.IngestersActive.WithLabelValues(source, genericConfig.Ingester, item.GetNamespace()).Set(1)
-			o.metrics.IngestersStatus.WithLabelValues(source).Set(1) // 1 = active
-		}
-
-		// Check if adapter already exists
-		if existingAdapter, exists := o.activeAdapters[source]; exists {
-			// Check if config changed
-			if o.configChanged(source, genericConfig) {
-				// Stop old adapter
-				existingAdapter.Stop()
-				delete(o.activeAdapters, source)
-			} else {
-				// Config unchanged, skip
+		// Process each config (one per source in multi-source mode)
+		for _, ingesterConfig := range ingesterConfigs {
+			// Convert IngesterConfig to generic.SourceConfig
+			genericConfig := config.ConvertIngesterConfigToGeneric(ingesterConfig)
+			if genericConfig == nil {
+				if o.metrics != nil {
+					o.metrics.IngestersConfigErrors.WithLabelValues(ingesterConfig.Source, "convert_to_generic_failed").Inc()
+				}
+				logger.Warn("Failed to convert IngesterConfig to generic.SourceConfig",
+					logger.Fields{
+						Component: "orchestrator",
+						Operation: "convert_to_generic",
+						Source:    ingesterConfig.Source,
+					})
 				continue
 			}
-		}
 
-		// Create new adapter
-		startupStartTime := time.Now()
-		adapter, err := o.adapterFactory.NewAdapter(genericConfig.Ingester)
-		if err != nil {
+			source := genericConfig.Source
+			activeSources[source] = true
+
+			// Update ingester active status
 			if o.metrics != nil {
-				o.metrics.IngestersConfigErrors.WithLabelValues(source, "create_adapter_failed").Inc()
-				o.metrics.IngestersStatus.WithLabelValues(source).Set(-1) // -1 = error
+				o.metrics.IngestersActive.WithLabelValues(source, genericConfig.Ingester, item.GetNamespace()).Set(1)
+				o.metrics.IngestersStatus.WithLabelValues(source).Set(1) // 1 = active
 			}
-			logger.Error("Failed to create adapter",
+
+			// Check if adapter already exists
+			if existingAdapter, exists := o.activeAdapters[source]; exists {
+				// Check if config changed
+				if o.configChanged(source, genericConfig) {
+					// Stop old adapter
+					existingAdapter.Stop()
+					delete(o.activeAdapters, source)
+				} else {
+					// Config unchanged, skip
+					continue
+				}
+			}
+
+			// Extract source name from source identifier (format: namespace/name/sourceName)
+			sourceName := o.extractSourceName(source, item.GetNamespace(), item.GetName())
+
+			// Create new adapter
+			startupStartTime := time.Now()
+			adapter, err := o.adapterFactory.NewAdapter(genericConfig.Ingester)
+			if err != nil {
+				// Update status: error
+				tracker := o.statusUpdater.GetOrCreateTracker(item.GetNamespace(), item.GetName())
+				tracker.UpdateSourceState(sourceName, genericConfig.Ingester, SourceStateError, err)
+				if o.metrics != nil {
+					o.metrics.IngestersConfigErrors.WithLabelValues(source, "create_adapter_failed").Inc()
+					o.metrics.IngestersStatus.WithLabelValues(source).Set(-1) // -1 = error
+				}
+				logger.Error("Failed to create adapter",
+					logger.Fields{
+						Component: "orchestrator",
+						Operation: "create_adapter",
+						Source:    source,
+						Error:     err,
+					})
+				continue
+			}
+
+			// Validate config
+			if err := adapter.Validate(genericConfig); err != nil {
+				// Update status: error
+				tracker := o.statusUpdater.GetOrCreateTracker(item.GetNamespace(), item.GetName())
+				tracker.UpdateSourceState(sourceName, genericConfig.Ingester, SourceStateError, err)
+				if o.metrics != nil {
+					o.metrics.IngestersConfigErrors.WithLabelValues(source, "validation_failed").Inc()
+					o.metrics.IngestersStatus.WithLabelValues(source).Set(-1) // -1 = error
+				}
+				logger.Error("Adapter validation failed",
+					logger.Fields{
+						Component: "orchestrator",
+						Operation: "validate_adapter",
+						Source:    source,
+						Error:     err,
+					})
+				continue
+			}
+
+			// Start adapter
+			events, err := adapter.Start(o.ctx, genericConfig)
+			if err != nil {
+				// Update status: error
+				tracker := o.statusUpdater.GetOrCreateTracker(item.GetNamespace(), item.GetName())
+				tracker.UpdateSourceState(sourceName, genericConfig.Ingester, SourceStateError, err)
+				if o.metrics != nil {
+					o.metrics.IngestersConfigErrors.WithLabelValues(source, "start_failed").Inc()
+					o.metrics.IngestersStatus.WithLabelValues(source).Set(-1) // -1 = error
+				}
+				logger.Error("Failed to start adapter",
+					logger.Fields{
+						Component: "orchestrator",
+						Operation: "start_adapter",
+						Source:    source,
+						Error:     err,
+					})
+				continue
+			}
+
+			// Update status: running
+			tracker := o.statusUpdater.GetOrCreateTracker(item.GetNamespace(), item.GetName())
+			tracker.UpdateSourceState(sourceName, genericConfig.Ingester, SourceStateRunning, nil)
+
+			// Record startup duration
+			if o.metrics != nil {
+				o.metrics.IngestersStartupDuration.WithLabelValues(source).Observe(time.Since(startupStartTime).Seconds())
+			}
+
+			// Store adapter, config, and event stream
+			o.activeAdapters[source] = adapter
+			o.activeConfigs[source] = genericConfig
+			o.activeEventStreams[source] = events
+
+			// Process events from this adapter
+			go o.processEvents(source, genericConfig, events)
+
+			logger.Info("Generic adapter started",
 				logger.Fields{
 					Component: "orchestrator",
-					Operation: "create_adapter",
+					Operation: "adapter_started",
 					Source:    source,
-					Error:     err,
+					Additional: map[string]interface{}{
+						"ingester": genericConfig.Ingester,
+						"namespace": item.GetNamespace(),
+						"name": item.GetName(),
+					},
 				})
-			continue
 		}
-
-		// Validate config
-		if err := adapter.Validate(genericConfig); err != nil {
-			if o.metrics != nil {
-				o.metrics.IngestersConfigErrors.WithLabelValues(source, "validation_failed").Inc()
-				o.metrics.IngestersStatus.WithLabelValues(source).Set(-1) // -1 = error
-			}
-			logger.Error("Adapter validation failed",
-				logger.Fields{
-					Component: "orchestrator",
-					Operation: "validate_adapter",
-					Source:    source,
-					Error:     err,
-				})
-			continue
-		}
-
-		// Start adapter
-		events, err := adapter.Start(o.ctx, genericConfig)
-		if err != nil {
-			if o.metrics != nil {
-				o.metrics.IngestersConfigErrors.WithLabelValues(source, "start_failed").Inc()
-				o.metrics.IngestersStatus.WithLabelValues(source).Set(-1) // -1 = error
-			}
-			logger.Error("Failed to start adapter",
-				logger.Fields{
-					Component: "orchestrator",
-					Operation: "start_adapter",
-					Source:    source,
-					Error:     err,
-				})
-			continue
-		}
-
-		// Record startup duration
-		if o.metrics != nil {
-			o.metrics.IngestersStartupDuration.WithLabelValues(source).Observe(time.Since(startupStartTime).Seconds())
-		}
-
-		// Store adapter, config, and event stream
-		o.activeAdapters[source] = adapter
-		o.activeConfigs[source] = genericConfig
-		o.activeEventStreams[source] = events
-
-		// Process events from this adapter
-		go o.processEvents(source, genericConfig, events)
-
-		logger.Info("Generic adapter started",
-			logger.Fields{
-				Component: "orchestrator",
-				Operation: "adapter_started",
-				Source:    source,
-				Additional: map[string]interface{}{
-					"ingester": genericConfig.Ingester,
-				},
-			})
 	}
 
 	// Stop adapters for sources that no longer exist
@@ -282,6 +310,15 @@ func (o *GenericOrchestrator) reloadAdapters() {
 		if !activeSources[source] {
 			// Get config before deleting
 			config := o.activeConfigs[source]
+			// Extract namespace/name from source (format: namespace/name/sourceName)
+			namespace, name, sourceName := o.parseSourceIdentifier(source)
+			if namespace != "" && name != "" {
+				// Update status: stopped
+				tracker := o.statusUpdater.GetOrCreateTracker(namespace, name)
+				if config != nil {
+					tracker.UpdateSourceState(sourceName, config.Ingester, SourceStateStopped, nil)
+				}
+			}
 			adapter.Stop()
 			delete(o.activeAdapters, source)
 			delete(o.activeConfigs, source)
@@ -289,9 +326,7 @@ func (o *GenericOrchestrator) reloadAdapters() {
 			if o.metrics != nil {
 				// Get ingester type from config before deletion
 				if config != nil {
-					// Find namespace from original CRD (we'd need to track this)
-					// For now, use empty namespace
-					o.metrics.IngestersActive.WithLabelValues(source, config.Ingester, "").Set(0)
+					o.metrics.IngestersActive.WithLabelValues(source, config.Ingester, namespace).Set(0)
 				}
 				o.metrics.IngestersStatus.WithLabelValues(source).Set(0) // 0 = inactive
 			}
@@ -375,14 +410,21 @@ func (o *GenericOrchestrator) processEvents(source string, config *generic.Sourc
 					o.lastEventTimestamp[source] = now
 					o.lastEventMu.Unlock()
 					o.metrics.IngestersLastEventTimestamp.WithLabelValues(source).Set(float64(now.Unix()))
+				}
 
-					// Update rate every second
-					if time.Since(lastRateUpdate) >= time.Second {
-						rate := float64(eventCount) / time.Since(lastRateUpdate).Seconds()
-						o.metrics.IngesterEventsProcessedRate.WithLabelValues(source).Set(rate)
-						eventCount = 0
-						lastRateUpdate = time.Now()
-					}
+				// Update source lastSeen in status
+				namespace, name, sourceName := o.parseSourceIdentifier(source)
+				if namespace != "" && name != "" {
+					tracker := o.statusUpdater.GetOrCreateTracker(namespace, name)
+					tracker.UpdateSourceLastSeen(sourceName)
+				}
+
+				// Update rate every second
+				if o.metrics != nil && time.Since(lastRateUpdate) >= time.Second {
+					rate := float64(eventCount) / time.Since(lastRateUpdate).Seconds()
+					o.metrics.IngesterEventsProcessedRate.WithLabelValues(source).Set(rate)
+					eventCount = 0
+					lastRateUpdate = time.Now()
 				}
 			}
 		}
@@ -412,5 +454,75 @@ func (o *GenericOrchestrator) Stop() {
 		delete(o.activeAdapters, source)
 		delete(o.activeConfigs, source)
 		delete(o.activeEventStreams, source)
+	}
+}
+
+// extractSourceName extracts the source name from a source identifier
+// Source format: namespace/name/sourceName (multi-source) or legacy source string
+func (o *GenericOrchestrator) extractSourceName(source, namespace, name string) string {
+	// Check if source is in multi-source format: namespace/name/sourceName
+	expectedPrefix := namespace + "/" + name + "/"
+	if len(source) > len(expectedPrefix) && source[:len(expectedPrefix)] == expectedPrefix {
+		return source[len(expectedPrefix):]
+	}
+	// Legacy mode: use source as-is
+	return source
+}
+
+// parseSourceIdentifier parses a source identifier into namespace, name, and sourceName
+// Returns empty strings if format is not recognized
+func (o *GenericOrchestrator) parseSourceIdentifier(source string) (namespace, name, sourceName string) {
+	// Format: namespace/name/sourceName (multi-source)
+	parts := strings.Split(source, "/")
+	if len(parts) == 3 {
+		return parts[0], parts[1], parts[2]
+	}
+	// Legacy format: just return empty strings (can't extract)
+	return "", "", source
+}
+
+// statusUpdateLoop periodically updates Ingester status
+func (o *GenericOrchestrator) statusUpdateLoop(ctx context.Context) {
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			o.updateAllIngesterStatus(ctx)
+		}
+	}
+}
+
+// updateAllIngesterStatus updates status for all tracked Ingesters
+func (o *GenericOrchestrator) updateAllIngesterStatus(ctx context.Context) {
+	o.mu.RLock()
+	ingesterMap := make(map[string]bool) // namespace/name -> true
+	for source := range o.activeAdapters {
+		namespace, name, _ := o.parseSourceIdentifier(source)
+		if namespace != "" && name != "" {
+			ingesterMap[namespace+"/"+name] = true
+		}
+	}
+	o.mu.RUnlock()
+
+	for key := range ingesterMap {
+		parts := strings.Split(key, "/")
+		if len(parts) == 2 {
+			if err := o.statusUpdater.UpdateStatus(ctx, parts[0], parts[1]); err != nil {
+				logger.Warn("Failed to update Ingester status",
+					logger.Fields{
+						Component: "orchestrator",
+						Operation: "update_status",
+						Namespace: parts[0],
+						Additional: map[string]interface{}{
+							"name":  parts[1],
+							"error": err.Error(),
+						},
+					})
+			}
+		}
 	}
 }

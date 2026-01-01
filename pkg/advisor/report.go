@@ -70,23 +70,23 @@ func (it *ImpactTracker) GenerateWeeklyReport() *WeeklyReport {
 
 // Format formats the weekly report as a string
 func (wr *WeeklyReport) Format() string {
-	report := fmt.Sprintf("\n=== Weekly Optimization Report ===\n\n")
+	report := "\n=== Weekly Optimization Report ===\n\n"
 	report += fmt.Sprintf("Period: %s to %s\n\n", wr.StartDate.Format("2006-01-02"), wr.EndDate.Format("2006-01-02"))
-	report += fmt.Sprintf("Summary:\n")
+	report += "Summary:\n"
 	report += fmt.Sprintf("  Total Optimizations Applied: %d\n", wr.TotalOptimizations)
 	report += fmt.Sprintf("  Total Observations Reduced: %d\n", wr.TotalObservationsReduced)
 	report += fmt.Sprintf("  Average Reduction: %.1f%%\n", wr.AverageReductionPercent*100)
 	report += fmt.Sprintf("  CPU Savings: %.1f minutes\n", wr.TotalCPUSavingsMinutes)
-	report += fmt.Sprintf("\n")
-	report += fmt.Sprintf("Most Effective:\n")
+	report += "\n"
+	report += "Most Effective:\n"
 	report += fmt.Sprintf("  Source: %s\n", wr.MostEffectiveSource)
 	report += fmt.Sprintf("  Action: %s\n", wr.MostEffectiveAction)
-	report += fmt.Sprintf("\n")
+	report += "\n"
 	report += fmt.Sprintf("Sources Optimized: %d\n", len(wr.SourcesOptimized))
 	for _, source := range wr.SourcesOptimized {
 		report += fmt.Sprintf("  - %s\n", source)
 	}
-	report += fmt.Sprintf("\n")
+	report += "\n"
 
 	return report
 }

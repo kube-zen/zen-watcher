@@ -16,7 +16,6 @@ package optimization
 
 import (
 	"context"
-	"sync"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 )
@@ -30,8 +29,6 @@ type Optimizer struct {
 		GetSourceConfig(source string) *generic.SourceConfig
 		GetAllSourceConfigs() map[string]*generic.SourceConfig
 	}
-
-	mu sync.RWMutex
 }
 
 // NewOptimizer creates a new optimizer with all components

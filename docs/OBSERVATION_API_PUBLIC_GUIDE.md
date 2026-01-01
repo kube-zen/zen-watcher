@@ -4,15 +4,22 @@
 
 **Audience**: Cluster operators, platform teams, and developers integrating with zen-watcher's Observation CRD.
 
-**Last Updated**: 2025-12-10
+**Last Updated**: 2025-01-01
 
-**Status**: ✅ Stable - v1 API is production-ready
+**Status**: ✅ v1alpha1 - Generic aggregation object for security/perf/cost/etc.
 
 ---
 
 ## Overview
 
-The `Observation` CRD is zen-watcher's core data model. zen-watcher is a generic Kubernetes Observation operator that aggregates signals from security, compliance, performance, or infrastructure tools, normalized into a unified format.
+The `Observation` CRD is zen-watcher's core data model and a **generic aggregation object**. zen-watcher is a generic Kubernetes Observation operator that aggregates signals from security, compliance, performance, cost, or any other infrastructure tools, normalized into a unified format.
+
+**Generic Aggregation**: Observations are not limited to security events. They can represent:
+- **Security**: Vulnerabilities, threats, policy violations
+- **Performance**: Latency spikes, resource exhaustion, SLA breaches
+- **Cost**: Resource waste, unused resources, billing anomalies
+- **Operations**: Pod crashes, deployment failures, infrastructure issues
+- **Compliance**: Audit findings, policy checks, regulatory requirements
 
 **Vendor Neutrality**: zen-watcher is designed to work with any tool or integration. Components like zen-hook, zen-agent, and zen-alpha (in the kube-zen ecosystem) are example producers/consumers, not required dependencies.
 
@@ -33,7 +40,7 @@ Use Observations when you need to:
 ### Basic Structure
 
 ```yaml
-apiVersion: zen.kube-zen.io/v1
+apiVersion: zen.kube-zen.io/v1alpha1
 kind: Observation
 metadata:
   name: <generated>
@@ -61,9 +68,11 @@ status:
 ### API Details
 
 - **Group**: `zen.kube-zen.io`
-- **Version**: `v1` (storage version, stable)
+- **Version**: `v1alpha1` (served and storage version)
 - **Kind**: `Observation`
 - **Scope**: `Namespaced` (each Observation belongs to a namespace)
+
+**Note**: All examples and references use `v1alpha1` only. See [API Stability Policy](./API_STABILITY_POLICY.md) for versioning strategy.
 
 ---
 
@@ -344,7 +353,7 @@ If `ttlSecondsAfterCreation` is not set, zen-watcher uses the default TTL from G
 ```go
 observation := &unstructured.Unstructured{
     Object: map[string]interface{}{
-        "apiVersion": "zen.kube-zen.io/v1",
+        "apiVersion": "zen.kube-zen.io/v1alpha1",
         "kind":       "Observation",
         "metadata": map[string]interface{}{
             "generateName": "my-obs-",

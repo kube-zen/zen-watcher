@@ -369,7 +369,7 @@ func (p *Processor) normalize(raw *generic.RawEvent, config *generic.SourceConfi
 
 // extractPriority extracts priority from raw data
 func (p *Processor) extractPriority(raw *generic.RawEvent, config *generic.SourceConfig) float64 {
-	if config.Normalization == nil || len(config.Normalization.Priority) == 0 {
+	if config == nil || config.Normalization == nil || len(config.Normalization.Priority) == 0 {
 		return 0.5 // Default
 	}
 

@@ -24,6 +24,29 @@ type Ingester struct {
 	Kind       string            `json:"kind" yaml:"kind"`
 	Metadata   metav1.ObjectMeta `json:"metadata" yaml:"metadata"`
 	Spec       IngesterSpec      `json:"spec" yaml:"spec"`
+	Status     *IngesterStatus   `json:"status,omitempty" yaml:"status,omitempty"`
+}
+
+// IngesterStatus represents the status section of an Ingester CRD
+type IngesterStatus struct {
+	// Sources tracks status for each source (multi-source mode)
+	Sources []SourceStatus `json:"sources,omitempty" yaml:"sources,omitempty"`
+	// Conditions tracks overall Ingester conditions
+	Conditions []metav1.Condition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+}
+
+// SourceStatus tracks the status of a single source
+type SourceStatus struct {
+	// Name is the source name (from spec.sources[].name)
+	Name string `json:"name" yaml:"name"`
+	// Type is the source type (informer, logs, webhook)
+	Type string `json:"type" yaml:"type"`
+	// State is the current state: Running, Stopped, Error
+	State string `json:"state" yaml:"state"`
+	// LastError is the last error message (if any)
+	LastError string `json:"lastError,omitempty" yaml:"lastError,omitempty"`
+	// LastSeen is the timestamp of the last event processed
+	LastSeen *metav1.Time `json:"lastSeen,omitempty" yaml:"lastSeen,omitempty"`
 }
 
 
