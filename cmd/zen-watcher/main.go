@@ -36,7 +36,6 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/optimization"
-	"go.uber.org/zap"
 	"github.com/kube-zen/zen-watcher/pkg/orchestrator"
 	"github.com/kube-zen/zen-watcher/pkg/processor"
 	"github.com/kube-zen/zen-watcher/pkg/scaling"
@@ -49,31 +48,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 )
-
-// Logging field helpers - using zap directly until SDK functions are available in published version
-func logString(key, value string) zap.Field {
-	return zap.String(key, value)
-}
-
-func logOperation(op string) zap.Field {
-	return zap.String("operation", op)
-}
-
-func logErrorCode(code string) zap.Field {
-	return zap.String("error_code", code)
-}
-
-func logBool(key string, value bool) zap.Field {
-	return zap.Bool(key, value)
-}
-
-func logFloat64(key string, value float64) zap.Field {
-	return zap.Float64(key, value)
-}
-
-func logStrings(key string, values []string) zap.Field {
-	return zap.Strings(key, values)
-}
 
 // Version, Commit, and BuildDate are set via ldflags during build
 var (
@@ -112,10 +86,10 @@ func main() {
 	defer systemMetrics.Close()
 
 	setupLog.Info("zen-watcher starting",
-		logString("version", Version),
-		logString("commit", Commit),
-		logString("buildDate", BuildDate),
-		logString("license", "Apache 2.0"))
+		sdklog.String("version", Version),
+		sdklog.String("commit", Commit),
+		sdklog.String("buildDate", BuildDate),
+		sdklog.String("license", "Apache 2.0"))
 
 	// Setup signal handling and context
 	ctx, _ := lifecycle.SetupSignalHandler()
@@ -133,7 +107,7 @@ func main() {
 	// Initialize Kubernetes clients
 	clients, err := kubernetes.NewClients()
 	if err != nil {
-		setupLog.Error(err, "Failed to initialize Kubernetes clients", logErrorCode("CLIENT_ERROR"), logOperation("kubernetes_init"))
+		setupLog.Error(err, "Failed to initialize Kubernetes clients", sdklog.ErrorCode("CLIENT_ERROR"), sdklog.Operation("kubernetes_init"))
 		os.Exit(1)
 	}
 
@@ -143,7 +117,7 @@ func main() {
 	// Load filter configuration from ConfigMap (initial load)
 	filterConfig, err := filter.LoadFilterConfig(clients.Standard)
 	if err != nil {
-		setupLog.Warn("Failed to load filter config, continuing without filter", logOperation("filter_load"), logString("error", err.Error()))
+		setupLog.Warn("Failed to load filter config, continuing without filter", sdklog.Operation("filter_load"), sdklog.String("error", err.Error()))
 		filterConfig = &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	}
 	filterInstance := filter.NewFilterWithMetrics(filterConfig, m)
@@ -202,7 +176,7 @@ func main() {
 	// Get namespace (required for leader election)
 	namespace, err := leader.RequirePodNamespace()
 	if err != nil {
-		setupLog.Error(err, "Failed to determine pod namespace", logErrorCode("NAMESPACE_ERROR"), logOperation("namespace_init"))
+		setupLog.Error(err, "Failed to determine pod namespace", sdklog.ErrorCode("NAMESPACE_ERROR"), sdklog.Operation("namespace_init"))
 		os.Exit(1)
 	}
 
@@ -235,10 +209,10 @@ func main() {
 				ElectionID: electionID,
 				Namespace:  namespace,
 			}
-			setupLog.Info("Leader election mode: builtin (Profile B)", logOperation("leader_init"))
+			setupLog.Info("Leader election mode: builtin (Profile B)", sdklog.Operation("leader_init"))
 		case "zenlead":
 			if *leaderElectionLeaseName == "" {
-				setupLog.Error(fmt.Errorf("--leader-election-lease-name is required when --leader-election-mode=zenlead"), "invalid configuration", logErrorCode("INVALID_CONFIG"), logOperation("leader_init"))
+				setupLog.Error(fmt.Errorf("--leader-election-lease-name is required when --leader-election-mode=zenlead"), "invalid configuration", sdklog.ErrorCode("INVALID_CONFIG"), sdklog.Operation("leader_init"))
 				os.Exit(1)
 			}
 			leConfig = zenlead.LeaderElectionConfig{
@@ -246,21 +220,21 @@ func main() {
 				LeaseName:  *leaderElectionLeaseName,
 				Namespace:  namespace,
 			}
-			setupLog.Info("Leader election mode: zenlead managed (Profile C)", logOperation("leader_init"), logString("leaseName", *leaderElectionLeaseName))
+			setupLog.Info("Leader election mode: zenlead managed (Profile C)", sdklog.Operation("leader_init"), sdklog.String("leaseName", *leaderElectionLeaseName))
 		case "disabled":
 			leConfig = zenlead.LeaderElectionConfig{
 				Mode: zenlead.Disabled,
 			}
-			setupLog.Info("Leader election disabled - single replica only (unsafe if replicas > 1)", logOperation("leader_init"))
+			setupLog.Info("Leader election disabled - single replica only (unsafe if replicas > 1)", sdklog.Operation("leader_init"))
 		default:
-			setupLog.Error(fmt.Errorf("invalid --leader-election-mode: %q (must be builtin, zenlead, or disabled)", *leaderElectionMode), "invalid configuration", logErrorCode("INVALID_CONFIG"), logOperation("leader_init"), logString("mode", *leaderElectionMode))
+			setupLog.Error(fmt.Errorf("invalid --leader-election-mode: %q (must be builtin, zenlead, or disabled)", *leaderElectionMode), "invalid configuration", sdklog.ErrorCode("INVALID_CONFIG"), sdklog.Operation("leader_init"), sdklog.String("mode", *leaderElectionMode))
 			os.Exit(1)
 		}
 
 		// Prepare manager options with leader election
 			mgrOpts, err := zenlead.PrepareManagerOptions(&baseOpts, &leConfig)
 		if err != nil {
-			setupLog.Error(err, "Failed to prepare manager options", logErrorCode("MANAGER_OPTIONS_ERROR"), logOperation("leader_init"))
+			setupLog.Error(err, "Failed to prepare manager options", sdklog.ErrorCode("MANAGER_OPTIONS_ERROR"), sdklog.Operation("leader_init"))
 			os.Exit(1)
 		}
 
@@ -274,14 +248,14 @@ func main() {
 
 		// Enforce safe HA configuration
 		if err := zenlead.EnforceSafeHA(replicaCount, mgrOpts.LeaderElection); err != nil {
-			setupLog.Error(err, "Unsafe HA configuration", logErrorCode("UNSAFE_HA_CONFIG"), logOperation("leader_init"))
+			setupLog.Error(err, "Unsafe HA configuration", sdklog.ErrorCode("UNSAFE_HA_CONFIG"), sdklog.Operation("leader_init"))
 			os.Exit(1)
 		}
 
 		// Always create manager (leader election is configured via options)
 		leaderManager, err := ctrl.NewManager(clients.Config, mgrOpts)
 		if err != nil {
-			setupLog.Error(err, "Failed to create leader election manager", logErrorCode("MANAGER_CREATE_ERROR"), logOperation("leader_manager_init"))
+			setupLog.Error(err, "Failed to create leader election manager", sdklog.ErrorCode("MANAGER_CREATE_ERROR"), sdklog.Operation("leader_manager_init"))
 			os.Exit(1)
 		}
 
@@ -376,7 +350,7 @@ func main() {
 	go func() {
 		defer wg.Done()
 		if err := configManager.Start(ctx); err != nil {
-			setupLog.Error(err, "ConfigManager stopped", logOperation("config_manager"))
+			setupLog.Error(err, "ConfigManager stopped", sdklog.Operation("config_manager"))
 		}
 	}()
 
@@ -395,7 +369,7 @@ func main() {
 	go func() {
 		defer wg.Done()
 		if err := adapterLauncher.Start(ctx); err != nil {
-			setupLog.Error(err, "Adapter launcher stopped", logOperation("adapter_launcher"))
+			setupLog.Error(err, "Adapter launcher stopped", sdklog.Operation("adapter_launcher"))
 		}
 	}()
 
@@ -404,7 +378,7 @@ func main() {
 	go func() {
 		defer wg.Done()
 		if err := configMapLoader.Start(ctx); err != nil {
-			setupLog.Error(err, "ConfigMap loader stopped", logOperation("configmap_loader"))
+			setupLog.Error(err, "ConfigMap loader stopped", sdklog.Operation("configmap_loader"))
 		}
 	}()
 
@@ -416,7 +390,7 @@ func main() {
 	go func() {
 		defer wg.Done()
 		if err := ingesterInformer.Start(ctx); err != nil {
-			setupLog.Error(err, "Ingester informer stopped", logOperation("ingester_informer"))
+			setupLog.Error(err, "Ingester informer stopped", sdklog.Operation("ingester_informer"))
 		}
 	}()
 
@@ -426,16 +400,16 @@ func main() {
 	go func() {
 		defer wg.Done()
 		// Wait for leader election (mandatory for HA)
-		setupLog.Info("Waiting for leader election before starting GenericOrchestrator", logOperation("generic_orchestrator"))
+		setupLog.Info("Waiting for leader election before starting GenericOrchestrator", sdklog.Operation("generic_orchestrator"))
 		select {
 		case <-leaderElectedCh:
-			setupLog.Info("Elected as leader, starting GenericOrchestrator", logOperation("generic_orchestrator"))
+			setupLog.Info("Elected as leader, starting GenericOrchestrator", sdklog.Operation("generic_orchestrator"))
 		case <-ctx.Done():
 			return
 		}
 		// Start GenericOrchestrator (we are the leader)
 		if err := genericOrchestrator.Start(ctx); err != nil {
-			setupLog.Error(err, "GenericOrchestrator stopped", logOperation("generic_orchestrator"))
+			setupLog.Error(err, "GenericOrchestrator stopped", sdklog.Operation("generic_orchestrator"))
 		}
 	}()
 
@@ -449,21 +423,21 @@ func main() {
 		// Ingester CRD configuration is accessed via ingesterStore
 		optimizer = optimization.NewOptimizerWithProcessor(obsSmartProc, nil)
 		setupLog.Info("Optimization engine initialized with shared SmartProcessor",
-			logOperation("optimizer_integration"),
-			logBool("optimization_enabled", true))
+			sdklog.Operation("optimizer_integration"),
+			sdklog.Bool("optimization_enabled", true))
 	} else {
 		// Fallback: create optimizer with its own SmartProcessor
 		// Ingester CRD configuration is accessed via ingesterStore
 		optimizer = optimization.NewOptimizer(nil)
 		setupLog.Info("Optimization engine initialized with independent SmartProcessor",
-			logOperation("optimizer_integration"))
+			sdklog.Operation("optimizer_integration"))
 	}
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		if err := optimizer.Start(ctx); err != nil {
-			setupLog.Error(err, "Optimizer stopped", logOperation("optimizer"))
+			setupLog.Error(err, "Optimizer stopped", sdklog.Operation("optimizer"))
 		}
 	}()
 
@@ -497,10 +471,10 @@ func main() {
 	go func() {
 		defer wg.Done()
 		// Wait for leader election (mandatory for HA)
-		setupLog.Info("Waiting for leader election before starting garbage collector", logOperation("gc"))
+		setupLog.Info("Waiting for leader election before starting garbage collector", sdklog.Operation("gc"))
 		select {
 		case <-leaderElectedCh:
-			setupLog.Info("Elected as leader, starting garbage collector", logOperation("gc"))
+			setupLog.Info("Elected as leader, starting garbage collector", sdklog.Operation("gc"))
 		case <-ctx.Done():
 			return
 		}
@@ -516,7 +490,7 @@ func main() {
 	var haMetrics *metrics.HAMetrics
 
 	if haConfig.IsHAEnabled() {
-		setupLog.Info("HA optimization enabled, initializing HA components", logOperation("ha_init"))
+		setupLog.Info("HA optimization enabled, initializing HA components", sdklog.Operation("ha_init"))
 
 		// Initialize HA metrics
 		haMetrics = metrics.NewHAMetrics()
@@ -533,7 +507,7 @@ func main() {
 			haDedupOptimizer = optimization.NewHADedupOptimizer(&haConfig.DedupOptimization, eventCounter)
 			if haDedupOptimizer != nil {
 				haDedupOptimizer.Start(30 * time.Second) // Update every 30 seconds
-				setupLog.Info("HA dedup optimizer started", logOperation("ha_dedup_init"))
+				setupLog.Info("HA dedup optimizer started", sdklog.Operation("ha_dedup_init"))
 			}
 		}
 
@@ -542,7 +516,7 @@ func main() {
 			haScalingCoordinator = scaling.NewHPACoordinator(&haConfig.AutoScaling, haMetrics, replicaID)
 			if haScalingCoordinator != nil {
 				haScalingCoordinator.Start(ctx, 1*time.Minute) // Evaluate every minute
-				setupLog.Info("HA scaling coordinator started", logOperation("ha_scaling_init"))
+				setupLog.Info("HA scaling coordinator started", sdklog.Operation("ha_scaling_init"))
 			}
 		}
 
@@ -550,8 +524,8 @@ func main() {
 		if haConfig.LoadBalancing.Strategy != "" {
 			haLoadBalancer = balancer.NewLoadBalancer(&haConfig.LoadBalancing)
 			setupLog.Info("HA load balancer initialized",
-				logOperation("ha_balancer_init"),
-				logString("strategy", haConfig.LoadBalancing.Strategy))
+				sdklog.Operation("ha_balancer_init"),
+				sdklog.String("strategy", haConfig.LoadBalancing.Strategy))
 		}
 
 		// Cache optimization is handled by the deduper itself
@@ -578,12 +552,12 @@ func main() {
 						// Log real metrics for debugging (if debug mode enabled)
 						if os.Getenv("DEBUG_METRICS") == "true" {
 							setupLog.Debug("HA Metrics collected",
-								logOperation("metrics_collection"),
-								logFloat64("cpu_usage", cpuUsage),
-								logFloat64("memory_usage", memoryUsage),
-								logFloat64("events_per_sec", eventsPerSec),
-								logFloat64("queue_depth", float64(queueDepth)),
-								logFloat64("response_time", responseTime))
+								sdklog.Operation("metrics_collection"),
+								sdklog.Float64("cpu_usage", cpuUsage),
+								sdklog.Float64("memory_usage", memoryUsage),
+								sdklog.Float64("events_per_sec", eventsPerSec),
+								sdklog.Float64("queue_depth", float64(queueDepth)),
+								sdklog.Float64("response_time", responseTime))
 						}
 
 						// Update scaling coordinator
@@ -630,14 +604,14 @@ func main() {
 	}
 
 	// Log configuration
-	setupLog.Info("zen-watcher ready", logOperation("startup_complete"))
+	setupLog.Info("zen-watcher ready", sdklog.Operation("startup_complete"))
 	autoDetect := os.Getenv("AUTO_DETECT_ENABLED")
 	if autoDetect == "" {
 		autoDetect = "true"
 	}
 	setupLog.Info("Configuration loaded",
-		logOperation("config_load"),
-		logString("auto_detect_enabled", autoDetect))
+		sdklog.Operation("config_load"),
+		sdklog.String("auto_detect_enabled", autoDetect))
 
 	// Wait for shutdown
 	lifecycle.WaitForShutdown(ctx, &wg, func() {
@@ -646,7 +620,7 @@ func main() {
 		if workerPool != nil {
 			workerPool.Stop()
 		}
-		setupLog.Info("zen-watcher stopped", logOperation("shutdown"))
+		setupLog.Info("zen-watcher stopped", sdklog.Operation("shutdown"))
 	})
 }
 
@@ -673,14 +647,14 @@ func handleConfigChange(
 			}
 			adapterLauncher.SetWorkerPool(workerPool)
 			log.Info("Worker pool configuration updated",
-				logOperation("config_update"),
-				logBool("enabled", newWorkerConfig.Enabled),
+				sdklog.Operation("config_update"),
+				sdklog.Bool("enabled", newWorkerConfig.Enabled),
 				sdklog.Int("size", newWorkerConfig.Size),
 				sdklog.Int("queue_size", newWorkerConfig.QueueSize))
 		} else {
 			workerPool.Stop()
 			adapterLauncher.SetWorkerPool(nil)
-			log.Info("Worker pool disabled via configuration", logOperation("config_update"))
+			log.Info("Worker pool disabled via configuration", sdklog.Operation("config_update"))
 		}
 	}
 
@@ -733,10 +707,10 @@ func handleConfigChange(
 			filterInstance.UpdateConfig(newFilterConfig)
 
 			log.Info("Namespace filtering configuration updated",
-				logOperation("config_update"),
-				logBool("enabled", enabled),
-				logStrings("included_namespaces", globalFilter.IncludedNamespaces),
-				logStrings("excluded_namespaces", globalFilter.ExcludedNamespaces))
+				sdklog.Operation("config_update"),
+				sdklog.Bool("enabled", enabled),
+				sdklog.Strings("included_namespaces", globalFilter.IncludedNamespaces),
+				sdklog.Strings("excluded_namespaces", globalFilter.ExcludedNamespaces))
 		} else {
 			// Disable global namespace filtering
 			currentFilterConfig := filterInstance.GetConfig()
@@ -755,7 +729,7 @@ func handleConfigChange(
 				}
 				filterInstance.UpdateConfig(newConfig)
 			}
-			log.Info("Namespace filtering disabled via configuration", logOperation("config_update"))
+			log.Info("Namespace filtering disabled via configuration", sdklog.Operation("config_update"))
 		}
 	}
 }
