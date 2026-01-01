@@ -1,122 +1,7 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  annotations:
-    kubectl.kubernetes.io/last-applied-configuration: '{"apiVersion":"apiextensions.k8s.io/v1","kind":"CustomResourceDefinition","metadata":{"annotations":{},"name":"ingesters.zen.kube-zen.io"},"spec":{"group":"zen.kube-zen.io","names":{"kind":"Ingester","listKind":"IngesterList","plural":"ingesters","shortNames":["ing","ingester"],"singular":"ingester"},"scope":"Namespaced","versions":[{"additionalPrinterColumns":[{"jsonPath":".spec.source","name":"Source","type":"string"},{"jsonPath":".spec.ingester","name":"Ingester","type":"string"},{"jsonPath":".spec.deduplication.window","name":"Dedup
-      Window","priority":1,"type":"string"},{"format":"double","jsonPath":".spec.filters.minPriority","name":"Min
-      Priority","priority":1,"type":"number"},{"jsonPath":".metadata.creationTimestamp","name":"Age","type":"date"}],"name":"v1alpha1","schema":{"openAPIV3Schema":{"properties":{"spec":{"properties":{"deduplication":{"description":"Deduplication
-      configuration for this ingester","properties":{"adaptive":{"default":false,"description":"Enable
-      adaptive deduplication that adjusts based on patterns","type":"boolean"},"enabled":{"default":true,"description":"Controls
-      whether deduplication is enabled (default: true)","type":"boolean"},"fields":{"description":"Fields
-      to use for deduplication key (only used if strategy=key or hybrid)","items":{"type":"string"},"type":"array"},"learningRate":{"default":0.1,"description":"Learning
-      rate for adaptive deduplication (0.0-1.0)","maximum":1,"minimum":0,"type":"number"},"minChange":{"default":0.05,"description":"Minimum
-      change threshold (0.0-1.0) to trigger adaptation","maximum":1,"minimum":0,"type":"number"},"strategy":{"default":"fingerprint","description":"Deduplication
-      strategy: fingerprint (content-based), key (field-based), hybrid, or adaptive","enum":["fingerprint","key","hybrid","adaptive"],"type":"string"},"window":{"description":"Deduplication
-      window as duration string (e.g., ''24h'', ''1h30m'')","pattern":"^[0-9]+(ns|us|µs|ms|s|m|h)$","type":"string"},"windowSeconds":{"description":"Deduplication
-      window in seconds (alternative to window)","maximum":31536000,"minimum":1,"type":"integer"}},"type":"object"},"destinations":{"description":"List
-      of destinations for observations from this ingester","items":{"properties":{"mapping":{"description":"Normalization
-      and mapping configuration","properties":{"domain":{"description":"Domain: security,
-      operations, cost, compliance, custom","enum":["security","operations","cost","compliance","custom"],"type":"string"},"fieldMapping":{"description":"Field
-      mappings from raw data to labels","items":{"properties":{"from":{"description":"JSONPath
-      in raw data (e.g., ''$.report.summary.criticalCount'')","type":"string"},"to":{"description":"Label
-      or field name (e.g., ''critical-count'')","type":"string"},"transform":{"description":"Optional
-      transform function: lower, upper, truncate:50, etc.","type":"string"}},"required":["from","to"],"type":"object"},"type":"array"},"priority":{"additionalProperties":{"maximum":1,"minimum":0,"type":"number"},"description":"Priority
-      mapping: source value -\u003e 0.0-1.0","type":"object"},"resource":{"description":"Resource
-      reference mappings","properties":{"apiVersion":{"description":"JSONPath to resource
-      apiVersion (e.g., ''.report.resource.apiVersion'')","type":"string"},"kind":{"description":"JSONPath
-      to resource kind (e.g., ''.report.resource.kind'')","type":"string"},"name":{"description":"JSONPath
-      to resource name (e.g., ''.report.resource.name'')","type":"string"},"namespace":{"description":"JSONPath
-      to resource namespace (e.g., ''.report.resource.namespace'')","type":"string"}},"type":"object"},"resourceExtraction":{"description":"How
-      to extract Kubernetes resources from raw data","properties":{"jsonpath":{"description":"JSONPath
-      expression to find resources array (if strategy=jsonpath)","type":"string"},"k8sOwner":{"description":"Extract
-      owner reference from Kubernetes resource (if strategy=k8s_owner)","properties":{"apiVersionField":{"description":"Field
-      path in raw data containing apiVersion","type":"string"},"kindField":{"description":"Field
-      path in raw data containing kind","type":"string"},"nameField":{"description":"Field
-      path in raw data containing name","type":"string"},"namespaceField":{"description":"Field
-      path in raw data containing namespace (optional)","type":"string"}},"type":"object"},"manual":{"description":"Manually
-      specified resources (if strategy=manual)","items":{"properties":{"apiVersion":{"type":"string"},"kind":{"type":"string"},"name":{"type":"string"},"namespace":{"type":"string"}},"type":"object"},"type":"array"},"strategy":{"description":"Extraction
-      strategy: jsonpath, k8s_owner, or manual","enum":["jsonpath","k8s_owner","manual"],"type":"string"}},"type":"object"},"severityMap":{"additionalProperties":{"enum":["CRITICAL","HIGH","MEDIUM","LOW","UNKNOWN"],"type":"string"},"description":"Map
-      source severity values to standard severity levels","type":"object"},"templates":{"description":"Go
-      template strings for title and description generation","properties":{"description":{"description":"Go
-      template for observation description","type":"string"},"title":{"description":"Go
-      template for observation title (access fields via .raw, .type, etc.)","type":"string"}},"type":"object"},"type":{"description":"Event
-      type (e.g., vulnerability, policy_violation, certificate_expiring)","pattern":"^[a-z0-9_]+$","type":"string"}},"type":"object"},"type":{"description":"Destination
-      type","enum":["crd"],"type":"string"},"value":{"description":"Destination value
-      - for type ''crd'', this should be ''observations''","pattern":"^[a-z0-9-]+$","type":"string"}},"required":["type","value"],"type":"object"},"minItems":1,"type":"array"},"filters":{"description":"Filter
-      configuration for this ingester","properties":{"enabled":{"default":true,"description":"Controls
-      whether filtering is enabled (default: true)","type":"boolean"},"excludeCategories":{"description":"List
-      of categories to exclude","items":{"type":"string"},"type":"array"},"excludeEventTypes":{"description":"List
-      of event types to exclude","items":{"type":"string"},"type":"array"},"excludeKinds":{"description":"List
-      of resource kinds to exclude (e.g., Pod, Deployment)","items":{"type":"string"},"type":"array"},"excludeNamespaces":{"description":"List
-      of namespaces to exclude","items":{"type":"string"},"type":"array"},"excludeRules":{"description":"List
-      of rule names to exclude (e.g., disallow-latest-tag)","items":{"type":"string"},"type":"array"},"ignoreKinds":{"description":"Alias
-      for excludeKinds (convenience for kubernetes-events source)","items":{"type":"string"},"type":"array"},"includeCategories":{"description":"List
-      of categories to include (if set, only these are allowed)","items":{"type":"string"},"type":"array"},"includeEventTypes":{"description":"List
-      of event types to include (if set, only these are allowed)","items":{"type":"string"},"type":"array"},"includeKinds":{"description":"List
-      of resource kinds to include (if set, only these are allowed)","items":{"type":"string"},"type":"array"},"includeNamespaces":{"description":"List
-      of namespaces to include (if set, only these are allowed)","items":{"type":"string"},"type":"array"},"includeSeverity":{"description":"List
-      of severity levels to include (if set, only these are allowed)","items":{"enum":["CRITICAL","HIGH","MEDIUM","LOW","UNKNOWN"],"type":"string"},"type":"array"},"minPriority":{"description":"Minimum
-      priority (0.0-1.0) to allow. Observations below this are filtered out.","maximum":1,"minimum":0,"type":"number"},"minSeverity":{"description":"Minimum
-      severity level to allow (CRITICAL \u003e HIGH \u003e MEDIUM \u003e LOW \u003e
-      UNKNOWN)","enum":["CRITICAL","HIGH","MEDIUM","LOW","UNKNOWN"],"type":"string"}},"type":"object"},"informer":{"description":"Informer
-      adapter configuration","properties":{"fieldSelector":{"description":"Optional
-      field selector","type":"string"},"gvr":{"properties":{"group":{"description":"API
-      group (e.g., aquasecurity.github.io)","type":"string"},"resource":{"description":"Resource
-      name (e.g., vulnerabilityreports)","type":"string"},"version":{"description":"API
-      version (e.g., v1alpha1)","type":"string"}},"required":["group","version","resource"],"type":"object"},"labelSelector":{"description":"Optional
-      label selector","type":"string"},"namespace":{"description":"Namespace to watch
-      (empty = all namespaces)","type":"string"},"resyncPeriod":{"default":"0","description":"Resync
-      period (e.g., ''30m'')","type":"string"}},"type":"object"},"ingester":{"description":"Ingester
-      type: informer, webhook, logs, or k8s-events","enum":["informer","webhook","logs","k8s-events"],"type":"string"},"logs":{"description":"Logs
-      adapter configuration","properties":{"container":{"description":"Container name
-      to tail logs from","type":"string"},"patterns":{"description":"Regex patterns
-      to match in logs","items":{"properties":{"priority":{"description":"Priority
-      (0.0-1.0) for matched events","maximum":1,"minimum":0,"type":"number"},"regex":{"description":"Regex
-      pattern with named groups","type":"string"},"type":{"description":"Event type
-      for matched lines","type":"string"}},"required":["regex"],"type":"object"},"type":"array"},"podSelector":{"description":"Pod
-      selector (e.g., app=sealed-secrets)","type":"string"},"pollInterval":{"default":"1s","description":"Poll
-      interval for checking new pods","type":"string"},"sinceSeconds":{"default":300,"description":"How
-      far back to read logs (seconds)","type":"integer"}},"type":"object"},"optimization":{"description":"Processing
-      order configuration","properties":{"order":{"default":"filter_first","description":"Processing
-      order: filter_first or dedup_first","enum":["filter_first","dedup_first"],"type":"string"},"processing":{"additionalProperties":{"properties":{"action":{"description":"Action
-      to take when threshold is exceeded: warn, alert, optimize","enum":["warn","alert","optimize"],"type":"string"},"critical":{"description":"Critical
-      threshold value","type":"number"},"description":{"description":"Human-readable
-      description of this threshold","type":"string"},"warning":{"description":"Warning
-      threshold value","type":"number"}},"type":"object"},"description":"Per-metric
-      thresholds for optimization triggers","type":"object"},"thresholds":{"description":"Optimization
-      thresholds for monitoring and alerts","properties":{"custom":{"description":"Custom
-      thresholds against raw data","items":{"properties":{"field":{"description":"JSONPath
-      in raw data","type":"string"},"message":{"type":"string"},"name":{"type":"string"},"operator":{"enum":["\u003e","\u003c","==","!=","contains"],"type":"string"},"value":{"description":"Value
-      to compare against","type":"string"}},"type":"object"},"type":"array"},"dedupEffectiveness":{"description":"Deduplication
-      effectiveness thresholds","properties":{"critical":{"description":"Critical
-      threshold for dedup effectiveness (0.0-1.0, lower = worse)","maximum":1,"minimum":0,"type":"number"},"warning":{"description":"Warning
-      threshold for dedup effectiveness (0.0-1.0, lower = worse)","maximum":1,"minimum":0,"type":"number"}},"type":"object"},"lowSeverityPercent":{"description":"Low
-      severity ratio thresholds","properties":{"critical":{"description":"Critical
-      threshold for low severity percentage (0.0-1.0)","maximum":1,"minimum":0,"type":"number"},"warning":{"description":"Warning
-      threshold for low severity percentage (0.0-1.0)","maximum":1,"minimum":0,"type":"number"}},"type":"object"},"observationsPerMinute":{"description":"Observation
-      rate thresholds","properties":{"critical":{"description":"Critical threshold
-      for observations per minute","minimum":1,"type":"integer"},"warning":{"description":"Warning
-      threshold for observations per minute","minimum":1,"type":"integer"}},"type":"object"}},"type":"object"}},"type":"object"},"rateLimit":{"description":"Rate
-      limiting configuration","properties":{"burst":{"description":"Burst size","minimum":1,"type":"integer"},"enabled":{"default":false,"description":"Enable
-      rate limiting","type":"boolean"},"requestsPerSecond":{"description":"Maximum
-      requests per second","minimum":0.1,"type":"number"}},"type":"object"},"source":{"description":"Tool
-      name (trivy, kyverno, falco, checkov, kube-bench, audit, cert-manager, sealed-secrets,
-      kubernetes-events, etc.)","pattern":"^[a-z0-9-]+$","type":"string"},"ttl":{"description":"TTL
-      configuration for observations from this ingester","properties":{"default":{"description":"Default
-      TTL as duration string (e.g., ''30d'', ''7d'')","pattern":"^[0-9]+(ns|us|µs|ms|s|m|h|d)$","type":"string"},"max":{"description":"Maximum
-      allowed TTL as duration string","pattern":"^[0-9]+(ns|us|µs|ms|s|m|h|d)$","type":"string"},"min":{"description":"Minimum
-      allowed TTL as duration string","pattern":"^[0-9]+(ns|us|µs|ms|s|m|h|d)$","type":"string"}},"type":"object"},"webhook":{"description":"Webhook
-      adapter configuration","properties":{"auth":{"description":"Authentication configuration","properties":{"secretName":{"description":"Secret
-      name containing auth credentials","type":"string"},"type":{"default":"none","enum":["none","bearer","basic"],"type":"string"}},"type":"object"},"bufferSize":{"default":100,"description":"Event
-      buffer size","type":"integer"},"path":{"description":"HTTP path for webhook
-      endpoint","type":"string"},"port":{"description":"Port to listen on","maximum":65535,"minimum":1,"type":"integer"}},"type":"object"}},"required":["source","ingester","destinations"],"type":"object"}},"type":"object"}},"served":true,"storage":true,"subresources":{"status":{}}}]}}
-
-      '
-  creationTimestamp: '2025-12-10T16:07:35Z'
-  generation: 1
   name: ingesters.zen.kube-zen.io
-  resourceVersion: '234930534'
-  uid: 20716b3d-42c5-4e2c-bfa4-a93b9d39fafe
 spec:
   conversion:
     strategy: None
@@ -132,24 +17,21 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
-    - jsonPath: .spec.source
-      name: Source
+    - name: Sources
+      type: integer
+      description: Number of sources
+      jsonPath: '.spec.sources ? size(.spec.sources) : 1'
+    - name: Destinations
+      type: integer
+      description: Number of destinations
+      jsonPath: '.spec.destinations ? size(.spec.destinations) : 0'
+    - name: Ready
       type: string
-    - jsonPath: .spec.ingester
-      name: Ingester
-      type: string
-    - jsonPath: .spec.deduplication.window
-      name: Dedup Window
-      priority: 1
-      type: string
-    - format: double
-      jsonPath: .spec.filters.minPriority
-      name: Min Priority
-      priority: 1
-      type: number
-    - jsonPath: .metadata.creationTimestamp
-      name: Age
+      description: Ready condition status
+      jsonPath: .status.conditions[?(@.type=="Ready")].status
+    - name: Age
       type: date
+      jsonPath: .metadata.creationTimestamp
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -161,12 +43,10 @@ spec:
                 properties:
                   enabled:
                     default: true
-                    description: 'Controls whether deduplication is enabled (default:
-                      true)'
+                    description: 'Controls whether deduplication is enabled (default: true)'
                     type: boolean
                   fields:
-                    description: Fields to use for deduplication key (only used if
-                      strategy=key or hybrid)
+                    description: Fields to use for deduplication key (only used if strategy=key or hybrid)
                     items:
                       type: string
                     type: array
@@ -184,16 +64,14 @@ spec:
                     type: number
                   strategy:
                     default: fingerprint
-                    description: 'Deduplication strategy: fingerprint (content-based),
-                      key (field-based), or hybrid'
+                    description: 'Deduplication strategy: fingerprint (content-based), key (field-based), or hybrid'
                     enum:
                     - fingerprint
                     - key
                     - hybrid
                     type: string
                   window:
-                    description: Deduplication window as duration string (e.g., '24h',
-                      '1h30m')
+                    description: Deduplication window as duration string (e.g., '24h', '1h30m')
                     pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
                     type: string
                   windowSeconds:
@@ -207,14 +85,9 @@ spec:
                 items:
                   properties:
                     type:
-                      description: 'Destination type: crd (write Observation CRDs),
-                        webhook (HTTP POST to URL), saas (external HTTP/queue sink
-                        managed by another system), queue (message queue)'
+                      description: 'Destination type: crd (write to Kubernetes CRDs)'
                       enum:
                       - crd
-                      - webhook
-                      - saas
-                      - queue
                       type: string
                     name:
                       description: Optional name for this destination (for reference)
@@ -224,7 +97,8 @@ spec:
                       pattern: ^[a-z0-9-]+$
                       type: string
                     gvr:
-                      description: 'For type ''crd'': Full GVR (GroupVersionResource) specification. If specified, overrides value.'
+                      description: 'For type ''crd'': Full GVR (GroupVersionResource) specification. If specified, overrides
+                        value.'
                       properties:
                         group:
                           description: API group (e.g., zen.kube-zen.io, or empty string for core resources like configmaps)
@@ -239,71 +113,12 @@ spec:
                       - version
                       - resource
                       type: object
-                    url:
-                      description: 'For type ''webhook'': HTTP URL to POST events
-                        to'
-                      type: string
-                      format: uri
-                    retryPolicy:
-                      description: 'For type ''webhook'': Retry policy configuration'
-                      properties:
-                        maxRetries:
-                          description: Maximum number of retries
-                          minimum: 0
-                          type: integer
-                        backoff:
-                          description: 'Backoff strategy: exponential, linear, fixed'
-                          enum:
-                          - exponential
-                          - linear
-                          - fixed
-                          type: string
-                        timeout:
-                          description: Request timeout as duration string (e.g., '30s')
-                          pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
-                          type: string
-                      type: object
-                    tenant:
-                      description: 'For type ''saas'': Tenant identifier (managed
-                        by external system)'
-                      type: string
-                    endpoint:
-                      description: 'For type ''saas'': Endpoint path or identifier
-                        (managed by external system)'
-                      type: string
-                    channel:
-                      description: 'Channel configuration for forwarding through zen-bridge (SaaS). When set, data flows through zen-bridge to zen-egress instead of directly to SaaS.'
-                      type: object
-                      properties:
-                        enabled:
-                          description: Enable channel forwarding through zen-bridge
-                          type: boolean
-                          default: true
-                        targetEgress:
-                          description: Target egress adapter name/ID for forwarding (optional, defaults to only registered egress if single, required if multiple egress adapters exist)
-                          type: string
-                        protocol:
-                          description: Protocol for channel communication (grpc, http, websocket)
-                          type: string
-                          enum:
-                          - grpc
-                          - http
-                          - websocket
-                          default: grpc
-                    queueName:
-                      description: 'For type ''queue'': Queue name or topic'
-                      type: string
-                    queueType:
-                      description: 'For type ''queue'': Queue type (kafka, sqs, rabbitmq,
-                        etc.)'
-                      type: string
                     mapping:
-                      description: Normalization and mapping configuration (optional,
-                        inherits from ingester-level if not specified)
+                      description: Normalization and mapping configuration (optional, inherits from ingester-level if not
+                        specified)
                       properties:
                         domain:
-                          description: 'Domain: security, operations, cost, compliance,
-                            custom'
+                          description: 'Domain: security, operations, cost, compliance, custom'
                           enum:
                           - security
                           - operations
@@ -322,8 +137,7 @@ spec:
                                 description: Label or field name
                                 type: string
                               transform:
-                                description: 'Optional transform function: lower,
-                                  upper, truncate:50, etc.'
+                                description: 'Optional transform function: lower, upper, truncate:50, etc.'
                                 type: string
                             required:
                             - from
@@ -350,8 +164,7 @@ spec:
                               type: string
                           type: object
                         resourceExtraction:
-                          description: How to extract Kubernetes resources from raw
-                            data
+                          description: How to extract Kubernetes resources from raw data
                           properties:
                             jsonpath:
                               type: string
@@ -395,12 +208,10 @@ spec:
                             - LOW
                             - UNKNOWN
                             type: string
-                          description: Map source severity values to standard severity
-                            levels
+                          description: Map source severity values to standard severity levels
                           type: object
                         templates:
-                          description: Go template strings for title and description
-                            generation
+                          description: Go template strings for title and description generation
                           properties:
                             description:
                               type: string
@@ -408,8 +219,7 @@ spec:
                               type: string
                           type: object
                         type:
-                          description: Event type (e.g., vulnerability, policy_violation,
-                            certificate_expiring)
+                          description: Event type (e.g., vulnerability, policy_violation, certificate_expiring)
                           pattern: ^[a-z0-9_]+$
                           type: string
                       type: object
@@ -421,24 +231,10 @@ spec:
                       type:
                         const: crd
                     required:
-                    - value
-                  - properties:
-                      type:
-                        const: webhook
-                    required:
-                    - url
-                  - properties:
-                      type:
-                        const: saas
-                    required:
-                    - tenant
-                    - endpoint
-                  - properties:
-                      type:
-                        const: queue
-                    required:
-                    - queueName
-                    - queueType
+                    - type
+                  x-kubernetes-validations:
+                  - rule: self.type == "crd" && (has(self.gvr) || (has(self.value) && self.value != ""))
+                    message: For type "crd", either gvr must be set or value must not be empty
                 minItems: 1
                 type: array
               filters:
@@ -446,8 +242,7 @@ spec:
                 properties:
                   enabled:
                     default: true
-                    description: 'Controls whether filtering is enabled (default:
-                      true)'
+                    description: 'Controls whether filtering is enabled (default: true)'
                     type: boolean
                   excludeCategories:
                     description: List of categories to exclude
@@ -475,38 +270,32 @@ spec:
                       type: string
                     type: array
                   ignoreKinds:
-                    description: Alias for excludeKinds (convenience for kubernetes-events
-                      source)
+                    description: Alias for excludeKinds (convenience for kubernetes-events source)
                     items:
                       type: string
                     type: array
                   includeCategories:
-                    description: List of categories to include (if set, only these
-                      are allowed)
+                    description: List of categories to include (if set, only these are allowed)
                     items:
                       type: string
                     type: array
                   includeEventTypes:
-                    description: List of event types to include (if set, only these
-                      are allowed)
+                    description: List of event types to include (if set, only these are allowed)
                     items:
                       type: string
                     type: array
                   includeKinds:
-                    description: List of resource kinds to include (if set, only these
-                      are allowed)
+                    description: List of resource kinds to include (if set, only these are allowed)
                     items:
                       type: string
                     type: array
                   includeNamespaces:
-                    description: List of namespaces to include (if set, only these
-                      are allowed)
+                    description: List of namespaces to include (if set, only these are allowed)
                     items:
                       type: string
                     type: array
                   includeSeverity:
-                    description: List of severity levels to include (if set, only
-                      these are allowed)
+                    description: List of severity levels to include (if set, only these are allowed)
                     items:
                       enum:
                       - CRITICAL
@@ -517,14 +306,12 @@ spec:
                       type: string
                     type: array
                   minPriority:
-                    description: Minimum priority (0.0-1.0) to allow. Observations
-                      below this are filtered out.
+                    description: Minimum priority (0.0-1.0) to allow. Observations below this are filtered out.
                     maximum: 1
                     minimum: 0
                     type: number
                   minSeverity:
-                    description: Minimum severity level to allow (CRITICAL > HIGH
-                      > MEDIUM > LOW > UNKNOWN)
+                    description: Minimum severity level to allow (CRITICAL > HIGH > MEDIUM > LOW > UNKNOWN)
                     enum:
                     - CRITICAL
                     - HIGH
@@ -535,7 +322,7 @@ spec:
                 type: object
               informer:
                 description: Informer adapter configuration
-                properties:
+                properties: &id001
                   fieldSelector:
                     description: Optional field selector
                     type: string
@@ -576,7 +363,7 @@ spec:
                 type: string
               logs:
                 description: Logs adapter configuration
-                properties:
+                properties: &id002
                   container:
                     description: Container name to tail logs from
                     type: string
@@ -625,8 +412,7 @@ spec:
                     additionalProperties:
                       properties:
                         action:
-                          description: 'Action to take when threshold is exceeded:
-                            warn, alert, optimize'
+                          description: 'Action to take when threshold is exceeded: warn, alert, optimize'
                           enum:
                           - warn
                           - alert
@@ -675,14 +461,12 @@ spec:
                         description: Deduplication effectiveness thresholds
                         properties:
                           critical:
-                            description: Critical threshold for dedup effectiveness
-                              (0.0-1.0, lower = worse)
+                            description: Critical threshold for dedup effectiveness (0.0-1.0, lower = worse)
                             maximum: 1
                             minimum: 0
                             type: number
                           warning:
-                            description: Warning threshold for dedup effectiveness
-                              (0.0-1.0, lower = worse)
+                            description: Warning threshold for dedup effectiveness (0.0-1.0, lower = worse)
                             maximum: 1
                             minimum: 0
                             type: number
@@ -691,14 +475,12 @@ spec:
                         description: Low severity ratio thresholds
                         properties:
                           critical:
-                            description: Critical threshold for low severity percentage
-                              (0.0-1.0)
+                            description: Critical threshold for low severity percentage (0.0-1.0)
                             maximum: 1
                             minimum: 0
                             type: number
                           warning:
-                            description: Warning threshold for low severity percentage
-                              (0.0-1.0)
+                            description: Warning threshold for low severity percentage (0.0-1.0)
                             maximum: 1
                             minimum: 0
                             type: number
@@ -734,8 +516,8 @@ spec:
                     type: number
                 type: object
               source:
-                description: Tool name (trivy, kyverno, falco, checkov, kube-bench,
-                  audit, cert-manager, sealed-secrets, kubernetes-events, etc.)
+                description: Tool name (trivy, kyverno, falco, checkov, kube-bench, audit, cert-manager, sealed-secrets, kubernetes-events,
+                  etc.)
                 pattern: ^[a-z0-9-]+$
                 type: string
               ttl:
@@ -756,7 +538,7 @@ spec:
                 type: object
               webhook:
                 description: Webhook adapter configuration
-                properties:
+                properties: &id003
                   auth:
                     description: Authentication configuration
                     properties:
@@ -823,688 +605,50 @@ spec:
                         type: integer
                     type: object
                 type: object
-            required:
-            - source
-            - ingester
-            - destinations
-            type: object
-        type: object
-    served: true
-    storage: false
-    subresources:
-      status: {}
-  - additionalPrinterColumns:
-    - jsonPath: .spec.source
-      name: Source
-      type: string
-    - jsonPath: .spec.ingester
-      name: Ingester
-      type: string
-    - jsonPath: .spec.deduplication.window
-      name: Dedup Window
-      priority: 1
-      type: string
-    - format: double
-      jsonPath: .spec.filters.minPriority
-      name: Min Priority
-      priority: 1
-      type: number
-    - jsonPath: .metadata.creationTimestamp
-      name: Age
-      type: date
-    name: v1
-    schema:
-      openAPIV3Schema:
-        properties:
-          spec:
-            properties:
-              deduplication:
-                description: Deduplication configuration for this ingester
-                properties:
-                  enabled:
-                    default: true
-                    description: 'Controls whether deduplication is enabled (default:
-                      true)'
-                    type: boolean
-                  fields:
-                    description: Fields to use for deduplication key (only used if
-                      strategy=key or hybrid)
-                    items:
-                      type: string
-                    type: array
-                  learningRate:
-                    default: 0.1
-                    description: Deduplication learning rate (0.0-1.0)
-                    maximum: 1
-                    minimum: 0
-                    type: number
-                  minChange:
-                    default: 0.05
-                    description: Minimum change threshold (0.0-1.0)
-                    maximum: 1
-                    minimum: 0
-                    type: number
-                  strategy:
-                    default: fingerprint
-                    description: 'Deduplication strategy: fingerprint (content-based),
-                      key (field-based), or hybrid'
-                    enum:
-                    - fingerprint
-                    - key
-                    - hybrid
-                    type: string
-                  window:
-                    description: Deduplication window as duration string (e.g., '24h',
-                      '1h30m')
-                    pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
-                    type: string
-                  windowSeconds:
-                    description: Deduplication window in seconds (alternative to window)
-                    maximum: 31536000
-                    minimum: 1
-                    type: integer
-                type: object
-              processing:
-                description: Processing pipeline configuration (v1.1+)
-                properties:
-                  dedup:
-                    description: Deduplication configuration (canonical location in v1.1+)
-                    properties:
-                      enabled:
-                        default: true
-                        description: 'Controls whether deduplication is enabled (default: true)'
-                        type: boolean
-                      strategy:
-                        default: fingerprint
-                        description: 'Deduplication strategy: fingerprint (content-based), key (field-based), or event-stream (strict window for noisy sources)'
-                        enum:
-                        - fingerprint
-                        - key
-                        - event-stream
-                        type: string
-                      window:
-                        description: Deduplication window as duration string (e.g., '24h', '1h30m', '5m' for event-stream)
-                        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
-                        type: string
-                      fields:
-                        description: Fields to use for deduplication key (only used if strategy=key)
-                        items:
-                          type: string
-                        type: array
-                      maxEventsPerWindow:
-                        description: Maximum events per window for event-stream strategy (optional, enforces strict limit)
-                        minimum: 1
-                        type: integer
-                    type: object
-                  order:
-                    description: 'Processing order: auto (learn and optimize), filter_first, or dedup_first'
-                    enum:
-                    - filter_first
-                    - dedup_first
-                    default: filter_first
-                    type: string
-                type: object
-              destinations:
-                description: List of destinations for observations from this ingester
+              sources:
+                description: Multi-source configuration (optional). If not set, legacy source/ingester fields are used for
+                  backward compatibility.
+                type: array
                 items:
+                  type: object
                   properties:
+                    name:
+                      type: string
+                      description: Source name (DNS label)
+                      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                     type:
-                      description: 'Destination type: crd (write Observation CRDs)'
+                      type: string
+                      description: Source type
                       enum:
-                      - crd
-                      type: string
-                    value:
-                      description: 'For type ''crd'': CRD resource name (e.g., ''observations''). Used if gvr is not specified.'
-                      pattern: ^[a-z0-9-]+$
-                      type: string
-                    gvr:
-                      description: 'For type ''crd'': Full GVR (GroupVersionResource) specification. If specified, overrides value.'
-                      properties:
-                        group:
-                          description: API group (e.g., zen.kube-zen.io, or empty string for core resources like configmaps)
-                          type: string
-                        version:
-                          description: API version (e.g., v1, v1alpha1)
-                          type: string
-                        resource:
-                          description: Resource name (e.g., observations, configmaps, secrets)
-                          type: string
-                      required:
-                      - version
-                      - resource
+                      - informer
+                      - logs
+                      - webhook
+                    informer:
+                      description: Informer adapter configuration
+                      properties: *id001
                       type: object
-                    mapping:
-                      description: Normalization and mapping configuration (optional)
-                      properties:
-                        domain:
-                          description: 'Domain: security, operations, cost, compliance,
-                            custom'
-                          enum:
-                          - security
-                          - operations
-                          - cost
-                          - compliance
-                          - custom
-                          type: string
-                        fieldMapping:
-                          description: Field mappings from raw data to labels
-                          items:
-                            properties:
-                              from:
-                                description: JSONPath in raw data
-                                type: string
-                              to:
-                                description: Label or field name
-                                type: string
-                              transform:
-                                description: 'Optional transform function: lower,
-                                  upper, truncate:50, etc.'
-                                type: string
-                            required:
-                            - from
-                            - to
-                            type: object
-                          type: array
-                        priority:
-                          additionalProperties:
-                            maximum: 1
-                            minimum: 0
-                            type: number
-                          description: 'Priority mapping: source value -> 0.0-1.0'
-                          type: object
-                        resource:
-                          description: Resource reference mappings
-                          properties:
-                            apiVersion:
-                              type: string
-                            kind:
-                              type: string
-                            name:
-                              type: string
-                            namespace:
-                              type: string
-                          type: object
-                        resourceExtraction:
-                          description: How to extract Kubernetes resources from raw
-                            data
-                          properties:
-                            jsonpath:
-                              type: string
-                            k8sOwner:
-                              properties:
-                                apiVersionField:
-                                  type: string
-                                kindField:
-                                  type: string
-                                nameField:
-                                  type: string
-                                namespaceField:
-                                  type: string
-                              type: object
-                            manual:
-                              items:
-                                properties:
-                                  apiVersion:
-                                    type: string
-                                  kind:
-                                    type: string
-                                  name:
-                                    type: string
-                                  namespace:
-                                    type: string
-                                type: object
-                              type: array
-                            strategy:
-                              enum:
-                              - jsonpath
-                              - k8s_owner
-                              - manual
-                              type: string
-                          type: object
-                        severityMap:
-                          additionalProperties:
-                            enum:
-                            - CRITICAL
-                            - HIGH
-                            - MEDIUM
-                            - LOW
-                            - UNKNOWN
-                            type: string
-                          description: Map source severity values to standard severity
-                            levels
-                          type: object
-                        templates:
-                          description: Go template strings for title and description
-                            generation
-                          properties:
-                            description:
-                              type: string
-                            title:
-                              type: string
-                          type: object
-                        type:
-                          description: Event type (e.g., vulnerability, policy_violation,
-                            certificate_expiring)
-                          pattern: ^[a-z0-9_]+$
-                          type: string
+                    logs:
+                      description: Logs adapter configuration
+                      properties: *id002
+                      type: object
+                    webhook:
+                      description: Webhook adapter configuration
+                      properties: *id003
                       type: object
                   required:
+                  - name
                   - type
-                  - value
-                  type: object
-                minItems: 1
-                type: array
-              filters:
-                description: Filter configuration for this ingester
-                properties:
-                  enabled:
-                    default: true
-                    description: 'Controls whether filtering is enabled (default:
-                      true)'
-                    type: boolean
-                  excludeCategories:
-                    description: List of categories to exclude
-                    items:
-                      type: string
-                    type: array
-                  excludeEventTypes:
-                    description: List of event types to exclude
-                    items:
-                      type: string
-                    type: array
-                  excludeKinds:
-                    description: List of resource kinds to exclude (e.g., Pod, Deployment)
-                    items:
-                      type: string
-                    type: array
-                  excludeNamespaces:
-                    description: List of namespaces to exclude
-                    items:
-                      type: string
-                    type: array
-                  excludeRules:
-                    description: List of rule names to exclude (e.g., disallow-latest-tag)
-                    items:
-                      type: string
-                    type: array
-                  ignoreKinds:
-                    description: Alias for excludeKinds (convenience for kubernetes-events
-                      source)
-                    items:
-                      type: string
-                    type: array
-                  includeCategories:
-                    description: List of categories to include (if set, only these
-                      are allowed)
-                    items:
-                      type: string
-                    type: array
-                  includeEventTypes:
-                    description: List of event types to include (if set, only these
-                      are allowed)
-                    items:
-                      type: string
-                    type: array
-                  includeKinds:
-                    description: List of resource kinds to include (if set, only these
-                      are allowed)
-                    items:
-                      type: string
-                    type: array
-                  includeNamespaces:
-                    description: List of namespaces to include (if set, only these
-                      are allowed)
-                    items:
-                      type: string
-                    type: array
-                  includeSeverity:
-                    description: List of severity levels to include (if set, only
-                      these are allowed)
-                    items:
-                      enum:
-                      - CRITICAL
-                      - HIGH
-                      - MEDIUM
-                      - LOW
-                      - UNKNOWN
-                      type: string
-                    type: array
-                  minPriority:
-                    description: Minimum priority (0.0-1.0) to allow. Observations
-                      below this are filtered out.
-                    maximum: 1
-                    minimum: 0
-                    type: number
-                  minSeverity:
-                    description: Minimum severity level to allow (CRITICAL > HIGH
-                      > MEDIUM > LOW > UNKNOWN)
-                    enum:
-                    - CRITICAL
-                    - HIGH
-                    - MEDIUM
-                    - LOW
-                    - UNKNOWN
-                    type: string
-                type: object
-              informer:
-                description: Informer adapter configuration
-                properties:
-                  fieldSelector:
-                    description: Optional field selector
-                    type: string
-                  gvr:
-                    properties:
-                      group:
-                        description: API group (e.g., aquasecurity.github.io)
-                        type: string
-                      resource:
-                        description: Resource name (e.g., vulnerabilityreports)
-                        type: string
-                      version:
-                        description: API version (e.g., v1alpha1)
-                        type: string
-                    required:
-                    - group
-                    - version
-                    - resource
-                    type: object
-                  labelSelector:
-                    description: Optional label selector
-                    type: string
-                  namespace:
-                    description: Namespace to watch (empty = all namespaces)
-                    type: string
-                  resyncPeriod:
-                    default: '0'
-                    description: Resync period (e.g., '30m')
-                    type: string
-                type: object
-              ingester:
-                description: 'Ingester type: informer, webhook, logs, or k8s-events'
-                enum:
-                - informer
-                - webhook
-                - logs
-                - k8s-events
-                type: string
-              logs:
-                description: Logs adapter configuration
-                properties:
-                  container:
-                    description: Container name to tail logs from
-                    type: string
-                  patterns:
-                    description: Regex patterns to match in logs
-                    items:
-                      properties:
-                        priority:
-                          description: Priority (0.0-1.0) for matched events
-                          maximum: 1
-                          minimum: 0
-                          type: number
-                        regex:
-                          description: Regex pattern with named groups
-                          type: string
-                        type:
-                          description: Event type for matched lines
-                          type: string
-                      required:
-                      - regex
-                      type: object
-                    type: array
-                  podSelector:
-                    description: Pod selector (e.g., app=sealed-secrets)
-                    type: string
-                  pollInterval:
-                    default: 1s
-                    description: Poll interval for checking new pods
-                    type: string
-                  sinceSeconds:
-                    default: 300
-                    description: How far back to read logs (seconds)
-                    type: integer
-                type: object
-              optimization:
-                description: Processing order configuration
-                properties:
-                  order:
-                    default: filter_first
-                    description: 'Processing order: filter_first or dedup_first'
-                    enum:
-                    - filter_first
-                    - dedup_first
-                    type: string
-                  processing:
-                    additionalProperties:
-                      properties:
-                        action:
-                          description: 'Action to take when threshold is exceeded:
-                            warn, alert, optimize'
-                          enum:
-                          - warn
-                          - alert
-                          - optimize
-                          type: string
-                        critical:
-                          description: Critical threshold value
-                          type: number
-                        description:
-                          description: Human-readable description of this threshold
-                          type: string
-                        warning:
-                          description: Warning threshold value
-                          type: number
-                      type: object
-                    description: Per-metric thresholds for optimization triggers
-                    type: object
-                  thresholds:
-                    description: Optimization thresholds for monitoring and alerts
-                    properties:
-                      custom:
-                        description: Custom thresholds against raw data
-                        items:
-                          properties:
-                            field:
-                              description: JSONPath in raw data
-                              type: string
-                            message:
-                              type: string
-                            name:
-                              type: string
-                            operator:
-                              enum:
-                              - '>'
-                              - <
-                              - ==
-                              - '!='
-                              - contains
-                              type: string
-                            value:
-                              description: Value to compare against
-                              type: string
-                          type: object
-                        type: array
-                      dedupEffectiveness:
-                        description: Deduplication effectiveness thresholds
-                        properties:
-                          critical:
-                            description: Critical threshold for dedup effectiveness
-                              (0.0-1.0, lower = worse)
-                            maximum: 1
-                            minimum: 0
-                            type: number
-                          warning:
-                            description: Warning threshold for dedup effectiveness
-                              (0.0-1.0, lower = worse)
-                            maximum: 1
-                            minimum: 0
-                            type: number
-                        type: object
-                      lowSeverityPercent:
-                        description: Low severity ratio thresholds
-                        properties:
-                          critical:
-                            description: Critical threshold for low severity percentage
-                              (0.0-1.0)
-                            maximum: 1
-                            minimum: 0
-                            type: number
-                          warning:
-                            description: Warning threshold for low severity percentage
-                              (0.0-1.0)
-                            maximum: 1
-                            minimum: 0
-                            type: number
-                        type: object
-                      observationsPerMinute:
-                        description: Observation rate thresholds
-                        properties:
-                          critical:
-                            description: Critical threshold for observations per minute
-                            minimum: 1
-                            type: integer
-                          warning:
-                            description: Warning threshold for observations per minute
-                            minimum: 1
-                            type: integer
-                        type: object
-                    type: object
-                type: object
-              rateLimit:
-                description: Rate limiting configuration
-                properties:
-                  burst:
-                    description: Burst size
-                    minimum: 1
-                    type: integer
-                  enabled:
-                    default: false
-                    description: Enable rate limiting
-                    type: boolean
-                  requestsPerSecond:
-                    description: Maximum requests per second
-                    minimum: 0.1
-                    type: number
-                type: object
-              source:
-                description: Tool name (trivy, kyverno, falco, checkov, kube-bench,
-                  audit, cert-manager, sealed-secrets, kubernetes-events, etc.)
-                pattern: ^[a-z0-9-]+$
-                type: string
-              ttl:
-                description: TTL configuration for observations from this ingester
-                properties:
-                  default:
-                    description: Default TTL as duration string (e.g., '30d', '7d')
-                    pattern: ^[0-9]+(ns|us|µs|ms|s|m|h|d)$
-                    type: string
-                  max:
-                    description: Maximum allowed TTL as duration string
-                    pattern: ^[0-9]+(ns|us|µs|ms|s|m|h|d)$
-                    type: string
-                  min:
-                    description: Minimum allowed TTL as duration string
-                    pattern: ^[0-9]+(ns|us|µs|ms|s|m|h|d)$
-                    type: string
-                type: object
-              webhook:
-                description: Webhook adapter configuration
-                properties:
-                  auth:
-                    description: Authentication configuration
-                    properties:
-                      secretName:
-                        description: Secret name containing auth credentials
-                        type: string
-                      type:
-                        default: none
-                        enum:
-                        - none
-                        - bearer
-                        - basic
-                        type: string
-                    type: object
-                  bufferSize:
-                    default: 100
-                    description: Event buffer size
-                    type: integer
-                  path:
-                    description: HTTP path for webhook endpoint
-                    type: string
-                  port:
-                    description: Port to listen on
-                    maximum: 65535
-                    minimum: 1
-                    type: integer
-                  methods:
-                    description: 'HTTP methods to accept (default: POST)'
-                    items:
-                      enum:
-                      - GET
-                      - POST
-                      - PUT
-                      - PATCH
-                      type: string
-                    type: array
-                  tls:
-                    description: TLS configuration for webhook endpoint
-                    properties:
-                      enabled:
-                        default: true
-                        description: 'Enable TLS (default: true)'
-                        type: boolean
-                      certSecretRef:
-                        description: Secret name containing TLS certificate and key
-                        type: string
-                      minVersion:
-                        description: Minimum TLS version (1.2, 1.3)
-                        enum:
-                        - '1.2'
-                        - '1.3'
-                        type: string
-                    type: object
-                  rateLimit:
-                    description: Rate limiting configuration
-                    properties:
-                      requestsPerSecond:
-                        description: Maximum requests per second
-                        minimum: 0.1
-                        type: number
-                      burst:
-                        description: Burst size
-                        minimum: 1
-                        type: integer
-                    type: object
-                type: object
             required:
             - source
             - ingester
             - destinations
             type: object
+            x-kubernetes-validations:
+            - rule: 'has(self.sources) ? size(self.sources) > 0 : (has(self.source) && has(self.ingester))'
+              message: Either spec.sources must have at least one entry, or both spec.source and spec.ingester must be set
+                (legacy mode)
         type: object
     served: true
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: Ingester
-    listKind: IngesterList
-    plural: ingesters
-    shortNames:
-    - ing
-    - ingester
-    singular: ingester
-  conditions:
-  - lastTransitionTime: '2025-12-10T16:07:35Z'
-    message: no conflicts found
-    reason: NoConflicts
-    status: 'True'
-    type: NamesAccepted
-  - lastTransitionTime: '2025-12-10T16:07:35Z'
-    message: the initial names have been accepted
-    reason: InitialNamesAccepted
-    status: 'True'
-    type: Established
-  storedVersions:
-  - v1

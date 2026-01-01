@@ -18,7 +18,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Ingester represents an Ingester CRD (v1)
+// Ingester represents an Ingester CRD (v1alpha1)
 type Ingester struct {
 	APIVersion string            `json:"apiVersion" yaml:"apiVersion"`
 	Kind       string            `json:"kind" yaml:"kind"`
@@ -26,10 +26,31 @@ type Ingester struct {
 	Spec       IngesterSpec      `json:"spec" yaml:"spec"`
 }
 
+
+// IngesterSource represents a single source configuration in the multi-source array
+type IngesterSource struct {
+	// Name is the source name (DNS label)
+	Name string `json:"name" yaml:"name"`
+	// Type is the source type: informer, logs, or webhook
+	Type string `json:"type" yaml:"type"`
+	// Informer configuration (required if Type == "informer")
+	Informer *InformerConfig `json:"informer,omitempty" yaml:"informer,omitempty"`
+	// Logs configuration (required if Type == "logs")
+	Logs *LogsConfig `json:"logs,omitempty" yaml:"logs,omitempty"`
+	// Webhook configuration (required if Type == "webhook")
+	Webhook *WebhookConfig `json:"webhook,omitempty" yaml:"webhook,omitempty"`
+}
+
 // IngesterSpec represents the spec section of an Ingester CRD
 type IngesterSpec struct {
-	Source        string               `json:"source" yaml:"source"`
-	Ingester      string               `json:"ingester" yaml:"ingester"`
+	// Multi-source configuration (optional). If set, creates one pipeline per source.
+	// If not set, legacy Source/Ingester fields are used for backward compatibility.
+	Sources []IngesterSource `json:"sources,omitempty" yaml:"sources,omitempty"`
+
+	// Legacy fields for backward compatibility (use Sources instead)
+
+	Source        string               `json:"source,omitempty" yaml:"source,omitempty"`
+	Ingester      string               `json:"ingester,omitempty" yaml:"ingester,omitempty"`
 	Destinations  []Destination        `json:"destinations" yaml:"destinations"`
 	Deduplication *DeduplicationConfig `json:"deduplication,omitempty" yaml:"deduplication,omitempty"`
 	Filters       *FilterConfig        `json:"filters,omitempty" yaml:"filters,omitempty"`
@@ -146,7 +167,18 @@ type RateLimitConfig struct {
 
 // LogsConfig represents logs-specific configuration
 type LogsConfig struct {
-	// TBD - placeholder for future logs configuration
+	PodSelector  string       `json:"podSelector,omitempty" yaml:"podSelector,omitempty"`
+	Container    string       `json:"container,omitempty" yaml:"container,omitempty"`
+	Patterns     []LogPattern `json:"patterns,omitempty" yaml:"patterns,omitempty"`
+	SinceSeconds int          `json:"sinceSeconds,omitempty" yaml:"sinceSeconds,omitempty"`
+	PollInterval string       `json:"pollInterval,omitempty" yaml:"pollInterval,omitempty"`
+}
+
+// LogPattern defines a regex pattern to match in logs
+type LogPattern struct {
+	Regex    string  `json:"regex" yaml:"regex"`
+	Type     string  `json:"type,omitempty" yaml:"type,omitempty"`
+	Priority float64 `json:"priority,omitempty" yaml:"priority,omitempty"`
 }
 
 // K8sEventsConfig represents Kubernetes events configuration

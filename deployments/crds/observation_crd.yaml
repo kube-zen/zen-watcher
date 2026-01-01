@@ -10,152 +10,54 @@ spec:
     plural: observations
     singular: observation
     shortNames:
-      - obs
-      - obsv
+    - obs
+    - obsv
   scope: Namespaced
   versions:
-    - name: v2
-      served: true
-      storage: false
-      schema:
-        openAPIV3Schema:
-          type: object
-          properties:
-            spec:
-              type: object
-              required: ["source", "type", "priority", "title", "description", "detectedAt"]
-              properties:
-                source:
-                  type: string
-                  description: "Source that generated this observation (trivy, falco, cert-manager, etc.)"
-                  pattern: "^[a-z0-9-]+$"
-                type:
-                  type: string
-                  description: "Type of event (vulnerability, certificate_expiring, policy_violation, etc.)"
-                  pattern: "^[a-z0-9_]+$"
-                priority:
-                  type: number
-                  description: "Priority score from 0.0 to 1.0 (1.0 = most critical)"
-                  minimum: 0.0
-                  maximum: 1.0
-                title:
-                  type: string
-                  description: "Human-readable title for this observation"
-                description:
-                  type: string
-                  description: "Detailed description of the observation"
-                detectedAt:
-                  type: string
-                  format: date-time
-                  description: "When this observation was detected (required)"
-                expiresAt:
-                  type: string
-                  format: date-time
-                  nullable: true
-                  description: "When this observation expires (null = never expires, uses TTL instead)"
-                resources:
-                  type: array
-                  description: "List of affected Kubernetes resources"
-                  items:
-                    type: object
-                    properties:
-                      apiVersion:
-                        type: string
-                      kind:
-                        type: string
-                      name:
-                        type: string
-                      namespace:
-                        type: string
-                raw:
+  - name: v1alpha1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
+            properties:
+              source:
+                type: string
+                description: 'Tool that detected this event (trivy, falco, kyverno, etc). Must match pattern: lowercase alphanumeric
+                  and hyphens only.'
+                pattern: ^[a-z0-9-]+$
+              type:
+                type: string
+                description: Type of event (vulnerability, certificate_expiring, policy_violation, etc.)
+                pattern: ^[a-z0-9_]+$
+              priority:
+                type: number
+                description: Priority score from 0.0 to 1.0 (1.0 = most critical)
+                minimum: 0.0
+                maximum: 1.0
+              title:
+                type: string
+                description: Human-readable title for this observation
+              description:
+                type: string
+                description: Detailed description of the observation
+              detectedAt:
+                type: string
+                format: date-time
+              expiresAt:
+                type: string
+                format: date-time
+                nullable: true
+                description: When this observation expires (null = never expires, uses TTL instead)
+              resources:
+                type: array
+                description: List of affected Kubernetes resources
+                items:
                   type: object
-                  x-kubernetes-preserve-unknown-fields: true
-                  description: "Raw event data (YAML-compatible map, source-specific structure)"
-                fingerprint:
-                  type: string
-                  description: "Content-based fingerprint for deduplication"
-                adapter:
-                  type: string
-                  description: "Adapter that processed this observation"
-                processedAt:
-                  type: string
-                  format: date-time
-                  nullable: true
-                  description: "When this observation was processed (null = not yet processed)"
-              x-kubernetes-preserve-unknown-fields: true
-            status:
-              type: object
-              properties:
-                processed:
-                  type: boolean
-                  description: "Whether this observation has been processed"
-                lastProcessedAt:
-                  type: string
-                  format: date-time
-                  description: "Timestamp when observation was last processed"
-      subresources:
-        status: {}
-      additionalPrinterColumns:
-        - name: Source
-          type: string
-          jsonPath: .spec.source
-        - name: Type
-          type: string
-          jsonPath: .spec.type
-        - name: Priority
-          type: number
-          format: float
-          jsonPath: .spec.priority
-        - name: Title
-          type: string
-          jsonPath: .spec.title
-          priority: 1
-        - name: Processed
-          type: boolean
-          jsonPath: .status.processed
-        - name: Age
-          type: date
-          jsonPath: .metadata.creationTimestamp
-    - name: v1
-      served: true
-      storage: true
-      schema:
-        openAPIV3Schema:
-          type: object
-          properties:
-            spec:
-              type: object
-              required: ["source", "category", "severity", "eventType"]
-              properties:
-                source:
-                  type: string
-                  description: "Tool that detected this event (trivy, falco, kyverno, etc). Must match pattern: lowercase alphanumeric and hyphens only."
-                  pattern: "^[a-z0-9-]+$"
-                category:
-                  type: string
-                  description: "Event category (security, compliance, performance, operations, cost)"
-                  enum:
-                    - security
-                    - compliance
-                    - performance
-                    - operations
-                    - cost
-                severity:
-                  type: string
-                  description: "Severity level (critical, high, medium, low, info). Values are normalized to uppercase by the controller before storage."
-                  enum:
-                    - critical
-                    - high
-                    - medium
-                    - low
-                    - info
-                eventType:
-                  type: string
-                  description: "Type of event (vulnerability, runtime-threat, policy-violation, etc.). Must match pattern: lowercase alphanumeric and underscores only."
-                  pattern: "^[a-z0-9_]+$"
-                resource:
-                  type: object
-                  description: "Affected Kubernetes resource"
                   properties:
                     apiVersion:
                       type: string
@@ -165,44 +67,112 @@ spec:
                       type: string
                     namespace:
                       type: string
-                      description: "Intentionally preserved to support granular RBAC policies (e.g., 'security-team can only view Observations in prod-* namespaces') and compliance auditing. This enables multi-tenancy controls while maintaining infrastructure-blind design (no cluster-unique identifiers like AWS account ID)."
-                details:
-                  type: object
-                  x-kubernetes-preserve-unknown-fields: true
-                  description: "Event-specific details (flexible JSON)"
-                detectedAt:
-                  type: string
-                  format: date-time
-                ttlSecondsAfterCreation:
-                  type: integer
-                  description: "TTL in seconds after creation (Kubernetes native style, like Jobs). Observation will be deleted after this duration. If not set, uses default TTL from GC configuration."
-                  minimum: 1
-            status:
-              type: object
-              properties:
-                processed:
-                  type: boolean
-                  description: "Whether this event has been processed"
-                lastProcessedAt:
-                  type: string
-                  format: date-time
-                  description: "Timestamp when event was last processed"
-      subresources:
-        status: {}
-      additionalPrinterColumns:
-        - name: Source
-          type: string
-          jsonPath: .spec.source
-        - name: Category
-          type: string
-          jsonPath: .spec.category
-        - name: Severity
-          type: string
-          jsonPath: .spec.severity
-        - name: Processed
-          type: boolean
-          jsonPath: .status.processed
-        - name: Age
-          type: date
-          jsonPath: .metadata.creationTimestamp
-
+              raw:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+                description: Raw event data (YAML-compatible map, source-specific structure)
+              fingerprint:
+                type: string
+                description: Content-based fingerprint for deduplication
+              adapter:
+                type: string
+                description: Adapter that processed this observation
+              processedAt:
+                type: string
+                format: date-time
+                nullable: true
+                description: When this observation was processed (null = not yet processed)
+              category:
+                type: string
+                description: Event category (security, compliance, performance, operations, cost)
+                enum:
+                - security
+                - compliance
+                - performance
+                - operations
+                - cost
+              severity:
+                type: string
+                description: Severity level (critical, high, medium, low, info). Values are normalized to uppercase by the
+                  controller before storage.
+                enum:
+                - critical
+                - high
+                - medium
+                - low
+                - info
+              eventType:
+                type: string
+                description: 'Type of event (vulnerability, runtime-threat, policy-violation, etc.). Must match pattern: lowercase
+                  alphanumeric and underscores only.'
+                pattern: ^[a-z0-9_]+$
+              resource:
+                type: object
+                description: Affected Kubernetes resource
+                properties:
+                  apiVersion:
+                    type: string
+                  kind:
+                    type: string
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+                    description: Intentionally preserved to support granular RBAC policies (e.g., 'security-team can only
+                      view Observations in prod-* namespaces') and compliance auditing. This enables multi-tenancy controls
+                      while maintaining infrastructure-blind design (no cluster-unique identifiers like AWS account ID).
+              details:
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+                description: Event-specific details (flexible JSON)
+              ttlSecondsAfterCreation:
+                type: integer
+                description: TTL in seconds after creation (Kubernetes native style, like Jobs). Observation will be deleted
+                  after this duration. If not set, uses default TTL from GC configuration.
+                minimum: 1
+              domain:
+                type: string
+                description: 'Domain: security, operations, performance, cost, compliance, custom'
+                enum:
+                - security
+                - operations
+                - performance
+                - cost
+                - compliance
+                - custom
+            required: []
+            x-kubernetes-validations:
+            - rule: (has(self.domain) && has(self.type) && has(self.priority) && has(self.title) && has(self.description)
+                && has(self.detectedAt)) || (has(self.category) && has(self.severity) && has(self.eventType))
+              message: Either provide full new-style fields (domain, type, priority, title, description, detectedAt) OR full
+                legacy-style fields (category, severity, eventType)
+          status: {}
+    subresources:
+      status: {}
+    additionalPrinterColumns:
+    - name: Source
+      type: string
+      jsonPath: .spec.source
+    - name: Type
+      type: string
+      jsonPath: .spec.type
+      priority: 1
+    - name: Category
+      type: string
+      jsonPath: .spec.category
+      priority: 1
+    - name: Severity
+      type: string
+      jsonPath: .spec.severity
+      priority: 1
+    - name: Priority
+      type: number
+      format: float
+      jsonPath: .spec.priority
+      priority: 1
+    - name: Ready
+      type: string
+      jsonPath: .status.conditions[?(@.type=="Ready")].status
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
