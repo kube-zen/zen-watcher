@@ -211,16 +211,17 @@ func (isu *IngesterStatusUpdater) UpdateStatus(ctx context.Context, namespace, n
 		},
 	}
 
-	// Update status
+	// Update status - use status subresource only
 	status := map[string]interface{}{
 		"sources":    statusSources,
 		"conditions": conditions,
 	}
 
+	// Set only the status field (preserve metadata for UpdateStatus)
 	current.Object["status"] = status
 
-	// Update using Update - only status field is modified, so Kubernetes will use status subresource
-	_, err = ingesterResource.Update(ctx, current, metav1.UpdateOptions{})
+	// Use UpdateStatus to update via status subresource only (D027: status integrity)
+	_, err = ingesterResource.UpdateStatus(ctx, current, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("failed to update Ingester status: %w", err)
 	}
