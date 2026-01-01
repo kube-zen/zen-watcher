@@ -21,6 +21,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 )
 
@@ -90,8 +91,15 @@ func (lg *LoadGenerator) SendWebhook(endpoint string, payload map[string]interfa
 func (lg *LoadGenerator) sendWebhookViaKubectl(endpoint string, jsonData []byte) error {
 	// This is a minimal implementation - in practice, we'd reuse scripts/data/send-webhooks.sh
 	// For e2e, we'll use a pod-based approach similar to send-webhooks.sh
-	kubeconfig := getKubeconfigPath()
-	clusterName := "zen-demo"
+	// Get cluster name from environment or use default
+	clusterName := os.Getenv("TEST_CLUSTER_NAME")
+	if clusterName == "" {
+		clusterName = "test-cluster"
+	}
+	
+	// Get kubeconfig path
+	home, _ := os.UserHomeDir()
+	kubeconfig := filepath.Join(home, ".config", "k3d", "kubeconfig-"+clusterName+".yaml")
 
 	// Create a temporary pod to send webhook (reuse send-webhooks.sh pattern)
 	podName := fmt.Sprintf("load-gen-%d", time.Now().Unix())

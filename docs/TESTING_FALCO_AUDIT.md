@@ -22,8 +22,8 @@ sudo mv ./kind /usr/local/bin/kind
 # Create cluster
 kind create cluster --name zen-test
 
-# Set context
-kubectl config use-context kind-zen-test
+# Note: Use --context flag instead of changing default context
+# kubectl config use-context kind-zen-test  # Don't do this
 ```
 
 ### Option B: Using minikube
@@ -32,8 +32,8 @@ kubectl config use-context kind-zen-test
 # Start minikube
 minikube start
 
-# Set context
-kubectl config use-context minikube
+# Note: Use --context flag instead of changing default context
+# kubectl config use-context minikube  # Don't do this
 ```
 
 ### Option C: Using k3d
@@ -42,8 +42,8 @@ kubectl config use-context minikube
 # Create cluster
 k3d cluster create zen-test
 
-# Set context
-kubectl config use-context k3d-zen-test
+# Note: Use --context flag instead of changing default context
+# kubectl config use-context k3d-zen-test  # Don't do this
 ```
 
 ## Step 2: Build and Load zen-watcher Image

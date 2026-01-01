@@ -30,17 +30,25 @@ import (
 )
 
 const (
-	clusterName    = "zen-demo"
-	namespace      = "zen-system"
-	testNamespace  = "default"
-	kubeconfigPath = ".kubeconfig-zen-demo"
+	defaultClusterName = "test-cluster"
+	namespace          = "zen-system"
+	testNamespace      = "default"
 )
 
 var (
-	kubectlCmd = []string{"kubectl", "--context=k3d-" + clusterName}
+	clusterName = getClusterName()
+	kubectlCmd  = []string{"kubectl", "--context=k3d-" + clusterName}
 )
 
-// getKubeconfigPath returns the path to the kubeconfig file for zen-demo
+// getClusterName returns the cluster name from environment variable or default
+func getClusterName() string {
+	if name := os.Getenv("TEST_CLUSTER_NAME"); name != "" {
+		return name
+	}
+	return defaultClusterName
+}
+
+// getKubeconfigPath returns the path to the kubeconfig file
 func getKubeconfigPath() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".config", "k3d", "kubeconfig-"+clusterName+".yaml")
@@ -54,7 +62,7 @@ func runKubectl(args ...string) (string, error) {
 	return string(output), err
 }
 
-// getKubernetesClient returns a Kubernetes client for the zen-demo cluster
+// getKubernetesClient returns a Kubernetes client for the test cluster
 func getKubernetesClient() (*kubernetes.Clientset, error) {
 	kubeconfig := getKubeconfigPath()
 	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
@@ -68,11 +76,11 @@ func getKubernetesClient() (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-// TestClusterExists verifies that the zen-demo cluster exists and is accessible
+// TestClusterExists verifies that the test cluster exists and is accessible
 func TestClusterExists(t *testing.T) {
 	kubeconfig := getKubeconfigPath()
 	if _, err := os.Stat(kubeconfig); os.IsNotExist(err) {
-		t.Fatalf("kubeconfig not found: %s (run: make zen-demo-up)", kubeconfig)
+		t.Fatalf("kubeconfig not found: %s (set TEST_CLUSTER_NAME env var or create cluster: %s)", kubeconfig, clusterName)
 	}
 
 	output, err := runKubectl("get", "nodes")

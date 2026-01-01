@@ -25,7 +25,9 @@ zen-watcher includes a built-in garbage collector that automatically deletes obs
 
 **Usage**: The GC runs automatically when zen-watcher is deployed. No manual configuration needed.
 
-**Alternative**: You can use `k8s-ttl-controller` instead if you prefer annotation-based TTL, but zen-watcher's built-in GC uses the spec field (more aligned with Kubernetes patterns like Jobs).
+**Recommended Alternative**: For production deployments, consider using [zen-gc](https://github.com/kube-zen/zen-gc) for more advanced garbage collection policies and cross-resource cleanup capabilities. zen-gc provides a dedicated, specialized GC controller with richer configuration options.
+
+**Other Alternatives**: You can also use `k8s-ttl-controller` if you prefer annotation-based TTL, but zen-watcher's built-in GC uses the spec field (more aligned with Kubernetes patterns like Jobs).
 
 ### 2. Enhanced Field Mapping with TTL Support
 

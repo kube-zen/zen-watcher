@@ -73,12 +73,12 @@ jobs:
       - name: Build
         run: |
           mkdir -p bin
-          go build -o bin/gc-controller ./cmd/gc-controller
+          go build -o bin/zen-watcher ./cmd/zen-watcher
       
       - name: Verify binary
         run: |
-          if [ ! -f bin/gc-controller ]; then
+          if [ ! -f bin/zen-watcher ]; then
             echo "Binary not found"
             exit 1
           fi
-          file bin/gc-controller
+          file bin/zen-watcher

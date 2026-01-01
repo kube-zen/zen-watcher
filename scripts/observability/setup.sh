@@ -7,6 +7,7 @@
 #
 # Usage:
 #   ./scripts/observability/setup.sh <namespace> <kubeconfig_file>
+#   KUBECTL_CONTEXT=k3d-zen-demo ./scripts/observability/setup.sh zen-system
 
 set -euo pipefail
 
@@ -19,11 +20,17 @@ KUBECONFIG_FILE="${2:-${HOME}/.kube/config}"
 
 export KUBECONFIG="${KUBECONFIG_FILE}"
 
+# Build kubectl command with context if provided
+KUBECTL_CMD="kubectl"
+if [ -n "${KUBECTL_CONTEXT:-}" ]; then
+    KUBECTL_CMD="kubectl --context=${KUBECTL_CONTEXT}"
+fi
+
 log_step "Setting up observability..."
 
 # Wait for Grafana to be ready
 log_info "Waiting for Grafana to be ready..."
-kubectl wait --for=condition=ready pod -n grafana -l app.kubernetes.io/name=grafana --timeout=120s 2>/dev/null || {
+$KUBECTL_CMD wait --for=condition=ready pod -n grafana -l app.kubernetes.io/name=grafana --timeout=120s 2>/dev/null || {
     log_warn "Grafana may not be ready yet, continuing..."
 }
 

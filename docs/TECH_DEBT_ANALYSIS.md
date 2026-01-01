@@ -4,7 +4,7 @@
 **Purpose**: Comprehensive analysis of technical debt, bugs, hardcoded values, and code quality issues in zen-watcher  
 **Status**: Pre-OSS Release Review
 
-**Note**: This analysis focuses on actual issues in zen-watcher's codebase. zen-watcher has a working built-in GC (not tech debt). The Generic GC project (`zen-gc`) is a separate, future project and is not related to this analysis.
+**Note**: This analysis focuses on actual issues in zen-watcher's codebase. zen-watcher has a working built-in GC (not tech debt).
 
 ---
 
@@ -12,7 +12,7 @@
 
 This document identifies technical debt, potential bugs, hardcoded values, and code quality issues in zen-watcher that should be addressed to improve code quality and maintainability.
 
-**Note**: zen-watcher has a working built-in GC (`pkg/gc/collector.go`) - this is NOT tech debt. The Generic GC project (`zen-gc`) is a separate, future project and is unrelated to this analysis.
+**Note**: zen-watcher has a working built-in GC (`pkg/gc/collector.go`) - this is NOT tech debt.
 
 **Priority Levels**:
 - 🔴 **Critical**: Must fix before OSS release
@@ -464,7 +464,6 @@ zen-watcher is in excellent shape with **zero tech debt**. All identified issues
 
 **Important Notes**:
 - zen-watcher's built-in GC (`pkg/gc/collector.go`) is working correctly and is NOT tech debt
-- The Generic GC project (`zen-gc`) is a separate, future project and is unrelated to zen-watcher's GC
 - All hardcoded values are now configurable via the `config` package
 - All critical validations are in place
 

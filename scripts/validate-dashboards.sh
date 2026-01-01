@@ -40,16 +40,22 @@ EXPECTED_DASHBOARDS=(
 
 log_step "Validating Grafana dashboards and sources..."
 
+# Build kubectl command with context if provided
+KUBECTL_CMD="kubectl"
+if [ -n "${KUBECTL_CONTEXT:-}" ]; then
+    KUBECTL_CMD="kubectl --context=${KUBECTL_CONTEXT}"
+fi
+
 # Get Grafana password
 GRAFANA_PASSWORD=""
-if kubectl get secret -n "$GRAFANA_NAMESPACE" grafana -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null > /tmp/grafana-password.txt 2>/dev/null; then
+if $KUBECTL_CMD get secret -n "$GRAFANA_NAMESPACE" grafana -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null > /tmp/grafana-password.txt 2>/dev/null; then
     GRAFANA_PASSWORD=$(cat /tmp/grafana-password.txt 2>/dev/null || echo "")
     rm -f /tmp/grafana-password.txt 2>/dev/null || true
 fi
 
 # Try alternative secret name
 if [ -z "$GRAFANA_PASSWORD" ]; then
-    GRAFANA_PASSWORD=$(kubectl get secret -n "$GRAFANA_NAMESPACE" -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
+    GRAFANA_PASSWORD=$($KUBECTL_CMD get secret -n "$GRAFANA_NAMESPACE" -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null || echo "")
 fi
 
 # Fallback to default
@@ -105,7 +111,7 @@ done
 
 # Get observations by source
 log_step "Checking observations by source..."
-OBSERVATIONS_BY_SOURCE=$(kubectl get observations -n "$NAMESPACE" -o jsonpath='{range .items[*]}{.spec.source}{"\n"}{end}' 2>/dev/null | sort | uniq -c | sort -rn || echo "")
+OBSERVATIONS_BY_SOURCE=$($KUBECTL_CMD get observations -n "$NAMESPACE" -o jsonpath='{range .items[*]}{.spec.source}{"\n"}{end}' 2>/dev/null | sort | uniq -c | sort -rn || echo "")
 
 # Validate sources have observations
 log_step "Validating sources have observations..."
@@ -170,7 +176,7 @@ if [ ${#MISSING_SOURCES[@]} -gt 0 ]; then
     done
 fi
 echo ""
-echo "Total Observations: $(kubectl get observations -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l)"
+echo "Total Observations: $($KUBECTL_CMD get observations -n "$NAMESPACE" --no-headers 2>/dev/null | wc -l)"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 

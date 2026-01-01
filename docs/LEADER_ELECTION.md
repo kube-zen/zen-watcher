@@ -1,13 +1,11 @@
 # Leader Election with zen-sdk
 
-zen-watcher supports leader election using **zen-sdk/pkg/leader**, the same approach as zen-flow and zen-lock.
+zen-watcher supports leader election using **zen-sdk/pkg/leader**.
 
 ## Overview
 
 zen-watcher uses **zen-sdk/pkg/leader** (controller-runtime Manager) for leader election:
-- ✅ Consistent approach across all Zen tools
 - ✅ Uses controller-runtime Manager (only for leader election, not reconciliation)
-- ✅ Same API as zen-flow and zen-lock
 - ✅ Standard Kubernetes Lease API
 
 ## Architecture
@@ -111,7 +109,7 @@ Leader election uses controller-runtime Manager with zen-sdk/pkg/leader:
 - **Retry Period**: 2 seconds (default)
 - **Lease Name**: `zen-watcher-leader-election`
 
-These are configured via `zen-sdk/pkg/leader` and match zen-flow and zen-lock.
+These are configured via `zen-sdk/pkg/leader`.
 
 ## Troubleshooting
 
@@ -161,7 +159,6 @@ zen-watcher uses **controller-runtime Manager** purely for leader election:
 - Manager is created with leader election enabled via `zen-sdk/pkg/leader`
 - Manager's `Elected()` channel is used to gate leader-only components
 - No controllers are registered with the Manager (we use client-go directly)
-- This allows zen-watcher to use the same leader election approach as zen-flow/zen-lock
 
 **Architecture:**
 ```
@@ -174,7 +171,17 @@ zen-watcher (client-go)
 
 ---
 
+## Alternative Approaches
+
+**Recommended Alternative**: For more advanced leader election scenarios or if you need service-level leader routing, consider using [zen-lead](https://github.com/kube-zen/zen-lead). zen-lead provides a dedicated leader election controller with service-level leader routing capabilities.
+
+**Current Implementation**: zen-watcher uses zen-sdk/pkg/leader for built-in leader election, which is sufficient for most use cases. zen-lead is recommended when you need:
+- Service-level leader routing (DNS-based leader access)
+- More sophisticated leader election policies
+- Cross-namespace leader coordination
+
 **See also:**
 - [zen-sdk Documentation](https://github.com/kube-zen/zen-sdk)
+- [zen-lead Documentation](https://github.com/kube-zen/zen-lead) - Advanced leader election with service routing
 - [SCALING.md](SCALING.md) - Scaling options for zen-watcher
 
