@@ -116,7 +116,7 @@ func NewOptimizationMetrics(filterPassRate, dedupEffectiveness, lowSeverityPerce
 }
 
 // GetDeduper returns a reference to the deduper for dynamic configuration updates
-func (oc *ObservationCreator) GetDeduper() *dedup.Deduper {
+func (oc *ObservationCreator) GetDeduper() *sdkdedup.Deduper {
 	return oc.deduper
 }
 
