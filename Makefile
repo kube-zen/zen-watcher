@@ -467,3 +467,28 @@ check:
 
 test-race:
 	@go test -v -race -timeout=15m ./...
+
+## zenctl: Build zenctl-oss CLI
+zenctl:
+	@echo "$(GREEN)Building zenctl...$(NC)"
+	@GOWORK=off go build -ldflags "$(GO_LDFLAGS)" -o zenctl ./cmd/zenctl
+
+## zenctl: Build zenctl-oss CLI (workspace-independent)
+zenctl:
+	@echo "$(GREEN)Building zenctl...$(NC)"
+	@GOWORK=off go build -ldflags "$(GO_LDFLAGS)" -o zenctl ./cmd/zenctl
+	@echo "$(GREEN)✅ zenctl built$(NC)"
+
+## test-zenctl: Test zenctl-oss (workspace-independent)
+test-zenctl:
+	@echo "$(GREEN)Testing zenctl...$(NC)"
+	@GOWORK=off go test ./cmd/zenctl/internal/...
+	@echo "$(GREEN)✅ zenctl tests passed$(NC)"
+
+# Version and build info for ldflags (zenctl)
+ZENCTL_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+ZENCTL_GIT_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+ZENCTL_BUILD_TIME ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")
+GO_LDFLAGS = -X github.com/kube-zen/zen-watcher/cmd/zenctl/internal/version.Version=$(ZENCTL_VERSION) \
+             -X github.com/kube-zen/zen-watcher/cmd/zenctl/internal/version.GitCommit=$(ZENCTL_GIT_COMMIT) \
+             -X github.com/kube-zen/zen-watcher/cmd/zenctl/internal/version.BuildTime=$(ZENCTL_BUILD_TIME)
