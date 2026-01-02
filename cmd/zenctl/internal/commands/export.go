@@ -4,8 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
+	"strings"
 
 	"github.com/kube-zen/zen-watcher/cmd/zenctl/internal/client"
 	"github.com/kube-zen/zen-watcher/cmd/zenctl/internal/discovery"
@@ -158,10 +157,10 @@ func redactSecrets(obj map[string]interface{}, path string) {
 	}
 
 	for key, value := range obj {
-		keyLower := key
+		keyLower := strings.ToLower(key)
 		for _, pattern := range secretFields {
 			// Check if key matches secret pattern
-			if contains(keyLower, pattern) {
+			if strings.Contains(keyLower, pattern) {
 				// Redact the value
 				obj[key] = "[REDACTED]"
 				continue
@@ -180,8 +179,3 @@ func redactSecrets(obj map[string]interface{}, path string) {
 		}
 	}
 }
-
-func contains(s, substr string) bool {
-	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
-}
-
