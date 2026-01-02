@@ -13,7 +13,7 @@ spec:
     rules:
       # Alert: High observation rate
       - alert: ZenWatcherHighObservationRate
-        expr: zen_watcher_observations_per_minute > 100
+        expr: sum(zen_watcher_observations_per_minute) by (source) > 100
         for: 5m
         labels:
           severity: warning
@@ -24,7 +24,7 @@ spec:
 
       # Alert: Critical observation rate
       - alert: ZenWatcherCriticalObservationRate
-        expr: zen_watcher_observations_per_minute > 200
+        expr: sum(zen_watcher_observations_per_minute) by (source) > 200
         for: 2m
         labels:
           severity: critical
@@ -35,7 +35,7 @@ spec:
 
       # Alert: High low severity ratio
       - alert: ZenWatcherHighLowSeverityRatio
-        expr: zen_watcher_low_severity_percent > 0.7
+        expr: avg(zen_watcher_low_severity_percent) by (source) > 0.7
         for: 10m
         labels:
           severity: info
@@ -46,7 +46,7 @@ spec:
 
       # Alert: Critical low severity ratio
       - alert: ZenWatcherCriticalLowSeverityRatio
-        expr: zen_watcher_low_severity_percent > 0.9
+        expr: avg(zen_watcher_low_severity_percent) by (source) > 0.9
         for: 5m
         labels:
           severity: warning
@@ -57,7 +57,7 @@ spec:
 
       # Alert: Low dedup effectiveness
       - alert: ZenWatcherLowDedupEffectiveness
-        expr: zen_watcher_dedup_effectiveness < 0.3
+        expr: avg(zen_watcher_dedup_effectiveness) by (source) < 0.3
         for: 10m
         labels:
           severity: info
@@ -68,7 +68,7 @@ spec:
 
       # Alert: Critical low dedup effectiveness
       - alert: ZenWatcherCriticalLowDedupEffectiveness
-        expr: zen_watcher_dedup_effectiveness < 0.1
+        expr: avg(zen_watcher_dedup_effectiveness) by (source) < 0.1
         for: 5m
         labels:
           severity: warning
@@ -104,7 +104,7 @@ spec:
 
       # Alert: High filter pass rate (filter too permissive)
       - alert: ZenWatcherHighFilterPassRate
-        expr: zen_watcher_filter_pass_rate > 0.95
+        expr: avg(zen_watcher_filter_pass_rate) by (source) > 0.95
         for: 10m
         labels:
           severity: info

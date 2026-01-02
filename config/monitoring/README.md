@@ -91,10 +91,10 @@ grafana:
 
 ```
 # Total events created by source, category, and severity
-zen_watcher_events_total{source="trivy",category="security",severity="HIGH"}
+zen_watcher_events_total{source="trivy",category="security",severity="high"}
 
 # Examples:
-zen_watcher_events_total{source="trivy",category="security",severity="HIGH"} 150
+zen_watcher_events_total{source="trivy",category="security",severity="high"} 150
 zen_watcher_events_total{source="kyverno",category="security",severity="MEDIUM"} 45
 zen_watcher_events_total{source="falco",category="security",severity="HIGH"} 12
 zen_watcher_events_total{source="kube-bench",category="compliance",severity="HIGH"} 8
@@ -159,7 +159,7 @@ zen_watcher_webhook_requests_total{endpoint="audit",status="200"}
 sum by (source) (rate(zen_watcher_events_total[5m])) * 60
 
 # HIGH severity events per minute
-sum(rate(zen_watcher_events_total{severity="HIGH"}[5m])) * 60
+sum(rate(zen_watcher_events_total{severity="high"}[5m])) * 60
 ```
 
 ### Tool Health
@@ -213,7 +213,7 @@ groups:
 
   # Tool detection failure
   - alert: ZenWatcherToolOffline
-    expr: zen_watcher_tools_active == 0
+    expr: sum(zen_watcher_tools_active) by (tool) == 0
     for: 5m
     labels:
       severity: info
@@ -223,7 +223,7 @@ groups:
 
   # High event rate (potential attack)
   - alert: ZenWatcherHighEventRate
-    expr: rate(zen_watcher_events_total{severity="HIGH"}[5m]) * 60 > 10
+    expr: rate(zen_watcher_events_total{severity="high"}[5m]) * 60 > 10
     for: 5m
     labels:
       severity: warning

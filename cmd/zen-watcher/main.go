@@ -19,11 +19,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 	"sync"
 	"time"
 
-	"github.com/kube-zen/zen-sdk/pkg/config"
+	sdkconfig "github.com/kube-zen/zen-sdk/pkg/config"
 	"github.com/kube-zen/zen-sdk/pkg/leader"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-sdk/pkg/zenlead"
@@ -150,7 +149,7 @@ func initializeFilterAndConfig(clients *kubernetes.Clients, m *metrics.Metrics, 
 	configMapLoader := config.NewConfigMapLoader(clients.Standard, filterInstance)
 
 	// Initialize ConfigManager for feature configuration
-	configNamespace := config.RequireEnvWithDefault("CONFIG_NAMESPACE", "zen-system")
+	configNamespace := sdkconfig.RequireEnvWithDefault("CONFIG_NAMESPACE", "zen-system")
 	configManager := config.NewConfigManagerWithMetrics(clients.Standard, configNamespace, m)
 
 	return filterInstance, configMapLoader, configManager
@@ -218,7 +217,7 @@ func setupLeaderElection(clients *kubernetes.Clients, namespace string, setupLog
 	}
 
 	// Get replica count from environment
-	replicaCount := config.RequireEnvIntWithDefault("REPLICA_COUNT", 1)
+	replicaCount := sdkconfig.RequireEnvIntWithDefault("REPLICA_COUNT", 1)
 
 	// Enforce safe HA configuration
 	if err := zenlead.EnforceSafeHA(replicaCount, mgrOpts.LeaderElection); err != nil {
@@ -311,8 +310,8 @@ func initializeAdapters(clients *kubernetes.Clients, proc *processor.Processor, 
 
 	// Create webhook channels for Falco and Audit webhooks
 	// Make channel buffer sizes configurable for better backpressure handling
-	falcoBufferSize := config.RequireEnvIntWithDefault("FALCO_BUFFER_SIZE", 100)
-	auditBufferSize := config.RequireEnvIntWithDefault("AUDIT_BUFFER_SIZE", 200)
+	falcoBufferSize := sdkconfig.RequireEnvIntWithDefault("FALCO_BUFFER_SIZE", 100)
+	auditBufferSize := sdkconfig.RequireEnvIntWithDefault("AUDIT_BUFFER_SIZE", 200)
 	falcoAlertsChan := make(chan map[string]interface{}, falcoBufferSize)
 	auditEventsChan := make(chan map[string]interface{}, auditBufferSize)
 
@@ -419,7 +418,7 @@ func startAllServices(ctx context.Context, wg *sync.WaitGroup, configManager *co
 
 	// Log configuration
 	setupLog.Info("zen-watcher ready", sdklog.Operation("startup_complete"))
-	autoDetect := config.RequireEnvWithDefault("AUTO_DETECT_ENABLED", "true")
+	autoDetect := sdkconfig.RequireEnvWithDefault("AUTO_DETECT_ENABLED", "true")
 	setupLog.Info("Configuration loaded",
 		sdklog.Operation("config_load"),
 		sdklog.String("auto_detect_enabled", autoDetect))
@@ -502,7 +501,7 @@ func startHAComponents(ctx context.Context, wg *sync.WaitGroup, observationCreat
 	setupLog.Info("HA optimization enabled, initializing HA components", sdklog.Operation("ha_init"))
 
 	haMetrics := metrics.NewHAMetrics()
-	replicaID := config.RequireEnvWithDefault("HOSTNAME", fmt.Sprintf("replica-%d", time.Now().UnixNano()))
+	replicaID := sdkconfig.RequireEnvWithDefault("HOSTNAME", fmt.Sprintf("replica-%d", time.Now().UnixNano()))
 
 	var haDedupOptimizer *optimization.HADedupOptimizer
 	var haScalingCoordinator *scaling.HPACoordinator
@@ -566,7 +565,7 @@ func updateHAMetrics(haScalingCoordinator *scaling.HPACoordinator, haLoadBalance
 	responseTime := systemMetrics.GetResponseTime()
 
 	// Log real metrics for debugging (if debug mode enabled)
-	if config.RequireEnvWithDefault("DEBUG_METRICS", "false") == "true" {
+	if sdkconfig.RequireEnvWithDefault("DEBUG_METRICS", "false") == "true" {
 		setupLog.Debug("HA Metrics collected",
 			sdklog.Operation("metrics_collection"),
 			sdklog.Float64("cpu_usage", cpuUsage),
@@ -584,7 +583,7 @@ func updateHAMetrics(haScalingCoordinator *scaling.HPACoordinator, haLoadBalance
 	// Update load balancer
 	if haLoadBalancer != nil {
 		load := 0.0 // TODO: Calculate load factor
-		replicaID := config.RequireEnvWithDefault("HOSTNAME", fmt.Sprintf("replica-%d", time.Now().UnixNano()))
+		replicaID := sdkconfig.RequireEnvWithDefault("HOSTNAME", fmt.Sprintf("replica-%d", time.Now().UnixNano()))
 		haLoadBalancer.UpdateReplica(replicaID, load, cpuUsage, memoryUsage, eventsPerSec, true)
 	}
 
