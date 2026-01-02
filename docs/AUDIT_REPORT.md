@@ -276,9 +276,10 @@ zen_watcher_tools_active{tool="falco"}
 - ✅ Mock implementations for testing
 
 **Areas for Improvement**:
-- ⚠️ Could add more edge case tests
-- ⚠️ Could add more performance/benchmark tests
-- ⚠️ Could add more E2E tests for full workflows
+- ✅ **ENHANCED**: Added validation test utilities for alert rules and dashboards
+- ⚠️ Could add more edge case tests (optional)
+- ⚠️ Could add more performance/benchmark tests (optional)
+- ⚠️ Could add more E2E tests for full workflows (optional - current coverage is adequate)
 
 ### Test Execution
 
@@ -330,9 +331,9 @@ zen_watcher_tools_active{tool="falco"}
 ### Long-term Actions (Info)
 
 5. **Test Enhancements**:
-   - [ ] Add alert rule validation tests
-   - [ ] Add dashboard query validation tests
-   - [ ] Add more E2E tests
+   - [x] ✅ **COMPLETED**: Add alert rule validation tests - Created `test/validation/alert_rules_test.go` with comprehensive validation
+   - [x] ✅ **COMPLETED**: Add dashboard query validation tests - Created `test/validation/dashboard_queries_test.go` with comprehensive validation
+   - [ ] Add more E2E tests (optional - current coverage is adequate)
 
 ---
 
