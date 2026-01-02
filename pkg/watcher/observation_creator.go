@@ -218,11 +218,16 @@ func (oc *ObservationCreator) SetGVRResolver(resolver func(source string) schema
 // The canonical pipeline order is enforced in Processor.ProcessEvent:
 // source → (filter | dedup, order chosen by optimization) → normalize → CreateObservation
 func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation *unstructured.Unstructured) error {
-	// Extract source early for metrics (optimized with field extractor)
+	// Extract source early for metrics (optimized with field extractor and type assertion)
 	sourceVal, _ := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "source")
 	source := ""
 	if sourceVal != nil {
-		source = fmt.Sprintf("%v", sourceVal)
+		// Optimize: use type assertion first, fallback to formatting only when needed
+		if str, ok := sourceVal.(string); ok {
+			source = str
+		} else {
+			source = fmt.Sprintf("%v", sourceVal)
+		}
 	}
 	if source == "" {
 		source = "unknown"
@@ -526,11 +531,16 @@ func (oc *ObservationCreator) getProcessingStrategy(source string) string {
 
 // extractDedupKey extracts minimal metadata for deduplication from observation
 func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstructured) dedup.DedupKey {
-	// Extract source (optimized)
+	// Extract source (optimized with type assertion)
 	sourceVal, _ := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "source")
 	source := ""
 	if sourceVal != nil {
-		source = fmt.Sprintf("%v", sourceVal)
+		// Optimize: use type assertion first, fallback to formatting only when needed
+		if str, ok := sourceVal.(string); ok {
+			source = str
+		} else {
+			source = fmt.Sprintf("%v", sourceVal)
+		}
 	}
 
 	// Extract resource info (optimized)

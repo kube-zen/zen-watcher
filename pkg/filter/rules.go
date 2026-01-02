@@ -28,9 +28,10 @@ import (
 // Filter provides filtering functionality for observations
 // Thread-safe: config can be updated dynamically via UpdateConfig()
 type Filter struct {
-	mu      sync.RWMutex
-	config  *FilterConfig
-	metrics *metrics.Metrics // Optional metrics
+	mu          sync.RWMutex
+	config      *FilterConfig
+	metrics     *metrics.Metrics // Optional metrics
+	sourceCache sync.Map          // Cache for lowercased source strings (map[string]string)
 }
 
 // NewFilter creates a new filter with the given configuration
@@ -112,11 +113,19 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	// Track evaluation latency
 	defer func() {
 		if f.metrics != nil {
-			// Extract source for metrics
+			// Extract source for metrics (optimized with type assertion and caching)
 			sourceVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
 			source := "unknown"
 			if sourceVal != nil {
-				source = strings.ToLower(fmt.Sprintf("%v", sourceVal))
+				// Optimize: use type assertion first
+				var sourceStr string
+				if str, ok := sourceVal.(string); ok {
+					sourceStr = str
+				} else {
+					sourceStr = fmt.Sprintf("%v", sourceVal)
+				}
+				// Cache lowercased source strings
+				source = f.getLowercasedSource(sourceStr)
 			}
 			// Track evaluation duration (use "total" as rule_type for overall evaluation)
 			duration := time.Since(startTime).Seconds()
@@ -534,6 +543,21 @@ func (f *Filter) checkRuleFilter(sourceFilter *SourceFilter, rule, source string
 	return true, ""
 }
 
+// getLowercasedSource returns a lowercased version of the source string, using cache
+func (f *Filter) getLowercasedSource(source string) string {
+	if source == "" {
+		return "unknown"
+	}
+	// Check cache first
+	if cached, ok := f.sourceCache.Load(source); ok {
+		return cached.(string)
+	}
+	// Compute and cache
+	lowercased := strings.ToLower(source)
+	f.sourceCache.Store(source, lowercased)
+	return lowercased
+}
+
 // extractSourceAndFilter extracts source and gets source-specific filter
 func (f *Filter) extractSourceAndFilter(observation *unstructured.Unstructured, config *FilterConfig) (string, *SourceFilter) {
 	sourceVal, sourceFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
@@ -541,7 +565,14 @@ func (f *Filter) extractSourceAndFilter(observation *unstructured.Unstructured, 
 		// No source - allow (will be handled elsewhere)
 		return "", nil
 	}
-	source := strings.ToLower(fmt.Sprintf("%v", sourceVal))
+	// Optimize: use type assertion first, then cache lowercased version
+	var sourceStr string
+	if str, ok := sourceVal.(string); ok {
+		sourceStr = str
+	} else {
+		sourceStr = fmt.Sprintf("%v", sourceVal)
+	}
+	source := f.getLowercasedSource(sourceStr)
 	sourceFilter := config.GetSourceFilter(source)
 	return source, sourceFilter
 }

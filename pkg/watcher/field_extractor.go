@@ -15,7 +15,7 @@
 package watcher
 
 import (
-	"fmt"
+	"strings"
 	"sync"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -41,8 +41,8 @@ func (fe *FieldExtractor) ExtractString(obj map[string]interface{}, path ...stri
 		return "", false
 	}
 
-	// Use cached path if available
-	cacheKey := fmt.Sprintf("%v", path)
+	// Use cached path if available (optimized key generation)
+	cacheKey := strings.Join(path, ":")
 	fe.mu.RLock()
 	cachedPath, exists := fe.fieldPathCache[cacheKey]
 	fe.mu.RUnlock()
@@ -65,7 +65,8 @@ func (fe *FieldExtractor) ExtractMap(obj map[string]interface{}, path ...string)
 		return nil, false
 	}
 
-	cacheKey := fmt.Sprintf("%v", path)
+	// Use cached path if available (optimized key generation)
+	cacheKey := strings.Join(path, ":")
 	fe.mu.RLock()
 	cachedPath, exists := fe.fieldPathCache[cacheKey]
 	fe.mu.RUnlock()
@@ -87,7 +88,8 @@ func (fe *FieldExtractor) ExtractFieldCopy(obj map[string]interface{}, path ...s
 		return nil, false
 	}
 
-	cacheKey := fmt.Sprintf("%v", path)
+	// Use cached path if available (optimized key generation)
+	cacheKey := strings.Join(path, ":")
 	fe.mu.RLock()
 	cachedPath, exists := fe.fieldPathCache[cacheKey]
 	fe.mu.RUnlock()
@@ -109,7 +111,8 @@ func (fe *FieldExtractor) ExtractInt64(obj map[string]interface{}, path ...strin
 		return 0, false
 	}
 
-	cacheKey := fmt.Sprintf("%v", path)
+	// Use cached path if available (optimized key generation)
+	cacheKey := strings.Join(path, ":")
 	fe.mu.RLock()
 	cachedPath, exists := fe.fieldPathCache[cacheKey]
 	fe.mu.RUnlock()

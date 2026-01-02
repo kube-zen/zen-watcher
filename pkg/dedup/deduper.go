@@ -298,7 +298,15 @@ func GenerateFingerprint(content map[string]interface{}) string {
 
 // getWindowForSource returns the deduplication window in seconds for a given source
 // Returns source-specific window if configured, otherwise default window
+// Must be called with lock held
 func (d *Deduper) getWindowForSource(source string) int {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.getWindowForSourceUnlocked(source)
+}
+
+// getWindowForSourceUnlocked returns source-specific window without lock (caller must hold lock)
+func (d *Deduper) getWindowForSourceUnlocked(source string) int {
 	if source == "" {
 		return d.defaultWindowSeconds
 	}
@@ -377,8 +385,15 @@ func (d *Deduper) isDuplicateInBucket(keyStr, fingerprintHash string, now time.T
 	return false
 }
 
-// addToBucket adds the key to the appropriate time bucket (called with lock held)
+// addToBucket adds the key to the appropriate time bucket (must be called with lock held)
 func (d *Deduper) addToBucket(keyStr, fingerprintHash string, now time.Time) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.addToBucketUnlocked(keyStr, fingerprintHash, now)
+}
+
+// addToBucketUnlocked adds the key to the appropriate time bucket (caller must hold lock)
+func (d *Deduper) addToBucketUnlocked(keyStr, fingerprintHash string, now time.Time) {
 	bucketKey := d.getBucketKey(now)
 	bucket, exists := d.buckets[bucketKey]
 	if !exists {
@@ -395,15 +410,22 @@ func (d *Deduper) addToBucket(keyStr, fingerprintHash string, now time.Time) {
 	bucket.fingerprints[fingerprintHash] = now
 }
 
-// isDuplicateFingerprintForSource checks if this fingerprint was seen recently for a specific source
+// isDuplicateFingerprintForSource checks if this fingerprint was seen recently for a specific source (must be called with lock held)
 func (d *Deduper) isDuplicateFingerprintForSource(fingerprintHash, source string, now time.Time) bool {
+	d.mu.RLock()
+	defer d.mu.RUnlock()
+	return d.isDuplicateFingerprintForSourceUnlocked(fingerprintHash, source, now)
+}
+
+// isDuplicateFingerprintForSourceUnlocked checks if this fingerprint was seen recently (caller must hold lock)
+func (d *Deduper) isDuplicateFingerprintForSourceUnlocked(fingerprintHash, source string, now time.Time) bool {
 	fp, exists := d.fingerprints[fingerprintHash]
 	if !exists {
 		return false
 	}
 
-	// Get source-specific window
-	windowSeconds := d.getWindowForSource(source)
+	// Get source-specific window (caller must hold lock)
+	windowSeconds := d.getWindowForSourceUnlocked(source)
 
 	// Check if fingerprint is still within window
 	age := now.Sub(fp.timestamp)
@@ -417,8 +439,15 @@ func (d *Deduper) isDuplicateFingerprintForSource(fingerprintHash, source string
 	return true
 }
 
-// addFingerprint adds or updates a fingerprint (called with lock held)
+// addFingerprint adds or updates a fingerprint (must be called with lock held)
 func (d *Deduper) addFingerprint(fingerprintHash string, now time.Time) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.addFingerprintUnlocked(fingerprintHash, now)
+}
+
+// addFingerprintUnlocked adds or updates a fingerprint (caller must hold lock)
+func (d *Deduper) addFingerprintUnlocked(fingerprintHash string, now time.Time) {
 	// Check if we need to evict old fingerprints
 	if len(d.fingerprints) >= d.maxSize {
 		// Evict oldest fingerprint
@@ -442,8 +471,15 @@ func (d *Deduper) addFingerprint(fingerprintHash string, now time.Time) {
 	}
 }
 
-// updateAggregation updates the aggregated event counter (called with lock held)
+// updateAggregation updates the aggregated event counter (must be called with lock held)
 func (d *Deduper) updateAggregation(fingerprintHash string, now time.Time) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.updateAggregationUnlocked(fingerprintHash, now)
+}
+
+// updateAggregationUnlocked updates the aggregated event counter (caller must hold lock)
+func (d *Deduper) updateAggregationUnlocked(fingerprintHash string, now time.Time) {
 	if !d.enableAggregation {
 		return
 	}
@@ -463,9 +499,16 @@ func (d *Deduper) updateAggregation(fingerprintHash string, now time.Time) {
 	agg.count++
 }
 
-// cleanupOldBuckets removes buckets that are outside the window (called with lock held)
+// cleanupOldBuckets removes buckets that are outside the window (must be called with lock held)
 // Uses the maximum window across all sources to ensure we don't delete buckets too early
 func (d *Deduper) cleanupOldBuckets(now time.Time) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.cleanupOldBucketsUnlocked(now)
+}
+
+// cleanupOldBucketsUnlocked removes buckets that are outside the window (caller must hold lock)
+func (d *Deduper) cleanupOldBucketsUnlocked(now time.Time) {
 	// Find the maximum window to ensure we keep buckets for all sources
 	maxWindowSeconds := d.defaultWindowSeconds
 	for _, window := range d.sourceWindows {
@@ -506,9 +549,16 @@ func (d *Deduper) cleanupOldBuckets(now time.Time) {
 	}
 }
 
-// cleanupOldFingerprints removes fingerprints outside the window (called with lock held)
+// cleanupOldFingerprints removes fingerprints outside the window (must be called with lock held)
 // Uses the maximum window across all sources to ensure we don't delete fingerprints too early
 func (d *Deduper) cleanupOldFingerprints(now time.Time) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.cleanupOldFingerprintsUnlocked(now)
+}
+
+// cleanupOldFingerprintsUnlocked removes fingerprints outside the window (caller must hold lock)
+func (d *Deduper) cleanupOldFingerprintsUnlocked(now time.Time) {
 	// Find the maximum window to ensure we keep fingerprints for all sources
 	maxWindowSeconds := d.defaultWindowSeconds
 	for _, window := range d.sourceWindows {
@@ -525,9 +575,16 @@ func (d *Deduper) cleanupOldFingerprints(now time.Time) {
 	}
 }
 
-// cleanupOldAggregations removes aggregated events outside the window (called with lock held)
+// cleanupOldAggregations removes aggregated events outside the window (must be called with lock held)
 // Uses the maximum window across all sources to ensure we don't delete aggregations too early
 func (d *Deduper) cleanupOldAggregations(now time.Time) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.cleanupOldAggregationsUnlocked(now)
+}
+
+// cleanupOldAggregationsUnlocked removes aggregated events outside the window (caller must hold lock)
+func (d *Deduper) cleanupOldAggregationsUnlocked(now time.Time) {
 	if !d.enableAggregation {
 		return
 	}
@@ -585,78 +642,125 @@ func (d *Deduper) ShouldCreate(key DedupKey) bool {
 // If content is provided, uses fingerprint-based dedup and all enhanced features
 // Returns true if this is the first event (should create), false if duplicate within window
 // Uses source-specific deduplication windows if configured
+// Optimized with fine-grained locking for better concurrent performance
 func (d *Deduper) ShouldCreateWithContent(key DedupKey, content map[string]interface{}) bool {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-
 	keyStr := key.String()
 	now := time.Now()
 	source := key.Source
 
-	// Get source-specific window
-	windowSeconds := d.getWindowForSource(source)
+	// Get source-specific window (read-only, use RLock)
+	d.mu.RLock()
+	windowSeconds := d.getWindowForSourceUnlocked(source)
+	d.mu.RUnlock()
 	ttl := time.Duration(windowSeconds) * time.Second
 
-	// 1. Rate limiting check (only if we have a source)
+	// 1. Rate limiting check (only if we have a source) - needs write lock
 	if source != "" {
-		if !d.checkRateLimit(source, now) {
+		d.mu.Lock()
+		allowed := d.checkRateLimit(source, now)
+		d.mu.Unlock()
+		if !allowed {
 			return false // Rate limit exceeded
 		}
 	}
 
-	// 2. Generate fingerprint if content is provided
+	// 2. Generate fingerprint if content is provided (no lock needed)
 	fingerprintHash := ""
 	if content != nil {
 		fingerprintHash = GenerateFingerprint(content)
 
 		// Check fingerprint-based dedup first (more accurate) with source-specific window
-		if d.isDuplicateFingerprintForSource(fingerprintHash, source, now) {
-			// Update aggregation
+		d.mu.RLock()
+		isDup := d.isDuplicateFingerprintForSource(fingerprintHash, source, now)
+		d.mu.RUnlock()
+		if isDup {
+			// Update aggregation (needs write lock)
+			d.mu.Lock()
 			d.updateAggregation(fingerprintHash, now)
+			d.mu.Unlock()
 			return false // Duplicate fingerprint
 		}
 	}
 
-	// 3. Check time-based bucket dedup
-	if d.isDuplicateInBucket(keyStr, fingerprintHash, now) {
+	// 3. Check time-based bucket dedup (read-only)
+	d.mu.RLock()
+	isDup := d.isDuplicateInBucket(keyStr, fingerprintHash, now)
+	d.mu.RUnlock()
+	if isDup {
 		if fingerprintHash != "" {
+			// Update aggregation (needs write lock)
+			d.mu.Lock()
 			d.updateAggregation(fingerprintHash, now)
+			d.mu.Unlock()
 		}
 		return false // Duplicate in bucket
 	}
 
-	// 4. Cleanup old buckets and fingerprints
-	d.cleanupOldBuckets(now)
-	d.cleanupOldFingerprints(now)
-	d.cleanupOldAggregations(now)
-
-	// 5. Original cache-based dedup (for backward compatibility) with source-specific TTL
-	d.cleanupExpiredForSource(source, now)
-	if ent, exists := d.cache[keyStr]; exists {
-		// Use source-specific window for TTL check
-		if now.Sub(ent.timestamp) < ttl {
-			d.updateLRU(keyStr)
-			ent.timestamp = now
-			return false // Duplicate in original cache
+	// 4. Check original cache-based dedup (read-only first)
+	d.mu.RLock()
+	ent, exists := d.cache[keyStr]
+	if exists {
+		isExpired := now.Sub(ent.timestamp) >= ttl
+		d.mu.RUnlock()
+		if !isExpired {
+			// Update LRU and timestamp (needs write lock)
+			d.mu.Lock()
+			// Double-check after acquiring write lock
+			if ent, stillExists := d.cache[keyStr]; stillExists && now.Sub(ent.timestamp) < ttl {
+				d.updateLRU(keyStr)
+				ent.timestamp = now
+				d.mu.Unlock()
+				return false // Duplicate in original cache
+			}
+			// Entry expired or removed, continue to add
+			if stillExists := d.cache[keyStr]; stillExists != nil {
+				delete(d.cache, keyStr)
+				d.removeFromLRU(keyStr)
+			}
+			d.mu.Unlock()
+		} else {
+			// Entry expired, remove it (needs write lock)
+			d.mu.Lock()
+			if stillExists := d.cache[keyStr]; stillExists != nil {
+				delete(d.cache, keyStr)
+				d.removeFromLRU(keyStr)
+			}
+			d.mu.Unlock()
 		}
-		delete(d.cache, keyStr)
-		d.removeFromLRU(keyStr)
+	} else {
+		d.mu.RUnlock()
 	}
 
-	// 6. Add to all structures
-	d.addToBucket(keyStr, fingerprintHash, now)
+	// 5. Cleanup old buckets and fingerprints (periodic, needs write lock)
+	// Only cleanup occasionally to avoid lock contention
+	d.mu.Lock()
+	d.cleanupOldBucketsUnlocked(now)
+	d.cleanupOldFingerprintsUnlocked(now)
+	d.cleanupOldAggregationsUnlocked(now)
+	d.cleanupExpiredForSourceUnlocked(source, now)
+
+	// 6. Add to all structures (write operations)
+	d.addToBucketUnlocked(keyStr, fingerprintHash, now)
 	if fingerprintHash != "" {
-		d.addFingerprint(fingerprintHash, now)
-		d.updateAggregation(fingerprintHash, now)
+		d.addFingerprintUnlocked(fingerprintHash, now)
+		d.updateAggregationUnlocked(fingerprintHash, now)
 	}
-	d.addToCache(keyStr, now)
+	d.addToCacheUnlocked(keyStr, now)
+	d.mu.Unlock()
 
 	return true // First event, should create
 }
 
-// cleanupExpiredForSource removes expired entries for a specific source (called with lock held)
+// cleanupExpiredForSource removes expired entries for a specific source (must be called with lock held)
 // Uses source-specific window if configured
 func (d *Deduper) cleanupExpiredForSource(source string, now time.Time) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.cleanupExpiredForSourceUnlocked(source, now)
+}
+
+// cleanupExpiredForSourceUnlocked removes expired entries for a specific source (caller must hold lock)
+func (d *Deduper) cleanupExpiredForSourceUnlocked(source string, now time.Time) {
 	expired := make([]string, 0)
 
 	// Parse source from cache keys to check expiration with source-specific window
@@ -672,7 +776,7 @@ func (d *Deduper) cleanupExpiredForSource(source string, now time.Time) {
 		}
 
 		// Use source-specific window if this entry matches the source
-		entryWindowSeconds := d.getWindowForSource(keySource)
+		entryWindowSeconds := d.getWindowForSourceUnlocked(keySource)
 		entryTTL := time.Duration(entryWindowSeconds) * time.Second
 
 		if now.Sub(ent.timestamp) >= entryTTL {
@@ -682,12 +786,19 @@ func (d *Deduper) cleanupExpiredForSource(source string, now time.Time) {
 
 	for _, keyStr := range expired {
 		delete(d.cache, keyStr)
-		d.removeFromLRU(keyStr)
+		d.removeFromLRUUnlocked(keyStr)
 	}
 }
 
-// addToCache adds a new entry to cache with LRU eviction if needed
+// addToCache adds a new entry to cache with LRU eviction if needed (must be called with lock held)
 func (d *Deduper) addToCache(keyStr string, timestamp time.Time) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.addToCacheUnlocked(keyStr, timestamp)
+}
+
+// addToCacheUnlocked adds a new entry to cache with LRU eviction if needed (caller must hold lock)
+func (d *Deduper) addToCacheUnlocked(keyStr string, timestamp time.Time) {
 	// If at capacity, evict LRU (oldest)
 	if len(d.cache) >= d.maxSize && len(d.lruList) > 0 {
 		// Remove oldest (first in list)
@@ -704,8 +815,15 @@ func (d *Deduper) addToCache(keyStr string, timestamp time.Time) {
 	d.lruList = append(d.lruList, keyStr)
 }
 
-// updateLRU moves key to end of LRU list (most recent)
+// updateLRU moves key to end of LRU list (most recent) (must be called with lock held)
 func (d *Deduper) updateLRU(keyStr string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.updateLRUUnlocked(keyStr)
+}
+
+// updateLRUUnlocked moves key to end of LRU list (caller must hold lock)
+func (d *Deduper) updateLRUUnlocked(keyStr string) {
 	// Find and remove from current position
 	for i, k := range d.lruList {
 		if k == keyStr {
@@ -718,8 +836,15 @@ func (d *Deduper) updateLRU(keyStr string) {
 	d.lruList = append(d.lruList, keyStr)
 }
 
-// removeFromLRU removes key from LRU list
+// removeFromLRU removes key from LRU list (must be called with lock held)
 func (d *Deduper) removeFromLRU(keyStr string) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.removeFromLRUUnlocked(keyStr)
+}
+
+// removeFromLRUUnlocked removes key from LRU list (caller must hold lock)
+func (d *Deduper) removeFromLRUUnlocked(keyStr string) {
 	for i, k := range d.lruList {
 		if k == keyStr {
 			d.lruList = append(d.lruList[:i], d.lruList[i+1:]...)
