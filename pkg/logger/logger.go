@@ -109,10 +109,11 @@ func GetLogger() *Logger {
 	return globalLogger
 }
 
-// WithFields creates a new logger with structured fields
-func (l *Logger) WithFields(fields Fields) *zap.Logger {
-	zapFields := []zap.Field{}
+// buildZapFields converts Fields struct to zap.Field slice
+func buildZapFields(fields Fields) []zap.Field {
+	zapFields := make([]zap.Field, 0, 16) // Pre-allocate for common fields
 
+	// String fields
 	if fields.Source != "" {
 		zapFields = append(zapFields, zap.String("source", fields.Source))
 	}
@@ -140,20 +141,22 @@ func (l *Logger) WithFields(fields Fields) *zap.Logger {
 	if fields.ResourceName != "" {
 		zapFields = append(zapFields, zap.String("resource_name", fields.ResourceName))
 	}
-	if fields.Error != nil {
-		zapFields = append(zapFields, zap.Error(fields.Error))
-	}
 	if fields.CorrelationID != "" {
 		zapFields = append(zapFields, zap.String("correlation_id", fields.CorrelationID))
 	}
 	if fields.Duration != "" {
 		zapFields = append(zapFields, zap.String("duration", fields.Duration))
 	}
-	if fields.Count > 0 {
-		zapFields = append(zapFields, zap.Int("count", fields.Count))
-	}
 	if fields.Reason != "" {
 		zapFields = append(zapFields, zap.String("reason", fields.Reason))
+	}
+
+	// Non-string fields
+	if fields.Error != nil {
+		zapFields = append(zapFields, zap.Error(fields.Error))
+	}
+	if fields.Count > 0 {
+		zapFields = append(zapFields, zap.Int("count", fields.Count))
 	}
 	if fields.Additional != nil {
 		for k, v := range fields.Additional {
@@ -161,7 +164,12 @@ func (l *Logger) WithFields(fields Fields) *zap.Logger {
 		}
 	}
 
-	return l.Logger.With(zapFields...)
+	return zapFields
+}
+
+// WithFields creates a new logger with structured fields
+func (l *Logger) WithFields(fields Fields) *zap.Logger {
+	return l.Logger.With(buildZapFields(fields)...)
 }
 
 // WithContext adds correlation ID from context

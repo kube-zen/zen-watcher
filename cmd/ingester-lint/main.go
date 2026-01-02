@@ -165,6 +165,26 @@ func lintIngester(ingester IngesterSpec, filename string) []Issue {
 	}
 
 	// Check required fields
+	issues = append(issues, lintRequiredFields(spec)...)
+
+	// Lint destinations
+	destinations, _ := spec["destinations"].([]interface{})
+	issues = append(issues, lintDestinations(destinations)...)
+
+	// Dangerous settings checks
+	source, _ := spec["source"].(string)
+	ingesterType, _ := spec["ingester"].(string)
+	issues = append(issues, lintDangerousSettings(spec, source, ingesterType)...)
+
+	// Check normalization hints
+	issues = append(issues, lintNormalizationHints(destinations)...)
+
+	return issues
+}
+
+func lintRequiredFields(spec map[string]interface{}) []Issue {
+	var issues []Issue
+
 	if source, ok := spec["source"].(string); !ok || source == "" {
 		issues = append(issues, Issue{
 			Severity: "error",
@@ -193,7 +213,12 @@ func lintIngester(ingester IngesterSpec, filename string) []Issue {
 		})
 	}
 
-	// Lint destinations
+	return issues
+}
+
+func lintDestinations(destinations []interface{}) []Issue {
+	var issues []Issue
+
 	for i, dest := range destinations {
 		destMap, ok := dest.(map[string]interface{})
 		if !ok {
@@ -230,9 +255,11 @@ func lintIngester(ingester IngesterSpec, filename string) []Issue {
 		}
 	}
 
-	// Dangerous settings checks
-	source, _ := spec["source"].(string)
-	ingesterType, _ := spec["ingester"].(string)
+	return issues
+}
+
+func lintDangerousSettings(spec map[string]interface{}, source, ingesterType string) []Issue {
+	var issues []Issue
 
 	// Check for high-rate sources without filters
 	if isHighRateSource(source, ingesterType) {
@@ -277,7 +304,12 @@ func lintIngester(ingester IngesterSpec, filename string) []Issue {
 		}
 	}
 
-	// Check normalization hints
+	return issues
+}
+
+func lintNormalizationHints(destinations []interface{}) []Issue {
+	var issues []Issue
+
 	for i, dest := range destinations {
 		destMap, ok := dest.(map[string]interface{})
 		if !ok {

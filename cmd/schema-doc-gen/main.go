@@ -83,7 +83,7 @@ func generateIngesterDoc(outputDir string) error {
 	}
 
 	outputPath := filepath.Join(outputDir, "INGESTER_SCHEMA_REFERENCE.md")
-	return os.WriteFile(outputPath, []byte(md), 0644)
+	return os.WriteFile(outputPath, []byte(md), 0600)
 }
 
 func generateObservationDoc(outputDir string) error {
@@ -125,7 +125,7 @@ func generateObservationDoc(outputDir string) error {
 	}
 
 	outputPath := filepath.Join(outputDir, "OBSERVATIONS_SCHEMA_REFERENCE.md")
-	return os.WriteFile(outputPath, []byte(md), 0644)
+	return os.WriteFile(outputPath, []byte(md), 0600)
 }
 
 func generateMarkdown(kind string, schema map[string]interface{}) string {

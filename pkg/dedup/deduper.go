@@ -116,19 +116,10 @@ type Deduper struct {
 	wg     sync.WaitGroup // Wait group for cleanup goroutine
 }
 
-// NewDeduper creates a new deduper with specified configuration and enhanced features
-func NewDeduper(windowSeconds, maxSize int) *Deduper {
-	if windowSeconds <= 0 {
-		windowSeconds = 60 // Default 60 seconds
-	}
-	if maxSize <= 0 {
-		maxSize = 10000 // Default 10k entries
-	}
-
-	// Parse per-source windows from environment variable
-	// Format: JSON object like {"cert-manager": 86400, "falco": 60, "default": 60}
+// parseSourceWindows parses per-source windows from environment variable
+func parseSourceWindows(defaultWindow int) (map[string]int, int) {
 	sourceWindows := make(map[string]int)
-	defaultWindowSeconds := windowSeconds
+	defaultWindowSeconds := defaultWindow
 
 	if sourceWindowsStr := os.Getenv("DEDUP_WINDOW_BY_SOURCE"); sourceWindowsStr != "" {
 		var config map[string]interface{}
@@ -148,7 +139,11 @@ func NewDeduper(windowSeconds, maxSize int) *Deduper {
 		}
 	}
 
-	// Read bucket size from env, default to 10% of default window or minimum 10 seconds
+	return sourceWindows, defaultWindowSeconds
+}
+
+// parseBucketSize reads bucket size from environment
+func parseBucketSize(defaultWindowSeconds int) int {
 	bucketSizeSeconds := defaultWindowSeconds / 10
 	if bucketSizeSeconds < 10 {
 		bucketSizeSeconds = 10
@@ -158,8 +153,11 @@ func NewDeduper(windowSeconds, maxSize int) *Deduper {
 			bucketSizeSeconds = b
 		}
 	}
+	return bucketSizeSeconds
+}
 
-	// Read rate limit from env, default 100 events/second per source
+// parseRateLimits reads rate limit configuration from environment
+func parseRateLimits() (int, int) {
 	maxRatePerSource := 100
 	if rateStr := os.Getenv("DEDUP_MAX_RATE_PER_SOURCE"); rateStr != "" {
 		if r, err := strconv.Atoi(rateStr); err == nil && r > 0 {
@@ -167,7 +165,6 @@ func NewDeduper(windowSeconds, maxSize int) *Deduper {
 		}
 	}
 
-	// Read burst capacity from env, default 2x rate limit
 	maxRateBurst := maxRatePerSource * 2
 	if burstStr := os.Getenv("DEDUP_RATE_BURST"); burstStr != "" {
 		if b, err := strconv.Atoi(burstStr); err == nil && b > 0 {
@@ -175,13 +172,33 @@ func NewDeduper(windowSeconds, maxSize int) *Deduper {
 		}
 	}
 
-	// Read aggregation enable flag from env, default true
+	return maxRatePerSource, maxRateBurst
+}
+
+// parseAggregationFlag reads aggregation enable flag from environment
+func parseAggregationFlag() bool {
 	enableAggregation := true
 	if aggStr := os.Getenv("DEDUP_ENABLE_AGGREGATION"); aggStr != "" {
 		if aggStr == "false" || aggStr == "0" {
 			enableAggregation = false
 		}
 	}
+	return enableAggregation
+}
+
+// NewDeduper creates a new deduper with specified configuration and enhanced features
+func NewDeduper(windowSeconds, maxSize int) *Deduper {
+	if windowSeconds <= 0 {
+		windowSeconds = 60 // Default 60 seconds
+	}
+	if maxSize <= 0 {
+		maxSize = 10000 // Default 10k entries
+	}
+
+	sourceWindows, defaultWindowSeconds := parseSourceWindows(windowSeconds)
+	bucketSizeSeconds := parseBucketSize(defaultWindowSeconds)
+	maxRatePerSource, maxRateBurst := parseRateLimits()
+	enableAggregation := parseAggregationFlag()
 
 	deduper := &Deduper{
 		cache:                make(map[string]*entry),
@@ -376,13 +393,6 @@ func (d *Deduper) addToBucket(keyStr, fingerprintHash string, now time.Time) {
 
 	bucket.keys[keyStr] = now
 	bucket.fingerprints[fingerprintHash] = now
-}
-
-// isDuplicateFingerprint checks if this fingerprint was seen recently (called with lock held)
-// Note: This uses default window since fingerprint doesn't have source context
-// For source-specific dedup, use isDuplicateFingerprintForSource
-func (d *Deduper) isDuplicateFingerprint(fingerprintHash string, now time.Time) bool {
-	return d.isDuplicateFingerprintForSource(fingerprintHash, "", now)
 }
 
 // isDuplicateFingerprintForSource checks if this fingerprint was seen recently for a specific source
@@ -642,21 +652,6 @@ func (d *Deduper) ShouldCreateWithContent(key DedupKey, content map[string]inter
 	d.addToCache(keyStr, now)
 
 	return true // First event, should create
-}
-
-// cleanupExpired removes expired entries (called with lock held)
-// Uses default window for cleanup (backward compatibility)
-func (d *Deduper) cleanupExpired(now time.Time) {
-	expired := make([]string, 0)
-	for keyStr, ent := range d.cache {
-		if now.Sub(ent.timestamp) >= d.ttl {
-			expired = append(expired, keyStr)
-		}
-	}
-	for _, keyStr := range expired {
-		delete(d.cache, keyStr)
-		d.removeFromLRU(keyStr)
-	}
 }
 
 // cleanupExpiredForSource removes expired entries for a specific source (called with lock held)

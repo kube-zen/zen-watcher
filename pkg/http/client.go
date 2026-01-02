@@ -105,6 +105,8 @@ func NewHardenedHTTPClient(config *HTTPClientConfig) *HardenedHTTPClient {
 	if config.TLSClientConfig != nil {
 		transport.TLSClientConfig = config.TLSClientConfig
 	} else if config.TLSInsecureSkipVerify {
+		// #nosec G402 - TLS InsecureSkipVerify may be required for development/testing
+		// or when connecting to self-signed certificates in controlled environments
 		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	}
 

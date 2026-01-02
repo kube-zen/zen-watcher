@@ -140,7 +140,10 @@ spec:
 	time.Sleep(2 * time.Second)
 
 	// Cleanup
-	exec.Command("kubectl", "--context=k3d-"+clusterName, "delete", "pod", podName, "-n", lg.namespace, "--ignore-not-found=true").Run()
+	if err := exec.Command("kubectl", "--context=k3d-"+clusterName, "delete", "pod", podName, "-n", lg.namespace, "--ignore-not-found=true").Run(); err != nil {
+		// Log but don't fail - cleanup is best effort
+		fmt.Printf("Warning: failed to cleanup pod %s: %v\n", podName, err)
+	}
 
 	return nil
 }

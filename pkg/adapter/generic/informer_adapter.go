@@ -98,7 +98,7 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 	informer := a.manager.GetInformer(gvr, resyncPeriod)
 
 	// Add event handlers
-	informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			u := obj.(*unstructured.Unstructured)
 			event := RawEvent{
@@ -167,6 +167,9 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 			}
 		},
 	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to add event handlers: %w", err)
+	}
 
 	// Start informer manager
 	a.manager.Start(ctx)
