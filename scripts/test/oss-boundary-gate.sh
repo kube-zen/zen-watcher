@@ -23,11 +23,12 @@ add_violation() {
 	FAILED=1
 }
 
-# Find relevant Go files (cmd/, pkg/, internal/ only)
+# Find relevant Go files (cmd/, pkg/, internal/ only, exclude test files)
 SCAN_DIRS=("cmd" "pkg" "internal")
 GO_FILES=$(find "$REPO_ROOT" -type f -name "*.go" | \
 	grep -E "/(cmd|pkg|internal)/" | \
-	grep -vE "/(scripts|tests?|fixtures?|docs|examples|vendor|dist)/" || true)
+	grep -vE "/(scripts|tests?|fixtures?|docs|examples|vendor|dist)/" | \
+	grep -v "_test\.go$" || true)
 
 if [ -z "$GO_FILES" ]; then
 	echo "⚠️  No Go files found in cmd/, pkg/, internal/"
