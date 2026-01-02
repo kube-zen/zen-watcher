@@ -165,7 +165,56 @@ func (o *GenericOrchestrator) reloadAdapters() {
 
 		// Process each config (one per source in multi-source mode)
 		for _, ingesterConfig := range ingesterConfigs {
-			o.processIngesterConfig(ingesterConfig, item, activeSources)
+			// Convert IngesterConfig to generic.SourceConfig
+			genericConfig := config.ConvertIngesterConfigToGeneric(ingesterConfig)
+			if genericConfig == nil {
+				if o.metrics != nil {
+					o.metrics.IngestersConfigErrors.WithLabelValues(ingesterConfig.Source, "convert_to_generic_failed").Inc()
+				}
+				logger := sdklog.NewLogger("zen-watcher-orchestrator")
+				logger.Warn("Failed to convert IngesterConfig to generic.SourceConfig",
+					sdklog.Operation("convert_to_generic"),
+					sdklog.String("source", ingesterConfig.Source))
+				continue
+			}
+
+			source := genericConfig.Source
+			activeSources[source] = true
+
+			// Update ingester active status
+			if o.metrics != nil {
+				o.metrics.IngestersActive.WithLabelValues(source, genericConfig.Ingester, item.GetNamespace()).Set(1)
+				o.metrics.IngestersStatus.WithLabelValues(source).Set(1) // 1 = active
+			}
+
+			// Check if adapter already exists
+			if existingAdapter, exists := o.activeAdapters[source]; exists {
+				// Check if config changed
+				if o.configChanged(source, genericConfig) {
+					// Stop old adapter
+					existingAdapter.Stop()
+					delete(o.activeAdapters, source)
+				} else {
+					// Config unchanged, skip
+					continue
+				}
+			}
+
+			// Extract source name from source identifier (format: namespace/name/sourceName)
+			sourceName := o.extractSourceName(source, item.GetNamespace(), item.GetName())
+
+			// Create and start adapter
+			if !o.createAndStartAdapter(source, sourceName, genericConfig, item) {
+				continue
+			}
+
+			logger := sdklog.NewLogger("zen-watcher-orchestrator")
+			logger.Info("Generic adapter started",
+				sdklog.Operation("adapter_started"),
+				sdklog.String("source", source),
+				sdklog.String("ingester", genericConfig.Ingester),
+				sdklog.String("namespace", item.GetNamespace()),
+				sdklog.String("name", item.GetName()))
 		}
 	}
 
