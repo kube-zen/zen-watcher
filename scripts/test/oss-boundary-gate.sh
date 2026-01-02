@@ -8,8 +8,17 @@ REPO_ROOT="${1:-$(pwd)}"
 FAILED=0
 VIOLATIONS=()
 
-echo "Checking OSS boundary in $REPO_ROOT..."
-echo "Scanning: cmd/, pkg/, internal/ (excluding scripts/, tests/, fixtures/, docs/, examples/, vendor/, dist/)"
+# Strict mode: includes _test.go files and optionally scripts/
+STRICT_MODE="${OSS_BOUNDARY_STRICT:-0}"
+
+if [ "$STRICT_MODE" = "1" ]; then
+	echo "Checking OSS boundary in $REPO_ROOT (STRICT MODE)..."
+	echo "Scanning: cmd/, pkg/, internal/ (including _test.go, optionally scripts/)"
+	echo "Excluding: docs/, vendor/, dist/"
+else
+	echo "Checking OSS boundary in $REPO_ROOT..."
+	echo "Scanning: cmd/, pkg/, internal/ (excluding scripts/, tests/, fixtures/, docs/, examples/, vendor/, dist/)"
+fi
 echo ""
 
 # Function to add violation with rule ID
@@ -23,12 +32,22 @@ add_violation() {
 	FAILED=1
 }
 
-# Find relevant Go files (cmd/, pkg/, internal/ only, exclude test files)
+# Find relevant Go files (cmd/, pkg/, internal/ only)
 SCAN_DIRS=("cmd" "pkg" "internal")
-GO_FILES=$(find "$REPO_ROOT" -type f -name "*.go" | \
-	grep -E "/(cmd|pkg|internal)/" | \
-	grep -vE "/(scripts|tests?|fixtures?|docs|examples|vendor|dist)/" | \
-	grep -v "_test\.go$" || true)
+if [ "$STRICT_MODE" = "1" ]; then
+	# Strict mode: include _test.go, optionally include scripts/
+	GO_FILES=$(find "$REPO_ROOT" -type f -name "*.go" | \
+		grep -E "/(cmd|pkg|internal)/" | \
+		grep -vE "/(tests?|fixtures?|docs|examples|vendor|dist)/" || true)
+	SCRIPT_FILES=$(find "$REPO_ROOT/scripts" -type f -name "*.go" 2>/dev/null || true)
+else
+	# Default mode: exclude _test.go and scripts/
+	GO_FILES=$(find "$REPO_ROOT" -type f -name "*.go" | \
+		grep -E "/(cmd|pkg|internal)/" | \
+		grep -vE "/(scripts|tests?|fixtures?|docs|examples|vendor|dist)/" | \
+		grep -v "_test\.go$" || true)
+	SCRIPT_FILES=""
+fi
 
 if [ -z "$GO_FILES" ]; then
 	echo "⚠️  No Go files found in cmd/, pkg/, internal/"
