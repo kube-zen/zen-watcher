@@ -38,6 +38,8 @@ func TestZenctlOSSRemainsSaaSFree(t *testing.T) {
 		"doctor",
 		"adapters",
 		"e2e",
+		"export",
+		"validate",
 		"version",
 		"completion",
 	}

@@ -44,7 +44,9 @@ Zen Kubernetes resources including DeliveryFlows, Destinations, and Ingesters.`,
 	rootCmd.AddCommand(commands.NewVersionCommand())
 	rootCmd.AddCommand(commands.NewAdaptersCommand())
 	rootCmd.AddCommand(commands.NewE2ECommand())
-	// TODO S802-S804: Add export, validate, diff, support-bundle commands
+	rootCmd.AddCommand(commands.NewExportCommand())
+	rootCmd.AddCommand(commands.NewValidateCommand())
+	// TODO: Add diff, support-bundle commands
 
 	// Add completion command
 	rootCmd.AddCommand(commands.NewCompletionCommand(rootCmd))
