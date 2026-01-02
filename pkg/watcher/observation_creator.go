@@ -87,9 +87,8 @@ type OptimizationMetrics struct {
 
 // sourceCounters tracks counters per source for rate calculations
 type sourceCounters struct {
-	attempted   int64 // Total events attempted
-	filtered    int64 // Events filtered out
-	deduped     int64 // Events deduplicated
+	attempted int64 // Total events attempted
+	deduped   int64 // Events deduplicated
 	created     int64 // Events created
 	lowSeverity int64 // LOW severity count
 	totalCount  int64 // Total count for severity distribution
@@ -798,6 +797,7 @@ func (oc *ObservationCreator) updateOptimizationMetrics(source string) {
 }
 
 // extractReasonFromDetails extracts reason from details map
+// nolint:unused // Kept for future use
 func (oc *ObservationCreator) extractReasonFromDetails(detailsVal map[string]interface{}) string {
 	reasonFields := []string{"reason", "rule", "testNumber", "checkId", "vulnerabilityID", "auditID"}
 	for _, field := range reasonFields {
