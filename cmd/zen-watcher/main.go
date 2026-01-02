@@ -24,11 +24,11 @@ import (
 
 	sdkconfig "github.com/kube-zen/zen-sdk/pkg/config"
 	"github.com/kube-zen/zen-sdk/pkg/leader"
+	sdklifecycle "github.com/kube-zen/zen-sdk/pkg/lifecycle"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-sdk/pkg/zenlead"
 	"github.com/kube-zen/zen-watcher/internal/informers"
 	"github.com/kube-zen/zen-watcher/internal/kubernetes"
-	"github.com/kube-zen/zen-watcher/internal/lifecycle"
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/balancer"
 	watcherconfig "github.com/kube-zen/zen-watcher/pkg/config"
@@ -91,7 +91,8 @@ func main() {
 		sdklog.String("license", "Apache 2.0"))
 
 	// Setup signal handling and context
-	ctx, _ := lifecycle.SetupSignalHandler()
+	ctx, cancel := sdklifecycle.ShutdownContext(context.Background(), "zen-watcher")
+	defer cancel()
 
 	// Initialize core components
 	m := metrics.NewMetrics()
@@ -130,9 +131,10 @@ func main() {
 		observationCreator, clients, gvrs, m, leaderElectedCh, filterInstance, log, setupLog, falcoAlertsChan, auditEventsChan)
 
 	// Wait for shutdown
-	lifecycle.WaitForShutdown(ctx, &wg, func() {
-		setupLog.Info("zen-watcher stopped", sdklog.Operation("shutdown"))
-	})
+	<-ctx.Done()
+	setupLog.Info("Shutting down zen-watcher...", sdklog.Operation("shutdown"))
+	wg.Wait()
+	setupLog.Info("zen-watcher stopped", sdklog.Operation("shutdown_complete"))
 }
 
 // initializeFilterAndConfig initializes filter and config components

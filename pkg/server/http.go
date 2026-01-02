@@ -25,6 +25,7 @@ import (
 	"sync"
 	"time"
 
+	sdklifecycle "github.com/kube-zen/zen-sdk/pkg/lifecycle"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/prometheus/client_golang/prometheus"
@@ -437,10 +438,6 @@ func (s *Server) Start(ctx context.Context, wg *sync.WaitGroup) {
 	// Graceful shutdown handler
 	go func() {
 		<-ctx.Done()
-		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.Info("Shutting down HTTP server",
-			sdklog.Operation("http_shutdown"))
-
 		// Get shutdown timeout from env var, default to 10 seconds
 		shutdownTimeout := 10 * time.Second
 		if timeoutStr := os.Getenv("HTTP_SHUTDOWN_TIMEOUT"); timeoutStr != "" {
@@ -455,17 +452,11 @@ func (s *Server) Start(ctx context.Context, wg *sync.WaitGroup) {
 			}
 		}
 
-		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
-		defer shutdownCancel()
-		if err := s.server.Shutdown(shutdownCtx); err != nil {
+		// Use zen-sdk lifecycle for graceful shutdown
+		if err := sdklifecycle.ShutdownHTTPServer(ctx, s.server, "zen-watcher-server", shutdownTimeout); err != nil {
 			logger := sdklog.NewLogger("zen-watcher-server")
 			logger.Error(err, "HTTP server shutdown error",
 				sdklog.Operation("http_shutdown"))
-		} else {
-			logger := sdklog.NewLogger("zen-watcher-server")
-			logger.Info("HTTP server shut down gracefully",
-				sdklog.Operation("http_shutdown"),
-				sdklog.Duration("duration", shutdownTimeout))
 		}
 	}()
 }
