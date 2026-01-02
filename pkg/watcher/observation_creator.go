@@ -709,7 +709,7 @@ func (oc *ObservationCreator) recordEventAttempted(source string) {
 func (oc *ObservationCreator) recordEventFiltered(source, reason string) {
 	counters := oc.getOrCreateSourceCounters(source)
 	if counters != nil {
-		counters.filtered++
+		// Filtered events are tracked via observationsFiltered metric
 	}
 }
 
