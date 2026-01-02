@@ -15,8 +15,9 @@
 package advisor
 
 import (
+	"bytes"
 	"fmt"
-	"strings"
+	"text/template"
 )
 
 // SuggestionEngine generates actionable suggestions from opportunities
@@ -125,27 +126,56 @@ func (se *SuggestionEngine) calculateReduction(opp Opportunity) float64 {
 }
 
 // formatTemplate formats a template string with opportunity data
+// Optimized: use text/template instead of multiple strings.ReplaceAll calls
 func (se *SuggestionEngine) formatTemplate(tmpl string, opp Opportunity, reduction float64) string {
-	result := tmpl
-	result = strings.ReplaceAll(result, "{{.source}}", opp.Source)
-	result = strings.ReplaceAll(result, "{{.reduction}}", fmt.Sprintf("%.0f", reduction*100))
-	result = strings.ReplaceAll(result, "{{.description}}", opp.Description)
-	return result
+	t, err := template.New("suggestion").Parse(tmpl)
+	if err != nil {
+		// Fallback to simple replacement if template parsing fails
+		return tmpl
+	}
+
+	data := map[string]interface{}{
+		"source":      opp.Source,
+		"reduction":   fmt.Sprintf("%.0f", reduction*100),
+		"description": opp.Description,
+	}
+
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, data); err != nil {
+		// Fallback to simple replacement if template execution fails
+		return tmpl
+	}
+
+	return buf.String()
 }
 
 // formatCommand formats a kubectl command template
+// Optimized: use text/template instead of multiple strings.ReplaceAll calls
 func (se *SuggestionEngine) formatCommand(tmpl string, opp Opportunity, reduction float64) string {
-	result := tmpl
-	result = strings.ReplaceAll(result, "{{.source}}", opp.Source)
-	result = strings.ReplaceAll(result, "{{.reduction}}", fmt.Sprintf("%.0f", reduction*100))
+	t, err := template.New("command").Parse(tmpl)
+	if err != nil {
+		// Fallback to simple replacement if template parsing fails
+		return tmpl
+	}
+
+	data := map[string]interface{}{
+		"source":    opp.Source,
+		"reduction": fmt.Sprintf("%.0f", reduction*100),
+	}
 
 	// Format minPriority value
 	if opp.Type == "high_low_severity" {
 		// Suggest minPriority = 0.5 for high low severity
-		result = strings.ReplaceAll(result, "{{.minPriority}}", "0.5")
+		data["minPriority"] = "0.5"
 	}
 
-	return result
+	var buf bytes.Buffer
+	if err := t.Execute(&buf, data); err != nil {
+		// Fallback to simple replacement if template execution fails
+		return tmpl
+	}
+
+	return buf.String()
 }
 
 // getDefaultRules returns default suggestion rules

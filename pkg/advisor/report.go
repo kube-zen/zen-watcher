@@ -16,6 +16,7 @@ package advisor
 
 import (
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -69,24 +70,26 @@ func (it *ImpactTracker) GenerateWeeklyReport() *WeeklyReport {
 }
 
 // Format formats the weekly report as a string
+// Optimized: use strings.Builder instead of string concatenation for better performance
 func (wr *WeeklyReport) Format() string {
-	report := "\n=== Weekly Optimization Report ===\n\n"
-	report += fmt.Sprintf("Period: %s to %s\n\n", wr.StartDate.Format("2006-01-02"), wr.EndDate.Format("2006-01-02"))
-	report += "Summary:\n"
-	report += fmt.Sprintf("  Total Optimizations Applied: %d\n", wr.TotalOptimizations)
-	report += fmt.Sprintf("  Total Observations Reduced: %d\n", wr.TotalObservationsReduced)
-	report += fmt.Sprintf("  Average Reduction: %.1f%%\n", wr.AverageReductionPercent*100)
-	report += fmt.Sprintf("  CPU Savings: %.1f minutes\n", wr.TotalCPUSavingsMinutes)
-	report += "\n"
-	report += "Most Effective:\n"
-	report += fmt.Sprintf("  Source: %s\n", wr.MostEffectiveSource)
-	report += fmt.Sprintf("  Action: %s\n", wr.MostEffectiveAction)
-	report += "\n"
-	report += fmt.Sprintf("Sources Optimized: %d\n", len(wr.SourcesOptimized))
+	var b strings.Builder
+	b.WriteString("\n=== Weekly Optimization Report ===\n\n")
+	fmt.Fprintf(&b, "Period: %s to %s\n\n", wr.StartDate.Format("2006-01-02"), wr.EndDate.Format("2006-01-02"))
+	b.WriteString("Summary:\n")
+	fmt.Fprintf(&b, "  Total Optimizations Applied: %d\n", wr.TotalOptimizations)
+	fmt.Fprintf(&b, "  Total Observations Reduced: %d\n", wr.TotalObservationsReduced)
+	fmt.Fprintf(&b, "  Average Reduction: %.1f%%\n", wr.AverageReductionPercent*100)
+	fmt.Fprintf(&b, "  CPU Savings: %.1f minutes\n", wr.TotalCPUSavingsMinutes)
+	b.WriteString("\n")
+	b.WriteString("Most Effective:\n")
+	fmt.Fprintf(&b, "  Source: %s\n", wr.MostEffectiveSource)
+	fmt.Fprintf(&b, "  Action: %s\n", wr.MostEffectiveAction)
+	b.WriteString("\n")
+	fmt.Fprintf(&b, "Sources Optimized: %d\n", len(wr.SourcesOptimized))
 	for _, source := range wr.SourcesOptimized {
-		report += fmt.Sprintf("  - %s\n", source)
+		fmt.Fprintf(&b, "  - %s\n", source)
 	}
-	report += "\n"
+	b.WriteString("\n")
 
-	return report
+	return b.String()
 }
