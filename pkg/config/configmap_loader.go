@@ -21,8 +21,8 @@ import (
 	"os"
 	"sync"
 
-	"github.com/kube-zen/zen-watcher/pkg/filter"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+	"github.com/kube-zen/zen-watcher/pkg/filter"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
@@ -33,7 +33,7 @@ import (
 // ConfigMapLoader watches a ConfigMap and reloads filter configuration dynamically
 type ConfigMapLoader struct {
 	clientSet          kubernetes.Interface
-	filter             *filter.Filter
+	filter             *sdkfilter.Filter
 	configMapName      string
 	configMapNamespace string
 	configMapKey       string
@@ -44,7 +44,7 @@ type ConfigMapLoader struct {
 // NewConfigMapLoader creates a new ConfigMap loader that watches for changes
 func NewConfigMapLoader(
 	clientSet kubernetes.Interface,
-	filter *filter.Filter,
+	filter *sdkfilter.Filter,
 ) *ConfigMapLoader {
 	configMapName := os.Getenv("FILTER_CONFIGMAP_NAME")
 	if configMapName == "" {
@@ -196,7 +196,7 @@ func (cml *ConfigMapLoader) handleConfigMapChange(cm *corev1.ConfigMap) {
 	}
 
 	// Parse JSON
-	var config filter.FilterConfig
+	var config sdkfilter.FilterConfig
 	if err := json.Unmarshal([]byte(filterJSON), &config); err != nil {
 		logger := sdklog.NewLogger("zen-watcher-config")
 		logger.Error(err, "Failed to parse filter config from ConfigMap, keeping last good config",
@@ -208,7 +208,7 @@ func (cml *ConfigMapLoader) handleConfigMapChange(cm *corev1.ConfigMap) {
 
 	// Validate config has sources map (prevent nil map panic)
 	if config.Sources == nil {
-		config.Sources = make(map[string]filter.SourceFilter)
+		config.Sources = make(map[string]sdkfilter.SourceFilter)
 	}
 
 	// Store config
@@ -247,14 +247,14 @@ func (cml *ConfigMapLoader) loadConfigWithContext(ctx context.Context) (*filter.
 	}
 
 	// Parse JSON
-	var config filter.FilterConfig
+	var config sdkfilter.FilterConfig
 	if err := json.Unmarshal([]byte(filterJSON), &config); err != nil {
 		return nil, fmt.Errorf("failed to parse filter config: %w", err)
 	}
 
 	// Validate config has sources map (prevent nil map panic)
 	if config.Sources == nil {
-		config.Sources = make(map[string]filter.SourceFilter)
+		config.Sources = make(map[string]sdkfilter.SourceFilter)
 	}
 
 	return &config, nil
@@ -276,7 +276,7 @@ func (cml *ConfigMapLoader) setLastGoodConfig(config *filter.FilterConfig) {
 }
 
 // GetLastGoodConfig returns the last known good configuration
-func (cml *ConfigMapLoader) GetLastGoodConfig() *filter.FilterConfig {
+func (cml *ConfigMapLoader) GetLastGoodConfig() *sdkfilter.FilterConfig {
 	cml.mu.RLock()
 	defer cml.mu.RUnlock()
 	return cml.lastGoodConfig

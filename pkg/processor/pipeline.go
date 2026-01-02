@@ -22,7 +22,6 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
-	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/hooks"
 	sdkdedup "github.com/kube-zen/zen-sdk/pkg/dedup"
 	sdkfilter "github.com/kube-zen/zen-sdk/pkg/filter"
@@ -44,8 +43,8 @@ type Processor struct {
 
 // NewProcessor creates a new event processor
 func NewProcessor(
-	filter *filter.Filter,
-	deduper *dedup.Deduper,
+	filter *sdkfilter.Filter,
+	deduper *sdkdedup.Deduper,
 	observationCreator *watcher.ObservationCreator,
 ) *Processor {
 	return NewProcessorWithMetrics(filter, deduper, observationCreator, nil)
@@ -53,8 +52,8 @@ func NewProcessor(
 
 // NewProcessorWithMetrics creates a new event processor with metrics
 func NewProcessorWithMetrics(
-	filter *filter.Filter,
-	deduper *dedup.Deduper,
+	filter *sdkfilter.Filter,
+	deduper *sdkdedup.Deduper,
 	observationCreator *watcher.ObservationCreator,
 	m *metrics.Metrics,
 ) *Processor {
