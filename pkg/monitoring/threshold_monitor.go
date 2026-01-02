@@ -16,7 +16,6 @@ package monitoring
 
 import (
 	"context"
-	"sync"
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
