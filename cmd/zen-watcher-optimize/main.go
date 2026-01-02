@@ -20,9 +20,9 @@ import (
 	"fmt"
 	"os"
 
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-watcher/internal/kubernetes"
 	"github.com/kube-zen/zen-watcher/pkg/cli"
-	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 )
 
 func main() {

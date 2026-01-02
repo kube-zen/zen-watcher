@@ -19,8 +19,8 @@ import (
 	"sync"
 	"time"
 
-	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-sdk/pkg/gc/ratelimiter"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 )
 
 // PerKeyRateLimiter wraps zen-sdk rate limiter to provide per-key (per-IP) rate limiting.
@@ -104,4 +104,3 @@ func (rl *PerKeyRateLimiter) RateLimitMiddleware(next http.HandlerFunc) http.Han
 		next(w, r)
 	}
 }
-
