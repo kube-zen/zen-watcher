@@ -35,7 +35,6 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/dispatcher"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/gc"
-	sdkfilter "github.com/kube-zen/zen-sdk/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/optimization"
 	"github.com/kube-zen/zen-watcher/pkg/orchestrator"
@@ -137,16 +136,14 @@ func main() {
 }
 
 // initializeFilterAndConfig initializes filter and config components
-func initializeFilterAndConfig(clients *kubernetes.Clients, m *metrics.Metrics, setupLog *sdklog.Logger) (*sdkfilter.Filter, *config.ConfigMapLoader, *config.ConfigManager) {
+func initializeFilterAndConfig(clients *kubernetes.Clients, m *metrics.Metrics, setupLog *sdklog.Logger) (*filter.Filter, *config.ConfigMapLoader, *config.ConfigManager) {
 	// Load filter configuration from ConfigMap (initial load)
 	filterConfig, err := filter.LoadFilterConfig(clients.Standard)
 	if err != nil {
 		setupLog.Warn("Failed to load filter config, continuing without filter", sdklog.Operation("filter_load"), sdklog.String("error", err.Error()))
-		filterConfig = &sdkfilter.FilterConfig{Sources: make(map[string]sdkfilter.SourceFilter)}
+		filterConfig = &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	}
-	// Create metrics adapter for zen-watcher metrics
-	metricsAdapter := filter.NewMetricsAdapter(m)
-	filterInstance := sdkfilter.NewFilterWithMetrics(filterConfig, metricsAdapter)
+	filterInstance := filter.NewFilterWithMetrics(filterConfig, m)
 
 	// Create ConfigMap loader for dynamic reloading
 	configMapLoader := config.NewConfigMapLoader(clients.Standard, filterInstance)
@@ -162,7 +159,7 @@ func initializeFilterAndConfig(clients *kubernetes.Clients, m *metrics.Metrics, 
 }
 
 // initializeObservationCreator initializes observation creator and processor
-func initializeObservationCreator(clients *kubernetes.Clients, gvrs *kubernetes.GVRs, filterInstance *sdkfilter.Filter, m *metrics.Metrics, setupLog *sdklog.Logger) (*watcher.ObservationCreator, *processor.Processor) {
+func initializeObservationCreator(clients *kubernetes.Clients, gvrs *kubernetes.GVRs, filterInstance *filter.Filter, m *metrics.Metrics, setupLog *sdklog.Logger) (*watcher.ObservationCreator, *processor.Processor) {
 	// Create optimization metrics wrapper
 	optimizationMetrics := watcher.NewOptimizationMetrics(
 		m.FilterPassRate,
@@ -668,20 +665,20 @@ func handleConfigChange(
 			// Get current filter config
 			currentFilterConfig := filterInstance.GetConfig()
 			if currentFilterConfig == nil {
-				currentFilterConfig = &sdkfilter.FilterConfig{
-					Sources: make(map[string]sdkfilter.SourceFilter),
+				currentFilterConfig = &filter.FilterConfig{
+					Sources: make(map[string]filter.SourceFilter),
 				}
 			}
 
 			// Create a new config with updated global namespace filter
 			// We need to preserve existing source filters and expression
-			newFilterConfig := &sdkfilter.FilterConfig{
+			newFilterConfig := &filter.FilterConfig{
 				Expression: currentFilterConfig.Expression,
 				Sources:    currentFilterConfig.Sources,
 			}
 
 			// Create or update global namespace filter
-			globalFilter := &sdkfilter.GlobalNamespaceFilter{
+			globalFilter := &filter.GlobalNamespaceFilter{
 				Enabled: true,
 			}
 
@@ -719,12 +716,12 @@ func handleConfigChange(
 			currentFilterConfig := filterInstance.GetConfig()
 			if currentFilterConfig != nil {
 				// Create a copy to avoid modifying the original
-				newConfig := &sdkfilter.FilterConfig{
+				newConfig := &filter.FilterConfig{
 					Expression: currentFilterConfig.Expression,
 					Sources:    currentFilterConfig.Sources,
 				}
 				if currentFilterConfig.GlobalNamespaceFilter != nil {
-					newConfig.GlobalNamespaceFilter = &sdkfilter.GlobalNamespaceFilter{
+					newConfig.GlobalNamespaceFilter = &filter.GlobalNamespaceFilter{
 						Enabled:            false,
 						IncludedNamespaces: currentFilterConfig.GlobalNamespaceFilter.IncludedNamespaces,
 						ExcludedNamespaces: currentFilterConfig.GlobalNamespaceFilter.ExcludedNamespaces,

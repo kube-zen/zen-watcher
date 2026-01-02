@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"time"
 
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	sdkfilter "github.com/kube-zen/zen-sdk/pkg/filter"
@@ -37,9 +36,13 @@ var (
 )
 
 // Filter wraps zen-sdk Filter with zen-watcher metrics support
+// This wrapper maintains backward compatibility while using zen-sdk internally
 type Filter struct {
-	*sdkfilter.Filter
-	metrics *metrics.Metrics
+	mu          sync.RWMutex
+	config      *FilterConfig
+	metrics     *metrics.Metrics        // Optional metrics
+	sourceCache sync.Map                 // Cache for lowercased source strings (map[string]string)
+	sdkFilter   *sdkfilter.Filter       // Internal zen-sdk filter
 }
 
 // NewFilter creates a new filter with the given configuration
@@ -54,8 +57,9 @@ func NewFilterWithMetrics(config *FilterConfig, m *metrics.Metrics) *Filter {
 		metricsAdapter = NewMetricsAdapter(m)
 	}
 	return &Filter{
-		Filter:  sdkfilter.NewFilterWithMetrics(config, metricsAdapter),
-		metrics: m,
+		config:    config,
+		metrics:   m,
+		sdkFilter: sdkfilter.NewFilterWithMetrics(config, metricsAdapter),
 	}
 }
 
@@ -107,12 +111,11 @@ func (f *Filter) GetConfig() *FilterConfig {
 // Allow checks if an observation should be allowed based on filter rules
 // Returns true if the observation should be processed, false if it should be filtered out
 // This is called BEFORE normalization and deduplication
-// Delegates to zen-sdk filter but maintains custom metrics tracking
+// Delegates to zen-sdk filter
 func (f *Filter) Allow(observation *unstructured.Unstructured) bool {
 	if f == nil || f.sdkFilter == nil {
 		return true
 	}
-	// Use SDK filter for actual filtering logic
 	return f.sdkFilter.Allow(observation)
 }
 
@@ -141,85 +144,6 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			f.metrics.FilterDecisions.WithLabelValues(source, "filter", "sdk_filtered").Inc()
 		}
 		return false, "sdk_filtered"
-	}
-	return true, ""
-}
-	startTime := time.Now()
-
-	if f == nil {
-		// No filter configured - allow all
-		return true, ""
-	}
-
-	// Get config atomically (thread-safe read)
-	config := f.getConfig()
-	if config == nil {
-		// No filter configured - allow all
-		return true, ""
-	}
-
-	// Track evaluation latency
-	defer func() {
-		if f.metrics != nil {
-			// Extract source for metrics (optimized with type assertion and caching)
-			sourceVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
-			source := "unknown"
-			if sourceVal != nil {
-				// Optimize: use type assertion first
-				var sourceStr string
-				if str, ok := sourceVal.(string); ok {
-					sourceStr = str
-				} else {
-					sourceStr = fmt.Sprintf("%v", sourceVal)
-				}
-				// Cache lowercased source strings
-				source = f.getLowercasedSource(sourceStr)
-			}
-			// Track evaluation duration (use "total" as rule_type for overall evaluation)
-			duration := time.Since(startTime).Seconds()
-			f.metrics.FilterRuleEvaluationDuration.WithLabelValues(source, "total").Observe(duration)
-		}
-	}()
-
-	// Check if expression-based filtering is enabled
-	if allowed, reason := f.checkExpressionFilter(config, observation); reason != "" {
-		return allowed, reason
-	}
-
-	// Extract source and get source-specific filter
-	source, sourceFilter := f.extractSourceAndFilter(observation, config)
-	if sourceFilter == nil {
-		return true, "" // No filter for this source - allow
-	}
-
-	// Check if source is enabled
-	if !sourceFilter.IsSourceEnabled() {
-		if f.metrics != nil {
-			f.metrics.FilterDecisions.WithLabelValues(source, "filter", "source_disabled").Inc()
-		}
-		filterLogger.Debug("Source disabled, filtering out observation",
-			sdklog.Operation("filter_check"),
-			sdklog.String("source", source),
-			sdklog.String("reason", "source_disabled"))
-		return false, "source_disabled"
-	}
-
-	// Extract fields from observation for filtering
-	fields := f.extractObservationFields(observation)
-
-	// Apply global namespace filtering first (if enabled)
-	if allowed, reason := f.checkGlobalNamespaceFilter(config, fields.namespace, source); !allowed {
-		return false, reason
-	}
-
-	// Apply all source-specific filters
-	if allowed, reason := f.applySourceFilters(sourceFilter, fields, source); !allowed {
-		return false, reason
-	}
-
-	// All filters passed
-	if f.metrics != nil {
-		f.metrics.FilterDecisions.WithLabelValues(source, "allow", "all_passed").Inc()
 	}
 	return true, ""
 }

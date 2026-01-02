@@ -414,7 +414,7 @@ func splitPath(path string) []string {
 }
 
 // extractDedupKey extracts deduplication key from observation and raw event
-func (p *Processor) extractDedupKey(observation *unstructured.Unstructured, raw *generic.RawEvent) sdkdedup.DedupKey {
+func (p *Processor) extractDedupKey(observation *unstructured.Unstructured, raw *generic.RawEvent) dedup.DedupKey {
 	// Generate fingerprint from raw data
 	rawEvent := watcher.RawEvent{
 		Source: raw.Source,
@@ -425,14 +425,14 @@ func (p *Processor) extractDedupKey(observation *unstructured.Unstructured, raw 
 
 	// Hash the fingerprint for dedup key
 	hash := sha256.Sum256([]byte(fingerprint))
-	return sdkdedup.DedupKey{
+	return dedup.DedupKey{
 		Source:      raw.Source,
 		MessageHash: fmt.Sprintf("%x", hash[:16]),
 	}
 }
 
 // shouldCreateWithStrategy determines if an observation should be created using the configured dedup strategy
-func (p *Processor) shouldCreateWithStrategy(key sdkdedup.DedupKey, content map[string]interface{}, config *generic.SourceConfig) bool {
+func (p *Processor) shouldCreateWithStrategy(key dedup.DedupKey, content map[string]interface{}, config *generic.SourceConfig) bool {
 	// Get strategy from config, default to "fingerprint" if not set
 	strategyName := "fingerprint"
 	if config != nil && config.Dedup != nil {
@@ -442,7 +442,7 @@ func (p *Processor) shouldCreateWithStrategy(key sdkdedup.DedupKey, content map[
 	}
 
 	// Build strategy config from generic config
-	strategyConfig := sdkdedup.StrategyConfig{
+	strategyConfig := dedup.StrategyConfig{
 		Strategy:           strategyName,
 		Window:             "",
 		Fields:             nil,
@@ -455,7 +455,7 @@ func (p *Processor) shouldCreateWithStrategy(key sdkdedup.DedupKey, content map[
 	}
 
 	// Get strategy from registry
-	strategy := sdkdedup.GetStrategy(strategyConfig)
+	strategy := dedup.GetStrategy(strategyConfig)
 
 	// Use strategy to determine if we should create
 	return strategy.ShouldCreate(p.deduper, key, content)

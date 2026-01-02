@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
-	"github.com/kube-zen/zen-watcher/pkg/dedup"
+	"github.com/kube-zen/zen-sdk/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -42,7 +42,7 @@ func setupBenchmarkProcessor() (*Processor, dynamic.Interface) {
 
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
-	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+	deduper := sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 
 	// Create observation creator with nil metrics for benchmarking
 	creator := watcher.NewObservationCreator(

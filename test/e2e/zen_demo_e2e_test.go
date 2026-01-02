@@ -255,7 +255,7 @@ spec:
 	}
 
 	// Verify dedup strategy
-	dedupOutput, err := runKubectl("get", "ingester", "test-canonical-spec", "-n", testNamespace, "-o", "jsonpath={.spec.processing.dedup.strategy}")
+	dedupOutput, err := runKubectl("get", "ingester", "test-canonical-spec", "-n", testNamespace, "-o", "jsonpath={.spec.processing.sdkdedup.strategy}")
 	if err != nil {
 		t.Errorf("Failed to get dedup strategy: %v", err)
 	} else {
