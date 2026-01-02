@@ -71,6 +71,14 @@ func (f *Filter) UpdateConfig(config *FilterConfig) {
 		config.Sources = make(map[string]SourceFilter)
 	}
 	f.config = config
+	// Update internal SDK filter
+	if f.sdkFilter != nil {
+		var metricsAdapter sdkfilter.FilterMetrics
+		if f.metrics != nil {
+			metricsAdapter = NewMetricsAdapter(f.metrics)
+		}
+		f.sdkFilter = sdkfilter.NewFilterWithMetrics(config, metricsAdapter)
+	}
 	filterLogger.Debug("Filter configuration updated dynamically",
 		sdklog.Operation("config_update"))
 }
@@ -99,14 +107,43 @@ func (f *Filter) GetConfig() *FilterConfig {
 // Allow checks if an observation should be allowed based on filter rules
 // Returns true if the observation should be processed, false if it should be filtered out
 // This is called BEFORE normalization and deduplication
+// Delegates to zen-sdk filter but maintains custom metrics tracking
 func (f *Filter) Allow(observation *unstructured.Unstructured) bool {
-	_, reason := f.AllowWithReason(observation)
-	return reason == ""
+	if f == nil || f.sdkFilter == nil {
+		return true
+	}
+	// Use SDK filter for actual filtering logic
+	return f.sdkFilter.Allow(observation)
 }
 
 // AllowWithReason checks if an observation should be allowed and returns the reason if filtered
 // Returns (true, "") if allowed, (false, reason) if filtered
+// Delegates to zen-sdk filter but maintains custom metrics tracking
 func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, string) {
+	if f == nil || f.sdkFilter == nil {
+		return true, ""
+	}
+	// Use SDK filter for actual filtering logic
+	// Note: SDK filter doesn't have AllowWithReason, so we use Allow and track metrics separately
+	allowed := f.sdkFilter.Allow(observation)
+	if !allowed {
+		// Extract source for metrics
+		sourceVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
+		source := "unknown"
+		if sourceVal != nil {
+			if str, ok := sourceVal.(string); ok {
+				source = str
+			} else {
+				source = fmt.Sprintf("%v", sourceVal)
+			}
+		}
+		if f.metrics != nil {
+			f.metrics.FilterDecisions.WithLabelValues(source, "filter", "sdk_filtered").Inc()
+		}
+		return false, "sdk_filtered"
+	}
+	return true, ""
+}
 	startTime := time.Now()
 
 	if f == nil {

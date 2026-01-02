@@ -25,9 +25,9 @@ import (
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/config"
-	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+	sdkdedup "github.com/kube-zen/zen-sdk/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/optimization"
 	"github.com/prometheus/client_golang/prometheus"
