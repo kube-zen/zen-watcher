@@ -14,7 +14,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery/cached/disk"
-	"k8s.io/client-go/dynamic"
 )
 
 func NewExportCommand() *cobra.Command {
