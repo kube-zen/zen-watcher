@@ -467,10 +467,6 @@ check:
 
 test-race:
 	@go test -v -race -timeout=15m ./...
-
-             -X github.com/kube-zen/zen-watcher/cmd/zenctl/internal/version.GitCommit=$(ZENCTL_GIT_COMMIT) \
-             -X github.com/kube-zen/zen-watcher/cmd/zenctl/internal/version.BuildTime=$(ZENCTL_BUILD_TIME)
-
 ## zenctl: Build zenctl-oss CLI (workspace-independent)
 zenctl:
 	@echo "$(GREEN)Building zenctl...$(NC)"
