@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
@@ -330,7 +330,9 @@ func (ii *IngesterInformer) Start(ctx context.Context) error {
 		DeleteFunc: ii.onDelete,
 	}
 
-	ii.informer.AddEventHandler(handlers)
+	if _, err := ii.informer.AddEventHandler(handlers); err != nil {
+		return fmt.Errorf("failed to add event handlers: %w", err)
+	}
 
 	// Start the informer factory
 	ii.factory.Start(ctx.Done())
@@ -340,11 +342,9 @@ func (ii *IngesterInformer) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to sync Ingester informer cache")
 	}
 
+	logger := sdklog.NewLogger("zen-watcher-config")
 	logger.Info("Ingester informer started and synced",
-		logger.Fields{
-			Component: "config",
-			Operation: "ingester_informer_synced",
-		})
+		sdklog.Operation("ingester_informer_synced"))
 
 	return nil
 }
@@ -358,40 +358,32 @@ func (ii *IngesterInformer) Stop() {
 func (ii *IngesterInformer) onAdd(obj interface{}) {
 	u, ok := obj.(*unstructured.Unstructured)
 	if !ok {
+		logger := sdklog.NewLogger("zen-watcher-config")
 		logger.Warn("Failed to convert Ingester CRD to unstructured",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_add_convert",
-			})
+			sdklog.Operation("ingester_add_convert"))
 		return
 	}
 
 	config := ii.ConvertToIngesterConfig(u)
 	if config != nil {
 		ii.store.AddOrUpdate(config)
+		logger := sdklog.NewLogger("zen-watcher-config")
 		logger.Debug("Added Ingester config",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_added",
-				Namespace: config.Namespace,
-				Additional: map[string]interface{}{
-					"name":     config.Name,
-					"source":   config.Source,
-					"ingester": config.Ingester,
-				},
-			})
+			sdklog.Operation("ingester_added"),
+			sdklog.String("namespace", config.Namespace),
+			sdklog.String("name", config.Name),
+			sdklog.String("source", config.Source),
+			sdklog.String("ingester", config.Ingester))
 	}
 }
 
 // onUpdate handles Ingester CRD update events
 func (ii *IngesterInformer) onUpdate(oldObj, newObj interface{}) {
+	logger := sdklog.NewLogger("zen-watcher-config")
 	u, ok := newObj.(*unstructured.Unstructured)
 	if !ok {
 		logger.Warn("Failed to convert Ingester CRD to unstructured",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_update_convert",
-			})
+			sdklog.Operation("ingester_update_convert"))
 		return
 	}
 
@@ -399,17 +391,11 @@ func (ii *IngesterInformer) onUpdate(oldObj, newObj interface{}) {
 	if config != nil {
 		ii.store.AddOrUpdate(config)
 		logger.Debug("Updated Ingester config",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_updated",
-				Namespace: config.Namespace,
-				Additional: map[string]interface{}{
-					"name":     config.Name,
-					"source":   config.Source,
-					"ingester": config.Ingester,
-				},
-				Source: config.Source,
-			})
+			sdklog.Operation("ingester_updated"),
+			sdklog.String("namespace", config.Namespace),
+			sdklog.String("name", config.Name),
+			sdklog.String("source", config.Source),
+			sdklog.String("ingester", config.Ingester))
 	}
 }
 
@@ -422,11 +408,9 @@ func (ii *IngesterInformer) onDelete(obj interface{}) {
 			u, ok = deleted.Obj.(*unstructured.Unstructured)
 		}
 		if !ok {
+			logger := sdklog.NewLogger("zen-watcher-config")
 			logger.Warn("Failed to convert deleted Ingester CRD to unstructured",
-				logger.Fields{
-					Component: "config",
-					Operation: "ingester_delete_convert",
-				})
+				sdklog.Operation("ingester_delete_convert"))
 			return
 		}
 	}
@@ -435,15 +419,11 @@ func (ii *IngesterInformer) onDelete(obj interface{}) {
 	name := u.GetName()
 	ii.store.Delete(namespace, name)
 
+	logger := sdklog.NewLogger("zen-watcher-config")
 	logger.Debug("Deleted Ingester config",
-		logger.Fields{
-			Component: "config",
-			Operation: "ingester_deleted",
-			Namespace: namespace,
-			Additional: map[string]interface{}{
-				"name": name,
-			},
-		})
+		sdklog.Operation("ingester_deleted"),
+		sdklog.String("namespace", namespace),
+		sdklog.String("name", name))
 }
 
 // ConvertToIngesterConfigs converts an unstructured Ingester CRD to one or more IngesterConfigs
@@ -452,15 +432,11 @@ func (ii *IngesterInformer) onDelete(obj interface{}) {
 func (ii *IngesterInformer) ConvertToIngesterConfigs(u *unstructured.Unstructured) []*IngesterConfig {
 	spec, ok := u.Object["spec"].(map[string]interface{})
 	if !ok {
+		logger := sdklog.NewLogger("zen-watcher-config")
 		logger.Warn("Ingester CRD missing spec",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_convert",
-				Namespace: u.GetNamespace(),
-				Additional: map[string]interface{}{
-					"name": u.GetName(),
-				},
-			})
+			sdklog.Operation("ingester_convert"),
+			sdklog.String("namespace", u.GetNamespace()),
+			sdklog.String("name", u.GetName()))
 		return nil
 	}
 
@@ -480,17 +456,13 @@ func (ii *IngesterInformer) ConvertToIngesterConfigs(u *unstructured.Unstructure
 // ConvertToIngesterConfig converts an unstructured Ingester CRD to IngesterConfig (legacy single-source)
 // Deprecated: Use ConvertToIngesterConfigs for multi-source support
 func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured) *IngesterConfig {
+	logger := sdklog.NewLogger("zen-watcher-config")
 	spec, ok := u.Object["spec"].(map[string]interface{})
 	if !ok {
 		logger.Warn("Ingester CRD missing spec",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_convert",
-				Namespace: u.GetNamespace(),
-				Additional: map[string]interface{}{
-					"name": u.GetName(),
-				},
-			})
+			sdklog.Operation("ingester_convert"),
+			sdklog.String("namespace", u.GetNamespace()),
+			sdklog.String("name", u.GetName()))
 		return nil
 	}
 
@@ -503,14 +475,9 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 	source, sourceOk := spec["source"].(string)
 	if !sourceOk || source == "" {
 		logger.Warn("Ingester CRD missing required field: source",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_convert",
-				Namespace: u.GetNamespace(),
-				Additional: map[string]interface{}{
-					"name": u.GetName(),
-				},
-			})
+			sdklog.Operation("ingester_convert"),
+			sdklog.String("namespace", u.GetNamespace()),
+			sdklog.String("name", u.GetName()))
 		return nil
 	}
 	config.Source = source
@@ -519,15 +486,10 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 	ingester, ingesterOk := spec["ingester"].(string)
 	if !ingesterOk || ingester == "" {
 		logger.Warn("Ingester CRD missing required field: ingester",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_convert",
-				Namespace: u.GetNamespace(),
-				Source:    source,
-				Additional: map[string]interface{}{
-					"name": u.GetName(),
-				},
-			})
+			sdklog.Operation("ingester_convert"),
+			sdklog.String("namespace", u.GetNamespace()),
+			sdklog.String("source", source),
+			sdklog.String("name", u.GetName()))
 		return nil
 	}
 	config.Ingester = ingester
@@ -535,32 +497,21 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 	// Debug: log spec keys for logs ingester
 	if ingester == "logs" {
 		logger.Info("Processing logs ingester",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_convert",
-				Source:    source,
-				Additional: map[string]interface{}{
-					"name":      u.GetName(),
-					"namespace": u.GetNamespace(),
-					"spec_keys": getSpecKeys(spec),
-				},
-			})
+			sdklog.Operation("ingester_convert"),
+			sdklog.String("source", source),
+			sdklog.String("name", u.GetName()),
+			sdklog.String("namespace", u.GetNamespace()))
 	}
 
 	// Validate destinations (required field)
 	destinations, destinationsOk := spec["destinations"].([]interface{})
 	if !destinationsOk || len(destinations) == 0 {
 		logger.Warn("Ingester CRD missing required field: destinations",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_convert",
-				Namespace: u.GetNamespace(),
-				Source:    source,
-				Additional: map[string]interface{}{
-					"name":     u.GetName(),
-					"ingester": ingester,
-				},
-			})
+			sdklog.Operation("ingester_convert"),
+			sdklog.String("namespace", u.GetNamespace()),
+			sdklog.String("source", source),
+			sdklog.String("name", u.GetName()),
+			sdklog.String("ingester", ingester))
 		return nil
 	}
 
@@ -584,17 +535,12 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 						// Validate GVR before using
 						if err := ValidateGVRConfig(group, version, resource); err != nil {
 							logger.Warn("Invalid GVR in destination configuration",
-								logger.Fields{
-									Component: "config",
-									Operation: "ingester_convert",
-									Source:    source,
-									Error:     err,
-									Additional: map[string]interface{}{
-										"group":    group,
-										"version":  version,
-										"resource": resource,
-									},
-								})
+								sdklog.Operation("ingester_convert"),
+								sdklog.String("source", source),
+								sdklog.String("group", group),
+								sdklog.String("version", version),
+								sdklog.String("resource", resource),
+								sdklog.Error(err))
 							continue
 						}
 						// Use specified GVR
@@ -608,11 +554,8 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 						gvr = ResolveDestinationGVR(destValue)
 					} else {
 						logger.Warn("Destination has neither gvr nor value",
-							logger.Fields{
-								Component: "config",
-								Operation: "ingester_convert",
-								Source:    source,
-							})
+							sdklog.Operation("ingester_convert"),
+							sdklog.String("source", source))
 						continue
 					}
 				} else if destValue != "" {
@@ -620,11 +563,8 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 					gvr = ResolveDestinationGVR(destValue)
 				} else {
 					logger.Warn("Destination has neither gvr nor value",
-						logger.Fields{
-							Component: "config",
-							Operation: "ingester_convert",
-							Source:    source,
-						})
+						sdklog.Operation("ingester_convert"),
+						sdklog.String("source", source))
 					continue
 				}
 
@@ -640,12 +580,9 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 	// Ensure at least one destination was extracted
 	if len(config.Destinations) == 0 {
 		logger.Warn("No valid CRD destinations found",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_convert",
-				Namespace: u.GetNamespace(),
-				Source:    source,
-			})
+			sdklog.Operation("ingester_convert"),
+			sdklog.String("namespace", u.GetNamespace()),
+			sdklog.String("source", source))
 		return nil
 	}
 
@@ -688,15 +625,9 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 	logs, logsOk := spec["logs"]
 	if logsOk {
 		logger.Info("Found logs section in spec",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_convert",
-				Source:    config.Source,
-				Additional: map[string]interface{}{
-					"logs_type":  fmt.Sprintf("%T", logs),
-					"logs_value": logs,
-				},
-			})
+			sdklog.Operation("ingester_convert"),
+			sdklog.String("source", config.Source),
+			sdklog.String("logs_type", fmt.Sprintf("%T", logs)))
 	}
 	if logs, ok := spec["logs"].(map[string]interface{}); ok {
 		config.Logs = &LogsConfig{
@@ -732,17 +663,12 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 			}
 		}
 		logger.Info("Extracted logs config",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_convert",
-				Source:    config.Source,
-				Additional: map[string]interface{}{
-					"podSelector":  config.Logs.PodSelector,
-					"container":    config.Logs.Container,
-					"patterns":     len(config.Logs.Patterns),
-					"pollInterval": config.Logs.PollInterval,
-				},
-			})
+			sdklog.Operation("ingester_convert"),
+			sdklog.String("source", config.Source),
+			sdklog.String("podSelector", config.Logs.PodSelector),
+			sdklog.String("container", config.Logs.Container),
+			sdklog.Int("patterns", len(config.Logs.Patterns)),
+			sdklog.String("pollInterval", config.Logs.PollInterval))
 	}
 
 	// Extract normalization config
@@ -929,6 +855,7 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 
 // convertMultiSourceIngester converts a multi-source Ingester CRD to multiple IngesterConfigs
 func (ii *IngesterInformer) convertMultiSourceIngester(u *unstructured.Unstructured, spec map[string]interface{}, sources []interface{}) []*IngesterConfig {
+	logger := sdklog.NewLogger("zen-watcher-config")
 	namespace := u.GetNamespace()
 	name := u.GetName()
 	var configs []*IngesterConfig
@@ -943,16 +870,11 @@ func (ii *IngesterInformer) convertMultiSourceIngester(u *unstructured.Unstructu
 		sourceMap, ok := sourceItem.(map[string]interface{})
 		if !ok {
 			logger.Warn("Invalid source entry in spec.sources",
-				logger.Fields{
-					Component: "config",
-					Operation: "ingester_convert",
-					Namespace: namespace,
-					Additional: map[string]interface{}{
-						"name":       name,
-						"index":      idx,
-						"source_type": fmt.Sprintf("%T", sourceItem),
-					},
-				})
+				sdklog.Operation("ingester_convert"),
+				sdklog.String("namespace", namespace),
+				sdklog.String("name", name),
+				sdklog.Int("index", idx),
+				sdklog.String("source_type", fmt.Sprintf("%T", sourceItem)))
 			continue
 		}
 
@@ -961,17 +883,12 @@ func (ii *IngesterInformer) convertMultiSourceIngester(u *unstructured.Unstructu
 		sourceType := getString(sourceMap, "type")
 		if sourceName == "" || sourceType == "" {
 			logger.Warn("Source missing name or type",
-				logger.Fields{
-					Component: "config",
-					Operation: "ingester_convert",
-					Namespace: namespace,
-					Additional: map[string]interface{}{
-						"name":       name,
-						"index":      idx,
-						"sourceName": sourceName,
-						"sourceType": sourceType,
-					},
-				})
+				sdklog.Operation("ingester_convert"),
+				sdklog.String("namespace", namespace),
+				sdklog.String("name", name),
+				sdklog.Int("index", idx),
+				sdklog.String("sourceName", sourceName),
+				sdklog.String("sourceType", sourceType))
 			continue
 		}
 
@@ -1058,32 +975,22 @@ func (ii *IngesterInformer) convertMultiSourceIngester(u *unstructured.Unstructu
 			}
 		default:
 			logger.Warn("Unknown source type",
-				logger.Fields{
-					Component: "config",
-					Operation: "ingester_convert",
-					Namespace: namespace,
-					Additional: map[string]interface{}{
-						"name":       name,
-						"sourceName": sourceName,
-						"sourceType": sourceType,
-					},
-				})
+				sdklog.Operation("ingester_convert"),
+				sdklog.String("namespace", namespace),
+				sdklog.String("name", name),
+				sdklog.String("sourceName", sourceName),
+				sdklog.String("sourceType", sourceType))
 			continue
 		}
 
 		// Validate config has required fields
 		if len(config.Destinations) == 0 {
 			logger.Warn("Source has no valid destinations",
-				logger.Fields{
-					Component: "config",
-					Operation: "ingester_convert",
-					Namespace: namespace,
-					Additional: map[string]interface{}{
-						"name":       name,
-						"sourceName": sourceName,
-						"sourceType": sourceType,
-					},
-				})
+				sdklog.Operation("ingester_convert"),
+				sdklog.String("namespace", namespace),
+				sdklog.String("name", name),
+				sdklog.String("sourceName", sourceName),
+				sdklog.String("sourceType", sourceType))
 			continue
 		}
 
@@ -1095,6 +1002,7 @@ func (ii *IngesterInformer) convertMultiSourceIngester(u *unstructured.Unstructu
 
 // convertLegacyIngester converts a legacy single-source Ingester CRD to IngesterConfig
 func (ii *IngesterInformer) convertLegacyIngester(u *unstructured.Unstructured, spec map[string]interface{}) *IngesterConfig {
+	logger := sdklog.NewLogger("zen-watcher-config")
 	config := &IngesterConfig{
 		Namespace: u.GetNamespace(),
 		Name:      u.GetName(),
@@ -1103,15 +1011,11 @@ func (ii *IngesterInformer) convertLegacyIngester(u *unstructured.Unstructured, 
 	// Extract source (required field)
 	source, sourceOk := spec["source"].(string)
 	if !sourceOk || source == "" {
+		logger := sdklog.NewLogger("zen-watcher-config")
 		logger.Warn("Ingester CRD missing required field: source",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_convert",
-				Namespace: u.GetNamespace(),
-				Additional: map[string]interface{}{
-					"name": u.GetName(),
-				},
-			})
+			sdklog.Operation("ingester_convert"),
+			sdklog.String("namespace", u.GetNamespace()),
+			sdklog.String("name", u.GetName()))
 		return nil
 	}
 	config.Source = source
@@ -1119,16 +1023,12 @@ func (ii *IngesterInformer) convertLegacyIngester(u *unstructured.Unstructured, 
 	// Extract ingester type (required field)
 	ingester, ingesterOk := spec["ingester"].(string)
 	if !ingesterOk || ingester == "" {
+		logger := sdklog.NewLogger("zen-watcher-config")
 		logger.Warn("Ingester CRD missing required field: ingester",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_convert",
-				Namespace: u.GetNamespace(),
-				Source:    source,
-				Additional: map[string]interface{}{
-					"name": u.GetName(),
-				},
-			})
+			sdklog.Operation("ingester_convert"),
+			sdklog.String("namespace", u.GetNamespace()),
+			sdklog.String("source", source),
+			sdklog.String("name", u.GetName()))
 		return nil
 	}
 	config.Ingester = ingester
@@ -1137,16 +1037,11 @@ func (ii *IngesterInformer) convertLegacyIngester(u *unstructured.Unstructured, 
 	destinations, destinationsOk := spec["destinations"].([]interface{})
 	if !destinationsOk || len(destinations) == 0 {
 		logger.Warn("Ingester CRD missing required field: destinations",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_convert",
-				Namespace: u.GetNamespace(),
-				Source:    source,
-				Additional: map[string]interface{}{
-					"name":     u.GetName(),
-					"ingester": ingester,
-				},
-			})
+			sdklog.Operation("ingester_convert"),
+			sdklog.String("namespace", u.GetNamespace()),
+			sdklog.String("source", source),
+			sdklog.String("name", u.GetName()),
+			sdklog.String("ingester", ingester))
 		return nil
 	}
 
@@ -1170,17 +1065,12 @@ func (ii *IngesterInformer) convertLegacyIngester(u *unstructured.Unstructured, 
 						// Validate GVR before using
 						if err := ValidateGVRConfig(group, version, resource); err != nil {
 							logger.Warn("Invalid GVR in destination configuration",
-								logger.Fields{
-									Component: "config",
-									Operation: "ingester_convert",
-									Source:    source,
-									Error:     err,
-									Additional: map[string]interface{}{
-										"group":    group,
-										"version":  version,
-										"resource": resource,
-									},
-								})
+								sdklog.Operation("ingester_convert"),
+								sdklog.String("source", source),
+								sdklog.String("group", group),
+								sdklog.String("version", version),
+								sdklog.String("resource", resource),
+								sdklog.Error(err))
 							continue
 						}
 						// Use specified GVR
@@ -1194,11 +1084,8 @@ func (ii *IngesterInformer) convertLegacyIngester(u *unstructured.Unstructured, 
 						gvr = ResolveDestinationGVR(destValue)
 					} else {
 						logger.Warn("Destination has neither gvr nor value",
-							logger.Fields{
-								Component: "config",
-								Operation: "ingester_convert",
-								Source:    source,
-							})
+							sdklog.Operation("ingester_convert"),
+							sdklog.String("source", source))
 						continue
 					}
 				} else if destValue != "" {
@@ -1206,11 +1093,8 @@ func (ii *IngesterInformer) convertLegacyIngester(u *unstructured.Unstructured, 
 					gvr = ResolveDestinationGVR(destValue)
 				} else {
 					logger.Warn("Destination has neither gvr nor value",
-						logger.Fields{
-							Component: "config",
-							Operation: "ingester_convert",
-							Source:    source,
-						})
+						sdklog.Operation("ingester_convert"),
+						sdklog.String("source", source))
 					continue
 				}
 
@@ -1226,12 +1110,9 @@ func (ii *IngesterInformer) convertLegacyIngester(u *unstructured.Unstructured, 
 	// Ensure at least one destination was extracted
 	if len(config.Destinations) == 0 {
 		logger.Warn("No valid CRD destinations found",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_convert",
-				Namespace: u.GetNamespace(),
-				Source:    source,
-			})
+			sdklog.Operation("ingester_convert"),
+			sdklog.String("namespace", u.GetNamespace()),
+			sdklog.String("source", source))
 		return nil
 	}
 
@@ -1324,6 +1205,7 @@ func (ii *IngesterInformer) convertLegacyIngester(u *unstructured.Unstructured, 
 // extractSharedConfig extracts shared configuration fields (destinations, processing, etc.)
 // that are common to all sources in a multi-source Ingester
 func (ii *IngesterInformer) extractSharedConfig(spec map[string]interface{}, namespace, name string) *IngesterConfig {
+	logger := sdklog.NewLogger("zen-watcher-config")
 	config := &IngesterConfig{
 		Namespace: namespace,
 		Name:      name,
@@ -1333,14 +1215,9 @@ func (ii *IngesterInformer) extractSharedConfig(spec map[string]interface{}, nam
 	destinations, destinationsOk := spec["destinations"].([]interface{})
 	if !destinationsOk || len(destinations) == 0 {
 		logger.Warn("Ingester CRD missing required field: destinations",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_convert",
-				Namespace: namespace,
-				Additional: map[string]interface{}{
-					"name": name,
-				},
-			})
+			sdklog.Operation("ingester_convert"),
+			sdklog.String("namespace", namespace),
+			sdklog.String("name", name))
 		return nil
 	}
 
@@ -1364,16 +1241,11 @@ func (ii *IngesterInformer) extractSharedConfig(spec map[string]interface{}, nam
 						// Validate GVR before using
 						if err := ValidateGVRConfig(group, version, resource); err != nil {
 							logger.Warn("Invalid GVR in destination configuration",
-								logger.Fields{
-									Component: "config",
-									Operation: "ingester_convert",
-									Error:     err,
-									Additional: map[string]interface{}{
-										"group":    group,
-										"version":  version,
-										"resource": resource,
-									},
-								})
+								sdklog.Operation("ingester_convert"),
+								sdklog.String("group", group),
+								sdklog.String("version", version),
+								sdklog.String("resource", resource),
+								sdklog.Error(err))
 							continue
 						}
 						// Use specified GVR
@@ -1387,21 +1259,15 @@ func (ii *IngesterInformer) extractSharedConfig(spec map[string]interface{}, nam
 						gvr = ResolveDestinationGVR(destValue)
 					} else {
 						logger.Warn("Destination has neither gvr nor value",
-							logger.Fields{
-								Component: "config",
-								Operation: "ingester_convert",
-							})
+							sdklog.Operation("ingester_convert"))
 						continue
 					}
 				} else if destValue != "" {
 					// Resolve GVR from destination value
 					gvr = ResolveDestinationGVR(destValue)
 				} else {
-					logger.Warn("Destination has neither gvr nor value",
-						logger.Fields{
-							Component: "config",
-							Operation: "ingester_convert",
-						})
+						logger.Warn("Destination has neither gvr nor value",
+							sdklog.Operation("ingester_convert"))
 					continue
 				}
 
@@ -1417,11 +1283,8 @@ func (ii *IngesterInformer) extractSharedConfig(spec map[string]interface{}, nam
 	// Ensure at least one destination was extracted
 	if len(config.Destinations) == 0 {
 		logger.Warn("No valid CRD destinations found",
-			logger.Fields{
-				Component: "config",
-				Operation: "ingester_convert",
-				Namespace: namespace,
-			})
+			sdklog.Operation("ingester_convert"),
+			sdklog.String("namespace", namespace))
 		return nil
 	}
 

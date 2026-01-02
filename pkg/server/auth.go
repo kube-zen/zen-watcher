@@ -20,7 +20,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 )
 
 // WebhookAuth handles authentication for webhook endpoints
@@ -45,11 +45,9 @@ func NewWebhookAuth() *WebhookAuth {
 	if token := os.Getenv("WEBHOOK_AUTH_TOKEN"); token != "" {
 		auth.tokenEnabled = true
 		auth.token = token
+		logger := sdklog.NewLogger("zen-watcher-server")
 		logger.Info("Webhook token authentication enabled",
-			logger.Fields{
-				Component: "server",
-				Operation: "auth_init",
-			})
+			sdklog.Operation("auth_init"))
 	}
 
 	// IP allowlist
@@ -59,14 +57,10 @@ func NewWebhookAuth() *WebhookAuth {
 		for i, ip := range auth.allowedIPs {
 			auth.allowedIPs[i] = strings.TrimSpace(ip)
 		}
+		logger := sdklog.NewLogger("zen-watcher-server")
 		logger.Info("Webhook IP allowlist enabled",
-			logger.Fields{
-				Component: "server",
-				Operation: "auth_init",
-				Additional: map[string]interface{}{
-					"allowed_ips": auth.allowedIPs,
-				},
-			})
+			sdklog.Operation("auth_init"),
+			sdklog.Strings("allowed_ips", auth.allowedIPs))
 	}
 
 	return auth
@@ -78,16 +72,12 @@ func (a *WebhookAuth) Authenticate(r *http.Request) bool {
 	if a.tokenEnabled {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
+			logger := sdklog.NewLogger("zen-watcher-server")
 			logger.Warn("Webhook request rejected: missing Authorization header",
-				logger.Fields{
-					Component: "server",
-					Operation: "auth_validate",
-					Reason:    "missing_auth_header",
-					Additional: map[string]interface{}{
-						"remote_addr": r.RemoteAddr,
-						"path":        r.URL.Path,
-					},
-				})
+				sdklog.Operation("auth_validate"),
+				sdklog.String("reason", "missing_auth_header"),
+				sdklog.String("remote_addr", r.RemoteAddr),
+				sdklog.String("path", r.URL.Path))
 			return false
 		}
 
@@ -96,16 +86,12 @@ func (a *WebhookAuth) Authenticate(r *http.Request) bool {
 		token = strings.TrimSpace(token)
 
 		if subtle.ConstantTimeCompare([]byte(token), []byte(a.token)) != 1 {
+			logger := sdklog.NewLogger("zen-watcher-server")
 			logger.Warn("Webhook request rejected: invalid token",
-				logger.Fields{
-					Component: "server",
-					Operation: "auth_validate",
-					Reason:    "invalid_token",
-					Additional: map[string]interface{}{
-						"remote_addr": r.RemoteAddr,
-						"path":        r.URL.Path,
-					},
-				})
+				sdklog.Operation("auth_validate"),
+				sdklog.String("reason", "invalid_token"),
+				sdklog.String("remote_addr", r.RemoteAddr),
+				sdklog.String("path", r.URL.Path))
 			return false
 		}
 	}
@@ -121,17 +107,13 @@ func (a *WebhookAuth) Authenticate(r *http.Request) bool {
 			}
 		}
 		if !allowed {
+			logger := sdklog.NewLogger("zen-watcher-server")
 			logger.Warn("Webhook request rejected: unauthorized IP",
-				logger.Fields{
-					Component: "server",
-					Operation: "auth_validate",
-					Reason:    "ip_not_allowed",
-					Additional: map[string]interface{}{
-						"client_ip":   clientIP,
-						"path":        r.URL.Path,
-						"allowed_ips": a.allowedIPs,
-					},
-				})
+				sdklog.Operation("auth_validate"),
+				sdklog.String("reason", "ip_not_allowed"),
+				sdklog.String("client_ip", clientIP),
+				sdklog.String("path", r.URL.Path),
+				sdklog.Strings("allowed_ips", a.allowedIPs))
 			return false
 		}
 	}
@@ -166,29 +148,25 @@ func getClientIP(r *http.Request) string {
 func (a *WebhookAuth) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !a.Authenticate(r) {
+			logger := sdklog.NewLogger("zen-watcher-server")
 			logger.Debug("Webhook request authentication failed",
-				logger.Fields{
-					Component: "server",
-					Operation: "auth_middleware",
-					Reason:    "authentication_failed",
-					Additional: map[string]interface{}{
-						"path":        r.URL.Path,
-						"remote_addr": r.RemoteAddr,
-					},
-				})
+				sdklog.Operation("auth_middleware"),
+				sdklog.String("reason", "authentication_failed"),
+				sdklog.String("path", r.URL.Path),
+				sdklog.String("remote_addr", r.RemoteAddr))
 			w.WriteHeader(http.StatusUnauthorized)
-			w.Write([]byte(`{"error":"unauthorized"}`))
+			if _, err := w.Write([]byte(`{"error":"unauthorized"}`)); err != nil {
+				logger.Warn("Failed to write authentication error response",
+					sdklog.Operation("auth_middleware"),
+					sdklog.Error(err))
+			}
 			return
 		}
+		logger := sdklog.NewLogger("zen-watcher-server")
 		logger.Debug("Webhook request authentication successful",
-			logger.Fields{
-				Component: "server",
-				Operation: "auth_middleware",
-				Additional: map[string]interface{}{
-					"path":        r.URL.Path,
-					"remote_addr": r.RemoteAddr,
-				},
-			})
+			sdklog.Operation("auth_middleware"),
+			sdklog.String("path", r.URL.Path),
+			sdklog.String("remote_addr", r.RemoteAddr))
 		next(w, r)
 	}
 }

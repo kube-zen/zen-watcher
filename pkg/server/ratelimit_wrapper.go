@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-sdk/pkg/gc/ratelimiter"
 )
 
@@ -88,17 +88,17 @@ func (rl *PerKeyRateLimiter) RateLimitMiddleware(next http.HandlerFunc) http.Han
 	return func(w http.ResponseWriter, r *http.Request) {
 		key := getClientIP(r)
 		if !rl.Allow(key) {
+			logger := sdklog.NewLogger("zen-watcher-server")
 			logger.Warn("Rate limit exceeded",
-				logger.Fields{
-					Component: "server",
-					Operation: "rate_limit",
-					Reason:    "rate_limit_exceeded",
-					Additional: map[string]interface{}{
-						"client_ip": key,
-					},
-				})
+				sdklog.Operation("rate_limit"),
+				sdklog.String("reason", "rate_limit_exceeded"),
+				sdklog.String("client_ip", key))
 			w.WriteHeader(http.StatusTooManyRequests)
-			w.Write([]byte(`{"error":"rate limit exceeded"}`))
+			if _, err := w.Write([]byte(`{"error":"rate limit exceeded"}`)); err != nil {
+				logger.Warn("Failed to write rate limit response",
+					sdklog.Operation("rate_limit"),
+					sdklog.Error(err))
+			}
 			return
 		}
 		next(w, r)

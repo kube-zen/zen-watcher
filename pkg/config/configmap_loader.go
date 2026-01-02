@@ -22,7 +22,7 @@ import (
 	"sync"
 
 	"github.com/kube-zen/zen-watcher/pkg/filter"
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
@@ -75,39 +75,27 @@ func NewConfigMapLoader(
 
 // Start starts watching the ConfigMap for changes
 func (cml *ConfigMapLoader) Start(ctx context.Context) error {
-	logger.Info("Starting ConfigMap watcher for filter config",
-		logger.Fields{
-			Component: "config",
-			Operation: "configmap_watcher_start",
-			Namespace: cml.configMapNamespace,
-			Additional: map[string]interface{}{
-				"configmap_name": cml.configMapName,
-			},
-		})
+	logger := sdklog.NewLogger("zen-watcher-config")
+	logger.InfoC(ctx, "Starting ConfigMap watcher for filter config",
+		sdklog.Operation("configmap_watcher_start"),
+		sdklog.String("namespace", cml.configMapNamespace),
+		sdklog.String("configmap_name", cml.configMapName))
 
 	// Load initial config (use context to respect cancellation)
 	initialConfig, err := cml.loadConfigWithContext(ctx)
 	if err != nil {
-		logger.Warn("Failed to load initial filter config, will retry on ConfigMap creation",
-			logger.Fields{
-				Component: "config",
-				Operation: "configmap_load_initial",
-				Namespace: cml.configMapNamespace,
-				Error:     err,
-			})
+		logger.WarnC(ctx, "Failed to load initial filter config, will retry on ConfigMap creation",
+			sdklog.Operation("configmap_load_initial"),
+			sdklog.String("namespace", cml.configMapNamespace),
+			sdklog.Error(err))
 		// Continue - we'll watch for ConfigMap creation
 	} else {
 		cml.updateFilter(initialConfig)
 		cml.setLastGoodConfig(initialConfig)
-		logger.Info("Loaded initial filter configuration from ConfigMap",
-			logger.Fields{
-				Component: "config",
-				Operation: "configmap_load_initial",
-				Namespace: cml.configMapNamespace,
-				Additional: map[string]interface{}{
-					"configmap_name": cml.configMapName,
-				},
-			})
+		logger.InfoC(ctx, "Loaded initial filter configuration from ConfigMap",
+			sdklog.Operation("configmap_load_initial"),
+			sdklog.String("namespace", cml.configMapNamespace),
+			sdklog.String("configmap_name", cml.configMapName))
 	}
 
 	// Create informer factory for the specific namespace
@@ -121,21 +109,17 @@ func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 	configMapInformer := factory.Core().V1().ConfigMaps().Informer()
 
 	// Add event handlers
-	configMapInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	if _, err := configMapInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			cm, ok := obj.(*corev1.ConfigMap)
 			if !ok || cm.Name != cml.configMapName {
 				return
 			}
+			logger := sdklog.NewLogger("zen-watcher-config")
 			logger.Info("ConfigMap added",
-				logger.Fields{
-					Component: "config",
-					Operation: "configmap_added",
-					Namespace: cm.Namespace,
-					Additional: map[string]interface{}{
-						"configmap_name": cm.Name,
-					},
-				})
+				sdklog.Operation("configmap_added"),
+				sdklog.String("namespace", cm.Namespace),
+				sdklog.String("configmap_name", cm.Name))
 			cml.handleConfigMapChange(cm)
 		},
 		UpdateFunc: func(oldObj, newObj interface{}) {
@@ -143,15 +127,11 @@ func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 			if !ok || cm.Name != cml.configMapName {
 				return
 			}
+			logger := sdklog.NewLogger("zen-watcher-config")
 			logger.Info("ConfigMap updated",
-				logger.Fields{
-					Component: "config",
-					Operation: "configmap_updated",
-					Namespace: cm.Namespace,
-					Additional: map[string]interface{}{
-						"configmap_name": cm.Name,
-					},
-				})
+				sdklog.Operation("configmap_updated"),
+				sdklog.String("namespace", cm.Namespace),
+				sdklog.String("configmap_name", cm.Name))
 			cml.handleConfigMapChange(cm)
 		},
 		DeleteFunc: func(obj interface{}) {
@@ -171,18 +151,16 @@ func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 			if cm.Name != cml.configMapName {
 				return
 			}
+			logger := sdklog.NewLogger("zen-watcher-config")
 			logger.Info("ConfigMap deleted, keeping last good config",
-				logger.Fields{
-					Component: "config",
-					Operation: "configmap_deleted",
-					Namespace: cm.Namespace,
-					Additional: map[string]interface{}{
-						"configmap_name": cm.Name,
-					},
-				})
+				sdklog.Operation("configmap_deleted"),
+				sdklog.String("namespace", cm.Namespace),
+				sdklog.String("configmap_name", cm.Name))
 			// Keep last good config - don't reset to default
 		},
-	})
+	}); err != nil {
+		return fmt.Errorf("failed to add event handlers: %w", err)
+	}
 
 	// Start the informer
 	factory.Start(ctx.Done())
@@ -192,15 +170,10 @@ func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to sync ConfigMap informer cache")
 	}
 
-	logger.Info("ConfigMap watcher started and synced",
-		logger.Fields{
-			Component: "config",
-			Operation: "configmap_watcher_synced",
-			Namespace: cml.configMapNamespace,
-			Additional: map[string]interface{}{
-				"configmap_name": cml.configMapName,
-			},
-		})
+	logger.InfoC(ctx, "ConfigMap watcher started and synced",
+		sdklog.Operation("configmap_watcher_synced"),
+		sdklog.String("namespace", cml.configMapNamespace),
+		sdklog.String("configmap_name", cml.configMapName))
 
 	// Block until context is cancelled
 	<-ctx.Done()
@@ -212,33 +185,24 @@ func (cml *ConfigMapLoader) handleConfigMapChange(cm *corev1.ConfigMap) {
 	// Extract filter.json from ConfigMap
 	filterJSON, found := cm.Data[cml.configMapKey]
 	if !found {
+		logger := sdklog.NewLogger("zen-watcher-config")
 		logger.Warn("Filter key not found in ConfigMap, keeping last good config",
-			logger.Fields{
-				Component: "config",
-				Operation: "configmap_reload",
-				Namespace: cm.Namespace,
-				Reason:    "key_not_found",
-				Additional: map[string]interface{}{
-					"configmap_name": cm.Name,
-					"key":            cml.configMapKey,
-				},
-			})
+			sdklog.Operation("configmap_reload"),
+			sdklog.String("namespace", cm.Namespace),
+			sdklog.String("reason", "key_not_found"),
+			sdklog.String("configmap_name", cm.Name),
+			sdklog.String("key", cml.configMapKey))
 		return
 	}
 
 	// Parse JSON
 	var config filter.FilterConfig
 	if err := json.Unmarshal([]byte(filterJSON), &config); err != nil {
-		logger.Error("Failed to parse filter config from ConfigMap, keeping last good config",
-			logger.Fields{
-				Component: "config",
-				Operation: "configmap_reload",
-				Namespace: cm.Namespace,
-				Error:     err,
-				Additional: map[string]interface{}{
-					"configmap_name": cm.Name,
-				},
-			})
+		logger := sdklog.NewLogger("zen-watcher-config")
+		logger.Error(err, "Failed to parse filter config from ConfigMap, keeping last good config",
+			sdklog.Operation("configmap_reload"),
+			sdklog.String("namespace", cm.Namespace),
+			sdklog.String("configmap_name", cm.Name))
 		return
 	}
 
@@ -253,15 +217,11 @@ func (cml *ConfigMapLoader) handleConfigMapChange(cm *corev1.ConfigMap) {
 	// Update filter with new config
 	// ConfigMap configs are loaded directly
 	cml.updateFilter(&config)
+	logger := sdklog.NewLogger("zen-watcher-config")
 	logger.Info("Reloaded filter configuration from ConfigMap",
-		logger.Fields{
-			Component: "config",
-			Operation: "configmap_reload",
-			Namespace: cm.Namespace,
-			Additional: map[string]interface{}{
-				"configmap_name": cm.Name,
-			},
-		})
+		sdklog.Operation("configmap_reload"),
+		sdklog.String("namespace", cm.Namespace),
+		sdklog.String("configmap_name", cm.Name))
 }
 
 // loadConfig loads the current ConfigMap configuration (uses context.Background for backward compatibility)

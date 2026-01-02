@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -96,24 +96,17 @@ func (a *WebhookAdapter) Start(ctx context.Context, config *SourceConfig) (<-cha
 
 		// Start server in goroutine
 		go func() {
+			logger := sdklog.NewLogger("zen-watcher-adapter")
 			logger.Info("Webhook adapter server starting",
-				logger.Fields{
-					Component: "adapter",
-					Operation: "webhook_start",
-					Source:    config.Source,
-					Additional: map[string]interface{}{
-						"port": config.Webhook.Port,
-						"path": config.Webhook.Path,
-					},
-				})
+				sdklog.Operation("webhook_start"),
+				sdklog.String("source", config.Source),
+				sdklog.Int("port", config.Webhook.Port),
+				sdklog.String("path", config.Webhook.Path))
 			if err := a.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				logger.Error("Webhook server error",
-					logger.Fields{
-						Component: "adapter",
-						Operation: "webhook_server",
-						Source:    config.Source,
-						Error:     err,
-					})
+				logger := sdklog.NewLogger("zen-watcher-adapter")
+				logger.Error(err, "Webhook server error",
+					sdklog.Operation("webhook_server"),
+					sdklog.String("source", config.Source))
 			}
 		}()
 
@@ -123,18 +116,22 @@ func (a *WebhookAdapter) Start(ctx context.Context, config *SourceConfig) (<-cha
 			if a.server != nil {
 				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
-				a.server.Shutdown(shutdownCtx)
+				if err := a.server.Shutdown(shutdownCtx); err != nil {
+					logger := sdklog.NewLogger("zen-watcher-adapter")
+					logger.Warn("Webhook server shutdown error",
+						sdklog.Operation("webhook_shutdown"),
+						sdklog.String("source", config.Source),
+						sdklog.Error(err))
+				}
 			}
 		}()
 	} else {
 		// Add handler to existing server
 		// Note: This is simplified - in production, you'd need to manage multiple paths
+		logger := sdklog.NewLogger("zen-watcher-adapter")
 		logger.Warn("Webhook server already running, adding handler",
-			logger.Fields{
-				Component: "adapter",
-				Operation: "webhook_add_handler",
-				Source:    config.Source,
-			})
+			sdklog.Operation("webhook_add_handler"),
+			sdklog.String("source", config.Source))
 	}
 
 	return a.events, nil
@@ -177,12 +174,10 @@ func (a *WebhookAdapter) handleWebhook(config *SourceConfig) http.HandlerFunc {
 			fmt.Fprintf(w, "OK")
 		default:
 			// Buffer full - backpressure
+			logger := sdklog.NewLogger("zen-watcher-adapter")
 			logger.Warn("Webhook event buffer full, dropping event",
-				logger.Fields{
-					Component: "adapter",
-					Operation: "webhook_backpressure",
-					Source:    config.Source,
-				})
+				sdklog.Operation("webhook_backpressure"),
+				sdklog.String("source", config.Source))
 			http.Error(w, "Buffer full", http.StatusServiceUnavailable)
 		}
 	}
@@ -217,7 +212,12 @@ func (a *WebhookAdapter) Stop() {
 	if a.server != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		a.server.Shutdown(ctx)
+		if err := a.server.Shutdown(ctx); err != nil {
+			logger := sdklog.NewLogger("zen-watcher-adapter")
+			logger.Warn("Webhook server shutdown error",
+				sdklog.Operation("webhook_stop"),
+				sdklog.Error(err))
+		}
 	}
 	close(a.events)
 }

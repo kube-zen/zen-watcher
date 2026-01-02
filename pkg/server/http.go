@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/config"
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -205,30 +205,21 @@ func (s *Server) registerHandlers(mux *http.ServeMux) {
 // handleFalcoWebhook handles POST /falco/webhook
 func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 	// Log webhook request received (before any processing)
-	logger.Info("Falco webhook request received",
-		logger.Fields{
-			Component: "server",
-			Operation: "falco_webhook",
-			Source:    "falco",
-			EventType: "webhook_request",
-			Additional: map[string]interface{}{
-				"method":      r.Method,
-				"remote_addr": r.RemoteAddr,
-				"user_agent":  r.UserAgent(),
-			},
-		})
+	logger := sdklog.NewLogger("zen-watcher-server")
+	logger.InfoC(r.Context(), "Falco webhook request received",
+		sdklog.Operation("falco_webhook"),
+		sdklog.String("source", "falco"),
+		sdklog.String("method", r.Method),
+		sdklog.String("remote_addr", r.RemoteAddr),
+		sdklog.String("user_agent", r.UserAgent()))
 
 	if r.Method != http.MethodPost {
-		logger.Warn("Falco webhook rejected: invalid method",
-			logger.Fields{
-				Component: "server",
-				Operation: "falco_webhook",
-				Source:    "falco",
-				Reason:    "invalid_method",
-				Additional: map[string]interface{}{
-					"method": r.Method,
-				},
-			})
+		logger := sdklog.NewLogger("zen-watcher-server")
+		logger.WarnC(r.Context(), "Falco webhook rejected: invalid method",
+			sdklog.Operation("falco_webhook"),
+			sdklog.String("source", "falco"),
+			sdklog.String("reason", "invalid_method"),
+			sdklog.String("method", r.Method))
 		s.webhookMetrics.WithLabelValues("falco", "405").Inc()
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -236,68 +227,51 @@ func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 
 	var alert map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&alert); err != nil {
-		logger.Warn("Failed to parse Falco alert",
-			logger.Fields{
-				Component: "server",
-				Operation: "falco_webhook",
-				Source:    "falco",
-				Error:     err,
-				Reason:    "parse_error",
-			})
+		logger := sdklog.NewLogger("zen-watcher-server")
+		logger.WarnC(r.Context(), "Failed to parse Falco alert",
+			sdklog.Operation("falco_webhook"),
+			sdklog.String("source", "falco"),
+			sdklog.String("reason", "parse_error"),
+			sdklog.Error(err))
 		s.webhookMetrics.WithLabelValues("falco", "400").Inc()
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	rule, _ := alert["rule"].(string)
-	correlationID := logger.GetCorrelationID(r.Context())
+	correlationID := sdklog.GetRequestID(r.Context())
 	if correlationID == "" {
 		correlationID = fmt.Sprintf("falco-%d", time.Now().UnixNano())
-		ctx := logger.WithCorrelationID(r.Context(), correlationID)
+		ctx := sdklog.WithRequestID(r.Context(), correlationID)
 		r = r.WithContext(ctx)
 	}
 
 	// Send to channel for processing (non-blocking)
 	select {
 	case s.falcoAlertsChan <- alert:
-		logger.Info("Falco webhook received and queued for processing",
-			logger.Fields{
-				Component:     "server",
-				Operation:     "falco_webhook",
-				Source:        "falco",
-				EventType:     "webhook_queued",
-				CorrelationID: correlationID,
-				Additional: map[string]interface{}{
-					"rule":     rule,
-					"priority": fmt.Sprintf("%v", alert["priority"]),
-				},
-			})
+		logger := sdklog.NewLogger("zen-watcher-server")
+		logger.InfoC(r.Context(), "Falco webhook received and queued for processing",
+			sdklog.Operation("falco_webhook"),
+			sdklog.String("source", "falco"),
+			sdklog.String("rule", rule),
+			sdklog.String("priority", fmt.Sprintf("%v", alert["priority"])))
 		s.webhookMetrics.WithLabelValues("falco", "200").Inc()
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
-			logger.Warn("Failed to write response",
-				logger.Fields{
-					Component:     "server",
-					Operation:     "falco_webhook",
-					Source:        "falco",
-					CorrelationID: correlationID,
-					Error:         err,
-				})
+			logger := sdklog.NewLogger("zen-watcher-server")
+			logger.WarnC(r.Context(), "Failed to write response",
+				sdklog.Operation("falco_webhook"),
+				sdklog.String("source", "falco"),
+				sdklog.Error(err))
 		}
 	default:
-		logger.Error("Falco alerts channel full, dropping alert",
-			logger.Fields{
-				Component:     "server",
-				Operation:     "falco_webhook",
-				Source:        "falco",
-				EventType:     "channel_full",
-				CorrelationID: correlationID,
-				Reason:        "channel_buffer_full",
-				Additional: map[string]interface{}{
-					"rule":     rule,
-					"priority": fmt.Sprintf("%v", alert["priority"]),
-				},
-			})
+		logger := sdklog.NewLogger("zen-watcher-server")
+		logger.ErrorC(r.Context(), fmt.Errorf("channel buffer full"), "Falco alerts channel full, dropping alert",
+			sdklog.Operation("falco_webhook"),
+			sdklog.String("source", "falco"),
+			sdklog.String("reason", "channel_buffer_full"),
+			sdklog.String("rule", rule),
+			sdklog.String("priority", fmt.Sprintf("%v", alert["priority"])))
 		s.webhookMetrics.WithLabelValues("falco", "503").Inc()
 		if s.webhookDropped != nil {
 			s.webhookDropped.WithLabelValues("falco").Inc()
@@ -309,30 +283,21 @@ func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 // handleAuditWebhook handles POST /audit/webhook
 func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
 	// Log webhook request received (before any processing)
-	logger.Info("Audit webhook request received",
-		logger.Fields{
-			Component: "server",
-			Operation: "audit_webhook",
-			Source:    "audit",
-			EventType: "webhook_request",
-			Additional: map[string]interface{}{
-				"method":      r.Method,
-				"remote_addr": r.RemoteAddr,
-				"user_agent":  r.UserAgent(),
-			},
-		})
+	logger := sdklog.NewLogger("zen-watcher-server")
+	logger.InfoC(r.Context(), "Audit webhook request received",
+		sdklog.Operation("audit_webhook"),
+		sdklog.String("source", "audit"),
+		sdklog.String("method", r.Method),
+		sdklog.String("remote_addr", r.RemoteAddr),
+		sdklog.String("user_agent", r.UserAgent()))
 
 	if r.Method != http.MethodPost {
-		logger.Warn("Audit webhook rejected: invalid method",
-			logger.Fields{
-				Component: "server",
-				Operation: "audit_webhook",
-				Source:    "audit",
-				Reason:    "invalid_method",
-				Additional: map[string]interface{}{
-					"method": r.Method,
-				},
-			})
+		logger := sdklog.NewLogger("zen-watcher-server")
+		logger.WarnC(r.Context(), "Audit webhook rejected: invalid method",
+			sdklog.Operation("audit_webhook"),
+			sdklog.String("source", "audit"),
+			sdklog.String("reason", "invalid_method"),
+			sdklog.String("method", r.Method))
 		s.webhookMetrics.WithLabelValues("audit", "405").Inc()
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -340,14 +305,12 @@ func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
 
 	var auditEvent map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&auditEvent); err != nil {
-		logger.Warn("Failed to parse audit event",
-			logger.Fields{
-				Component: "server",
-				Operation: "audit_webhook",
-				Source:    "audit",
-				Error:     err,
-				Reason:    "parse_error",
-			})
+		logger := sdklog.NewLogger("zen-watcher-server")
+		logger.WarnC(r.Context(), "Failed to parse audit event",
+			sdklog.Operation("audit_webhook"),
+			sdklog.String("source", "audit"),
+			sdklog.String("reason", "parse_error"),
+			sdklog.Error(err))
 		s.webhookMetrics.WithLabelValues("audit", "400").Inc()
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -357,57 +320,42 @@ func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
 	verb := fmt.Sprintf("%v", auditEvent["verb"])
 	objectRef, _ := auditEvent["objectRef"].(map[string]interface{})
 	resource := fmt.Sprintf("%v", objectRef["resource"])
-	correlationID := logger.GetCorrelationID(r.Context())
+	correlationID := sdklog.GetRequestID(r.Context())
 	if correlationID == "" {
 		correlationID = fmt.Sprintf("audit-%s", auditID)
-		ctx := logger.WithCorrelationID(r.Context(), correlationID)
+		ctx := sdklog.WithRequestID(r.Context(), correlationID)
 		r = r.WithContext(ctx)
 	}
 
 	// Send to channel for processing (non-blocking)
 	select {
 	case s.auditEventsChan <- auditEvent:
-		logger.Info("Audit webhook received and queued for processing",
-			logger.Fields{
-				Component:     "server",
-				Operation:     "audit_webhook",
-				Source:        "audit",
-				EventType:     "webhook_queued",
-				CorrelationID: correlationID,
-				Additional: map[string]interface{}{
-					"audit_id": auditID,
-					"verb":     verb,
-					"resource": resource,
-					"stage":    fmt.Sprintf("%v", auditEvent["stage"]),
-				},
-			})
+		logger := sdklog.NewLogger("zen-watcher-server")
+		logger.InfoC(r.Context(), "Audit webhook received and queued for processing",
+			sdklog.Operation("audit_webhook"),
+			sdklog.String("source", "audit"),
+			sdklog.String("audit_id", auditID),
+			sdklog.String("verb", verb),
+			sdklog.String("resource", resource),
+			sdklog.String("stage", fmt.Sprintf("%v", auditEvent["stage"])))
 		s.webhookMetrics.WithLabelValues("audit", "200").Inc()
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
-			logger.Warn("Failed to write response",
-				logger.Fields{
-					Component:     "server",
-					Operation:     "audit_webhook",
-					Source:        "audit",
-					CorrelationID: correlationID,
-					Error:         err,
-				})
+			logger := sdklog.NewLogger("zen-watcher-server")
+			logger.WarnC(r.Context(), "Failed to write response",
+				sdklog.Operation("audit_webhook"),
+				sdklog.String("source", "audit"),
+				sdklog.Error(err))
 		}
 	default:
-		logger.Error("Audit events channel full, dropping event",
-			logger.Fields{
-				Component:     "server",
-				Operation:     "audit_webhook",
-				Source:        "audit",
-				EventType:     "channel_full",
-				CorrelationID: correlationID,
-				Reason:        "channel_buffer_full",
-				Additional: map[string]interface{}{
-					"audit_id": auditID,
-					"verb":     verb,
-					"resource": resource,
-				},
-			})
+		logger := sdklog.NewLogger("zen-watcher-server")
+		logger.ErrorC(r.Context(), fmt.Errorf("channel buffer full"), "Audit events channel full, dropping event",
+			sdklog.Operation("audit_webhook"),
+			sdklog.String("source", "audit"),
+			sdklog.String("reason", "channel_buffer_full"),
+			sdklog.String("audit_id", auditID),
+			sdklog.String("verb", verb),
+			sdklog.String("resource", resource))
 		s.webhookMetrics.WithLabelValues("audit", "503").Inc()
 		if s.webhookDropped != nil {
 			s.webhookDropped.WithLabelValues("audit").Inc()
@@ -437,35 +385,26 @@ func (s *Server) Start(ctx context.Context, wg *sync.WaitGroup) {
 			)
 		}
 
+		logger := sdklog.NewLogger("zen-watcher-server")
 		logger.Info("HTTP server starting",
-			logger.Fields{
-				Component: "server",
-				Operation: "http_start",
-				Additional: map[string]interface{}{
-					"address":   s.server.Addr,
-					"endpoints": endpoints,
-					"pprof":     s.isPprofEnabled(),
-				},
-			})
+			sdklog.Operation("http_start"),
+			sdklog.String("address", s.server.Addr),
+			sdklog.Strings("endpoints", endpoints),
+			sdklog.Bool("pprof", s.isPprofEnabled()))
 
 		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("HTTP server error",
-				logger.Fields{
-					Component: "server",
-					Operation: "http_serve",
-					Error:     err,
-				})
+			logger := sdklog.NewLogger("zen-watcher-server")
+			logger.Error(err, "HTTP server error",
+				sdklog.Operation("http_serve"))
 		}
 	}()
 
 	// Graceful shutdown handler
 	go func() {
 		<-ctx.Done()
+		logger := sdklog.NewLogger("zen-watcher-server")
 		logger.Info("Shutting down HTTP server",
-			logger.Fields{
-				Component: "server",
-				Operation: "http_shutdown",
-			})
+			sdklog.Operation("http_shutdown"))
 
 		// Get shutdown timeout from env var, default to 10 seconds
 		shutdownTimeout := 10 * time.Second
@@ -473,34 +412,25 @@ func (s *Server) Start(ctx context.Context, wg *sync.WaitGroup) {
 			if parsed, err := time.ParseDuration(timeoutStr); err == nil {
 				shutdownTimeout = parsed
 			} else {
+				logger := sdklog.NewLogger("zen-watcher-server")
 				logger.Warn("Invalid HTTP_SHUTDOWN_TIMEOUT, using default",
-					logger.Fields{
-						Component: "server",
-						Operation: "http_shutdown",
-						Additional: map[string]interface{}{
-							"invalid_value": timeoutStr,
-							"default":       "10s",
-						},
-					})
+					sdklog.Operation("http_shutdown"),
+					sdklog.String("invalid_value", timeoutStr),
+					sdklog.String("default", "10s"))
 			}
 		}
 
 		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), shutdownTimeout)
 		defer shutdownCancel()
 		if err := s.server.Shutdown(shutdownCtx); err != nil {
-			logger.Error("HTTP server shutdown error",
-				logger.Fields{
-					Component: "server",
-					Operation: "http_shutdown",
-					Error:     err,
-				})
+			logger := sdklog.NewLogger("zen-watcher-server")
+			logger.Error(err, "HTTP server shutdown error",
+				sdklog.Operation("http_shutdown"))
 		} else {
+			logger := sdklog.NewLogger("zen-watcher-server")
 			logger.Info("HTTP server shut down gracefully",
-				logger.Fields{
-					Component: "server",
-					Operation: "http_shutdown",
-					Duration:  shutdownTimeout.String(),
-				})
+				sdklog.Operation("http_shutdown"),
+				sdklog.Duration("duration", shutdownTimeout))
 		}
 	}()
 }
@@ -520,20 +450,30 @@ func (s *Server) handleHAHealth(w http.ResponseWriter, r *http.Request) {
 
 	if status == nil || !status.Healthy {
 		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":     "unhealthy",
 			"replica_id": status.ReplicaID,
-		})
+		}); err != nil {
+			logger := sdklog.NewLogger("zen-watcher-server")
+			logger.Warn("Failed to encode HA health response",
+				sdklog.Operation("ha_health"),
+				sdklog.Error(err))
+		}
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"status":     "healthy",
 		"replica_id": status.ReplicaID,
 		"enabled":    status.Enabled,
-	})
+	}); err != nil {
+		logger := sdklog.NewLogger("zen-watcher-server")
+		logger.Warn("Failed to encode HA health response",
+			sdklog.Operation("ha_health"),
+			sdklog.Error(err))
+	}
 }
 
 // handleHAMetrics handles GET /ha/metrics - HA-specific metrics for auto-scaling
@@ -549,7 +489,7 @@ func (s *Server) handleHAMetrics(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	if err := json.NewEncoder(w).Encode(map[string]interface{}{
 		"replica_id":     status.ReplicaID,
 		"cpu_usage":      status.CPUUsage,
 		"memory_usage":   status.MemoryUsage,
@@ -557,7 +497,12 @@ func (s *Server) handleHAMetrics(w http.ResponseWriter, r *http.Request) {
 		"queue_depth":    status.QueueDepth,
 		"current_load":   status.CurrentLoad,
 		"timestamp":      time.Now().Format(time.RFC3339),
-	})
+	}); err != nil {
+		logger := sdklog.NewLogger("zen-watcher-server")
+		logger.Warn("Failed to encode HA metrics response",
+			sdklog.Operation("ha_metrics"),
+			sdklog.Error(err))
+	}
 }
 
 // handleHAStatus handles GET /ha/status - Current HA status and load
@@ -573,7 +518,12 @@ func (s *Server) handleHAStatus(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(status)
+	if err := json.NewEncoder(w).Encode(status); err != nil {
+		logger := sdklog.NewLogger("zen-watcher-server")
+		logger.Warn("Failed to encode HA status response",
+			sdklog.Operation("ha_status"),
+			sdklog.Error(err))
+	}
 }
 
 // UpdateHAStatus updates the HA status with current metrics
