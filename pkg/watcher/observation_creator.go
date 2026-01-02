@@ -890,3 +890,34 @@ func (oc *ObservationCreator) updateOptimizationMetrics(source string) {
 		}
 	}
 }
+
+// extractReasonFromDetails extracts reason from details map
+func (oc *ObservationCreator) extractReasonFromDetails(detailsVal map[string]interface{}) string {
+	reasonFields := []string{"reason", "rule", "testNumber", "checkId", "vulnerabilityID", "auditID"}
+	for _, field := range reasonFields {
+		if r, ok := detailsVal[field].(string); ok && r != "" {
+			return r
+		}
+		if r, ok := detailsVal[field].(interface{}); ok {
+			return fmt.Sprintf("%v", r)
+		}
+	}
+	return ""
+}
+
+// extractMessage extracts message for hashing
+func (oc *ObservationCreator) extractMessage(detailsVal map[string]interface{}) string {
+	if detailsVal == nil {
+		return ""
+	}
+	messageFields := []string{"message", "output"}
+	for _, field := range messageFields {
+		if msg, ok := detailsVal[field].(string); ok && msg != "" {
+			return msg
+		}
+		if msg, ok := detailsVal[field].(interface{}); ok {
+			return fmt.Sprintf("%v", msg)
+		}
+	}
+	return ""
+}
