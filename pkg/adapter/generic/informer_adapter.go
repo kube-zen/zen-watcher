@@ -32,10 +32,9 @@ import (
 // Can watch any Kubernetes resource including ConfigMaps, CRDs, Pods, etc.
 type InformerAdapter struct {
 	manager *informers.Manager
-	stopCh  chan struct{}
-	queue   workqueue.RateLimitingInterface // Internal queue for backpressure
-	workers int                             // Number of worker goroutines
-	mu      sync.Mutex
+	stopCh chan struct{}
+	queue  workqueue.RateLimitingInterface // Internal queue for backpressure
+	mu     sync.Mutex
 }
 
 // NewInformerAdapterWithManager creates a new informer adapter using the informer manager
@@ -193,6 +192,8 @@ func (a *InformerAdapter) createEventHandlers(ctx context.Context, events chan<-
 }
 
 // processQueue processes items from the workqueue and emits RawEvents
+// NOTE: This function is currently unused but kept for future queue-based processing
+// nolint:unused
 func (a *InformerAdapter) processQueue(ctx context.Context, events chan<- RawEvent, source string) {
 	for {
 		select {

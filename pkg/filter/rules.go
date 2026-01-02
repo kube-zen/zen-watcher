@@ -157,22 +157,7 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	}
 
 	// Apply all source-specific filters
-	if allowed, reason := f.checkSeverityFilter(sourceFilter, fields.severity, source); !allowed {
-		return false, reason
-	}
-	if allowed, reason := f.checkEventTypeFilter(sourceFilter, fields.eventType, source); !allowed {
-		return false, reason
-	}
-	if allowed, reason := f.checkNamespaceFilter(sourceFilter, fields.namespace, source); !allowed {
-		return false, reason
-	}
-	if allowed, reason := f.checkKindFilter(sourceFilter, fields.kind, source); !allowed {
-		return false, reason
-	}
-	if allowed, reason := f.checkCategoryFilter(sourceFilter, fields.category, source); !allowed {
-		return false, reason
-	}
-	if allowed, reason := f.checkRuleFilter(sourceFilter, fields.rule, source); !allowed {
+	if allowed, reason := f.applySourceFilters(sourceFilter, fields, source); !allowed {
 		return false, reason
 	}
 
@@ -559,6 +544,29 @@ func (f *Filter) extractSourceAndFilter(observation *unstructured.Unstructured, 
 	source := strings.ToLower(fmt.Sprintf("%v", sourceVal))
 	sourceFilter := config.GetSourceFilter(source)
 	return source, sourceFilter
+}
+
+// applySourceFilters applies all source-specific filters
+func (f *Filter) applySourceFilters(sourceFilter *SourceFilter, fields observationFields, source string) (bool, string) {
+	if allowed, reason := f.checkSeverityFilter(sourceFilter, fields.severity, source); !allowed {
+		return false, reason
+	}
+	if allowed, reason := f.checkEventTypeFilter(sourceFilter, fields.eventType, source); !allowed {
+		return false, reason
+	}
+	if allowed, reason := f.checkNamespaceFilter(sourceFilter, fields.namespace, source); !allowed {
+		return false, reason
+	}
+	if allowed, reason := f.checkKindFilter(sourceFilter, fields.kind, source); !allowed {
+		return false, reason
+	}
+	if allowed, reason := f.checkCategoryFilter(sourceFilter, fields.category, source); !allowed {
+		return false, reason
+	}
+	if allowed, reason := f.checkRuleFilter(sourceFilter, fields.rule, source); !allowed {
+		return false, reason
+	}
+	return true, ""
 }
 
 // checkExpressionFilter checks expression-based filtering

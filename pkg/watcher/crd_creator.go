@@ -106,34 +106,12 @@ func (cc *CRDCreator) convertToCRD(observation *unstructured.Unstructured) *unst
 		namespace = "default"
 	}
 
-	// Determine kind from resource name (plural -> singular, capitalized)
-	kind := cc.gvr.Resource
-	// Simple plural handling: remove trailing 's' if present
-	if len(kind) > 1 && kind[len(kind)-1] == 's' {
-		if len(kind) > 2 && kind[len(kind)-2] != 's' && !strings.HasSuffix(kind, "us") {
-			kind = kind[:len(kind)-1] // Remove trailing 's'
-		}
-	}
-	// Capitalize first letter
-	if len(kind) > 0 {
-		kind = strings.ToUpper(kind[:1]) + kind[1:]
-	}
-
-	// Build apiVersion
-	apiVersion := cc.gvr.Version
-	if cc.gvr.Group != "" {
-		apiVersion = fmt.Sprintf("%s/%s", cc.gvr.Group, cc.gvr.Version)
-	}
+	// Determine kind and apiVersion
+	kind := determineKindFromResource(cc.gvr.Resource)
+	apiVersion := buildAPIVersionFromGVR(cc.gvr)
 
 	// Extract source for name prefix
-	source, _ := extractStringFromMap(spec, "source")
-	if source == "" {
-		source = "event"
-	}
-	namePrefix := source
-	if len(namePrefix) > 20 {
-		namePrefix = namePrefix[:20]
-	}
+	namePrefix := extractNamePrefixFromSpec(spec)
 
 	// Extract labels from observation metadata
 	labels, _ := extractMap(observation.Object, "metadata", "labels")

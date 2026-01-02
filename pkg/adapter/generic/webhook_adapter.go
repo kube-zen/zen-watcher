@@ -23,16 +23,14 @@ import (
 	"time"
 
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
-	"k8s.io/client-go/kubernetes"
 )
 
 // WebhookAdapter handles ALL webhook-based sources
 type WebhookAdapter struct {
-	server    *http.Server
-	events    chan RawEvent
-	mu        sync.RWMutex
-	configs   map[string]*SourceConfig // path -> config
-	clientSet kubernetes.Interface
+	server  *http.Server
+	events  chan RawEvent
+	mu      sync.RWMutex
+	configs map[string]*SourceConfig // path -> config
 }
 
 // NewWebhookAdapter creates a new generic webhook adapter

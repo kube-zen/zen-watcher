@@ -346,25 +346,7 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 	createdObservation := observation
 
 	if err != nil {
-		// Track creation errors
-		if oc.observationsCreateErrors != nil {
-			errorType := "create_failed"
-			errMsg := strings.ToLower(err.Error())
-			// Extract error type from error message
-			if strings.Contains(errMsg, "already exists") {
-				errorType = "already_exists"
-			} else if strings.Contains(errMsg, "forbidden") {
-				errorType = "forbidden"
-			} else if strings.Contains(errMsg, "not found") {
-				errorType = "not_found"
-			}
-			oc.observationsCreateErrors.WithLabelValues(source, errorType).Inc()
-		}
-		// Track destination delivery failure
-		if oc.destinationMetrics != nil {
-			oc.destinationMetrics.DestinationDeliveryTotal.WithLabelValues(source, "crd", "failure").Inc()
-			oc.destinationMetrics.DestinationDeliveryLatency.WithLabelValues(source, "crd").Observe(deliveryDuration.Seconds())
-		}
+		oc.handleCreationError(err, source, gvr.Resource, deliveryDuration)
 		return fmt.Errorf("failed to create resource %s: %w", gvr.Resource, err)
 	}
 
@@ -375,83 +357,7 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 	}
 
 	// STEP 2: UPDATE METRICS ONLY AFTER SUCCESSFUL CREATION
-	// Increment observations created metric
-	if oc.observationsCreated != nil {
-		oc.observationsCreated.WithLabelValues(source).Inc()
-	}
-
-	// Track event for HA metrics
-	if oc.systemMetrics != nil {
-		oc.systemMetrics.RecordEvent()
-	}
-
-	// Record created event for optimization metrics
-	if oc.optimizationMetrics != nil {
-		oc.recordEventCreated(source, severity)
-		oc.updateOptimizationMetrics(source)
-	}
-
-	// Increment eventsTotal metric - this tracks events by source/category/severity/eventType/namespace/kind
-	// Only increment AFTER observation CRD is successfully created
-	if oc.eventsTotal != nil {
-		if category == "" {
-			category = "unknown"
-		}
-		if severity == "" {
-			severity = "info"
-		}
-		if eventType == "" {
-			eventType = "unknown"
-		}
-
-		// Extract namespace and kind from resource (optimized)
-		resourceNamespace := namespace // Use observation namespace as fallback
-		resourceKind := ""
-		resourceVal, _ := oc.fieldExtractor.ExtractMap(observation.Object, "spec", "resource")
-		if resourceVal != nil {
-			if ns, ok := resourceVal["namespace"].(string); ok && ns != "" {
-				resourceNamespace = ns
-			} else if ns, ok := resourceVal["namespace"].(interface{}); ok {
-				resourceNamespace = fmt.Sprintf("%v", ns)
-			}
-			if k, ok := resourceVal["kind"].(string); ok && k != "" {
-				resourceKind = k
-			} else if k, ok := resourceVal["kind"].(interface{}); ok {
-				resourceKind = fmt.Sprintf("%v", k)
-			}
-		}
-		if resourceNamespace == "" {
-			resourceNamespace = "default"
-		}
-		if resourceKind == "" {
-			resourceKind = "Unknown"
-		}
-
-		// Get processing strategy for this source (default to filter_first)
-		strategy := "filter_first"
-		oc.orderMu.RLock()
-		if order, exists := oc.currentOrder[source]; exists {
-			strategy = string(order)
-		}
-		oc.orderMu.RUnlock()
-
-		oc.eventsTotal.WithLabelValues(source, category, severity, eventType, resourceNamespace, resourceKind, strategy).Inc()
-		logger.Debug("Metric incremented after observation creation",
-			sdklog.Operation("observation_create"),
-			sdklog.String("source", source),
-			sdklog.String("category", category),
-			sdklog.String("severity", severity),
-			sdklog.String("eventType", eventType),
-			sdklog.String("observation_name", createdObservation.GetName()),
-			sdklog.String("observation_namespace", namespace),
-			sdklog.String("resource_namespace", resourceNamespace),
-			sdklog.String("resource_kind", resourceKind))
-	} else {
-		logger := sdklog.NewLogger("zen-watcher")
-		logger.Error(fmt.Errorf("eventsTotal metric is nil"), "eventsTotal metric is nil, metrics will not be incremented",
-			sdklog.Operation("observation_create"),
-			sdklog.String("source", source))
-	}
+	oc.updateMetricsAfterCreation(observation, source, category, severity, eventType, namespace, createdObservation, logger)
 
 	// STEP 3: LOG SUCCESS
 	logger.Debug("Observation created successfully",

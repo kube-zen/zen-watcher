@@ -31,7 +31,6 @@ type ThresholdMonitor struct {
 	}
 	thresholdExceeded *prometheus.CounterVec
 	checkInterval     time.Duration
-	mu                sync.RWMutex
 	lastChecks        map[string]time.Time
 }
 
