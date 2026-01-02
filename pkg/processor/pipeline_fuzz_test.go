@@ -25,7 +25,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
-	"github.com/kube-zen/zen-sdk/pkg/dedup"
+	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -64,7 +64,7 @@ func FuzzProcessEvent(f *testing.F) {
 		})
 		filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 		f := filter.NewFilter(filterConfig)
-		deduper := sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+		deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 		creator := watcher.NewObservationCreator(
 			dynamicClient,
 			observationGVR,
@@ -132,7 +132,7 @@ func FuzzProcessEvent_ExtremeSizes(f *testing.F) {
 		})
 		filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 		filter := filter.NewFilter(filterConfig)
-		deduper := sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+		deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 		creator := watcher.NewObservationCreator(
 			dynamicClient,
 			observationGVR,
@@ -190,7 +190,7 @@ func FuzzProcessEvent_HighCardinalityLabels(f *testing.F) {
 		})
 		filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 		filter := filter.NewFilter(filterConfig)
-		deduper := sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+		deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 		creator := watcher.NewObservationCreator(
 			dynamicClient,
 			observationGVR,

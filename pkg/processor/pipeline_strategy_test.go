@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
-	"github.com/kube-zen/zen-sdk/pkg/dedup"
+	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -46,7 +46,7 @@ func setupTestProcessor(t *testing.T) (*Processor, dynamic.Interface) {
 	}
 	f := filter.NewFilter(filterConfig)
 
-	deduper := sdkdedup.NewDeduper(60, 10000)
+	deduper := dedup.NewDeduper(60, 10000)
 	defer deduper.Stop()
 
 	creator := watcher.NewObservationCreator(
