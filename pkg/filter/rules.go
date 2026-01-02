@@ -16,7 +16,6 @@ package filter
 
 import (
 	"fmt"
-	"strings"
 	"sync"
 
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
