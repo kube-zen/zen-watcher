@@ -56,67 +56,72 @@ func main() {
 	ctx := context.Background()
 
 	// Execute command
-	switch *command {
-	case "analyze":
-		if *source == "" {
-			fmt.Fprintf(os.Stderr, "Error: --source is required for analyze command\n")
-			os.Exit(1)
-		}
-		if err := optimizeCLI.Analyze(ctx, *source); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-
-	case "apply":
-		if *source == "" {
-			fmt.Fprintf(os.Stderr, "Error: --source is required for apply command\n")
-			os.Exit(1)
-		}
-		if *suggestion == 0 {
-			fmt.Fprintf(os.Stderr, "Error: --suggestion is required for apply command\n")
-			os.Exit(1)
-		}
-		if err := optimizeCLI.Apply(ctx, *source, *suggestion); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-
-	case "auto":
-		if err := optimizeCLI.Auto(ctx, *enable); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-
-	case "history":
-		if *source == "" {
-			fmt.Fprintf(os.Stderr, "Error: --source is required for history command\n")
-			os.Exit(1)
-		}
-		if err := optimizeCLI.History(ctx, *source); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-
-	case "list":
-		if err := optimizeCLI.ListSources(ctx); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-
-	default:
-		fmt.Fprintf(os.Stderr, "Usage: zen-watcher-optimize --command=<command> [options]\n\n")
-		fmt.Fprintf(os.Stderr, "Commands:\n")
-		fmt.Fprintf(os.Stderr, "  analyze    - Analyze optimization opportunities for a source\n")
-		fmt.Fprintf(os.Stderr, "  apply      - Apply a suggestion by index\n")
-		fmt.Fprintf(os.Stderr, "  auto       - DEPRECATED: Auto-optimization removed. Configure processing order in Ingester CRD.\n")
-		fmt.Fprintf(os.Stderr, "  history    - Show optimization history for a source\n")
-		fmt.Fprintf(os.Stderr, "  list       - List all sources and their optimization status\n\n")
-		fmt.Fprintf(os.Stderr, "Examples:\n")
-		fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=analyze --source=<source-name>\n")
-		fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=apply --source=<source-name> --suggestion=1\n")
-		fmt.Fprintf(os.Stderr, "  DEPRECATED: Use Ingester CRD spec.processing.order instead\n")
-		fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=history --source=<source-name>\n")
-		fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=list\n")
+	if err := executeCommand(ctx, optimizeCLI, *command, *source, *suggestion, *enable); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// executeCommand executes the specified command
+func executeCommand(ctx context.Context, optimizeCLI *cli.OptimizeCLI, command, source string, suggestion int, enable bool) error {
+	switch command {
+	case "analyze":
+		return executeAnalyze(ctx, optimizeCLI, source)
+	case "apply":
+		return executeApply(ctx, optimizeCLI, source, suggestion)
+	case "auto":
+		return optimizeCLI.Auto(ctx, enable)
+	case "history":
+		return executeHistory(ctx, optimizeCLI, source)
+	case "list":
+		return optimizeCLI.ListSources(ctx)
+	default:
+		printUsage()
+		os.Exit(1)
+		return nil
+	}
+}
+
+// executeAnalyze executes the analyze command
+func executeAnalyze(ctx context.Context, optimizeCLI *cli.OptimizeCLI, source string) error {
+	if source == "" {
+		return fmt.Errorf("--source is required for analyze command")
+	}
+	return optimizeCLI.Analyze(ctx, source)
+}
+
+// executeApply executes the apply command
+func executeApply(ctx context.Context, optimizeCLI *cli.OptimizeCLI, source string, suggestion int) error {
+	if source == "" {
+		return fmt.Errorf("--source is required for apply command")
+	}
+	if suggestion == 0 {
+		return fmt.Errorf("--suggestion is required for apply command")
+	}
+	return optimizeCLI.Apply(ctx, source, suggestion)
+}
+
+// executeHistory executes the history command
+func executeHistory(ctx context.Context, optimizeCLI *cli.OptimizeCLI, source string) error {
+	if source == "" {
+		return fmt.Errorf("--source is required for history command")
+	}
+	return optimizeCLI.History(ctx, source)
+}
+
+// printUsage prints usage information
+func printUsage() {
+	fmt.Fprintf(os.Stderr, "Usage: zen-watcher-optimize --command=<command> [options]\n\n")
+	fmt.Fprintf(os.Stderr, "Commands:\n")
+	fmt.Fprintf(os.Stderr, "  analyze    - Analyze optimization opportunities for a source\n")
+	fmt.Fprintf(os.Stderr, "  apply      - Apply a suggestion by index\n")
+	fmt.Fprintf(os.Stderr, "  auto       - DEPRECATED: Auto-optimization removed. Configure processing order in Ingester CRD.\n")
+	fmt.Fprintf(os.Stderr, "  history    - Show optimization history for a source\n")
+	fmt.Fprintf(os.Stderr, "  list       - List all sources and their optimization status\n\n")
+	fmt.Fprintf(os.Stderr, "Examples:\n")
+	fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=analyze --source=<source-name>\n")
+	fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=apply --source=<source-name> --suggestion=1\n")
+	fmt.Fprintf(os.Stderr, "  DEPRECATED: Use Ingester CRD spec.processing.order instead\n")
+	fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=history --source=<source-name>\n")
+	fmt.Fprintf(os.Stderr, "  zen-watcher-optimize --command=list\n")
 }

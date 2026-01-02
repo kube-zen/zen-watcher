@@ -165,119 +165,7 @@ func (o *GenericOrchestrator) reloadAdapters() {
 
 		// Process each config (one per source in multi-source mode)
 		for _, ingesterConfig := range ingesterConfigs {
-			// Convert IngesterConfig to generic.SourceConfig
-			genericConfig := config.ConvertIngesterConfigToGeneric(ingesterConfig)
-			if genericConfig == nil {
-				if o.metrics != nil {
-					o.metrics.IngestersConfigErrors.WithLabelValues(ingesterConfig.Source, "convert_to_generic_failed").Inc()
-				}
-				logger := sdklog.NewLogger("zen-watcher-orchestrator")
-				logger.Warn("Failed to convert IngesterConfig to generic.SourceConfig",
-					sdklog.Operation("convert_to_generic"),
-					sdklog.String("source", ingesterConfig.Source))
-				continue
-			}
-
-			source := genericConfig.Source
-			activeSources[source] = true
-
-			// Update ingester active status
-			if o.metrics != nil {
-				o.metrics.IngestersActive.WithLabelValues(source, genericConfig.Ingester, item.GetNamespace()).Set(1)
-				o.metrics.IngestersStatus.WithLabelValues(source).Set(1) // 1 = active
-			}
-
-			// Check if adapter already exists
-			if existingAdapter, exists := o.activeAdapters[source]; exists {
-				// Check if config changed
-				if o.configChanged(source, genericConfig) {
-					// Stop old adapter
-					existingAdapter.Stop()
-					delete(o.activeAdapters, source)
-				} else {
-					// Config unchanged, skip
-					continue
-				}
-			}
-
-			// Extract source name from source identifier (format: namespace/name/sourceName)
-			sourceName := o.extractSourceName(source, item.GetNamespace(), item.GetName())
-
-			// Create new adapter
-			startupStartTime := time.Now()
-			adapter, err := o.adapterFactory.NewAdapter(genericConfig.Ingester)
-			if err != nil {
-				// Update status: error
-				tracker := o.statusUpdater.GetOrCreateTracker(item.GetNamespace(), item.GetName())
-				tracker.UpdateSourceState(sourceName, genericConfig.Ingester, SourceStateError, err)
-				if o.metrics != nil {
-					o.metrics.IngestersConfigErrors.WithLabelValues(source, "create_adapter_failed").Inc()
-					o.metrics.IngestersStatus.WithLabelValues(source).Set(-1) // -1 = error
-				}
-				logger := sdklog.NewLogger("zen-watcher-orchestrator")
-				logger.Error(err, "Failed to create adapter",
-					sdklog.Operation("create_adapter"),
-					sdklog.String("source", source))
-				continue
-			}
-
-			// Validate config
-			if err := adapter.Validate(genericConfig); err != nil {
-				// Update status: error
-				tracker := o.statusUpdater.GetOrCreateTracker(item.GetNamespace(), item.GetName())
-				tracker.UpdateSourceState(sourceName, genericConfig.Ingester, SourceStateError, err)
-				if o.metrics != nil {
-					o.metrics.IngestersConfigErrors.WithLabelValues(source, "validation_failed").Inc()
-					o.metrics.IngestersStatus.WithLabelValues(source).Set(-1) // -1 = error
-				}
-				logger := sdklog.NewLogger("zen-watcher-orchestrator")
-				logger.Error(err, "Adapter validation failed",
-					sdklog.Operation("validate_adapter"),
-					sdklog.String("source", source))
-				continue
-			}
-
-			// Start adapter
-			events, err := adapter.Start(o.ctx, genericConfig)
-			if err != nil {
-				// Update status: error
-				tracker := o.statusUpdater.GetOrCreateTracker(item.GetNamespace(), item.GetName())
-				tracker.UpdateSourceState(sourceName, genericConfig.Ingester, SourceStateError, err)
-				if o.metrics != nil {
-					o.metrics.IngestersConfigErrors.WithLabelValues(source, "start_failed").Inc()
-					o.metrics.IngestersStatus.WithLabelValues(source).Set(-1) // -1 = error
-				}
-				logger := sdklog.NewLogger("zen-watcher-orchestrator")
-				logger.Error(err, "Failed to start adapter",
-					sdklog.Operation("start_adapter"),
-					sdklog.String("source", source))
-				continue
-			}
-
-			// Update status: running
-			tracker := o.statusUpdater.GetOrCreateTracker(item.GetNamespace(), item.GetName())
-			tracker.UpdateSourceState(sourceName, genericConfig.Ingester, SourceStateRunning, nil)
-
-			// Record startup duration
-			if o.metrics != nil {
-				o.metrics.IngestersStartupDuration.WithLabelValues(source).Observe(time.Since(startupStartTime).Seconds())
-			}
-
-			// Store adapter, config, and event stream
-			o.activeAdapters[source] = adapter
-			o.activeConfigs[source] = genericConfig
-			o.activeEventStreams[source] = events
-
-			// Process events from this adapter
-			go o.processEvents(source, genericConfig, events)
-
-			logger := sdklog.NewLogger("zen-watcher-orchestrator")
-			logger.Info("Generic adapter started",
-				sdklog.Operation("adapter_started"),
-				sdklog.String("source", source),
-				sdklog.String("ingester", genericConfig.Ingester),
-				sdklog.String("namespace", item.GetNamespace()),
-				sdklog.String("name", item.GetName()))
+			o.processIngesterConfig(ingesterConfig, item, activeSources)
 		}
 	}
 
@@ -320,81 +208,74 @@ func (o *GenericOrchestrator) processEvents(source string, config *generic.Sourc
 	lastRateUpdate := time.Now()
 
 	if o.enableBatching && o.batchProcessor != nil {
-		// Use batch processing for improved throughput
-		for rawEvent := range events {
-			processStart := time.Now()
-			if err := o.batchProcessor.AddEvent(o.ctx, &rawEvent, config); err != nil {
-				if o.metrics != nil {
-					o.metrics.IngesterErrorsTotal.WithLabelValues(source, "batch_add_failed", "batch").Inc()
-				}
-				logger := sdklog.NewLogger("zen-watcher-orchestrator")
-				logger.Error(err, "Failed to add event to batch",
-					sdklog.Operation("batch_add_event"),
-					sdklog.String("source", source))
-			} else {
-				eventCount++
-				if o.metrics != nil {
-					o.metrics.IngesterEventsProcessed.WithLabelValues(source, config.Ingester).Inc()
-					o.metrics.IngesterProcessingLatency.WithLabelValues(source, "batch").Observe(time.Since(processStart).Seconds())
+		o.processBatchEvents(source, config, events, &eventCount, &lastRateUpdate)
+	} else {
+		o.processSingleEvents(source, config, events, &eventCount, &lastRateUpdate)
+	}
+}
 
-					// Update last event timestamp
-					now := time.Now()
-					o.lastEventMu.Lock()
-					o.lastEventTimestamp[source] = now
-					o.lastEventMu.Unlock()
-					o.metrics.IngestersLastEventTimestamp.WithLabelValues(source).Set(float64(now.Unix()))
+// processBatchEvents processes events using batch processor
+func (o *GenericOrchestrator) processBatchEvents(source string, config *generic.SourceConfig, events <-chan generic.RawEvent, eventCount *int, lastRateUpdate *time.Time) {
+	for rawEvent := range events {
+		processStart := time.Now()
+		if err := o.batchProcessor.AddEvent(o.ctx, &rawEvent, config); err != nil {
+			if o.metrics != nil {
+				o.metrics.IngesterErrorsTotal.WithLabelValues(source, "batch_add_failed", "batch").Inc()
+			}
+			logger := sdklog.NewLogger("zen-watcher-orchestrator")
+			logger.Error(err, "Failed to add event to batch",
+				sdklog.Operation("batch_add_event"),
+				sdklog.String("source", source))
+		} else {
+			o.updateEventMetrics(source, config.Ingester, processStart, eventCount, lastRateUpdate, "batch")
+		}
+	}
+}
 
-					// Update rate every second
-					if time.Since(lastRateUpdate) >= time.Second {
-						rate := float64(eventCount) / time.Since(lastRateUpdate).Seconds()
-						o.metrics.IngesterEventsProcessedRate.WithLabelValues(source).Set(rate)
-						eventCount = 0
-						lastRateUpdate = time.Now()
-					}
-				}
+// processSingleEvents processes events one-by-one
+func (o *GenericOrchestrator) processSingleEvents(source string, config *generic.SourceConfig, events <-chan generic.RawEvent, eventCount *int, lastRateUpdate *time.Time) {
+	for rawEvent := range events {
+		processStart := time.Now()
+		if err := o.processor.ProcessEvent(o.ctx, &rawEvent, config); err != nil {
+			if o.metrics != nil {
+				o.metrics.IngesterErrorsTotal.WithLabelValues(source, "process_failed", "processor").Inc()
+			}
+			logger := sdklog.NewLogger("zen-watcher-orchestrator")
+			logger.Error(err, "Failed to process event",
+				sdklog.Operation("process_event"),
+				sdklog.String("source", source))
+		} else {
+			o.updateEventMetrics(source, config.Ingester, processStart, eventCount, lastRateUpdate, "processor")
+			// Update source lastSeen in status
+			namespace, name, sourceName := o.parseSourceIdentifier(source)
+			if namespace != "" && name != "" {
+				tracker := o.statusUpdater.GetOrCreateTracker(namespace, name)
+				tracker.UpdateSourceLastSeen(sourceName)
 			}
 		}
-	} else {
-		// Process events one-by-one (original behavior)
-		for rawEvent := range events {
-			processStart := time.Now()
-			if err := o.processor.ProcessEvent(o.ctx, &rawEvent, config); err != nil {
-				if o.metrics != nil {
-					o.metrics.IngesterErrorsTotal.WithLabelValues(source, "process_failed", "processor").Inc()
-				}
-				logger := sdklog.NewLogger("zen-watcher-orchestrator")
-				logger.Error(err, "Failed to process event",
-					sdklog.Operation("process_event"),
-					sdklog.String("source", source))
-			} else {
-				eventCount++
-				if o.metrics != nil {
-					o.metrics.IngesterEventsProcessed.WithLabelValues(source, config.Ingester).Inc()
-					o.metrics.IngesterProcessingLatency.WithLabelValues(source, "processor").Observe(time.Since(processStart).Seconds())
+	}
+}
 
-					// Update last event timestamp
-					now := time.Now()
-					o.lastEventMu.Lock()
-					o.lastEventTimestamp[source] = now
-					o.lastEventMu.Unlock()
-					o.metrics.IngestersLastEventTimestamp.WithLabelValues(source).Set(float64(now.Unix()))
-				}
+// updateEventMetrics updates event processing metrics
+func (o *GenericOrchestrator) updateEventMetrics(source, ingester string, processStart time.Time, eventCount *int, lastRateUpdate *time.Time, processorType string) {
+	*eventCount++
+	if o.metrics != nil {
+		o.metrics.IngesterEventsProcessed.WithLabelValues(source, ingester).Inc()
+		o.metrics.IngesterProcessingLatency.WithLabelValues(source, processorType).Observe(time.Since(processStart).Seconds())
 
-				// Update source lastSeen in status
-				namespace, name, sourceName := o.parseSourceIdentifier(source)
-				if namespace != "" && name != "" {
-					tracker := o.statusUpdater.GetOrCreateTracker(namespace, name)
-					tracker.UpdateSourceLastSeen(sourceName)
-				}
+		// Update last event timestamp
+		now := time.Now()
+		o.lastEventMu.Lock()
+		o.lastEventTimestamp[source] = now
+		o.lastEventMu.Unlock()
+		o.metrics.IngestersLastEventTimestamp.WithLabelValues(source).Set(float64(now.Unix()))
 
-				// Update rate every second
-				if o.metrics != nil && time.Since(lastRateUpdate) >= time.Second {
-					rate := float64(eventCount) / time.Since(lastRateUpdate).Seconds()
-					o.metrics.IngesterEventsProcessedRate.WithLabelValues(source).Set(rate)
-					eventCount = 0
-					lastRateUpdate = time.Now()
-				}
-			}
+		// Update rate every second
+		if time.Since(*lastRateUpdate) >= time.Second {
+			rate := float64(*eventCount) / time.Since(*lastRateUpdate).Seconds()
+			o.metrics.IngesterEventsProcessedRate.WithLabelValues(source).Set(rate)
+			*eventCount = 0
+			*lastRateUpdate = time.Now()
 		}
 	}
 }

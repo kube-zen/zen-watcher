@@ -129,19 +129,10 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 		return allowed, reason
 	}
 
-	// Extract source from observation
-	sourceVal, sourceFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
-	if !sourceFound || sourceVal == nil {
-		// No source - allow (will be handled elsewhere)
-		return true, ""
-	}
-	source := strings.ToLower(fmt.Sprintf("%v", sourceVal))
-
-	// Get source-specific filter
-	sourceFilter := config.GetSourceFilter(source)
+	// Extract source and get source-specific filter
+	source, sourceFilter := f.extractSourceAndFilter(observation, config)
 	if sourceFilter == nil {
-		// No filter for this source - allow
-		return true, ""
+		return true, "" // No filter for this source - allow
 	}
 
 	// Check if source is enabled
@@ -556,6 +547,18 @@ func (f *Filter) checkRuleFilter(sourceFilter *SourceFilter, rule, source string
 		}
 	}
 	return true, ""
+}
+
+// extractSourceAndFilter extracts source and gets source-specific filter
+func (f *Filter) extractSourceAndFilter(observation *unstructured.Unstructured, config *FilterConfig) (string, *SourceFilter) {
+	sourceVal, sourceFound, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
+	if !sourceFound || sourceVal == nil {
+		// No source - allow (will be handled elsewhere)
+		return "", nil
+	}
+	source := strings.ToLower(fmt.Sprintf("%v", sourceVal))
+	sourceFilter := config.GetSourceFilter(source)
+	return source, sourceFilter
 }
 
 // checkExpressionFilter checks expression-based filtering

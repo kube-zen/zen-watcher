@@ -324,40 +324,7 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 	}
 
 	// Extract category, severity, and eventType from spec for metrics BEFORE creation (optimized)
-	categoryVal, categoryFound := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "category")
-	severityVal, severityFound := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "severity")
-	eventTypeVal, eventTypeFound := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "eventType")
-	category := ""
-	if categoryVal != nil {
-		category = fmt.Sprintf("%v", categoryVal)
-	} else if !categoryFound {
-		logger.Debug("Category not found in spec",
-			sdklog.Operation("observation_create"),
-			sdklog.String("source", source))
-	}
-	severity := ""
-	if severityVal != nil {
-		severity = fmt.Sprintf("%v", severityVal)
-	} else if !severityFound {
-		logger := sdklog.NewLogger("zen-watcher")
-		logger.Debug("Severity not found in spec",
-			sdklog.Operation("observation_create"),
-			sdklog.String("source", source))
-	}
-	eventType := ""
-	if eventTypeVal != nil {
-		eventType = fmt.Sprintf("%v", eventTypeVal)
-	} else if !eventTypeFound {
-		logger := sdklog.NewLogger("zen-watcher")
-		logger.Debug("EventType not found in spec",
-			sdklog.Operation("observation_create"),
-			sdklog.String("source", source))
-	}
-
-	// Normalize severity to uppercase for consistency
-	if severity != "" {
-		severity = normalizeSeverity(severity)
-	}
+	category, severity, eventType := oc.extractMetricsFields(observation, logger, source)
 
 	// Set TTL in spec if not already set (Kubernetes native style)
 	oc.setTTLIfNotSet(observation)
@@ -498,6 +465,160 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 	return nil
 }
 
+// extractMetricsFields extracts category, severity, and eventType from observation
+func (oc *ObservationCreator) extractMetricsFields(observation *unstructured.Unstructured, logger *sdklog.Logger, source string) (string, string, string) {
+	categoryVal, categoryFound := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "category")
+	severityVal, severityFound := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "severity")
+	eventTypeVal, eventTypeFound := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "eventType")
+	
+	category := ""
+	if categoryVal != nil {
+		category = fmt.Sprintf("%v", categoryVal)
+	} else if !categoryFound {
+		logger.Debug("Category not found in spec",
+			sdklog.Operation("observation_create"),
+			sdklog.String("source", source))
+	}
+	
+	severity := ""
+	if severityVal != nil {
+		severity = fmt.Sprintf("%v", severityVal)
+	} else if !severityFound {
+		logger.Debug("Severity not found in spec",
+			sdklog.Operation("observation_create"),
+			sdklog.String("source", source))
+	}
+	
+	eventType := ""
+	if eventTypeVal != nil {
+		eventType = fmt.Sprintf("%v", eventTypeVal)
+	} else if !eventTypeFound {
+		logger.Debug("EventType not found in spec",
+			sdklog.Operation("observation_create"),
+			sdklog.String("source", source))
+	}
+
+	// Normalize severity to uppercase for consistency
+	if severity != "" {
+		severity = normalizeSeverity(severity)
+	}
+	
+	return category, severity, eventType
+}
+
+// handleCreationError handles observation creation errors
+func (oc *ObservationCreator) handleCreationError(err error, source, resource string, deliveryDuration time.Duration) {
+	// Track creation errors
+	if oc.observationsCreateErrors != nil {
+		errorType := classifyError(err)
+		oc.observationsCreateErrors.WithLabelValues(source, errorType).Inc()
+	}
+	// Track destination delivery failure
+	if oc.destinationMetrics != nil {
+		oc.destinationMetrics.DestinationDeliveryTotal.WithLabelValues(source, "crd", "failure").Inc()
+		oc.destinationMetrics.DestinationDeliveryLatency.WithLabelValues(source, "crd").Observe(deliveryDuration.Seconds())
+	}
+}
+
+// updateMetricsAfterCreation updates all metrics after successful observation creation
+func (oc *ObservationCreator) updateMetricsAfterCreation(observation *unstructured.Unstructured, source, category, severity, eventType, namespace string, createdObservation *unstructured.Unstructured, logger *sdklog.Logger) {
+	// Increment observations created metric
+	if oc.observationsCreated != nil {
+		oc.observationsCreated.WithLabelValues(source).Inc()
+	}
+
+	// Track event for HA metrics
+	if oc.systemMetrics != nil {
+		oc.systemMetrics.RecordEvent()
+	}
+
+	// Record created event for optimization metrics
+	if oc.optimizationMetrics != nil {
+		oc.recordEventCreated(source, severity)
+		oc.updateOptimizationMetrics(source)
+	}
+
+	// Increment eventsTotal metric
+	oc.updateEventsTotalMetric(observation, source, category, severity, eventType, namespace, createdObservation, logger)
+}
+
+// updateEventsTotalMetric updates the eventsTotal metric
+func (oc *ObservationCreator) updateEventsTotalMetric(observation *unstructured.Unstructured, source, category, severity, eventType, namespace string, createdObservation *unstructured.Unstructured, logger *sdklog.Logger) {
+	if oc.eventsTotal == nil {
+		logger := sdklog.NewLogger("zen-watcher")
+		logger.Error(fmt.Errorf("eventsTotal metric is nil"), "eventsTotal metric is nil, metrics will not be incremented",
+			sdklog.Operation("observation_create"),
+			sdklog.String("source", source))
+		return
+	}
+
+	// Normalize values
+	if category == "" {
+		category = "unknown"
+	}
+	if severity == "" {
+		severity = "info"
+	}
+	if eventType == "" {
+		eventType = "unknown"
+	}
+
+	// Extract namespace and kind from resource
+	resourceNamespace, resourceKind := oc.extractResourceInfo(observation, namespace)
+
+	// Get processing strategy for this source
+	strategy := oc.getProcessingStrategy(source)
+
+	oc.eventsTotal.WithLabelValues(source, category, severity, eventType, resourceNamespace, resourceKind, strategy).Inc()
+	logger.Debug("Metric incremented after observation creation",
+		sdklog.Operation("observation_create"),
+		sdklog.String("source", source),
+		sdklog.String("category", category),
+		sdklog.String("severity", severity),
+		sdklog.String("eventType", eventType),
+		sdklog.String("observation_name", createdObservation.GetName()),
+		sdklog.String("observation_namespace", namespace),
+		sdklog.String("resource_namespace", resourceNamespace),
+		sdklog.String("resource_kind", resourceKind))
+}
+
+// extractResourceInfo extracts namespace and kind from resource
+func (oc *ObservationCreator) extractResourceInfo(observation *unstructured.Unstructured, defaultNamespace string) (string, string) {
+	resourceNamespace := defaultNamespace
+	resourceKind := ""
+	resourceVal, _ := oc.fieldExtractor.ExtractMap(observation.Object, "spec", "resource")
+	if resourceVal != nil {
+		if ns, ok := resourceVal["namespace"].(string); ok && ns != "" {
+			resourceNamespace = ns
+		} else if ns, ok := resourceVal["namespace"].(interface{}); ok {
+			resourceNamespace = fmt.Sprintf("%v", ns)
+		}
+		if k, ok := resourceVal["kind"].(string); ok && k != "" {
+			resourceKind = k
+		} else if k, ok := resourceVal["kind"].(interface{}); ok {
+			resourceKind = fmt.Sprintf("%v", k)
+		}
+	}
+	if resourceNamespace == "" {
+		resourceNamespace = "default"
+	}
+	if resourceKind == "" {
+		resourceKind = "Unknown"
+	}
+	return resourceNamespace, resourceKind
+}
+
+// getProcessingStrategy gets the processing strategy for a source
+func (oc *ObservationCreator) getProcessingStrategy(source string) string {
+	strategy := "filter_first"
+	oc.orderMu.RLock()
+	if order, exists := oc.currentOrder[source]; exists {
+		strategy = string(order)
+	}
+	oc.orderMu.RUnlock()
+	return strategy
+}
+
 // extractDedupKey extracts minimal metadata for deduplication from observation
 func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstructured) dedup.DedupKey {
 	// Extract source (optimized)
@@ -541,32 +662,7 @@ func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstruct
 	reason := ""
 	detailsVal, _ := oc.fieldExtractor.ExtractMap(observation.Object, "spec", "details")
 	if detailsVal != nil {
-		// Try common reason fields
-		if r, ok := detailsVal["reason"].(string); ok {
-			reason = r
-		} else if r, ok := detailsVal["reason"].(interface{}); ok {
-			reason = fmt.Sprintf("%v", r)
-		} else if r, ok := detailsVal["rule"].(string); ok {
-			reason = r
-		} else if r, ok := detailsVal["rule"].(interface{}); ok {
-			reason = fmt.Sprintf("%v", r)
-		} else if r, ok := detailsVal["testNumber"].(string); ok {
-			reason = r
-		} else if r, ok := detailsVal["testNumber"].(interface{}); ok {
-			reason = fmt.Sprintf("%v", r)
-		} else if r, ok := detailsVal["checkId"].(string); ok {
-			reason = r
-		} else if r, ok := detailsVal["checkId"].(interface{}); ok {
-			reason = fmt.Sprintf("%v", r)
-		} else if r, ok := detailsVal["vulnerabilityID"].(string); ok {
-			reason = r
-		} else if r, ok := detailsVal["vulnerabilityID"].(interface{}); ok {
-			reason = fmt.Sprintf("%v", r)
-		} else if r, ok := detailsVal["auditID"].(string); ok {
-			reason = r
-		} else if r, ok := detailsVal["auditID"].(interface{}); ok {
-			reason = fmt.Sprintf("%v", r)
-		}
+		reason = oc.extractReasonFromDetails(detailsVal)
 	}
 	// Fallback to eventType if no reason found (optimized)
 	if reason == "" {
@@ -577,18 +673,7 @@ func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstruct
 	}
 
 	// Extract message for hashing
-	message := ""
-	if detailsVal != nil {
-		if msg, ok := detailsVal["message"].(string); ok {
-			message = msg
-		} else if msg, ok := detailsVal["message"].(interface{}); ok {
-			message = fmt.Sprintf("%v", msg)
-		} else if msg, ok := detailsVal["output"].(string); ok {
-			message = msg
-		} else if msg, ok := detailsVal["output"].(interface{}); ok {
-			message = fmt.Sprintf("%v", msg)
-		}
-	}
+	message := oc.extractMessage(detailsVal)
 
 	// Hash message
 	messageHash := dedup.HashMessage(message)
@@ -668,12 +753,23 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 	spec, _ := oc.fieldExtractor.ExtractMap(observation.Object, "spec")
 	if spec == nil {
 		spec = make(map[string]interface{})
-		unstructured.SetNestedMap(observation.Object, spec, "spec")
+		if err := unstructured.SetNestedMap(observation.Object, spec, "spec"); err != nil {
+			logger := sdklog.NewLogger("zen-watcher-observation-creator")
+			logger.Warn("Failed to set spec",
+				sdklog.Operation("set_ttl"),
+				sdklog.Error(err))
+			return
+		}
 	}
 
 	// Set TTL in spec (only if not already set)
 	spec["ttlSecondsAfterCreation"] = defaultTTLSeconds
-	unstructured.SetNestedMap(observation.Object, spec, "spec")
+	if err := unstructured.SetNestedMap(observation.Object, spec, "spec"); err != nil {
+		logger := sdklog.NewLogger("zen-watcher-observation-creator")
+		logger.Warn("Failed to set spec with TTL",
+			sdklog.Operation("set_ttl"),
+			sdklog.Error(err))
+	}
 }
 
 // getOrCreateSourceCounters gets or creates source counters, returns nil if metrics disabled

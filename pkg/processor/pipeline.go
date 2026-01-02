@@ -99,62 +99,7 @@ func (p *Processor) ProcessEvent(ctx context.Context, raw *generic.RawEvent, con
 	}
 
 	// Step 4: Apply filter and dedup in the order determined by optimization
-	// Both filter and dedup are always applied; optimization chooses which runs first.
-	// IMPORTANT: Normalization has NOT happened yet - we're working with minimal observation structure
-	var filtered bool
-	var deduped bool
-
-	if order == "dedup_first" {
-		// Dedup first, then filter
-		dedupKey := p.extractDedupKey(observation, raw)
-		shouldCreate := p.shouldCreateWithStrategy(dedupKey, observation.Object, config)
-		if !shouldCreate {
-			logger := sdklog.NewLogger("zen-watcher-processor")
-			logger.Debug("Event deduplicated",
-				sdklog.Operation("dedup"),
-				sdklog.String("source", raw.Source))
-			deduped = true
-		}
-
-		// Then filter (even if deduped, we still check filter for metrics)
-		if !deduped && p.filter != nil {
-			allowed, reason := p.filter.AllowWithReason(observation)
-			if !allowed {
-				logger := sdklog.NewLogger("zen-watcher-processor")
-				logger.Debug("Event filtered",
-					sdklog.Operation("filter"),
-					sdklog.String("source", raw.Source),
-					sdklog.String("reason", reason))
-				filtered = true
-			}
-		}
-	} else {
-		// Filter first (default), then dedup
-		if p.filter != nil {
-			allowed, reason := p.filter.AllowWithReason(observation)
-			if !allowed {
-				logger := sdklog.NewLogger("zen-watcher-processor")
-				logger.Debug("Event filtered",
-					sdklog.Operation("filter"),
-					sdklog.String("source", raw.Source),
-					sdklog.String("reason", reason))
-				filtered = true
-			}
-		}
-
-		// Then dedup (even if filtered, we still check dedup for metrics)
-		if !filtered {
-			dedupKey := p.extractDedupKey(observation, raw)
-			shouldCreate := p.shouldCreateWithStrategy(dedupKey, observation.Object, config)
-			if !shouldCreate {
-				logger := sdklog.NewLogger("zen-watcher-processor")
-				logger.Debug("Event deduplicated",
-					sdklog.Operation("dedup"),
-					sdklog.String("source", raw.Source))
-				deduped = true
-			}
-		}
-	}
+	filtered, deduped := p.applyFilterAndDedup(observation, raw, config, order)
 
 	// If filtered or deduped, stop here (no normalization needed)
 	if filtered || deduped {
@@ -410,6 +355,56 @@ func (p *Processor) extractField(data map[string]interface{}, path string) inter
 		}
 	}
 	return nil
+}
+
+// applyFilterAndDedup applies filter and dedup in the specified order
+func (p *Processor) applyFilterAndDedup(observation *unstructured.Unstructured, raw *generic.RawEvent, config *generic.SourceConfig, order string) (bool, bool) {
+	var filtered bool
+	var deduped bool
+
+	if order == "dedup_first" {
+		deduped = p.applyDedup(observation, raw, config)
+		if !deduped && p.filter != nil {
+			filtered = p.applyFilter(observation, raw)
+		}
+	} else {
+		// Filter first (default)
+		if p.filter != nil {
+			filtered = p.applyFilter(observation, raw)
+		}
+		if !filtered {
+			deduped = p.applyDedup(observation, raw, config)
+		}
+	}
+	return filtered, deduped
+}
+
+// applyFilter applies filter to observation
+func (p *Processor) applyFilter(observation *unstructured.Unstructured, raw *generic.RawEvent) bool {
+	allowed, reason := p.filter.AllowWithReason(observation)
+	if !allowed {
+		logger := sdklog.NewLogger("zen-watcher-processor")
+		logger.Debug("Event filtered",
+			sdklog.Operation("filter"),
+			sdklog.String("source", raw.Source),
+			sdklog.String("reason", reason))
+		return true
+	}
+	return false
+}
+
+// applyDedup applies deduplication to observation
+func (p *Processor) applyDedup(observation *unstructured.Unstructured, raw *generic.RawEvent, config *generic.SourceConfig) bool {
+	dedupKey := p.extractDedupKey(observation, raw)
+	shouldCreate := p.shouldCreateWithStrategy(dedupKey, observation.Object, config)
+	if !shouldCreate {
+		logger := sdklog.NewLogger("zen-watcher-processor")
+		logger.Debug("Event deduplicated",
+			sdklog.Operation("dedup"),
+			sdklog.String("source", raw.Source))
+		return true
+	}
+	return false
 }
 
 // splitPath splits a JSONPath-like path
