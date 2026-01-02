@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-sdk/pkg/leader"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-sdk/pkg/zenlead"
 	"github.com/kube-zen/zen-watcher/internal/informers"
 	"github.com/kube-zen/zen-watcher/internal/kubernetes"
@@ -35,7 +36,6 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/gc"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
-	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/optimization"
 	"github.com/kube-zen/zen-watcher/pkg/orchestrator"
 	"github.com/kube-zen/zen-watcher/pkg/processor"
@@ -279,9 +279,9 @@ func configureLeaderElection(namespace string, setupLog *sdklog.Logger) zenlead.
 			os.Exit(1)
 		}
 		leConfig = zenlead.LeaderElectionConfig{
-			Mode:       zenlead.ZenLeadManaged,
-			LeaseName:  *leaderElectionLeaseName,
-			Namespace:  namespace,
+			Mode:      zenlead.ZenLeadManaged,
+			LeaseName: *leaderElectionLeaseName,
+			Namespace: namespace,
 		}
 		setupLog.Info("Leader election mode: zenlead managed (Profile C)", sdklog.Operation("leader_init"), sdklog.String("leaseName", *leaderElectionLeaseName))
 	case "disabled":
