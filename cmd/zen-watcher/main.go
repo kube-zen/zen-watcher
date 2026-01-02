@@ -317,8 +317,11 @@ func initializeAdapters(clients *kubernetes.Clients, proc *processor.Processor, 
 	)
 
 	// Create webhook channels for Falco and Audit webhooks
-	falcoAlertsChan := make(chan map[string]interface{}, 100)
-	auditEventsChan := make(chan map[string]interface{}, 200)
+	// Make channel buffer sizes configurable for better backpressure handling
+	falcoBufferSize := getEnvInt("FALCO_BUFFER_SIZE", 100)
+	auditBufferSize := getEnvInt("AUDIT_BUFFER_SIZE", 200)
+	falcoAlertsChan := make(chan map[string]interface{}, falcoBufferSize)
+	auditEventsChan := make(chan map[string]interface{}, auditBufferSize)
 
 	// Create Ingester store and informer
 	ingesterStore := config.NewIngesterStore()

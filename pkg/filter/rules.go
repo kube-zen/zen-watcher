@@ -25,6 +25,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// Package-level logger to avoid repeated allocations
+var (
+	filterLogger = sdklog.NewLogger("zen-watcher-filter")
+)
+
 // Filter provides filtering functionality for observations
 // Thread-safe: config can be updated dynamically via UpdateConfig()
 type Filter struct {
@@ -59,8 +64,7 @@ func (f *Filter) UpdateConfig(config *FilterConfig) {
 		config.Sources = make(map[string]SourceFilter)
 	}
 	f.config = config
-	logger := sdklog.NewLogger("zen-watcher-filter")
-	logger.Debug("Filter configuration updated dynamically",
+	filterLogger.Debug("Filter configuration updated dynamically",
 		sdklog.Operation("config_update"))
 }
 
@@ -149,8 +153,7 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 		if f.metrics != nil {
 			f.metrics.FilterDecisions.WithLabelValues(source, "filter", "source_disabled").Inc()
 		}
-		logger := sdklog.NewLogger("zen-watcher-filter")
-		logger.Debug("Source disabled, filtering out observation",
+		filterLogger.Debug("Source disabled, filtering out observation",
 			sdklog.Operation("filter_check"),
 			sdklog.String("source", source),
 			sdklog.String("reason", "source_disabled"))
@@ -278,8 +281,7 @@ func (f *Filter) checkGlobalNamespaceFilter(config *FilterConfig, namespace, sou
 				if f.metrics != nil {
 					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "global_exclude_namespace").Inc()
 				}
-				logger := sdklog.NewLogger("zen-watcher-filter")
-				logger.Debug("Namespace excluded by global filter",
+				filterLogger.Debug("Namespace excluded by global filter",
 					sdklog.Operation("filter_check"),
 					sdklog.String("source", source),
 					sdklog.String("namespace", namespace),
@@ -301,8 +303,7 @@ func (f *Filter) checkGlobalNamespaceFilter(config *FilterConfig, namespace, sou
 			if f.metrics != nil {
 				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "global_include_namespace").Inc()
 			}
-			logger := sdklog.NewLogger("zen-watcher-filter")
-			logger.Debug("Namespace not in global include list",
+			filterLogger.Debug("Namespace not in global include list",
 				sdklog.Operation("filter_check"),
 				sdklog.String("source", source),
 				sdklog.String("namespace", namespace),
@@ -327,8 +328,7 @@ func (f *Filter) checkSeverityFilter(sourceFilter *SourceFilter, severity, sourc
 			if f.metrics != nil {
 				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "include_severity").Inc()
 			}
-			logger := sdklog.NewLogger("zen-watcher-filter")
-			logger.Debug("Severity not in include list, filtering out observation",
+			filterLogger.Debug("Severity not in include list, filtering out observation",
 				sdklog.Operation("filter_check"),
 				sdklog.String("source", source),
 				sdklog.String("severity", severity),
@@ -341,8 +341,7 @@ func (f *Filter) checkSeverityFilter(sourceFilter *SourceFilter, severity, sourc
 			if f.metrics != nil {
 				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "min_severity").Inc()
 			}
-			logger := sdklog.NewLogger("zen-watcher-filter")
-			logger.Debug("Severity below minimum, filtering out observation",
+			filterLogger.Debug("Severity below minimum, filtering out observation",
 				sdklog.Operation("filter_check"),
 				sdklog.String("source", source),
 				sdklog.String("severity", severity),
@@ -362,8 +361,7 @@ func (f *Filter) checkEventTypeFilter(sourceFilter *SourceFilter, eventType, sou
 				if f.metrics != nil {
 					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_event_type").Inc()
 				}
-				logger := sdklog.NewLogger("zen-watcher-filter")
-				logger.Debug("EventType excluded, filtering out observation",
+				filterLogger.Debug("EventType excluded, filtering out observation",
 					sdklog.Operation("filter_check"),
 					sdklog.String("source", source),
 					sdklog.String("event_type", eventType),
@@ -384,8 +382,7 @@ func (f *Filter) checkEventTypeFilter(sourceFilter *SourceFilter, eventType, sou
 			if f.metrics != nil {
 				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "include_event_type").Inc()
 			}
-			logger := sdklog.NewLogger("zen-watcher-filter")
-			logger.Debug("EventType not in include list, filtering out observation",
+			filterLogger.Debug("EventType not in include list, filtering out observation",
 				sdklog.Operation("filter_check"),
 				sdklog.String("source", source),
 				sdklog.String("event_type", eventType),
@@ -404,8 +401,7 @@ func (f *Filter) checkNamespaceFilter(sourceFilter *SourceFilter, namespace, sou
 				if f.metrics != nil {
 					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_namespace").Inc()
 				}
-				logger := sdklog.NewLogger("zen-watcher-filter")
-				logger.Debug("Namespace excluded, filtering out observation",
+				filterLogger.Debug("Namespace excluded, filtering out observation",
 					sdklog.Operation("filter_check"),
 					sdklog.String("source", source),
 					sdklog.String("namespace", namespace),
@@ -426,8 +422,7 @@ func (f *Filter) checkNamespaceFilter(sourceFilter *SourceFilter, namespace, sou
 			if f.metrics != nil {
 				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "include_namespace").Inc()
 			}
-			logger := sdklog.NewLogger("zen-watcher-filter")
-			logger.Debug("Namespace not in include list, filtering out observation",
+			filterLogger.Debug("Namespace not in include list, filtering out observation",
 				sdklog.Operation("filter_check"),
 				sdklog.String("source", source),
 				sdklog.String("namespace", namespace),
@@ -446,8 +441,7 @@ func (f *Filter) checkKindFilter(sourceFilter *SourceFilter, kind, source string
 				if f.metrics != nil {
 					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_kind").Inc()
 				}
-				logger := sdklog.NewLogger("zen-watcher-filter")
-				logger.Debug("Kind excluded, filtering out observation",
+				filterLogger.Debug("Kind excluded, filtering out observation",
 					sdklog.Operation("filter_check"),
 					sdklog.String("source", source),
 					sdklog.String("resource_kind", kind),
@@ -468,8 +462,7 @@ func (f *Filter) checkKindFilter(sourceFilter *SourceFilter, kind, source string
 			if f.metrics != nil {
 				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "include_kind").Inc()
 			}
-			logger := sdklog.NewLogger("zen-watcher-filter")
-			logger.Debug("Kind not in include list, filtering out observation",
+			filterLogger.Debug("Kind not in include list, filtering out observation",
 				sdklog.Operation("filter_check"),
 				sdklog.String("source", source),
 				sdklog.String("resource_kind", kind),
@@ -488,8 +481,7 @@ func (f *Filter) checkCategoryFilter(sourceFilter *SourceFilter, category, sourc
 				if f.metrics != nil {
 					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_category").Inc()
 				}
-				logger := sdklog.NewLogger("zen-watcher-filter")
-				logger.Debug("Category excluded, filtering out observation",
+				filterLogger.Debug("Category excluded, filtering out observation",
 					sdklog.Operation("filter_check"),
 					sdklog.String("source", source),
 					sdklog.String("category", category),
@@ -510,8 +502,7 @@ func (f *Filter) checkCategoryFilter(sourceFilter *SourceFilter, category, sourc
 			if f.metrics != nil {
 				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "include_category").Inc()
 			}
-			logger := sdklog.NewLogger("zen-watcher-filter")
-			logger.Debug("Category not in include list, filtering out observation",
+			filterLogger.Debug("Category not in include list, filtering out observation",
 				sdklog.Operation("filter_check"),
 				sdklog.String("source", source),
 				sdklog.String("category", category),
@@ -530,8 +521,7 @@ func (f *Filter) checkRuleFilter(sourceFilter *SourceFilter, rule, source string
 				if f.metrics != nil {
 					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_rule").Inc()
 				}
-				logger := sdklog.NewLogger("zen-watcher-filter")
-				logger.Debug("Rule excluded, filtering out observation",
+				filterLogger.Debug("Rule excluded, filtering out observation",
 					sdklog.Operation("filter_check"),
 					sdklog.String("source", source),
 					sdklog.String("rule", rule),
@@ -618,8 +608,7 @@ func (f *Filter) checkExpressionFilter(config *FilterConfig, observation *unstru
 
 	result, err := exprFilter.Evaluate(observation)
 	if err != nil {
-		logger := sdklog.NewLogger("zen-watcher-filter")
-		logger.Debug("Failed to evaluate filter expression, falling back to list-based filters",
+		filterLogger.Debug("Failed to evaluate filter expression, falling back to list-based filters",
 			sdklog.Operation("filter_check"),
 			sdklog.String("reason", "expression_eval_error"),
 			sdklog.String("error", err.Error()))

@@ -36,6 +36,11 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
+// Package-level logger to avoid repeated allocations
+var (
+	observationLogger = sdklog.NewLogger("zen-watcher-observation-creator")
+)
+
 // ObservationCreator handles creation of resources (any GVR) with centralized filtering, normalization, deduplication, and metrics
 // Flow: filter() → normalize() → dedup() → create resource (any GVR) + update metrics + log
 // Note: Named "ObservationCreator" for backward compatibility, but it creates any resource type based on destination GVR
@@ -320,8 +325,7 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 	if metadata == nil {
 		metadata = make(map[string]interface{})
 		if err := unstructured.SetNestedMap(observation.Object, metadata, "metadata"); err != nil {
-			logger := sdklog.NewLogger("zen-watcher-observation-creator")
-			logger.Warn("Failed to set metadata",
+			observationLogger.Warn("Failed to set metadata",
 				sdklog.Operation("ensure_metadata"),
 				sdklog.Error(err))
 		}
@@ -543,28 +547,11 @@ func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstruct
 		}
 	}
 
-	// Extract resource info (optimized)
+	// Extract resource info (optimized with helper function)
 	resourceVal, _ := oc.fieldExtractor.ExtractMap(observation.Object, "spec", "resource")
-	namespace := ""
-	kind := ""
-	name := ""
-	if resourceVal != nil {
-		if ns, ok := resourceVal["namespace"].(string); ok {
-			namespace = ns
-		} else if ns, ok := resourceVal["namespace"].(interface{}); ok {
-			namespace = fmt.Sprintf("%v", ns)
-		}
-		if k, ok := resourceVal["kind"].(string); ok {
-			kind = k
-		} else if k, ok := resourceVal["kind"].(interface{}); ok {
-			kind = fmt.Sprintf("%v", k)
-		}
-		if n, ok := resourceVal["name"].(string); ok {
-			name = n
-		} else if n, ok := resourceVal["name"].(interface{}); ok {
-			name = fmt.Sprintf("%v", n)
-		}
-	}
+	namespace := extractStringField(resourceVal, "namespace")
+	kind := extractStringField(resourceVal, "kind")
+	name := extractStringField(resourceVal, "name")
 	// Fallback to metadata namespace if resource namespace is empty (optimized)
 	if namespace == "" {
 		namespace, _ = oc.fieldExtractor.ExtractString(observation.Object, "metadata", "namespace")
@@ -601,6 +588,22 @@ func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstruct
 		Reason:      reason,
 		MessageHash: messageHash,
 	}
+}
+
+// extractStringField extracts a string field from a map with type assertion optimization
+func extractStringField(m map[string]interface{}, key string) string {
+	if m == nil {
+		return ""
+	}
+	val, ok := m[key]
+	if !ok {
+		return ""
+	}
+	// Optimize: use type assertion first, fallback to formatting only when needed
+	if str, ok := val.(string); ok {
+		return str
+	}
+	return fmt.Sprintf("%v", val)
 }
 
 // setTTLIfNotSet sets spec.ttlSecondsAfterCreation if not already set
