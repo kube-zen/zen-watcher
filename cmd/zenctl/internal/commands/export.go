@@ -62,7 +62,7 @@ Example:
 			}
 
 			var gvr schema.GroupVersionResource
-			var gvk metav1.GroupVersionKind
+			var gvk schema.GroupVersionKind
 
 			switch resourceType {
 			case "flow":
