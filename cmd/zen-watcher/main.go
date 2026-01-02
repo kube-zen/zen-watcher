@@ -119,7 +119,7 @@ func main() {
 	}
 
 	zenlead.ControllerRuntimeDefaults(clients.Config)
-	leaderManager, leaderElectedCh := setupLeaderElection(clients, namespace, setupLog)
+	_, leaderElectedCh := setupLeaderElection(clients, namespace, setupLog)
 
 	// Create informer manager for generic adapters
 	informerManager := informers.NewManager(informers.Config{
