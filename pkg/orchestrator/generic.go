@@ -280,6 +280,107 @@ func (o *GenericOrchestrator) updateEventMetrics(source, ingester string, proces
 	}
 }
 
+// processIngesterConfigItem processes a single ingester config item
+func (o *GenericOrchestrator) processIngesterConfigItem(ingesterConfig *config.IngesterConfig, item unstructured.Unstructured, activeSources map[string]bool) {
+	// Convert IngesterConfig to generic.SourceConfig
+	genericConfig := config.ConvertIngesterConfigToGeneric(ingesterConfig)
+	if genericConfig == nil {
+		if o.metrics != nil {
+			o.metrics.IngestersConfigErrors.WithLabelValues(ingesterConfig.Source, "convert_to_generic_failed").Inc()
+		}
+		logger := sdklog.NewLogger("zen-watcher-orchestrator")
+		logger.Warn("Failed to convert IngesterConfig to generic.SourceConfig",
+			sdklog.Operation("convert_to_generic"),
+			sdklog.String("source", ingesterConfig.Source))
+		return
+	}
+
+	source := genericConfig.Source
+	activeSources[source] = true
+
+	// Update ingester active status
+	if o.metrics != nil {
+		o.metrics.IngestersActive.WithLabelValues(source, genericConfig.Ingester, item.GetNamespace()).Set(1)
+		o.metrics.IngestersStatus.WithLabelValues(source).Set(1) // 1 = active
+	}
+
+	// Check if adapter already exists
+	if existingAdapter, exists := o.activeAdapters[source]; exists {
+		if o.configChanged(source, genericConfig) {
+			existingAdapter.Stop()
+			delete(o.activeAdapters, source)
+		} else {
+			return // Config unchanged, skip
+		}
+	}
+
+	// Extract source name and create/start adapter
+	sourceName := o.extractSourceName(source, item.GetNamespace(), item.GetName())
+	if o.createAndStartAdapterForSource(source, sourceName, genericConfig, item) {
+		logger := sdklog.NewLogger("zen-watcher-orchestrator")
+		logger.Info("Generic adapter started",
+			sdklog.Operation("adapter_started"),
+			sdklog.String("source", source),
+			sdklog.String("ingester", genericConfig.Ingester),
+			sdklog.String("namespace", item.GetNamespace()),
+			sdklog.String("name", item.GetName()))
+	}
+}
+
+// createAndStartAdapterForSource creates and starts an adapter for a source
+func (o *GenericOrchestrator) createAndStartAdapterForSource(source, sourceName string, genericConfig *generic.SourceConfig, item unstructured.Unstructured) bool {
+	startupStartTime := time.Now()
+	adapter, err := o.adapterFactory.NewAdapter(genericConfig.Ingester)
+	if err != nil {
+		o.handleAdapterError(source, sourceName, genericConfig, item, err, "create_adapter_failed")
+		return false
+	}
+
+	if err := adapter.Validate(genericConfig); err != nil {
+		o.handleAdapterError(source, sourceName, genericConfig, item, err, "validation_failed")
+		return false
+	}
+
+	events, err := adapter.Start(o.ctx, genericConfig)
+	if err != nil {
+		o.handleAdapterError(source, sourceName, genericConfig, item, err, "start_failed")
+		return false
+	}
+
+	// Update status: running
+	tracker := o.statusUpdater.GetOrCreateTracker(item.GetNamespace(), item.GetName())
+	tracker.UpdateSourceState(sourceName, genericConfig.Ingester, SourceStateRunning, nil)
+
+	// Record startup duration
+	if o.metrics != nil {
+		o.metrics.IngestersStartupDuration.WithLabelValues(source).Observe(time.Since(startupStartTime).Seconds())
+	}
+
+	// Store adapter, config, and event stream
+	o.activeAdapters[source] = adapter
+	o.activeConfigs[source] = genericConfig
+	o.activeEventStreams[source] = events
+
+	// Process events from this adapter
+	go o.processEvents(source, genericConfig, events)
+
+	return true
+}
+
+// handleAdapterError handles adapter creation/validation/start errors
+func (o *GenericOrchestrator) handleAdapterError(source, sourceName string, genericConfig *generic.SourceConfig, item unstructured.Unstructured, err error, errorType string) {
+	tracker := o.statusUpdater.GetOrCreateTracker(item.GetNamespace(), item.GetName())
+	tracker.UpdateSourceState(sourceName, genericConfig.Ingester, SourceStateError, err)
+	if o.metrics != nil {
+		o.metrics.IngestersConfigErrors.WithLabelValues(source, errorType).Inc()
+		o.metrics.IngestersStatus.WithLabelValues(source).Set(-1) // -1 = error
+	}
+	logger := sdklog.NewLogger("zen-watcher-orchestrator")
+	logger.Error(err, "Adapter operation failed",
+		sdklog.Operation(errorType),
+		sdklog.String("source", source))
+}
+
 // configChanged checks if config has changed
 func (o *GenericOrchestrator) configChanged(source string, newConfig *generic.SourceConfig) bool {
 	oldConfig, exists := o.activeConfigs[source]
