@@ -294,7 +294,7 @@ func (oc *ObservationCreator) getSourceMetrics(source string) *SourceMetrics {
 		LowSeverityPercent:    lowSeverityPercent,
 		DedupEffectiveness:    dedupEffectiveness,
 		TotalObservations:     counters.totalCount,
-		FilteredCount:         counters.filtered,
+		FilteredCount:         0, // Filtered events are tracked via observationsFiltered metric
 		DedupedCount:          counters.deduped,
 		CreatedCount:          counters.created,
 	}
