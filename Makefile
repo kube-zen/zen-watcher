@@ -506,3 +506,9 @@ release-zenctl:
 	@echo "$(GREEN)✅ zenctl-oss releases built in dist/$(NC)"
 	@echo "   Files:"
 	@ls -lh dist/zenctl-* dist/SHA256SUMS 2>/dev/null | awk '{print "   " $$9 " (" $$5 ")"}'
+
+## oss-boundary: Run OSS boundary enforcement gate
+oss-boundary:
+	@echo "$(GREEN)Running OSS boundary gate...$(NC)"
+	@bash scripts/test/oss-boundary-gate.sh .
+	@echo "$(GREEN)✅ OSS boundary check passed$(NC)"
