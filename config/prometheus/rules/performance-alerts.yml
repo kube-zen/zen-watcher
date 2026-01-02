@@ -206,15 +206,15 @@ spec:
 
     - alert: ZenWatcherHighObservationCount
       expr: |
-        sum(zen_watcher_observations_live) > 10000
+        sum(zen_watcher_observations_live) by (source) > 10000
       for: 10m
       labels:
         severity: warning
         component: storage
         team: operations
       annotations:
-        summary: "High observation count in etcd"
-        description: "Current live observations: {{$value}}. May impact etcd performance and GC frequency."
+        summary: "High observation count in etcd for {{$labels.source}}"
+        description: "Source {{$labels.source}} has {{$value}} live observations. May impact etcd performance and GC frequency."
 
   - name: zen-watcher.service-availability
     interval: 30s
@@ -261,7 +261,7 @@ spec:
     # Adapter health alerts
     - alert: ZenWatcherAdapterFailing
       expr: |
-        sum(rate(zen_watcher_adapter_runs_total{outcome="error"}[5m])) > 0.5
+        sum(rate(zen_watcher_adapter_runs_total{outcome="error"}[5m])) by (adapter) > 0.5
       for: 5m
       labels:
         severity: warning
@@ -270,14 +270,6 @@ spec:
       annotations:
         summary: "Adapter {{$labels.adapter}} experiencing errors"
         description: "Adapter {{$labels.adapter}} has {{$value}} errors/sec. Check adapter configuration."
-
-      labels:
-        severity: critical
-        component: adapter
-        team: sre
-      annotations:
-        summary: "CRD adapter {{$labels.mapping}} failing"
-        description: "CRD adapter {{$labels.mapping}} has {{$value}} errors/sec. Mapping: {{$labels.mapping}}, Stage: {{$labels.stage}}"
 
   - name: zen-watcher.trend-analysis
     interval: 2m

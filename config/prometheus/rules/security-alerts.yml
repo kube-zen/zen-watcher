@@ -16,7 +16,7 @@ spec:
     rules:
     # Falco Critical Runtime Threats
     - alert: FalcoCriticalRuntimeThreat
-      expr: sum(rate(zen_watcher_events_total{source="falco",severity="critical"}[2m])) * 60 > 1
+      expr: sum(rate(zen_watcher_events_total{source="falco",severity="critical"}[2m])) by (namespace, kind) * 60 > 1
       for: 0s
       labels:
         severity: critical
@@ -33,7 +33,7 @@ spec:
         
     # Critical Vulnerability Detected
     - alert: CriticalVulnerabilityDetected
-      expr: sum(rate(zen_watcher_events_total{source="trivy",severity="critical"}[5m])) * 60 > 0
+      expr: sum(rate(zen_watcher_events_total{source="trivy",severity="critical"}[5m])) by (eventType, kind, namespace) * 60 > 0
       for: 0s
       labels:
         severity: critical
@@ -67,7 +67,7 @@ spec:
         
     # Critical Infrastructure as Code Issue
     - alert: CriticalIaCIssue
-      expr: sum(rate(zen_watcher_events_total{source="checkov",severity="critical"}[5m])) * 60 > 0
+      expr: sum(rate(zen_watcher_events_total{source="checkov",severity="critical"}[5m])) by (eventType) * 60 > 0
       for: 0s
       labels:
         severity: critical
@@ -84,7 +84,7 @@ spec:
         
     # Suspicious Audit Activity
     - alert: SuspiciousAuditActivity
-      expr: sum(rate(zen_watcher_events_total{source="audit",severity=~"critical|high"}[1m])) * 60 > 100
+      expr: sum(rate(zen_watcher_events_total{source="audit",severity=~"critical|high"}[1m])) by (namespace, eventType) * 60 > 100
       for: 2m
       labels:
         severity: critical
@@ -156,7 +156,7 @@ spec:
         
     # Falco High Priority Events
     - alert: FalcoHighPriorityEvent
-      expr: sum(rate(zen_watcher_events_total{source="falco",severity="high"}[2m])) * 60 > 10
+      expr: sum(rate(zen_watcher_events_total{source="falco",severity="high"}[2m])) by (eventType) * 60 > 10
       for: 5m
       labels:
         severity: warning
@@ -190,7 +190,7 @@ spec:
         
     # High Severity IaC Issue
     - alert: HighSeverityIaCIssue
-      expr: sum(rate(zen_watcher_events_total{source="checkov",severity="high"}[5m])) * 60 > 3
+      expr: sum(rate(zen_watcher_events_total{source="checkov",severity="high"}[5m])) by (eventType) * 60 > 3
       for: 10m
       labels:
         severity: warning
@@ -207,7 +207,7 @@ spec:
         
     # Unauthorized Access Attempt
     - alert: UnauthorizedAccessAttempt
-      expr: sum(rate(zen_watcher_events_total{source="audit",eventType=~".*unauthorized.*|.*forbidden.*",severity=~"critical|high"}[2m])) * 60 > 50
+      expr: sum(rate(zen_watcher_events_total{source="audit",eventType=~".*unauthorized.*|.*forbidden.*",severity=~"critical|high"}[2m])) by (namespace) * 60 > 50
       for: 5m
       labels:
         severity: warning
@@ -224,7 +224,7 @@ spec:
         
     # Policy Violation Warning
     - alert: PolicyViolationWarning
-      expr: sum(rate(zen_watcher_events_total{source="kyverno",severity="high"}[2m])) * 60 > 5
+      expr: sum(rate(zen_watcher_events_total{source="kyverno",severity="high"}[2m])) by (eventType, namespace) * 60 > 5
       for: 5m
       labels:
         severity: warning
@@ -399,7 +399,7 @@ spec:
           sum(rate(zen_watcher_events_total{severity=~"critical|high"}[5m])) by (namespace) * 60
         ) > 5 and on(namespace)
         (
-          count(sum(rate(zen_watcher_events_total{severity=~"critical|high"}[5m])) by (namespace, source)) >= 2
+          count(sum(rate(zen_watcher_events_total{severity=~"critical|high"}[5m])) by (namespace, source)) by (namespace) >= 2
         )
       for: 10m
       labels:
@@ -419,10 +419,10 @@ spec:
     - alert: VulnerabilityRuntimeCorrelation
       expr: |
         (
-          sum(rate(zen_watcher_events_total{source="falco",severity=~"critical|high"}[5m])) * 60
+          sum(rate(zen_watcher_events_total{source="falco",severity=~"critical|high"}[5m])) by (namespace) * 60
         ) > 0 and on(namespace)
         (
-          sum(rate(zen_watcher_events_total{source="trivy",severity=~"critical|high"}[1h])) > 0
+          sum(rate(zen_watcher_events_total{source="trivy",severity=~"critical|high"}[1h])) by (namespace) > 0
         )
       for: 15m
       labels:
