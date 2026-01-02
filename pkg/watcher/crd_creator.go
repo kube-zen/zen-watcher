@@ -118,6 +118,7 @@ func (cc *CRDCreator) convertToCRD(observation *unstructured.Unstructured) *unst
 	if labels == nil {
 		labels = make(map[string]interface{})
 	}
+	source, _ := extractStringFromMap(spec, "source")
 	if source != "" {
 		labels["source"] = source
 	}
