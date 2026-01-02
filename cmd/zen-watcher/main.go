@@ -120,17 +120,6 @@ func main() {
 	zenlead.ControllerRuntimeDefaults(clients.Config)
 	leaderManager, leaderElectedCh := setupLeaderElection(clients, namespace, setupLog)
 
-	// Get elected channel (always available, but only signals when leader election is enabled)
-	var leaderElectedCh <-chan struct{}
-	if mgrOpts.LeaderElection {
-		leaderElectedCh = leaderManager.Elected()
-	} else {
-		// No leader election - create a channel that's immediately ready
-		ch := make(chan struct{})
-		close(ch)
-		leaderElectedCh = ch
-	}
-
 	// Create informer manager for generic adapters
 	informerManager := informers.NewManager(informers.Config{
 		DynamicClient: clients.Dynamic,
