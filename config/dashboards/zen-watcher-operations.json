@@ -452,7 +452,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "avg(zen_watcher_dedup_cache_usage_ratio) * 100",
+          "expr": "avg(zen_watcher_dedup_cache_usage) * 100",
           "legendFormat": "Cache Usage",
           "refId": "A"
         }
@@ -521,7 +521,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "avg(zen_watcher_webhook_queue_usage_ratio) * 100",
+          "expr": "avg(zen_watcher_webhook_queue_usage) * 100",
           "legendFormat": "Queue Usage",
           "refId": "A"
         }
