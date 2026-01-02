@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/config"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+	"github.com/kube-zen/zen-watcher/pkg/config"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
@@ -205,7 +205,7 @@ func (isu *IngesterStatusUpdater) UpdateStatus(ctx context.Context, namespace, n
 		map[string]interface{}{
 			"type":               "Ready",
 			"status":             mapConditionStatus(ready),
-			"reason":              readyReason,
+			"reason":             readyReason,
 			"message":            readyMessage,
 			"lastTransitionTime": metav1.Now().Format(time.RFC3339),
 		},
@@ -244,4 +244,3 @@ func mapConditionStatus(ready bool) string {
 	}
 	return "False"
 }
-

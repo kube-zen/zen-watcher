@@ -741,10 +741,8 @@ func (oc *ObservationCreator) recordEventAttempted(source string) {
 // recordEventFiltered records that an event was filtered
 //nolint:unused // May be used for future metrics tracking
 func (oc *ObservationCreator) recordEventFiltered(source, reason string) {
-	counters := oc.getOrCreateSourceCounters(source)
-	if counters != nil {
-		// Filtered events are tracked via observationsFiltered metric
-	}
+	_ = oc.getOrCreateSourceCounters(source)
+	// Filtered events are tracked via observationsFiltered metric
 }
 
 // recordEventDeduped records that an event was deduplicated

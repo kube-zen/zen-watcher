@@ -34,7 +34,6 @@ var _ = setupTestEnv
 // TestPipelineIntegration_FullFlow_FilterFirst tests complete pipeline with filter_first strategy
 func TestPipelineIntegration_FullFlow_FilterFirst(t *testing.T) {
 	dynamicClient := setupTestEnv(t)
-	proc := setupPipeline(t, dynamicClient)
 
 	ctx := context.Background()
 	observationGVR := schema.GroupVersionResource{
@@ -63,7 +62,7 @@ func TestPipelineIntegration_FullFlow_FilterFirst(t *testing.T) {
 		nil, // observationsCreateErrors
 		f,   // filter
 	)
-	proc = processor.NewProcessor(f, deduper, creator)
+	proc := processor.NewProcessor(f, deduper, creator)
 
 	// Test 1: HIGH severity event should pass filter and create observation
 	rawEvent1 := &generic.RawEvent{
@@ -137,7 +136,6 @@ func TestPipelineIntegration_FullFlow_FilterFirst(t *testing.T) {
 // TestPipelineIntegration_FullFlow_DedupFirst tests complete pipeline with dedup_first strategy
 func TestPipelineIntegration_FullFlow_DedupFirst(t *testing.T) {
 	dynamicClient := setupTestEnv(t)
-	proc := setupPipeline(t, dynamicClient)
 
 	ctx := context.Background()
 	observationGVR := schema.GroupVersionResource{
@@ -159,7 +157,7 @@ func TestPipelineIntegration_FullFlow_DedupFirst(t *testing.T) {
 		nil, // observationsCreateErrors
 		f,   // filter
 	)
-	proc = processor.NewProcessor(f, deduper, creator)
+	proc := processor.NewProcessor(f, deduper, creator)
 
 	sourceConfig := &generic.SourceConfig{
 		Source: "test-source",

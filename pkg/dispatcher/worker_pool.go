@@ -88,8 +88,8 @@ type WorkerPool struct {
 	wg            sync.WaitGroup
 	ctx           context.Context
 	cancel        context.CancelFunc
-	activeWorkers int64 // Atomic counter for active workers
-	stopOnce      sync.Once // Protects against double close
+	activeWorkers int64          // Atomic counter for active workers
+	stopOnce      sync.Once      // Protects against double close
 	drainWg       sync.WaitGroup // Tracks drain goroutines
 }
 

@@ -74,12 +74,12 @@ func (rl *PerKeyRateLimiter) Allow(key string) bool {
 // cleanup removes old entries to prevent memory leaks.
 func (rl *PerKeyRateLimiter) cleanup() {
 	for range rl.cleanupTick.C {
-		rl.mu.Lock()
 		// Note: zen-sdk rate limiter doesn't track last access time,
 		// so we can't implement automatic cleanup based on inactivity.
 		// For now, we keep all limiters. In production, consider adding
 		// a last-access-time tracking mechanism if memory becomes an issue.
-		rl.mu.Unlock()
+		// No cleanup logic currently implemented, so no lock needed.
+		_ = rl // Keep reference to avoid unused receiver warning
 	}
 }
 

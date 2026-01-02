@@ -159,10 +159,9 @@ func parseTTLToSeconds(ttlStr string) (int64, error) {
 	}
 
 	// Try parsing with day/week suffixes
-	var multiplier int64 = 1
-	var numStr string
-
 	if len(ttlStr) > 1 {
+		var multiplier int64
+		var numStr string
 		lastChar := ttlStr[len(ttlStr)-1:]
 		switch lastChar {
 		case "w":
