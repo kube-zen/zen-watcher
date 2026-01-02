@@ -323,6 +323,8 @@ spec:
       annotations:
         summary: "Filter rule evaluation slow for {{$labels.source}}"
         description: "Filter rule evaluation for source {{$labels.source}} p95 duration is {{$value}}s."
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/FILTER_OPTIMIZATION.md"
+        action_required: "Review filter rule complexity and consider optimization"
 
   # Mapping and Normalization Alerts
   # NOTE: These alerts are commented out until mapping/normalization metrics are fully implemented

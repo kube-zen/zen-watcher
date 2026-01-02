@@ -50,7 +50,7 @@ spec:
         
     # CIS Benchmark Critical Failure
     - alert: CISBenchmarkCriticalFailure
-      expr: sum(rate(zen_watcher_events_total{source="kube-bench",category="compliance",severity=~"critical|high"}[5m])) * 60 > 0
+      expr: sum(rate(zen_watcher_events_total{source="kube-bench",category="compliance",severity=~"critical|high"}[5m])) by (eventType) * 60 > 0
       for: 0s
       labels:
         severity: critical
@@ -101,7 +101,7 @@ spec:
         
     # Policy Violation Critical
     - alert: PolicyViolationCritical
-      expr: sum(rate(zen_watcher_events_total{source="kyverno",severity="critical"}[2m])) * 60 > 0
+      expr: sum(rate(zen_watcher_events_total{source="kyverno",severity="critical"}[2m])) by (eventType, kind, namespace) * 60 > 0
       for: 0s
       labels:
         severity: critical
@@ -139,7 +139,7 @@ spec:
     rules:
     # High Severity Vulnerability
     - alert: HighSeverityVulnerability
-      expr: sum(rate(zen_watcher_events_total{source="trivy",severity="high"}[5m])) * 60 > 5
+      expr: sum(rate(zen_watcher_events_total{source="trivy",severity="high"}[5m])) by (eventType) * 60 > 5
       for: 5m
       labels:
         severity: warning
