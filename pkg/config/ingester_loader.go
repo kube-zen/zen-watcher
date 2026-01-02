@@ -1066,6 +1066,7 @@ func getBool(m map[string]interface{}, key string) bool {
 }
 
 // getSpecKeys returns all keys in the spec map for debugging
+// nolint:unused // Kept for future use
 func getSpecKeys(spec map[string]interface{}) []string {
 	keys := make([]string, 0, len(spec))
 	for k := range spec {

@@ -812,6 +812,7 @@ func (oc *ObservationCreator) extractReasonFromDetails(detailsVal map[string]int
 }
 
 // extractMessage extracts message for hashing
+// nolint:unused // Kept for future use
 func (oc *ObservationCreator) extractMessage(detailsVal map[string]interface{}) string {
 	if detailsVal == nil {
 		return ""

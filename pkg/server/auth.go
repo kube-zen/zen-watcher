@@ -34,6 +34,7 @@ type WebhookAuth struct {
 	allowedIPs         []string
 
 	// mTLS (future)
+	// nolint:unused // Kept for future use
 	mtlsEnabled bool
 }
 
