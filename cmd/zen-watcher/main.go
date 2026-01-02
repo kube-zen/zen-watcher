@@ -760,3 +760,13 @@ func getDuration(config map[string]interface{}, key string, defaultValue time.Du
 	}
 	return defaultValue
 }
+
+// getEnvInt gets an integer environment variable with a default value
+func getEnvInt(key string, defaultValue int) int {
+	if val := os.Getenv(key); val != "" {
+		if intVal, err := strconv.Atoi(val); err == nil && intVal > 0 {
+			return intVal
+		}
+	}
+	return defaultValue
+}
