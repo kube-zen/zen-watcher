@@ -31,7 +31,7 @@ import (
 	"github.com/kube-zen/zen-watcher/internal/lifecycle"
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/balancer"
-	"github.com/kube-zen/zen-watcher/pkg/config"
+	watcherconfig "github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/kube-zen/zen-watcher/pkg/dispatcher"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/gc"
@@ -136,7 +136,7 @@ func main() {
 }
 
 // initializeFilterAndConfig initializes filter and config components
-func initializeFilterAndConfig(clients *kubernetes.Clients, m *metrics.Metrics, setupLog *sdklog.Logger) (*filter.Filter, *config.ConfigMapLoader, *config.ConfigManager) {
+func initializeFilterAndConfig(clients *kubernetes.Clients, m *metrics.Metrics, setupLog *sdklog.Logger) (*filter.Filter, *watcherconfig.ConfigMapLoader, *watcherconfig.ConfigManager) {
 	// Load filter configuration from ConfigMap (initial load)
 	filterConfig, err := filter.LoadFilterConfig(clients.Standard)
 	if err != nil {
@@ -146,11 +146,11 @@ func initializeFilterAndConfig(clients *kubernetes.Clients, m *metrics.Metrics, 
 	filterInstance := filter.NewFilterWithMetrics(filterConfig, m)
 
 	// Create ConfigMap loader for dynamic reloading
-	configMapLoader := config.NewConfigMapLoader(clients.Standard, filterInstance)
+	configMapLoader := watcherconfig.NewConfigMapLoader(clients.Standard, filterInstance)
 
 	// Initialize ConfigManager for feature configuration
 	configNamespace := sdkconfig.RequireEnvWithDefault("CONFIG_NAMESPACE", "zen-system")
-	configManager := config.NewConfigManagerWithMetrics(clients.Standard, configNamespace, m)
+	configManager := watcherconfig.NewConfigManagerWithMetrics(clients.Standard, configNamespace, m)
 
 	return filterInstance, configMapLoader, configManager
 }
@@ -290,7 +290,7 @@ func configureLeaderElection(namespace string, setupLog *sdklog.Logger) zenlead.
 }
 
 // initializeAdapters initializes adapters and orchestrator
-func initializeAdapters(clients *kubernetes.Clients, proc *processor.Processor, m *metrics.Metrics, gvrs *kubernetes.GVRs, observationCreator *watcher.ObservationCreator, setupLog *sdklog.Logger) (*orchestrator.GenericOrchestrator, *config.IngesterStore, *config.IngesterInformer, *server.Server, chan map[string]interface{}, chan map[string]interface{}) {
+func initializeAdapters(clients *kubernetes.Clients, proc *processor.Processor, m *metrics.Metrics, gvrs *kubernetes.GVRs, observationCreator *watcher.ObservationCreator, setupLog *sdklog.Logger) (*orchestrator.GenericOrchestrator, *watcherconfig.IngesterStore, *watcherconfig.IngesterInformer, *server.Server, chan map[string]interface{}, chan map[string]interface{}) {
 	// Create informer manager for generic adapters
 	informerManager := informers.NewManager(informers.Config{
 		DynamicClient: clients.Dynamic,
@@ -316,8 +316,8 @@ func initializeAdapters(clients *kubernetes.Clients, proc *processor.Processor, 
 	auditEventsChan := make(chan map[string]interface{}, auditBufferSize)
 
 	// Create Ingester store and informer
-	ingesterStore := config.NewIngesterStore()
-	ingesterInformer := config.NewIngesterInformer(ingesterStore, clients.Dynamic)
+	ingesterStore := watcherconfig.NewIngesterStore()
+	ingesterInformer := watcherconfig.NewIngesterInformer(ingesterStore, clients.Dynamic)
 
 	// Set up GVR resolver for dynamic destination GVR support
 	observationCreator.SetGVRResolver(func(source string) schema.GroupVersionResource {
@@ -346,7 +346,7 @@ func initializeAdapters(clients *kubernetes.Clients, proc *processor.Processor, 
 }
 
 // startAllServices starts all services
-func startAllServices(ctx context.Context, wg *sync.WaitGroup, configManager *config.ConfigManager, configMapLoader *config.ConfigMapLoader, ingesterInformer *config.IngesterInformer, genericOrchestrator *orchestrator.GenericOrchestrator, httpServer *server.Server, observationCreator *watcher.ObservationCreator, clients *kubernetes.Clients, gvrs *kubernetes.GVRs, m *metrics.Metrics, leaderElectedCh <-chan struct{}, filterInstance *filter.Filter, log *sdklog.Logger, setupLog *sdklog.Logger, falcoAlertsChan, auditEventsChan chan map[string]interface{}) {
+func startAllServices(ctx context.Context, wg *sync.WaitGroup, configManager *watcherconfig.ConfigManager, configMapLoader *watcherconfig.ConfigMapLoader, ingesterInformer *watcherconfig.IngesterInformer, genericOrchestrator *orchestrator.GenericOrchestrator, httpServer *server.Server, observationCreator *watcher.ObservationCreator, clients *kubernetes.Clients, gvrs *kubernetes.GVRs, m *metrics.Metrics, leaderElectedCh <-chan struct{}, filterInstance *filter.Filter, log *sdklog.Logger, setupLog *sdklog.Logger, falcoAlertsChan, auditEventsChan chan map[string]interface{}) {
 	// Create adapter factory and launcher
 	adapterFactory := watcher.NewAdapterFactory(clients.Standard)
 	adapters := adapterFactory.CreateAdapters()
@@ -493,7 +493,7 @@ func startGarbageCollector(ctx context.Context, wg *sync.WaitGroup, clients *kub
 
 // startHAComponents starts HA optimization components
 func startHAComponents(ctx context.Context, wg *sync.WaitGroup, observationCreator *watcher.ObservationCreator, m *metrics.Metrics, httpServer *server.Server, falcoAlertsChan, auditEventsChan chan map[string]interface{}, setupLog *sdklog.Logger) {
-	haConfig := config.LoadHAConfig()
+	haConfig := watcherconfig.LoadHAConfig()
 	if !haConfig.IsHAEnabled() {
 		return
 	}
