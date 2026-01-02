@@ -289,8 +289,9 @@ helm-validate:
 	fi
 	@echo "$(GREEN)✅ Helm chart validation complete$(NC)"
 
-## ci: Run CI pipeline (all checks + Docker build + Helm validation)
-ci: all docker-all helm-validate
+## ci: Run CI pipeline (all checks + Docker build)
+## Note: Helm charts are in helm-charts repository, not validated here
+ci: all docker-all
 	@echo "$(GREEN)✅ CI pipeline complete$(NC)"
 
 ## sync-crd-to-chart: Sync Observation CRD to helm-charts repository
