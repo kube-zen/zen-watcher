@@ -15,7 +15,10 @@ fi
 
 VERSION="$1"
 IMAGE="kubezen/zen-watcher"
-HELM_CHART_PATH="../helm-charts/charts/zen-watcher"
+# Helm charts are in separate repository: https://github.com/kube-zen/helm-charts
+# To update chart versions, clone the repo and set CHARTS_REPO environment variable
+CHARTS_REPO="${CHARTS_REPO:-}"
+HELM_CHART_PATH="${CHARTS_REPO:+${CHARTS_REPO}/charts/zen-watcher}"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🚀 zen-watcher CI: Release ${VERSION}"
@@ -56,10 +59,16 @@ if [ -f "Makefile" ]; then
     sed -i "s/^VERSION ?= .*/VERSION ?= ${VERSION}/" Makefile 2>/dev/null || true
 fi
 # Update Chart.yaml in helm-charts repo if accessible
-if [ -d "$HELM_CHART_PATH" ]; then
+# Requires: CHARTS_REPO environment variable pointing to cloned helm-charts repo
+# Clone with: git clone https://github.com/kube-zen/helm-charts.git
+if [ -n "$CHARTS_REPO" ] && [ -d "$HELM_CHART_PATH" ]; then
     sed -i "s/^version: .*/version: ${VERSION}/" "${HELM_CHART_PATH}/Chart.yaml"
     sed -i "s/^  tag: .*/  tag: \"${VERSION}\"/" "${HELM_CHART_PATH}/values.yaml"
     echo "  ✅ Updated helm chart version"
+elif [ -z "$CHARTS_REPO" ]; then
+    echo "  ℹ️  CHARTS_REPO not set - skipping helm chart version update"
+    echo "     To update chart: git clone https://github.com/kube-zen/helm-charts.git"
+    echo "     Then set: export CHARTS_REPO=/path/to/helm-charts"
 fi
 echo "  ✅ Version references updated"
 echo ""
@@ -126,8 +135,10 @@ echo "To complete the release, run:"
 echo "  git push origin main"
 echo "  git push origin v${VERSION}"
 echo ""
-echo "If helm-charts repo is separate, also:"
-echo "  cd ${HELM_CHART_PATH}/.."
+echo "To update helm-charts repo:"
+echo "  git clone https://github.com/kube-zen/helm-charts.git"
+echo "  cd helm-charts"
+echo "  # Update charts/zen-watcher/Chart.yaml version to ${VERSION}"
 echo "  git commit -am 'chore: zen-watcher ${VERSION}'"
 echo "  git push origin main"
 echo ""

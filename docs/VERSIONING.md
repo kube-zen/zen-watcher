@@ -62,7 +62,9 @@ git push origin main
 git push origin v${VERSION}
 
 # 5. Update helm-charts repo
-cd ../helm-charts
+# Clone if needed: git clone https://github.com/kube-zen/helm-charts.git
+cd helm-charts
+# Update charts/zen-watcher/Chart.yaml version to ${VERSION}
 git commit -am "chore: zen-watcher ${VERSION}"
 git push origin main
 
