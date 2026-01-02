@@ -37,7 +37,8 @@ const (
 
 var (
 	clusterName = getClusterName()
-	kubectlCmd  = []string{"kubectl", "--context=k3d-" + clusterName}
+	// nolint:unused // Kept for future use
+	kubectlCmd = []string{"kubectl", "--context=k3d-" + clusterName}
 )
 
 // getClusterName returns the cluster name from environment variable or default
