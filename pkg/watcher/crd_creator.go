@@ -161,7 +161,12 @@ func (cc *CRDCreator) convertToCRD(observation *unstructured.Unstructured) *unst
 
 	// Add annotations if present
 	if annotations, ok := extractMap(observation.Object, "metadata", "annotations"); ok && annotations != nil {
-		unstructured.SetNestedMap(targetResource.Object, annotations, "metadata", "annotations")
+		if err := unstructured.SetNestedMap(targetResource.Object, annotations, "metadata", "annotations"); err != nil {
+			logger := sdklog.NewLogger("zen-watcher-crd-creator")
+			logger.Warn("Failed to set annotations",
+				sdklog.Operation("create_target_resource"),
+				sdklog.Error(err))
+		}
 	}
 
 	return targetResource

@@ -18,6 +18,7 @@ import (
 	"context"
 	"time"
 
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -141,7 +142,12 @@ func EventToObservation(event *Event) *unstructured.Unstructured {
 		if event.Resource.Namespace != "" {
 			resource["namespace"] = event.Resource.Namespace
 		}
-		unstructured.SetNestedMap(obs.Object, resource, "spec", "resource")
+		if err := unstructured.SetNestedMap(obs.Object, resource, "spec", "resource"); err != nil {
+			logger := sdklog.NewLogger("zen-watcher-adapter")
+			logger.Warn("Failed to set resource in observation",
+				sdklog.Operation("create_observation"),
+				sdklog.Error(err))
+		}
 	}
 
 	// Add details if provided
@@ -163,7 +169,12 @@ func EventToObservation(event *Event) *unstructured.Unstructured {
 				details[k] = v
 			}
 		}
-		unstructured.SetNestedMap(obs.Object, details, "spec", "details")
+		if err := unstructured.SetNestedMap(obs.Object, details, "spec", "details"); err != nil {
+			logger := sdklog.NewLogger("zen-watcher-adapter")
+			logger.Warn("Failed to set details in observation",
+				sdklog.Operation("create_observation"),
+				sdklog.Error(err))
+		}
 	}
 
 	return obs
