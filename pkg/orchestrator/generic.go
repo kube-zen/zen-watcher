@@ -281,7 +281,7 @@ func (o *GenericOrchestrator) updateEventMetrics(source, ingester string, proces
 }
 
 // processIngesterConfigItem processes a single ingester config item
-func (o *GenericOrchestrator) processIngesterConfigItem(ingesterConfig *config.IngesterConfig, item unstructured.Unstructured, activeSources map[string]bool) {
+func (o *GenericOrchestrator) processIngesterConfigItem(ingesterConfig *config.IngesterConfig, item *unstructured.Unstructured, activeSources map[string]bool) {
 	// Convert IngesterConfig to generic.SourceConfig
 	genericConfig := config.ConvertIngesterConfigToGeneric(ingesterConfig)
 	if genericConfig == nil {
@@ -328,7 +328,7 @@ func (o *GenericOrchestrator) processIngesterConfigItem(ingesterConfig *config.I
 }
 
 // createAndStartAdapterForSource creates and starts an adapter for a source
-func (o *GenericOrchestrator) createAndStartAdapterForSource(source, sourceName string, genericConfig *generic.SourceConfig, item unstructured.Unstructured) bool {
+func (o *GenericOrchestrator) createAndStartAdapterForSource(source, sourceName string, genericConfig *generic.SourceConfig, item *unstructured.Unstructured) bool {
 	startupStartTime := time.Now()
 	adapter, err := o.adapterFactory.NewAdapter(genericConfig.Ingester)
 	if err != nil {
@@ -368,7 +368,7 @@ func (o *GenericOrchestrator) createAndStartAdapterForSource(source, sourceName 
 }
 
 // handleAdapterError handles adapter creation/validation/start errors
-func (o *GenericOrchestrator) handleAdapterError(source, sourceName string, genericConfig *generic.SourceConfig, item unstructured.Unstructured, err error, errorType string) {
+func (o *GenericOrchestrator) handleAdapterError(source, sourceName string, genericConfig *generic.SourceConfig, item *unstructured.Unstructured, err error, errorType string) {
 	tracker := o.statusUpdater.GetOrCreateTracker(item.GetNamespace(), item.GetName())
 	tracker.UpdateSourceState(sourceName, genericConfig.Ingester, SourceStateError, err)
 	if o.metrics != nil {
