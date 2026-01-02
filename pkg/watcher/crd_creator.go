@@ -230,3 +230,41 @@ func classifyError(err error) string {
 	}
 	return "create_failed"
 }
+
+// determineKindFromResource determines kind from resource name (plural -> singular, capitalized)
+func determineKindFromResource(resource string) string {
+	kind := resource
+	// Simple plural handling: remove trailing 's' if present
+	if len(kind) > 1 && kind[len(kind)-1] == 's' {
+		if len(kind) > 2 && kind[len(kind)-2] != 's' && !strings.HasSuffix(kind, "us") {
+			kind = kind[:len(kind)-1] // Remove trailing 's'
+		}
+	}
+	// Capitalize first letter
+	if len(kind) > 0 {
+		kind = strings.ToUpper(kind[:1]) + kind[1:]
+	}
+	return kind
+}
+
+// buildAPIVersionFromGVR builds apiVersion from GVR
+func buildAPIVersionFromGVR(gvr schema.GroupVersionResource) string {
+	apiVersion := gvr.Version
+	if gvr.Group != "" {
+		apiVersion = fmt.Sprintf("%s/%s", gvr.Group, gvr.Version)
+	}
+	return apiVersion
+}
+
+// extractNamePrefixFromSpec extracts name prefix from source in spec
+func extractNamePrefixFromSpec(spec map[string]interface{}) string {
+	source, _ := extractStringFromMap(spec, "source")
+	if source == "" {
+		source = "event"
+	}
+	namePrefix := source
+	if len(namePrefix) > 20 {
+		namePrefix = namePrefix[:20]
+	}
+	return namePrefix
+}
