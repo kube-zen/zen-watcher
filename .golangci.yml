@@ -1,5 +1,8 @@
 # golangci-lint configuration for OSS repos
 # Based on Kubernetes and OSS best practices
+# Compatible with golangci-lint v2.x
+
+version: 2
 
 run:
   timeout: 5m

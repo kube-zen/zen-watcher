@@ -247,7 +247,9 @@ func validateManifest(t *testing.T, manifest string, crdType string) error {
 		outputStr := string(output)
 		// If CRD doesn't exist or server-side validation not available, try client-side
 		if strings.Contains(outputStr, "no matches for kind") ||
-			strings.Contains(outputStr, "the server could not find the requested resource") {
+			strings.Contains(outputStr, "the server could not find the requested resource") ||
+			strings.Contains(outputStr, "resource mapping not found") ||
+			strings.Contains(outputStr, "ensure CRDs are installed") {
 			// Fall back to client-side validation
 			cmd = exec.Command("kubectl", "apply", "--dry-run=client", "-f", tmpFile)
 			output, err = cmd.CombinedOutput()
@@ -255,7 +257,9 @@ func validateManifest(t *testing.T, manifest string, crdType string) error {
 				outputStr = string(output)
 				// If CRD doesn't exist in client cache either, skip validation
 				if strings.Contains(outputStr, "no matches for kind") ||
-					strings.Contains(outputStr, "NotFound") {
+					strings.Contains(outputStr, "NotFound") ||
+					strings.Contains(outputStr, "resource mapping not found") ||
+					strings.Contains(outputStr, "ensure CRDs are installed") {
 					t.Skipf("CRD not available for validation (expected in unit tests): %s", outputStr)
 					return nil
 				}
