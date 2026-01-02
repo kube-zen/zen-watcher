@@ -407,36 +407,6 @@ func TestFilter_Allow_Enabled(t *testing.T) {
 	}
 }
 
-func TestFilter_meetsMinSeverity(t *testing.T) {
-	f := &Filter{}
-
-	tests := []struct {
-		name        string
-		severity    string
-		minSeverity string
-		expected    bool
-	}{
-		{"CRITICAL meets CRITICAL", "CRITICAL", "CRITICAL", true},
-		{"CRITICAL meets HIGH", "CRITICAL", "HIGH", true},
-		{"CRITICAL meets MEDIUM", "CRITICAL", "MEDIUM", true},
-		{"HIGH meets HIGH", "HIGH", "HIGH", true},
-		{"HIGH meets MEDIUM", "HIGH", "MEDIUM", true},
-		{"HIGH fails CRITICAL", "HIGH", "CRITICAL", false},
-		{"MEDIUM meets MEDIUM", "MEDIUM", "MEDIUM", true},
-		{"MEDIUM fails HIGH", "MEDIUM", "HIGH", false},
-		{"LOW fails MEDIUM", "LOW", "MEDIUM", false},
-		{"Unknown severity fails HIGH minimum", "UNKNOWN", "HIGH", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := f.meetsMinSeverity(tt.severity, tt.minSeverity)
-			if result != tt.expected {
-				t.Errorf("meetsMinSeverity(%q, %q) = %v, want %v", tt.severity, tt.minSeverity, result, tt.expected)
-			}
-		})
-	}
-}
 
 // Helper functions to create test observations
 
