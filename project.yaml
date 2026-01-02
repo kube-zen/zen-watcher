@@ -1,7 +1,7 @@
 projectType: controller
 projectName: zen-watcher
 projectDescription: "Kube-ZEN component"
-goVersion: "1.24"
+goVersion: "1.25"
 imageName: "kubezen/zen-watcher"
 hasHelmChart: false
 runsRace: true

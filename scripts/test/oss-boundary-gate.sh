@@ -33,6 +33,33 @@ if grep -r "tenant.*entitlement\|entitlement.*tenant" "$REPO_ROOT" --include="*.
 	FAILED=1
 fi
 
+# Check for SaaS API endpoints
+if grep -r "/v1/clusters\|/v1/adapters\|/v1/tenants" "$REPO_ROOT" --include="*.go" --include="*.sh" 2>/dev/null | grep -v "oss-boundary-gate.sh"; then
+	echo "❌ FAIL: Found SaaS API endpoint references (/v1/clusters, /v1/adapters, /v1/tenants)"
+	FAILED=1
+fi
+
+# Check for entitlement as standalone pattern (SaaS concept)
+if grep -r "\bentitlement\b" "$REPO_ROOT" --include="*.go" -i 2>/dev/null | grep -v "oss-boundary-gate.sh" | grep -v "OSS_BOUNDARY.md" | grep -v "//.*entitlement"; then
+	# Allow if it's in comments or context, but fail if it's in code paths
+	if grep -r "\bentitlement\b" "$REPO_ROOT" --include="*.go" -i 2>/dev/null | grep -v "oss-boundary-gate.sh" | grep -v "OSS_BOUNDARY.md" | grep -v "//" | grep -v "entitlement.*label\|label.*entitlement"; then
+		echo "❌ FAIL: Found entitlement references in code (SaaS-only concept)"
+		FAILED=1
+	fi
+fi
+
+# Check for SaaS package imports
+if grep -r '".*src/saas/' "$REPO_ROOT" --include="*.go" 2>/dev/null | grep -v "oss-boundary-gate.sh"; then
+	echo "❌ FAIL: Found imports from src/saas/ packages"
+	FAILED=1
+fi
+
+# Check for Redis/Cockroach client usage in CLI paths (controllers are OK)
+if grep -r "redis\|cockroach" "$REPO_ROOT/cmd" --include="*.go" -i 2>/dev/null | grep -v "oss-boundary-gate.sh" | grep -v "test"; then
+	echo "❌ FAIL: Found Redis/Cockroach client usage in CLI code paths"
+	FAILED=1
+fi
+
 if [ $FAILED -eq 0 ]; then
 	echo "✅ PASS: OSS boundary check passed"
 	exit 0

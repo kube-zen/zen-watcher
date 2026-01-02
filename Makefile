@@ -467,10 +467,16 @@ check:
 
 test-race:
 	@go test -v -race -timeout=15m ./...
-## zenctl: Build zenctl-oss CLI (workspace-independent)
+## zenctl: Build zenctl-oss CLI (workspace-independent, default)
 zenctl:
 	@echo "$(GREEN)Building zenctl...$(NC)"
 	@GOWORK=off go build -ldflags "$(ZENCTL_LDFLAGS)" -o zenctl ./cmd/zenctl
+	@echo "$(GREEN)✅ zenctl built$(NC)"
+
+## zenctl-workspace: Build zenctl-oss CLI with workspace mode
+zenctl-workspace:
+	@echo "$(GREEN)Building zenctl (workspace mode)...$(NC)"
+	@go build -ldflags "$(ZENCTL_LDFLAGS)" -o zenctl ./cmd/zenctl
 	@echo "$(GREEN)✅ zenctl built$(NC)"
 
 ## test-zenctl: Test zenctl-oss (workspace-independent)
@@ -486,3 +492,17 @@ ZENCTL_BUILD_TIME ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -
 ZENCTL_LDFLAGS = -X github.com/kube-zen/zen-watcher/cmd/zenctl/internal/version.Version=$(ZENCTL_VERSION) \
                  -X github.com/kube-zen/zen-watcher/cmd/zenctl/internal/version.GitCommit=$(ZENCTL_GIT_COMMIT) \
                  -X github.com/kube-zen/zen-watcher/cmd/zenctl/internal/version.BuildTime=$(ZENCTL_BUILD_TIME)
+
+## release-zenctl: Build zenctl-oss for multiple architectures with checksums
+release-zenctl:
+	@echo "$(GREEN)Building zenctl-oss releases...$(NC)"
+	@mkdir -p dist
+	@GOOS=linux GOARCH=amd64 GOWORK=off go build -ldflags "$(ZENCTL_LDFLAGS)" -o dist/zenctl-linux-amd64 ./cmd/zenctl
+	@GOOS=linux GOARCH=arm64 GOWORK=off go build -ldflags "$(ZENCTL_LDFLAGS)" -o dist/zenctl-linux-arm64 ./cmd/zenctl
+	@GOOS=darwin GOARCH=amd64 GOWORK=off go build -ldflags "$(ZENCTL_LDFLAGS)" -o dist/zenctl-darwin-amd64 ./cmd/zenctl
+	@GOOS=darwin GOARCH=arm64 GOWORK=off go build -ldflags "$(ZENCTL_LDFLAGS)" -o dist/zenctl-darwin-arm64 ./cmd/zenctl
+	@echo "$(GREEN)Generating SHA256SUMS...$(NC)"
+	@cd dist && sha256sum zenctl-* > SHA256SUMS
+	@echo "$(GREEN)✅ zenctl-oss releases built in dist/$(NC)"
+	@echo "   Files:"
+	@ls -lh dist/zenctl-* dist/SHA256SUMS 2>/dev/null | awk '{print "   " $$9 " (" $$5 ")"}'
