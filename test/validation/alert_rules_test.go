@@ -25,10 +25,10 @@ import (
 
 // PrometheusRule represents a PrometheusRule resource
 type PrometheusRule struct {
-	APIVersion string    `yaml:"apiVersion"`
-	Kind       string    `yaml:"kind"`
-	Metadata   Metadata  `yaml:"metadata"`
-	Spec       RuleSpec  `yaml:"spec"`
+	APIVersion string   `yaml:"apiVersion"`
+	Kind       string   `yaml:"kind"`
+	Metadata   Metadata `yaml:"metadata"`
+	Spec       RuleSpec `yaml:"spec"`
 }
 
 type Metadata struct {
@@ -57,44 +57,44 @@ type Rule struct {
 // KnownMetrics is a set of metrics that are defined in pkg/metrics/definitions.go
 // This list should be kept in sync with actual metric definitions
 var KnownMetrics = map[string]bool{
-	"zen_watcher_events_total":                                    true,
-	"zen_watcher_observations_created_total":                      true,
-	"zen_watcher_observations_filtered_total":                     true,
-	"zen_watcher_observations_deduped_total":                      true,
-	"zen_watcher_observations_deleted_total":                      true,
-	"zen_watcher_observations_create_errors_total":                true,
-	"zen_watcher_filter_decisions_total":                          true,
-	"zen_watcher_filter_pass_rate":                                true,
-	"zen_watcher_adapter_runs_total":                              true,
-	"zen_watcher_ingesters_active":                                true,
-	"zen_watcher_ingesters_status":                                true,
-	"zen_watcher_ingesters_config_errors_total":                   true,
-	"zen_watcher_ingester_processing_latency_seconds":              true,
-	"zen_watcher_ingester_events_processed_total":                 true,
-	"zen_watcher_dedup_cache_usage":                               true,
-	"zen_watcher_dedup_evictions_total":                           true,
-	"zen_watcher_dedup_effectiveness":                             true,
-	"zen_watcher_dedup_effectiveness_per_strategy":                true,
-	"zen_watcher_dedup_decisions_total":                           true,
-	"zen_watcher_gc_runs_total":                                   true,
-	"zen_watcher_gc_duration_seconds":                             true,
-	"zen_watcher_gc_errors_total":                                 true,
-	"zen_watcher_observations_live":                               true,
-	"zen_watcher_tools_active":                                    true,
-	"zen_watcher_informer_cache_synced":                           true,
-	"zen_watcher_event_processing_duration_seconds":               true,
-	"zen_watcher_webhook_requests_total":                          true,
-	"zen_watcher_webhook_events_dropped_total":                    true,
-	"zen_watcher_webhook_queue_usage":                             true,
-	"zen_watcher_optimization_filter_effectiveness_ratio":         true,
-	"zen_watcher_optimization_deduplication_rate_ratio":           true,
-	"zen_watcher_optimization_source_events_processed_total":       true,
-	"zen_watcher_optimization_source_processing_latency_seconds":   true,
-	"zen_watcher_optimization_strategy_changes_total":              true,
-	"zen_watcher_optimization_decisions_total":                    true,
-	"zen_watcher_optimization_confidence":                         true,
-	"zen_watcher_optimization_current_strategy":                   true,
-	"zen_watcher_pipeline_errors_total":                           true,
+	"zen_watcher_events_total":                                   true,
+	"zen_watcher_observations_created_total":                     true,
+	"zen_watcher_observations_filtered_total":                    true,
+	"zen_watcher_observations_deduped_total":                     true,
+	"zen_watcher_observations_deleted_total":                     true,
+	"zen_watcher_observations_create_errors_total":               true,
+	"zen_watcher_filter_decisions_total":                         true,
+	"zen_watcher_filter_pass_rate":                               true,
+	"zen_watcher_adapter_runs_total":                             true,
+	"zen_watcher_ingesters_active":                               true,
+	"zen_watcher_ingesters_status":                               true,
+	"zen_watcher_ingesters_config_errors_total":                  true,
+	"zen_watcher_ingester_processing_latency_seconds":            true,
+	"zen_watcher_ingester_events_processed_total":                true,
+	"zen_watcher_dedup_cache_usage":                              true,
+	"zen_watcher_dedup_evictions_total":                          true,
+	"zen_watcher_dedup_effectiveness":                            true,
+	"zen_watcher_dedup_effectiveness_per_strategy":               true,
+	"zen_watcher_dedup_decisions_total":                          true,
+	"zen_watcher_gc_runs_total":                                  true,
+	"zen_watcher_gc_duration_seconds":                            true,
+	"zen_watcher_gc_errors_total":                                true,
+	"zen_watcher_observations_live":                              true,
+	"zen_watcher_tools_active":                                   true,
+	"zen_watcher_informer_cache_synced":                          true,
+	"zen_watcher_event_processing_duration_seconds":              true,
+	"zen_watcher_webhook_requests_total":                         true,
+	"zen_watcher_webhook_events_dropped_total":                   true,
+	"zen_watcher_webhook_queue_usage":                            true,
+	"zen_watcher_optimization_filter_effectiveness_ratio":        true,
+	"zen_watcher_optimization_deduplication_rate_ratio":          true,
+	"zen_watcher_optimization_source_events_processed_total":     true,
+	"zen_watcher_optimization_source_processing_latency_seconds": true,
+	"zen_watcher_optimization_strategy_changes_total":            true,
+	"zen_watcher_optimization_decisions_total":                   true,
+	"zen_watcher_optimization_confidence":                        true,
+	"zen_watcher_optimization_current_strategy":                  true,
+	"zen_watcher_pipeline_errors_total":                          true,
 }
 
 // ValidSeverityValues are the valid severity label values (lowercase)
@@ -281,4 +281,3 @@ func TestAlertRulesRequiredFields(t *testing.T) {
 		})
 	}
 }
-

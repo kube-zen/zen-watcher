@@ -18,8 +18,8 @@ import (
 	"context"
 	"testing"
 
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 )
@@ -61,4 +61,3 @@ func AssertObservationField(t *testing.T, obs *unstructured.Unstructured, fieldP
 		t.Errorf("Field %s = %v, want %v", fieldPath, value, expectedValue)
 	}
 }
-

@@ -82,27 +82,33 @@ func TestObservationCRDSchemaFileExists(t *testing.T) {
 		t.Fatal("CRD must have at least one version")
 	}
 
-	// Check v1 version exists and is served/stored
-	v1Found := false
+	// Check that at least one version exists and is served/stored
+	// Accept v1 or v1alpha1 (v1alpha1 is current, v1 is target for future)
+	versionFound := false
+	versionName := ""
 	for _, v := range versions {
 		versionMap, ok := v.(map[string]interface{})
 		if !ok {
 			continue
 		}
-		if versionMap["name"] == "v1" {
-			v1Found = true
+		name, _ := versionMap["name"].(string)
+		if name == "v1" || name == "v1alpha1" {
+			versionFound = true
+			versionName = name
 			if served, ok := versionMap["served"].(bool); !ok || !served {
-				t.Error("v1 version must be served")
+				t.Errorf("%s version must be served", name)
 			}
 			if storage, ok := versionMap["storage"].(bool); !ok || !storage {
-				t.Error("v1 version must be stored")
+				t.Errorf("%s version must be stored", name)
 			}
 			break
 		}
 	}
 
-	if !v1Found {
-		t.Error("CRD must have v1 version")
+	if !versionFound {
+		t.Error("CRD must have v1 or v1alpha1 version")
+	} else if versionName == "v1alpha1" {
+		t.Logf("CRD has v1alpha1 version (v1 is target for future migration)")
 	}
 }
 

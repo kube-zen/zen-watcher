@@ -24,10 +24,10 @@ import (
 
 // Dashboard represents a Grafana dashboard JSON structure
 type Dashboard struct {
-	Panels     []Panel     `json:"panels"`
-	Templating Templating  `json:"templating,omitempty"`
-	Title      string      `json:"title,omitempty"`
-	UID        string      `json:"uid,omitempty"`
+	Panels     []Panel    `json:"panels"`
+	Templating Templating `json:"templating,omitempty"`
+	Title      string     `json:"title,omitempty"`
+	UID        string     `json:"uid,omitempty"`
 }
 
 type Panel struct {
@@ -212,4 +212,3 @@ func TestDashboardSeverityFilters(t *testing.T) {
 		})
 	}
 }
-

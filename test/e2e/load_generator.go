@@ -91,15 +91,31 @@ func (lg *LoadGenerator) SendWebhook(endpoint string, payload map[string]interfa
 func (lg *LoadGenerator) sendWebhookViaKubectl(endpoint string, jsonData []byte) error {
 	// This is a minimal implementation - in practice, we'd reuse scripts/data/send-webhooks.sh
 	// For e2e, we'll use a pod-based approach similar to send-webhooks.sh
-	// Get cluster name from environment or use default
-	clusterName := os.Getenv("TEST_CLUSTER_NAME")
-	if clusterName == "" {
-		clusterName = "test-cluster"
+	// Get kubeconfig path - use KUBECONFIG env var if set
+	var kubeconfig string
+	if kc := os.Getenv("KUBECONFIG"); kc != "" {
+		kubeconfig = kc
+	} else {
+		// Get cluster name from environment or use default
+		clusterName := os.Getenv("TEST_CLUSTER_NAME")
+		if clusterName == "" {
+			clusterName = "test-cluster"
+		}
+		home, _ := os.UserHomeDir()
+		kubeconfig = filepath.Join(home, ".config", "k3d", "kubeconfig-"+clusterName+".yaml")
 	}
 
-	// Get kubeconfig path
-	home, _ := os.UserHomeDir()
-	kubeconfig := filepath.Join(home, ".config", "k3d", "kubeconfig-"+clusterName+".yaml")
+	// Get kubectl context
+	var context string
+	if ctx := os.Getenv("KUBECTL_CONTEXT"); ctx != "" {
+		context = ctx
+	} else {
+		clusterName := os.Getenv("TEST_CLUSTER_NAME")
+		if clusterName == "" {
+			clusterName = "test-cluster"
+		}
+		context = "k3d-" + clusterName
+	}
 
 	// Create a temporary pod to send webhook (reuse send-webhooks.sh pattern)
 	podName := fmt.Sprintf("load-gen-%d", time.Now().Unix())
@@ -129,7 +145,7 @@ spec:
   restartPolicy: Never
 `, podName, lg.namespace, string(jsonData), watcherURL)
 
-	cmd := exec.Command("kubectl", "--context=k3d-"+clusterName, "apply", "-f", "-")
+	cmd := exec.Command("kubectl", "--context="+context, "apply", "-f", "-")
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
 	cmd.Stdin = bytes.NewReader([]byte(podYAML))
 	if err := cmd.Run(); err != nil {
@@ -140,7 +156,7 @@ spec:
 	time.Sleep(2 * time.Second)
 
 	// Cleanup
-	if err := exec.Command("kubectl", "--context=k3d-"+clusterName, "delete", "pod", podName, "-n", lg.namespace, "--ignore-not-found=true").Run(); err != nil {
+	if err := exec.Command("kubectl", "--context="+context, "delete", "pod", podName, "-n", lg.namespace, "--ignore-not-found=true").Run(); err != nil {
 		// Log but don't fail - cleanup is best effort
 		fmt.Printf("Warning: failed to cleanup pod %s: %v\n", podName, err)
 	}

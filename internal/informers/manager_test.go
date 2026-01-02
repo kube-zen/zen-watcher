@@ -19,12 +19,14 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic/fake"
 )
 
 func TestNewManager(t *testing.T) {
-	dynamicClient := fake.NewSimpleDynamicClient(nil)
+	scheme := runtime.NewScheme()
+	dynamicClient := fake.NewSimpleDynamicClient(scheme)
 
 	config := Config{
 		DynamicClient: dynamicClient,
@@ -42,7 +44,8 @@ func TestNewManager(t *testing.T) {
 }
 
 func TestNewManager_DefaultResyncZero(t *testing.T) {
-	dynamicClient := fake.NewSimpleDynamicClient(nil)
+	scheme := runtime.NewScheme()
+	dynamicClient := fake.NewSimpleDynamicClient(scheme)
 
 	config := Config{
 		DynamicClient: dynamicClient,
@@ -60,7 +63,8 @@ func TestNewManager_DefaultResyncZero(t *testing.T) {
 }
 
 func TestGetInformer(t *testing.T) {
-	dynamicClient := fake.NewSimpleDynamicClient(nil)
+	scheme := runtime.NewScheme()
+	dynamicClient := fake.NewSimpleDynamicClient(scheme)
 
 	config := Config{
 		DynamicClient: dynamicClient,
@@ -87,7 +91,8 @@ func TestGetInformer(t *testing.T) {
 }
 
 func TestGetInformer_CustomResync(t *testing.T) {
-	dynamicClient := fake.NewSimpleDynamicClient(nil)
+	scheme := runtime.NewScheme()
+	dynamicClient := fake.NewSimpleDynamicClient(scheme)
 
 	config := Config{
 		DynamicClient: dynamicClient,
@@ -116,7 +121,8 @@ func TestGetInformer_CustomResync(t *testing.T) {
 }
 
 func TestStart(t *testing.T) {
-	dynamicClient := fake.NewSimpleDynamicClient(nil)
+	scheme := runtime.NewScheme()
+	dynamicClient := fake.NewSimpleDynamicClient(scheme)
 
 	config := Config{
 		DynamicClient: dynamicClient,
@@ -135,7 +141,8 @@ func TestStart(t *testing.T) {
 }
 
 func TestWaitForCacheSync(t *testing.T) {
-	dynamicClient := fake.NewSimpleDynamicClient(nil)
+	scheme := runtime.NewScheme()
+	dynamicClient := fake.NewSimpleDynamicClient(scheme)
 
 	config := Config{
 		DynamicClient: dynamicClient,

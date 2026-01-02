@@ -746,4 +746,3 @@ func getDuration(config map[string]interface{}, key string, defaultValue time.Du
 	}
 	return defaultValue
 }
-

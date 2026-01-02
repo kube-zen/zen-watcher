@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package errors provides structured error types for zen-watcher with pipeline context.
+// This package now uses zen-sdk/pkg/errors as the base implementation.
 package errors
 
-import "fmt"
+import (
+	sdkerrors "github.com/kube-zen/zen-sdk/pkg/errors"
+)
 
 // ErrorCategory represents the category of an error
 type ErrorCategory string
@@ -34,93 +38,66 @@ const (
 	PIPELINE_ERROR ErrorCategory = "PIPELINE_ERROR"
 )
 
-// PipelineError represents a categorized pipeline error
-type PipelineError struct {
-	Category    ErrorCategory
-	Source      string
-	Ingester    string
-	Code        string
-	Message     string
-	OriginalErr error
-}
-
-func (e *PipelineError) Error() string {
-	if e.OriginalErr != nil {
-		return fmt.Sprintf("[%s] %s: %s (source: %s, ingester: %s): %v",
-			e.Category, e.Code, e.Message, e.Source, e.Ingester, e.OriginalErr)
-	}
-	return fmt.Sprintf("[%s] %s: %s (source: %s, ingester: %s)",
-		e.Category, e.Code, e.Message, e.Source, e.Ingester)
-}
+// PipelineError is an alias for zen-sdk's ContextError.
+// This maintains backward compatibility while using the shared implementation.
+type PipelineError = sdkerrors.ContextError
 
 // NewConfigError creates a new CONFIG_ERROR
 func NewConfigError(source, ingester, code, message string, err error) *PipelineError {
-	return &PipelineError{
-		Category:    CONFIG_ERROR,
-		Source:      source,
-		Ingester:    ingester,
-		Code:        code,
-		Message:     message,
-		OriginalErr: err,
-	}
+	ctxErr := sdkerrors.Wrap(err, string(CONFIG_ERROR), message)
+	return sdkerrors.WithMultipleContext(ctxErr, map[string]string{
+		"source":   source,
+		"ingester": ingester,
+		"code":     code,
+	})
 }
 
 // NewFilterError creates a new FILTER_ERROR
 func NewFilterError(source, ingester, code, message string, err error) *PipelineError {
-	return &PipelineError{
-		Category:    FILTER_ERROR,
-		Source:      source,
-		Ingester:    ingester,
-		Code:        code,
-		Message:     message,
-		OriginalErr: err,
-	}
+	ctxErr := sdkerrors.Wrap(err, string(FILTER_ERROR), message)
+	return sdkerrors.WithMultipleContext(ctxErr, map[string]string{
+		"source":   source,
+		"ingester": ingester,
+		"code":     code,
+	})
 }
 
 // NewDedupError creates a new DEDUP_ERROR
 func NewDedupError(source, ingester, code, message string, err error) *PipelineError {
-	return &PipelineError{
-		Category:    DEDUP_ERROR,
-		Source:      source,
-		Ingester:    ingester,
-		Code:        code,
-		Message:     message,
-		OriginalErr: err,
-	}
+	ctxErr := sdkerrors.Wrap(err, string(DEDUP_ERROR), message)
+	return sdkerrors.WithMultipleContext(ctxErr, map[string]string{
+		"source":   source,
+		"ingester": ingester,
+		"code":     code,
+	})
 }
 
 // NewNormalizeError creates a new NORMALIZE_ERROR
 func NewNormalizeError(source, ingester, code, message string, err error) *PipelineError {
-	return &PipelineError{
-		Category:    NORMALIZE_ERROR,
-		Source:      source,
-		Ingester:    ingester,
-		Code:        code,
-		Message:     message,
-		OriginalErr: err,
-	}
+	ctxErr := sdkerrors.Wrap(err, string(NORMALIZE_ERROR), message)
+	return sdkerrors.WithMultipleContext(ctxErr, map[string]string{
+		"source":   source,
+		"ingester": ingester,
+		"code":     code,
+	})
 }
 
 // NewCRDWriteError creates a new CRD_WRITE_ERROR
 func NewCRDWriteError(source, ingester, code, message string, err error) *PipelineError {
-	return &PipelineError{
-		Category:    CRD_WRITE_ERROR,
-		Source:      source,
-		Ingester:    ingester,
-		Code:        code,
-		Message:     message,
-		OriginalErr: err,
-	}
+	ctxErr := sdkerrors.Wrap(err, string(CRD_WRITE_ERROR), message)
+	return sdkerrors.WithMultipleContext(ctxErr, map[string]string{
+		"source":   source,
+		"ingester": ingester,
+		"code":     code,
+	})
 }
 
 // NewPipelineError creates a new PIPELINE_ERROR
 func NewPipelineError(source, ingester, code, message string, err error) *PipelineError {
-	return &PipelineError{
-		Category:    PIPELINE_ERROR,
-		Source:      source,
-		Ingester:    ingester,
-		Code:        code,
-		Message:     message,
-		OriginalErr: err,
-	}
+	ctxErr := sdkerrors.Wrap(err, string(PIPELINE_ERROR), message)
+	return sdkerrors.WithMultipleContext(ctxErr, map[string]string{
+		"source":   source,
+		"ingester": ingester,
+		"code":     code,
+	})
 }

@@ -50,15 +50,32 @@ func getClusterName() string {
 }
 
 // getKubeconfigPath returns the path to the kubeconfig file
+// Uses KUBECONFIG env var if set, otherwise falls back to k3d default location
 func getKubeconfigPath() string {
+	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
+		return kubeconfig
+	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".config", "k3d", "kubeconfig-"+clusterName+".yaml")
 }
 
+// getKubectlContext returns the kubectl context to use
+// Uses KUBECTL_CONTEXT env var if set, otherwise falls back to k3d-{clusterName}
+func getKubectlContext() string {
+	if context := os.Getenv("KUBECTL_CONTEXT"); context != "" {
+		return context
+	}
+	return "k3d-" + clusterName
+}
+
 // runKubectl runs a kubectl command and returns stdout
 func runKubectl(args ...string) (string, error) {
-	cmd := exec.Command("kubectl", append([]string{"--context=k3d-" + clusterName}, args...)...)
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+getKubeconfigPath())
+	context := getKubectlContext()
+	cmd := exec.Command("kubectl", append([]string{"--context=" + context}, args...)...)
+	// Use KUBECONFIG if set, otherwise let kubectl use default
+	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
+	}
 	output, err := cmd.CombinedOutput()
 	return string(output), err
 }
@@ -184,8 +201,13 @@ spec:
 `
 
 	// Apply the Ingester
-	cmd := exec.Command("kubectl", "--context=k3d-"+clusterName, "apply", "-f", "-")
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+getKubeconfigPath())
+	context := getKubectlContext()
+	cmd := exec.Command("kubectl", "--context="+context, "apply", "-f", "-")
+	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
+	} else {
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+getKubeconfigPath())
+	}
 	cmd.Stdin = strings.NewReader(testIngester)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -233,8 +255,13 @@ spec:
 `
 
 	// Apply the Ingester
-	cmd := exec.Command("kubectl", "--context=k3d-"+clusterName, "apply", "-f", "-")
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+getKubeconfigPath())
+	context := getKubectlContext()
+	cmd := exec.Command("kubectl", "--context="+context, "apply", "-f", "-")
+	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
+	} else {
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+getKubeconfigPath())
+	}
 	cmd.Stdin = strings.NewReader(testIngester)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -344,8 +371,13 @@ spec:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Apply the Ingester
-			cmd := exec.Command("kubectl", "--context=k3d-"+clusterName, "apply", "-f", "-")
-			cmd.Env = append(os.Environ(), "KUBECONFIG="+getKubeconfigPath())
+			context := getKubectlContext()
+			cmd := exec.Command("kubectl", "--context="+context, "apply", "-f", "-")
+			if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
+				cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
+			} else {
+				cmd.Env = append(os.Environ(), "KUBECONFIG="+getKubeconfigPath())
+			}
 			cmd.Stdin = strings.NewReader(tt.ingesterYAML)
 			output, err := cmd.CombinedOutput()
 
@@ -353,8 +385,13 @@ spec:
 				// For invalid configs, we expect the loader to reject them
 				// Check if Ingester was created (it shouldn't be)
 				time.Sleep(1 * time.Second)
-				checkCmd := exec.Command("kubectl", "--context=k3d-"+clusterName, "get", "ingester", "-n", testNamespace, "-o", "name")
-				checkCmd.Env = append(os.Environ(), "KUBECONFIG="+getKubeconfigPath())
+				context := getKubectlContext()
+				checkCmd := exec.Command("kubectl", "--context="+context, "get", "ingester", "-n", testNamespace, "-o", "name")
+				if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
+					checkCmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
+				} else {
+					checkCmd.Env = append(os.Environ(), "KUBECONFIG="+getKubeconfigPath())
+				}
 				checkOutput, _ := checkCmd.CombinedOutput()
 				if strings.Contains(string(checkOutput), strings.TrimSpace(strings.Split(tt.ingesterYAML, "\n")[4])) {
 					t.Errorf("Invalid Ingester was accepted (should be rejected): %s", string(checkOutput))
@@ -385,9 +422,14 @@ func TestMetricsMovement(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "kubectl", "--context=k3d-"+clusterName,
+	context := getKubectlContext()
+	cmd := exec.CommandContext(ctx, "kubectl", "--context="+context,
 		"port-forward", "-n", namespace, "svc/zen-watcher", port+":8080")
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+getKubeconfigPath())
+	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
+	} else {
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+getKubeconfigPath())
+	}
 	if err := cmd.Start(); err != nil {
 		t.Skipf("Failed to start port-forward (non-critical): %v", err)
 		return
@@ -430,8 +472,13 @@ spec:
     - type: crd
       value: observations
 `
-	applyCmd := exec.Command("kubectl", "--context=k3d-"+clusterName, "apply", "-f", "-")
-	applyCmd.Env = append(os.Environ(), "KUBECONFIG="+getKubeconfigPath())
+	context := getKubectlContext()
+	applyCmd := exec.Command("kubectl", "--context="+context, "apply", "-f", "-")
+	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
+		applyCmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
+	} else {
+		applyCmd.Env = append(os.Environ(), "KUBECONFIG="+getKubeconfigPath())
+	}
 	applyCmd.Stdin = strings.NewReader(testIngester)
 	if err := applyCmd.Run(); err != nil {
 		t.Fatalf("Failed to apply test Ingester: %v", err)
@@ -505,9 +552,14 @@ func TestMetricsEndpoint(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "kubectl", "--context=k3d-"+clusterName,
+	context := getKubectlContext()
+	cmd := exec.CommandContext(ctx, "kubectl", "--context="+context,
 		"port-forward", "-n", namespace, "svc/zen-watcher", port+":8080")
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+getKubeconfigPath())
+	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
+	} else {
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+getKubeconfigPath())
+	}
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("Failed to start port-forward: %v", err)
 	}

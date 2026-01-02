@@ -104,8 +104,9 @@ func TestConfigMapLoader_ReloadConfig(t *testing.T) {
 	if allowed {
 		t.Error("Expected MEDIUM severity to be filtered out after update to HIGH minimum")
 	}
-	if reason != "min_severity" {
-		t.Errorf("Expected reason 'min_severity', got '%s'", reason)
+	// SDK filter returns generic "sdk_filtered" reason
+	if reason != "sdk_filtered" {
+		t.Errorf("Expected reason 'sdk_filtered', got '%s'", reason)
 	}
 
 	// Test HIGH severity should pass
@@ -192,8 +193,9 @@ func TestConfigMapLoader_InvalidConfigKeepsLastGood(t *testing.T) {
 	if allowed {
 		t.Error("Expected LOW severity to be filtered out (last good config has MEDIUM minimum)")
 	}
-	if reason != "min_severity" {
-		t.Errorf("Expected reason 'min_severity', got '%s'", reason)
+	// SDK filter returns generic "sdk_filtered" reason
+	if reason != "sdk_filtered" {
+		t.Errorf("Expected reason 'sdk_filtered', got '%s'", reason)
 	}
 }
 

@@ -27,6 +27,7 @@ import (
 
 	sdklifecycle "github.com/kube-zen/zen-sdk/pkg/lifecycle"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+	sdkmetrics "github.com/kube-zen/zen-sdk/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -85,6 +86,18 @@ func NewServerWithIngester(
 	mux := http.NewServeMux()
 	auth := NewWebhookAuth()
 
+	// Initialize HTTP metrics using zen-sdk/pkg/metrics
+	httpMetrics, err := sdkmetrics.NewHTTPMetrics(sdkmetrics.HTTPMetricsConfig{
+		Component: "zen-watcher",
+		Prefix:    "http",
+		Registry:  prometheus.DefaultRegisterer,
+	})
+	if err != nil {
+		// Log warning but continue without HTTP metrics
+		fmt.Fprintf(os.Stderr, "Failed to initialize HTTP metrics: %v\n", err)
+		httpMetrics = nil
+	}
+
 	// Rate limiter: 100 requests per minute per IP (configurable)
 	maxRequests := 100
 	if maxReqStr := os.Getenv("WEBHOOK_RATE_LIMIT"); maxReqStr != "" {
@@ -104,7 +117,7 @@ func NewServerWithIngester(
 	s := &Server{
 		server: &http.Server{
 			Addr:         ":" + port,
-			Handler:      mux,
+			Handler:      mux, // Will be wrapped with metrics middleware after handlers are registered
 			ReadTimeout:  15 * time.Second,
 			WriteTimeout: 15 * time.Second,
 			IdleTimeout:  60 * time.Second,
@@ -124,7 +137,14 @@ func NewServerWithIngester(
 		},
 	}
 
+	// Register all handlers first
 	s.registerHandlers(mux)
+
+	// Wrap mux with HTTP metrics middleware if available (after handlers are registered)
+	if httpMetrics != nil {
+		s.server.Handler = httpMetrics.Middleware("zen-watcher")(mux)
+	}
+
 	return s
 }
 

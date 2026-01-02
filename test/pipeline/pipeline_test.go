@@ -21,8 +21,8 @@ import (
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
-	sdkdedup "github.com/kube-zen/zen-sdk/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/processor"
+	"github.com/kube-zen/zen-watcher/test/helpers"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -63,7 +63,7 @@ func setupPipeline(t *testing.T, dynamicClient dynamic.Interface) *processor.Pro
 	f := filter.NewFilter(filterConfig)
 
 	// Create deduper
-	deduper := sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+	deduper := helpers.NewTestDeduperWithDefaults(t)
 
 	// Create observation creator
 	creator := watcher.NewObservationCreator(

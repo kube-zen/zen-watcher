@@ -74,8 +74,9 @@ func TestFilter_ExpressionVsListBased(t *testing.T) {
 	if allowed {
 		t.Errorf("Expression should take precedence and filter out HIGH severity")
 	}
-	if reason != "expression_filtered" {
-		t.Errorf("Expected reason 'expression_filtered', got: %s", reason)
+	// SDK filter returns generic "sdk_filtered" reason
+	if reason != "sdk_filtered" {
+		t.Errorf("Expected reason 'sdk_filtered', got: %s", reason)
 	}
 }
 

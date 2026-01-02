@@ -19,7 +19,6 @@ import (
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
-	sdkdedup "github.com/kube-zen/zen-sdk/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/processor"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -55,6 +54,7 @@ func SetupTestEnvWithGVR(t *testing.T, gvr schema.GroupVersionResource) dynamic.
 }
 
 // SetupPipeline creates a complete pipeline with fake clients
+// The deduper is automatically cleaned up when the test completes
 func SetupPipeline(t *testing.T, dynamicClient dynamic.Interface, gvr schema.GroupVersionResource) *processor.Processor {
 	t.Helper()
 
@@ -64,8 +64,8 @@ func SetupPipeline(t *testing.T, dynamicClient dynamic.Interface, gvr schema.Gro
 	}
 	f := filter.NewFilter(filterConfig)
 
-	// Create deduper
-	deduper := sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+	// Create deduper with automatic cleanup
+	deduper := NewTestDeduperWithDefaults(t)
 
 	// Create observation creator
 	creator := watcher.NewObservationCreator(
@@ -110,4 +110,3 @@ func CreateTestSourceConfigWithProcessing(source, order string) *generic.SourceC
 	}
 	return config
 }
-

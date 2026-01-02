@@ -31,6 +31,12 @@ func TestConvertToIngesterConfig_ProcessingFilter(t *testing.T) {
 			"spec": map[string]interface{}{
 				"source":   "test-source",
 				"ingester": "informer",
+				"destinations": []interface{}{
+					map[string]interface{}{
+						"type":  "crd",
+						"value": "observations",
+					},
+				},
 				"processing": map[string]interface{}{
 					"filter": map[string]interface{}{
 						"expression":        "severity >= HIGH",
@@ -87,7 +93,8 @@ func TestConvertToIngesterConfig_ProcessingFilter(t *testing.T) {
 }
 
 func TestConvertToIngesterConfig_ProcessingFilterOnly(t *testing.T) {
-	// Test that only spec.processing.filter is supported
+	// Test that spec.processing.filter takes precedence over spec.filters
+	// Legacy spec.filters is supported as fallback when processing.filter is not present
 	u := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"metadata": map[string]interface{}{
@@ -97,6 +104,12 @@ func TestConvertToIngesterConfig_ProcessingFilterOnly(t *testing.T) {
 			"spec": map[string]interface{}{
 				"source":   "test-source",
 				"ingester": "informer",
+				"destinations": []interface{}{
+					map[string]interface{}{
+						"type":  "crd",
+						"value": "observations",
+					},
+				},
 				"filters": map[string]interface{}{
 					"expression":  "severity = CRITICAL",
 					"minPriority": 0.7,
@@ -112,9 +125,13 @@ func TestConvertToIngesterConfig_ProcessingFilterOnly(t *testing.T) {
 		t.Fatal("Expected non-nil config")
 	}
 
-	// Verify filter config is NOT loaded from spec.filters (only processing.filter is supported)
-	if config.Filter != nil {
-		t.Fatal("Filter config should not be loaded from spec.filters (only spec.processing.filter is supported)")
+	// Legacy spec.filters is supported as fallback when processing.filter is not present
+	// This test verifies that legacy location works when canonical location is absent
+	if config.Filter == nil {
+		t.Fatal("Filter config should be loaded from spec.filters when spec.processing.filter is not present (legacy fallback)")
+	}
+	if config.Filter.Expression != "severity = CRITICAL" {
+		t.Errorf("Expected expression 'severity = CRITICAL', got '%s'", config.Filter.Expression)
 	}
 }
 
@@ -129,6 +146,12 @@ func TestConvertToIngesterConfig_ProcessingFilterCanonical(t *testing.T) {
 			"spec": map[string]interface{}{
 				"source":   "test-source",
 				"ingester": "informer",
+				"destinations": []interface{}{
+					map[string]interface{}{
+						"type":  "crd",
+						"value": "observations",
+					},
+				},
 				"processing": map[string]interface{}{
 					"filter": map[string]interface{}{
 						"expression": "severity >= HIGH", // Canonical location

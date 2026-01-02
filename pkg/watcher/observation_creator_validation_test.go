@@ -16,19 +16,86 @@ package watcher
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"testing"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 )
 
+// setupTestEnvWithNameGeneration creates a fake client with generateName support
+func setupTestEnvWithNameGeneration(t *testing.T) dynamic.Interface {
+	t.Helper()
+	scheme := runtime.NewScheme()
+	observationGVR := schema.GroupVersionResource{
+		Group:    "zen.kube-zen.io",
+		Version:  "v1",
+		Resource: "observations",
+	}
+	client := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{
+		observationGVR: "ObservationList",
+	})
+	return &nameGeneratingClient{Interface: client, t: t}
+}
+
+type nameGeneratingClient struct {
+	dynamic.Interface
+	t *testing.T
+}
+
+func (c *nameGeneratingClient) Resource(resource schema.GroupVersionResource) dynamic.NamespaceableResourceInterface {
+	return &nameGeneratingResource{NamespaceableResourceInterface: c.Interface.Resource(resource), t: c.t}
+}
+
+type nameGeneratingResource struct {
+	dynamic.NamespaceableResourceInterface
+	t *testing.T
+}
+
+func (r *nameGeneratingResource) Create(ctx context.Context, obj *unstructured.Unstructured, options metav1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	generateName, hasGenerateName, _ := unstructured.NestedString(obj.Object, "metadata", "generateName")
+	name, hasName, _ := unstructured.NestedString(obj.Object, "metadata", "name")
+	if hasGenerateName && generateName != "" && (!hasName || name == "") {
+		randomBytes := make([]byte, 8)
+		if _, err := rand.Read(randomBytes); err == nil {
+			name = generateName + hex.EncodeToString(randomBytes)
+			_ = unstructured.SetNestedField(obj.Object, name, "metadata", "name")
+		}
+	}
+	return r.NamespaceableResourceInterface.Create(ctx, obj, options, subresources...)
+}
+
+func (r *nameGeneratingResource) Namespace(namespace string) dynamic.ResourceInterface {
+	return &nameGeneratingNamespacedResource{ResourceInterface: r.NamespaceableResourceInterface.Namespace(namespace), t: r.t}
+}
+
+type nameGeneratingNamespacedResource struct {
+	dynamic.ResourceInterface
+	t *testing.T
+}
+
+func (r *nameGeneratingNamespacedResource) Create(ctx context.Context, obj *unstructured.Unstructured, options metav1.CreateOptions, subresources ...string) (*unstructured.Unstructured, error) {
+	generateName, hasGenerateName, _ := unstructured.NestedString(obj.Object, "metadata", "generateName")
+	name, hasName, _ := unstructured.NestedString(obj.Object, "metadata", "name")
+	if hasGenerateName && generateName != "" && (!hasName || name == "") {
+		randomBytes := make([]byte, 8)
+		if _, err := rand.Read(randomBytes); err == nil {
+			name = generateName + hex.EncodeToString(randomBytes)
+			_ = unstructured.SetNestedField(obj.Object, name, "metadata", "name")
+		}
+	}
+	return r.ResourceInterface.Create(ctx, obj, options, subresources...)
+}
+
 // TestObservationCreator_ValidEnumValues tests that valid enum values are accepted
 func TestObservationCreator_ValidEnumValues(t *testing.T) {
-	scheme := runtime.NewScheme()
-	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme)
+	// Use improved fake client with generateName support
+	dynamicClient := setupTestEnvWithNameGeneration(t)
 
 	observationGVR := schema.GroupVersionResource{
 		Group:    "zen.kube-zen.io",
@@ -90,8 +157,8 @@ func TestObservationCreator_ValidEnumValues(t *testing.T) {
 
 // TestObservationCreator_ValidTTLRange tests that TTL values within valid range are accepted
 func TestObservationCreator_ValidTTLRange(t *testing.T) {
-	scheme := runtime.NewScheme()
-	dynamicClient := dynamicfake.NewSimpleDynamicClient(scheme)
+	// Use improved fake client with generateName support
+	dynamicClient := setupTestEnvWithNameGeneration(t)
 
 	observationGVR := schema.GroupVersionResource{
 		Group:    "zen.kube-zen.io",

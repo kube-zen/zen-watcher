@@ -20,10 +20,10 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
-	sdkdedup "github.com/kube-zen/zen-sdk/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/processor"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
+	"github.com/kube-zen/zen-watcher/test/helpers"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 )
@@ -51,7 +51,7 @@ func TestPipelineIntegration_FullFlow_FilterFirst(t *testing.T) {
 		},
 	}
 	f := filter.NewFilter(filterConfig)
-	deduper := sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+	deduper := helpers.NewTestDeduperWithDefaults(t)
 	creator := watcher.NewObservationCreator(
 		dynamicClient,
 		observationGVR,
@@ -144,7 +144,7 @@ func TestPipelineIntegration_FullFlow_DedupFirst(t *testing.T) {
 		Resource: "observations",
 	}
 
-	deduper := sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+	deduper := helpers.NewTestDeduperWithDefaults(t)
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
 	creator := watcher.NewObservationCreator(
@@ -240,7 +240,7 @@ func TestPipelineIntegration_FullFlow_FilterAndDedup(t *testing.T) {
 		},
 	}
 	f := filter.NewFilter(filterConfig)
-	deduper := sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+	deduper := helpers.NewTestDeduperWithDefaults(t)
 
 	observationGVR := schema.GroupVersionResource{
 		Group:    "zen.kube-zen.io",

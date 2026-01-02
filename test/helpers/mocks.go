@@ -49,4 +49,3 @@ func CreateTestRawEventWithData(source string, data map[string]interface{}) *gen
 		Metadata:  make(map[string]interface{}),
 	}
 }
-
