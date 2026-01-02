@@ -206,7 +206,7 @@ func (s *Server) registerHandlers(mux *http.ServeMux) {
 func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 	// Log webhook request received (before any processing)
 	logger := sdklog.NewLogger("zen-watcher-server")
-	logger.InfoC(r.Context(), "Falco webhook request received",
+	logger.Info("Falco webhook request received",
 		sdklog.Operation("falco_webhook"),
 		sdklog.String("source", "falco"),
 		sdklog.String("method", r.Method),
@@ -215,7 +215,7 @@ func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.WarnC(r.Context(), "Falco webhook rejected: invalid method",
+		logger.Warn("Falco webhook rejected: invalid method",
 			sdklog.Operation("falco_webhook"),
 			sdklog.String("source", "falco"),
 			sdklog.String("reason", "invalid_method"),
@@ -228,7 +228,7 @@ func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 	var alert map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&alert); err != nil {
 		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.WarnC(r.Context(), "Failed to parse Falco alert",
+		logger.Warn("Failed to parse Falco alert",
 			sdklog.Operation("falco_webhook"),
 			sdklog.String("source", "falco"),
 			sdklog.String("reason", "parse_error"),
@@ -244,7 +244,7 @@ func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 	select {
 	case s.falcoAlertsChan <- alert:
 		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.InfoC(r.Context(), "Falco webhook received and queued for processing",
+		logger.Info("Falco webhook received and queued for processing",
 			sdklog.Operation("falco_webhook"),
 			sdklog.String("source", "falco"),
 			sdklog.String("rule", rule),
@@ -253,14 +253,14 @@ func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
 			logger := sdklog.NewLogger("zen-watcher-server")
-			logger.WarnC(r.Context(), "Failed to write response",
+			logger.Warn("Failed to write response",
 				sdklog.Operation("falco_webhook"),
 				sdklog.String("source", "falco"),
 				sdklog.Error(err))
 		}
 	default:
 		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.ErrorC(r.Context(), fmt.Errorf("channel buffer full"), "Falco alerts channel full, dropping alert",
+		logger.Error(fmt.Errorf("channel buffer full"), "Falco alerts channel full, dropping alert",
 			sdklog.Operation("falco_webhook"),
 			sdklog.String("source", "falco"),
 			sdklog.String("reason", "channel_buffer_full"),
@@ -278,7 +278,7 @@ func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
 	// Log webhook request received (before any processing)
 	logger := sdklog.NewLogger("zen-watcher-server")
-	logger.InfoC(r.Context(), "Audit webhook request received",
+	logger.Info("Audit webhook request received",
 		sdklog.Operation("audit_webhook"),
 		sdklog.String("source", "audit"),
 		sdklog.String("method", r.Method),
@@ -287,7 +287,7 @@ func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.WarnC(r.Context(), "Audit webhook rejected: invalid method",
+		logger.Warn("Audit webhook rejected: invalid method",
 			sdklog.Operation("audit_webhook"),
 			sdklog.String("source", "audit"),
 			sdklog.String("reason", "invalid_method"),
@@ -300,7 +300,7 @@ func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
 	var auditEvent map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&auditEvent); err != nil {
 		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.WarnC(r.Context(), "Failed to parse audit event",
+		logger.Warn("Failed to parse audit event",
 			sdklog.Operation("audit_webhook"),
 			sdklog.String("source", "audit"),
 			sdklog.String("reason", "parse_error"),
@@ -314,18 +314,12 @@ func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
 	verb := fmt.Sprintf("%v", auditEvent["verb"])
 	objectRef, _ := auditEvent["objectRef"].(map[string]interface{})
 	resource := fmt.Sprintf("%v", objectRef["resource"])
-	correlationID := sdklog.GetRequestID(r.Context())
-	if correlationID == "" {
-		correlationID = fmt.Sprintf("audit-%s", auditID)
-		ctx := sdklog.WithRequestID(r.Context(), correlationID)
-		r = r.WithContext(ctx)
-	}
 
 	// Send to channel for processing (non-blocking)
 	select {
 	case s.auditEventsChan <- auditEvent:
 		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.InfoC(r.Context(), "Audit webhook received and queued for processing",
+		logger.Info("Audit webhook received and queued for processing",
 			sdklog.Operation("audit_webhook"),
 			sdklog.String("source", "audit"),
 			sdklog.String("audit_id", auditID),
@@ -336,14 +330,14 @@ func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
 			logger := sdklog.NewLogger("zen-watcher-server")
-			logger.WarnC(r.Context(), "Failed to write response",
+			logger.Warn("Failed to write response",
 				sdklog.Operation("audit_webhook"),
 				sdklog.String("source", "audit"),
 				sdklog.Error(err))
 		}
 	default:
 		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.ErrorC(r.Context(), fmt.Errorf("channel buffer full"), "Audit events channel full, dropping event",
+		logger.Error(fmt.Errorf("channel buffer full"), "Audit events channel full, dropping event",
 			sdklog.Operation("audit_webhook"),
 			sdklog.String("source", "audit"),
 			sdklog.String("reason", "channel_buffer_full"),

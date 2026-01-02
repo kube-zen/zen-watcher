@@ -76,7 +76,7 @@ func NewConfigMapLoader(
 // Start starts watching the ConfigMap for changes
 func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 	logger := sdklog.NewLogger("zen-watcher-config")
-	logger.InfoC(ctx, "Starting ConfigMap watcher for filter config",
+	logger.Info("Starting ConfigMap watcher for filter config",
 		sdklog.Operation("configmap_watcher_start"),
 		sdklog.String("namespace", cml.configMapNamespace),
 		sdklog.String("configmap_name", cml.configMapName))
@@ -84,7 +84,7 @@ func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 	// Load initial config (use context to respect cancellation)
 	initialConfig, err := cml.loadConfigWithContext(ctx)
 	if err != nil {
-		logger.WarnC(ctx, "Failed to load initial filter config, will retry on ConfigMap creation",
+		logger.Warn("Failed to load initial filter config, will retry on ConfigMap creation",
 			sdklog.Operation("configmap_load_initial"),
 			sdklog.String("namespace", cml.configMapNamespace),
 			sdklog.Error(err))
@@ -92,7 +92,7 @@ func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 	} else {
 		cml.updateFilter(initialConfig)
 		cml.setLastGoodConfig(initialConfig)
-		logger.InfoC(ctx, "Loaded initial filter configuration from ConfigMap",
+		logger.Info("Loaded initial filter configuration from ConfigMap",
 			sdklog.Operation("configmap_load_initial"),
 			sdklog.String("namespace", cml.configMapNamespace),
 			sdklog.String("configmap_name", cml.configMapName))
@@ -170,7 +170,7 @@ func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to sync ConfigMap informer cache")
 	}
 
-	logger.InfoC(ctx, "ConfigMap watcher started and synced",
+	logger.Info("ConfigMap watcher started and synced",
 		sdklog.Operation("configmap_watcher_synced"),
 		sdklog.String("namespace", cml.configMapNamespace),
 		sdklog.String("configmap_name", cml.configMapName))
