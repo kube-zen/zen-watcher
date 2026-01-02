@@ -21,9 +21,15 @@ import (
 	"time"
 
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+	sdkfilter "github.com/kube-zen/zen-sdk/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
+
+// Type aliases for compatibility
+type FilterConfig = sdkfilter.FilterConfig
+type SourceFilter = sdkfilter.SourceFilter
+type GlobalNamespaceFilter = sdkfilter.GlobalNamespaceFilter
 
 // Package-level logger to avoid repeated allocations
 var (
