@@ -211,12 +211,12 @@ func (a *LogsAdapter) streamPodLogs(ctx context.Context, pod corev1.Pod, config 
 
 		// Match against all patterns
 		for _, pattern := range patterns {
-		matches := pattern.Regex.FindStringSubmatch(line)
-		if matches != nil {
-			// Extract named groups
-			// Optimized: pre-allocate map with estimated capacity (typically 2-5 groups)
-			namedGroups := make(map[string]string, 4)
-			for i, name := range pattern.Regex.SubexpNames() {
+			matches := pattern.Regex.FindStringSubmatch(line)
+			if matches != nil {
+				// Extract named groups
+				// Optimized: pre-allocate map with estimated capacity (typically 2-5 groups)
+				namedGroups := make(map[string]string, 4)
+				for i, name := range pattern.Regex.SubexpNames() {
 					if i > 0 && name != "" && i < len(matches) {
 						namedGroups[name] = matches[i]
 					}

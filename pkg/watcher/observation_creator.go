@@ -45,35 +45,34 @@ var (
 // Flow: filter() → normalize() → dedup() → create resource (any GVR) + update metrics + log
 // Note: Named "ObservationCreator" for backward compatibility, but it creates any resource type based on destination GVR
 type ObservationCreator struct {
-	dynClient                dynamic.Interface
-	eventGVR                 schema.GroupVersionResource                     // Default GVR (for backward compatibility)
-	gvrResolver              func(source string) schema.GroupVersionResource // Optional: Resolve GVR from source
-	eventsTotal              *prometheus.CounterVec
-	observationsCreated      *prometheus.CounterVec
-	observationsFiltered     *prometheus.CounterVec
-	observationsDeduped      prometheus.Counter
-	observationsCreateErrors *prometheus.CounterVec
-	deduper                  *sdkdedup.Deduper
-	filter                   *filter.Filter
-	// Optimization metrics (optional)
+	dynClient   dynamic.Interface
+	eventGVR    schema.GroupVersionResource                     // Default GVR (for backward compatibility)
+	gvrResolver func(source string) schema.GroupVersionResource // Optional: Resolve GVR from source
+
+	// Metrics tracking
+	metrics *MetricsTracker
+
+	// Processing components
+	deduper *sdkdedup.Deduper
+	filter  *filter.Filter
+
+	// Optimization components (optional)
 	optimizationMetrics *OptimizationMetrics
-	// Source config loader (optional, for dynamic processing order)
-	sourceConfigLoader interface {
-		GetSourceConfig(source string) *generic.SourceConfig
-	}
-	// Current processing order per source (for logging changes)
-	currentOrder map[string]ProcessingOrder
-	orderMu      sync.RWMutex
-	// SmartProcessor for per-source optimization (optional)
-	smartProcessor *optimization.SmartProcessor
-	// System metrics tracker for HA coordination (optional)
-	systemMetrics interface {
+	smartProcessor     *optimization.SmartProcessor
+	systemMetrics      interface {
 		RecordEvent()
 		SetQueueDepth(int)
 	}
-	// Field extractor for optimized field access (Phase 2 optimization)
-	fieldExtractor *FieldExtractor
-	// Metrics for destination delivery tracking
+
+	// Configuration
+	sourceConfigLoader interface {
+		GetSourceConfig(source string) *generic.SourceConfig
+	}
+	currentOrder map[string]ProcessingOrder
+	orderMu      sync.RWMutex
+
+	// Utilities
+	fieldExtractor    *FieldExtractor
 	destinationMetrics *metrics.Metrics
 }
 
@@ -173,19 +172,15 @@ func NewObservationCreatorWithOptimization(
 		}
 	}
 	return &ObservationCreator{
-		dynClient:                dynClient,
-		eventGVR:                 eventGVR,
-		eventsTotal:              eventsTotal,
-		observationsCreated:      observationsCreated,
-		observationsFiltered:     observationsFiltered,
-		observationsDeduped:      observationsDeduped,
-		observationsCreateErrors: observationsCreateErrors,
-		deduper:                  sdkdedup.NewDeduper(windowSeconds, maxSize),
-		filter:                   filter,
-		optimizationMetrics:      optimizationMetrics,
-		currentOrder:             make(map[string]ProcessingOrder),
-		smartProcessor:           optimization.NewSmartProcessor(), // Created here, can be shared with optimizer
-		fieldExtractor:           NewFieldExtractor(),
+		dynClient:   dynClient,
+		eventGVR:    eventGVR,
+		metrics:     NewMetricsTracker(eventsTotal, observationsCreated, observationsFiltered, observationsDeduped, observationsCreateErrors),
+		deduper:     sdkdedup.NewDeduper(windowSeconds, maxSize),
+		filter:      filter,
+		optimizationMetrics: optimizationMetrics,
+		currentOrder: make(map[string]ProcessingOrder),
+		smartProcessor: optimization.NewSmartProcessor(), // Created here, can be shared with optimizer
+		fieldExtractor: NewFieldExtractor(),
 	}
 }
 
@@ -440,9 +435,9 @@ func (oc *ObservationCreator) extractMetricsFields(observation *unstructured.Uns
 // handleCreationError handles observation creation errors
 func (oc *ObservationCreator) handleCreationError(err error, source, resource string, deliveryDuration time.Duration) {
 	// Track creation errors
-	if oc.observationsCreateErrors != nil {
+	if oc.metrics != nil && oc.metrics.ObservationsCreateErrors != nil {
 		errorType := classifyError(err)
-		oc.observationsCreateErrors.WithLabelValues(source, errorType).Inc()
+		oc.metrics.ObservationsCreateErrors.WithLabelValues(source, errorType).Inc()
 	}
 	// Track destination delivery failure
 	if oc.destinationMetrics != nil {
@@ -454,8 +449,8 @@ func (oc *ObservationCreator) handleCreationError(err error, source, resource st
 // updateMetricsAfterCreation updates all metrics after successful observation creation
 func (oc *ObservationCreator) updateMetricsAfterCreation(observation *unstructured.Unstructured, source, category, severity, eventType, namespace string, createdObservation *unstructured.Unstructured, logger *sdklog.Logger) {
 	// Increment observations created metric
-	if oc.observationsCreated != nil {
-		oc.observationsCreated.WithLabelValues(source).Inc()
+	if oc.metrics != nil && oc.metrics.ObservationsCreated != nil {
+		oc.metrics.ObservationsCreated.WithLabelValues(source).Inc()
 	}
 
 	// Track event for HA metrics
@@ -475,7 +470,7 @@ func (oc *ObservationCreator) updateMetricsAfterCreation(observation *unstructur
 
 // updateEventsTotalMetric updates the eventsTotal metric
 func (oc *ObservationCreator) updateEventsTotalMetric(observation *unstructured.Unstructured, source, category, severity, eventType, namespace string, createdObservation *unstructured.Unstructured, logger *sdklog.Logger) {
-	if oc.eventsTotal == nil {
+	if oc.metrics == nil || oc.metrics.EventsTotal == nil {
 		logger := sdklog.NewLogger("zen-watcher")
 		logger.Error(fmt.Errorf("eventsTotal metric is nil"), "eventsTotal metric is nil, metrics will not be incremented",
 			sdklog.Operation("observation_create"),
@@ -500,7 +495,7 @@ func (oc *ObservationCreator) updateEventsTotalMetric(observation *unstructured.
 	// Get processing strategy for this source
 	strategy := oc.getProcessingStrategy(source)
 
-	oc.eventsTotal.WithLabelValues(source, category, severity, eventType, resourceNamespace, resourceKind, strategy).Inc()
+	oc.metrics.EventsTotal.WithLabelValues(source, category, severity, eventType, resourceNamespace, resourceKind, strategy).Inc()
 	logger.Debug("Metric incremented after observation creation",
 		sdklog.Operation("observation_create"),
 		sdklog.String("source", source),
@@ -521,7 +516,7 @@ func (oc *ObservationCreator) extractResourceInfo(observation *unstructured.Unst
 	if resourceVal != nil {
 		if ns, ok := resourceVal["namespace"].(string); ok && ns != "" {
 			resourceNamespace = ns
-		} else if ns, ok := resourceVal["namespace"].(interface{}); ok {
+		} else if ns := resourceVal["namespace"]; ns != nil {
 			resourceNamespace = fmt.Sprintf("%v", ns)
 		}
 		if k, ok := resourceVal["kind"].(string); ok && k != "" {

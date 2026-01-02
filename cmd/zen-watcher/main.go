@@ -361,8 +361,7 @@ func startAllServices(ctx context.Context, wg *sync.WaitGroup, configManager *co
 	adapterLauncher := watcher.NewAdapterLauncher(adapters, observationCreator)
 
 	// Create worker pool
-	var workerPool *dispatcher.WorkerPool
-	workerPool = dispatcher.NewWorkerPool(5, 10)
+	workerPool := dispatcher.NewWorkerPool(5, 10)
 
 	// Register config change handler
 	configManager.OnConfigChange(func(newConfig map[string]interface{}) {
@@ -752,6 +751,8 @@ func getInt(config map[string]interface{}, key string, defaultValue int) int {
 	return defaultValue
 }
 
+// getDuration parses a duration from config map
+// nolint:unused // Kept for future use
 func getDuration(config map[string]interface{}, key string, defaultValue time.Duration) time.Duration {
 	if strValue, ok := config[key].(string); ok {
 		if duration, err := time.ParseDuration(strValue); err == nil {

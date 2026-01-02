@@ -60,6 +60,10 @@ issues:
     - path: zz_generated\.deepcopy\.go
       linters:
         - all
+    
+    # Note: fmt.Print* should not be used in production code
+    # Use structured logging (zen-sdk/pkg/logging) instead
+    # This is enforced via CI checks, not linter rules
 
 output:
   formats:

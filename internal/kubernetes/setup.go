@@ -17,9 +17,9 @@ package kubernetes
 import (
 	"time"
 
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-watcher/internal/informers"
 	"github.com/kube-zen/zen-watcher/pkg/config"
-	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"

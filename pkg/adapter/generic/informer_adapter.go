@@ -20,8 +20,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/internal/informers"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+	"github.com/kube-zen/zen-watcher/internal/informers"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
@@ -32,9 +32,9 @@ import (
 // Can watch any Kubernetes resource including ConfigMaps, CRDs, Pods, etc.
 type InformerAdapter struct {
 	manager *informers.Manager
-	stopCh chan struct{}
-	queue  workqueue.RateLimitingInterface //nolint:staticcheck // Internal queue for backpressure (deprecated API but still functional, migration to TypedRateLimitingInterface requires refactoring)
-	mu     sync.Mutex
+	stopCh  chan struct{}
+	queue   workqueue.TypedRateLimitingInterface[*RawEvent] // Internal queue for backpressure (future use)
+	mu      sync.Mutex
 }
 
 // NewInformerAdapterWithManager creates a new informer adapter using the informer manager
@@ -205,16 +205,8 @@ func (a *InformerAdapter) processQueue(ctx context.Context, events chan<- RawEve
 				return
 			}
 
-			// Process the event
-			event, ok := item.(RawEvent)
-			if !ok {
-			logger := sdklog.NewLogger("zen-watcher-adapter")
-			logger.Warn("Unexpected item type in queue",
-				sdklog.Operation("process_queue"),
-				sdklog.String("source", source))
-				a.queue.Done(item)
-				continue
-			}
+			// Process the event (no type assertion needed with TypedRateLimitingInterface)
+			event := *item
 
 			// Emit to channel (with context cancellation check)
 			select {

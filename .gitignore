@@ -42,6 +42,13 @@ dist/
 .env
 .env.local
 
+# Security: Never commit credentials or tokens
+**/dockerhub*.txt
+**/*credential*.txt
+**/*token*.txt
+**/*password*.txt
+**/*secret*.txt
+
 # GitHub CI/CD (disabled - using .github.disabled instead)
 .github/
 

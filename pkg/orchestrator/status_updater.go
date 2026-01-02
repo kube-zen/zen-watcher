@@ -226,8 +226,7 @@ func (isu *IngesterStatusUpdater) UpdateStatus(ctx context.Context, namespace, n
 		return fmt.Errorf("failed to update Ingester status: %w", err)
 	}
 
-	logger := sdklog.NewLogger("zen-watcher-orchestrator")
-	logger.Debug("Updated Ingester status",
+	orchestratorLogger.Debug("Updated Ingester status",
 		sdklog.Operation("update_status"),
 		sdklog.String("namespace", namespace),
 		sdklog.String("name", name),

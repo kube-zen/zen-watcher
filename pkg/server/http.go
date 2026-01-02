@@ -141,13 +141,45 @@ func (s *Server) isPprofEnabled() bool {
 
 // registerHandlers registers all HTTP handlers
 func (s *Server) registerHandlers(mux *http.ServeMux) {
-	// Health check endpoint
+	// Health check endpoint (Kubernetes standard: /healthz)
+	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"status":    "alive",
+			"service":   "zen-watcher",
+			"timestamp": time.Now().UTC().Format(time.RFC3339),
+		})
+	})
+
+	// Legacy /health endpoint (kept for backward compatibility)
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, "healthy")
 	})
 
-	// Readiness probe endpoint
+	// Readiness probe endpoint (Kubernetes standard: /readyz)
+	mux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		s.readyMu.RLock()
+		ready := s.ready
+		s.readyMu.RUnlock()
+
+		if ready {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"status": "ready",
+			})
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"status": "not_ready",
+			})
+		}
+	})
+
+	// Legacy /ready endpoint (kept for backward compatibility)
 	mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
 		s.readyMu.RLock()
 		ready := s.ready

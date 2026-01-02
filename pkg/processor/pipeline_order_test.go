@@ -45,23 +45,27 @@ func (m *mockFilter) AllowWithReason(obs *unstructured.Unstructured) (bool, stri
 }
 
 // mockDeduper tracks when it's called
+// nolint:unused // Kept for future use
 type mockDeduper struct {
 	called       bool
 	callOrder    int
 	shouldCreate bool
 }
 
+// nolint:unused // Kept for future use
 func (m *mockDeduper) ShouldCreateWithContent(key string, content map[string]interface{}) bool {
 	m.called = true
 	return m.shouldCreate
 }
 
 // mockNormalizer tracks when it's called
+// nolint:unused // Kept for future use
 type mockNormalizer struct {
 	called    bool
 	callOrder int
 }
 
+// nolint:unused // Kept for future use
 func (m *mockNormalizer) Normalize(obs *unstructured.Unstructured) *unstructured.Unstructured {
 	m.called = true
 	return obs

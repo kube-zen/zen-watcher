@@ -23,6 +23,9 @@ import (
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 )
 
+// Package-level logger shared with pipeline.go (same package)
+// processorLogger is defined in pipeline.go
+
 // EventBatch represents a batch of events from the same source
 type EventBatch struct {
 	Source    string
@@ -190,8 +193,7 @@ func (bp *BatchProcessor) processBatch(ctx context.Context, source string, batch
 	// but batching reduces channel overhead and allows better scheduling
 	for _, event := range events {
 		if err := bp.processor.ProcessEvent(ctx, event, config); err != nil {
-			logger := sdklog.NewLogger("zen-watcher-processor")
-			logger.Warn("Batch event processing failed",
+			processorLogger.Warn("Batch event processing failed",
 				sdklog.Operation("batch_event_process"),
 				sdklog.String("source", source),
 				sdklog.Error(err))
@@ -199,8 +201,7 @@ func (bp *BatchProcessor) processBatch(ctx context.Context, source string, batch
 		}
 	}
 
-	logger := sdklog.NewLogger("zen-watcher-processor")
-	logger.Debug("Processed event batch",
+	processorLogger.Debug("Processed event batch",
 		sdklog.Operation("batch_processed"),
 		sdklog.String("source", source),
 		sdklog.Int("batch_size", len(events)))

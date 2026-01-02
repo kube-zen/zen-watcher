@@ -32,6 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// Package-level logger to avoid repeated allocations in hot paths
+var processorLogger = sdklog.NewLogger("zen-watcher-processor")
+
 // Processor processes RawEvents through the pipeline
 type Processor struct {
 	genericThresholdMonitor *monitoring.GenericThresholdMonitor
@@ -384,8 +387,7 @@ func (p *Processor) applyFilterAndDedup(observation *unstructured.Unstructured, 
 func (p *Processor) applyFilter(observation *unstructured.Unstructured, raw *generic.RawEvent) bool {
 	allowed, reason := p.filter.AllowWithReason(observation)
 	if !allowed {
-		logger := sdklog.NewLogger("zen-watcher-processor")
-		logger.Debug("Event filtered",
+		processorLogger.Debug("Event filtered",
 			sdklog.Operation("filter"),
 			sdklog.String("source", raw.Source),
 			sdklog.String("reason", reason))
@@ -399,8 +401,7 @@ func (p *Processor) applyDedup(observation *unstructured.Unstructured, raw *gene
 	dedupKey := p.extractDedupKey(observation, raw)
 	shouldCreate := p.shouldCreateWithStrategy(dedupKey, observation.Object, config)
 	if !shouldCreate {
-		logger := sdklog.NewLogger("zen-watcher-processor")
-		logger.Debug("Event deduplicated",
+		processorLogger.Debug("Event deduplicated",
 			sdklog.Operation("dedup"),
 			sdklog.String("source", raw.Source))
 		return true
