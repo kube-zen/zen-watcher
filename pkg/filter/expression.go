@@ -149,101 +149,12 @@ func (ef *ExpressionFilter) evaluateComparison(node *ASTNode, obs *unstructured.
 		return false, err
 	}
 
-	switch node.Operator {
-	case "=":
-		return ef.compareEqual(leftVal, rightVal), nil
-	case "!=":
-		return !ef.compareEqual(leftVal, rightVal), nil
-	case ">":
-		return ef.compareGreater(leftVal, rightVal), nil
-	case ">=":
-		eq := ef.compareEqual(leftVal, rightVal)
-		gt := ef.compareGreater(leftVal, rightVal)
-		return eq || gt, nil
-	case "<":
-		return ef.compareGreater(rightVal, leftVal), nil
-	case "<=":
-		eq := ef.compareEqual(leftVal, rightVal)
-		gt := ef.compareGreater(rightVal, leftVal)
-		return eq || gt, nil
-	case "IN":
-		return ef.compareIn(leftVal, rightVal), nil
-	case "NOT IN":
-		return !ef.compareIn(leftVal, rightVal), nil
-	case "CONTAINS":
-		return ef.compareContains(leftVal, rightVal), nil
-	case "STARTS_WITH":
-		return ef.compareStartsWith(leftVal, rightVal), nil
-	case "ENDS_WITH":
-		return ef.compareEndsWith(leftVal, rightVal), nil
-	case "EXISTS":
-		return leftVal != nil, nil
-	case "NOT EXISTS":
-		return leftVal == nil, nil
-	default:
-		return false, fmt.Errorf("unknown comparison operator: %s", node.Operator)
-	}
+	return ef.evaluateComparisonOperator(node.Operator, leftVal, rightVal)
 }
 
 // evaluateLogical evaluates a logical operation (AND, OR, NOT)
 func (ef *ExpressionFilter) evaluateLogical(node *ASTNode, obs *unstructured.Unstructured) (bool, error) {
-	switch node.Operator {
-	case "AND":
-		if node.Left == nil || node.Right == nil {
-			return false, fmt.Errorf("AND requires left and right operands")
-		}
-		leftVal, err := ef.evaluateNode(node.Left, obs)
-		if err != nil {
-			return false, err
-		}
-		if leftBool, ok := leftVal.(bool); ok && !leftBool {
-			return false, nil // Short-circuit
-		}
-		rightVal, err := ef.evaluateNode(node.Right, obs)
-		if err != nil {
-			return false, err
-		}
-		if rightBool, ok := rightVal.(bool); ok {
-			return rightBool, nil
-		}
-		return false, fmt.Errorf("logical operation requires boolean operands")
-
-	case "OR":
-		if node.Left == nil || node.Right == nil {
-			return false, fmt.Errorf("OR requires left and right operands")
-		}
-		leftVal, err := ef.evaluateNode(node.Left, obs)
-		if err != nil {
-			return false, err
-		}
-		if leftBool, ok := leftVal.(bool); ok && leftBool {
-			return true, nil // Short-circuit
-		}
-		rightVal, err := ef.evaluateNode(node.Right, obs)
-		if err != nil {
-			return false, err
-		}
-		if rightBool, ok := rightVal.(bool); ok {
-			return rightBool, nil
-		}
-		return false, fmt.Errorf("logical operation requires boolean operands")
-
-	case "NOT":
-		if node.Left == nil {
-			return false, fmt.Errorf("NOT requires left operand")
-		}
-		leftVal, err := ef.evaluateNode(node.Left, obs)
-		if err != nil {
-			return false, err
-		}
-		if leftBool, ok := leftVal.(bool); ok {
-			return !leftBool, nil
-		}
-		return false, fmt.Errorf("NOT requires boolean operand")
-
-	default:
-		return false, fmt.Errorf("unknown logical operator: %s", node.Operator)
-	}
+	return ef.evaluateLogicalOperator(node, obs)
 }
 
 // evaluateMacro evaluates a macro (e.g., is_critical, severity >= HIGH)
@@ -380,4 +291,115 @@ func (ef *ExpressionFilter) compareSeverity(left, right interface{}) int {
 	rightLevel := severityLevels[rightStr]
 
 	return leftLevel - rightLevel
+}
+
+// evaluateComparisonOperator evaluates a comparison operator
+func (ef *ExpressionFilter) evaluateComparisonOperator(op string, leftVal, rightVal interface{}) (bool, error) {
+	switch op {
+	case "=":
+		return ef.compareEqual(leftVal, rightVal), nil
+	case "!=":
+		return !ef.compareEqual(leftVal, rightVal), nil
+	case ">":
+		return ef.compareGreater(leftVal, rightVal), nil
+	case ">=":
+		eq := ef.compareEqual(leftVal, rightVal)
+		gt := ef.compareGreater(leftVal, rightVal)
+		return eq || gt, nil
+	case "<":
+		return ef.compareGreater(rightVal, leftVal), nil
+	case "<=":
+		eq := ef.compareEqual(leftVal, rightVal)
+		gt := ef.compareGreater(rightVal, leftVal)
+		return eq || gt, nil
+	case "IN":
+		return ef.compareIn(leftVal, rightVal), nil
+	case "NOT IN":
+		return !ef.compareIn(leftVal, rightVal), nil
+	case "CONTAINS":
+		return ef.compareContains(leftVal, rightVal), nil
+	case "STARTS_WITH":
+		return ef.compareStartsWith(leftVal, rightVal), nil
+	case "ENDS_WITH":
+		return ef.compareEndsWith(leftVal, rightVal), nil
+	case "EXISTS":
+		return leftVal != nil, nil
+	case "NOT EXISTS":
+		return leftVal == nil, nil
+	default:
+		return false, fmt.Errorf("unknown comparison operator: %s", op)
+	}
+}
+
+// evaluateLogicalOperator evaluates a logical operator
+func (ef *ExpressionFilter) evaluateLogicalOperator(node *ASTNode, obs *unstructured.Unstructured) (bool, error) {
+	switch node.Operator {
+	case "AND":
+		return ef.evaluateAND(node, obs)
+	case "OR":
+		return ef.evaluateOR(node, obs)
+	case "NOT":
+		return ef.evaluateNOT(node, obs)
+	default:
+		return false, fmt.Errorf("unknown logical operator: %s", node.Operator)
+	}
+}
+
+// evaluateAND evaluates AND operation
+func (ef *ExpressionFilter) evaluateAND(node *ASTNode, obs *unstructured.Unstructured) (bool, error) {
+	if node.Left == nil || node.Right == nil {
+		return false, fmt.Errorf("AND requires left and right operands")
+	}
+	leftVal, err := ef.evaluateNode(node.Left, obs)
+	if err != nil {
+		return false, err
+	}
+	if leftBool, ok := leftVal.(bool); ok && !leftBool {
+		return false, nil // Short-circuit
+	}
+	rightVal, err := ef.evaluateNode(node.Right, obs)
+	if err != nil {
+		return false, err
+	}
+	if rightBool, ok := rightVal.(bool); ok {
+		return rightBool, nil
+	}
+	return false, fmt.Errorf("logical operation requires boolean operands")
+}
+
+// evaluateOR evaluates OR operation
+func (ef *ExpressionFilter) evaluateOR(node *ASTNode, obs *unstructured.Unstructured) (bool, error) {
+	if node.Left == nil || node.Right == nil {
+		return false, fmt.Errorf("OR requires left and right operands")
+	}
+	leftVal, err := ef.evaluateNode(node.Left, obs)
+	if err != nil {
+		return false, err
+	}
+	if leftBool, ok := leftVal.(bool); ok && leftBool {
+		return true, nil // Short-circuit
+	}
+	rightVal, err := ef.evaluateNode(node.Right, obs)
+	if err != nil {
+		return false, err
+	}
+	if rightBool, ok := rightVal.(bool); ok {
+		return rightBool, nil
+	}
+	return false, fmt.Errorf("logical operation requires boolean operands")
+}
+
+// evaluateNOT evaluates NOT operation
+func (ef *ExpressionFilter) evaluateNOT(node *ASTNode, obs *unstructured.Unstructured) (bool, error) {
+	if node.Left == nil {
+		return false, fmt.Errorf("NOT requires left operand")
+	}
+	leftVal, err := ef.evaluateNode(node.Left, obs)
+	if err != nil {
+		return false, err
+	}
+	if leftBool, ok := leftVal.(bool); ok {
+		return !leftBool, nil
+	}
+	return false, fmt.Errorf("NOT requires boolean operand")
 }

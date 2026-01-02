@@ -424,3 +424,57 @@ func (gc *Collector) getNamespacesToScan() []string {
 	// Use empty string to list across all namespaces
 	return []string{""} // "" means all namespaces
 }
+
+// processChunk processes a chunk of observations and deletes old ones
+func (gc *Collector) processChunk(ctx context.Context, items []unstructured.Unstructured, cutoffTime time.Time) int {
+	deletedCount := 0
+	for _, obs := range items {
+		shouldDelete, reason := gc.shouldDeleteObservation(obs, cutoffTime)
+		if !shouldDelete {
+			continue
+		}
+
+		// Extract source for metrics
+		source := "unknown"
+		if sourceVal, _, _ := unstructured.NestedFieldCopy(obs.Object, "spec", "source"); sourceVal != nil {
+			source = fmt.Sprintf("%v", sourceVal)
+		}
+
+		// Delete the Observation
+		name := obs.GetName()
+		namespace := obs.GetNamespace()
+		if namespace == "" {
+			namespace = "default"
+		}
+
+		err := gc.dynClient.Resource(gc.eventGVR).Namespace(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+		if err != nil {
+			// Track GC errors
+			if gc.gcErrors != nil {
+				errorType := "delete_failed"
+				errMsg := strings.ToLower(err.Error())
+				if strings.Contains(errMsg, "not found") {
+					errorType = "not_found"
+				} else if strings.Contains(errMsg, "forbidden") {
+					errorType = "forbidden"
+				}
+				gc.gcErrors.WithLabelValues("delete", errorType).Inc()
+			}
+			logger := sdklog.NewLogger("zen-watcher-gc")
+			logger.Warn("Failed to delete Observation",
+				sdklog.Operation("gc_delete"),
+				sdklog.String("namespace", namespace),
+				sdklog.String("resource_name", name),
+				sdklog.String("source", source),
+				sdklog.String("reason", reason),
+				sdklog.Error(err))
+			continue
+		}
+
+		deletedCount++
+		if gc.observationsDeleted != nil {
+			gc.observationsDeleted.WithLabelValues(source, reason).Inc()
+		}
+	}
+	return deletedCount
+}

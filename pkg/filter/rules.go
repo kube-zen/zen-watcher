@@ -197,6 +197,77 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	}
 
 	// Extract fields from observation for filtering
+	fields := f.extractObservationFields(observation)
+
+	// Apply global namespace filtering first (if enabled)
+	if allowed, reason := f.checkGlobalNamespaceFilter(config, fields.namespace, source); !allowed {
+		return false, reason
+	}
+
+	// Apply all source-specific filters
+	if allowed, reason := f.checkSeverityFilter(sourceFilter, fields.severity, source); !allowed {
+		return false, reason
+	}
+	if allowed, reason := f.checkEventTypeFilter(sourceFilter, fields.eventType, source); !allowed {
+		return false, reason
+	}
+	if allowed, reason := f.checkNamespaceFilter(sourceFilter, fields.namespace, source); !allowed {
+		return false, reason
+	}
+	if allowed, reason := f.checkKindFilter(sourceFilter, fields.kind, source); !allowed {
+		return false, reason
+	}
+	if allowed, reason := f.checkCategoryFilter(sourceFilter, fields.category, source); !allowed {
+		return false, reason
+	}
+	if allowed, reason := f.checkRuleFilter(sourceFilter, fields.rule, source); !allowed {
+		return false, reason
+	}
+
+	// All filters passed
+	if f.metrics != nil {
+		f.metrics.FilterDecisions.WithLabelValues(source, "allow", "all_passed").Inc()
+	}
+	return true, ""
+}
+
+// meetsMinSeverity checks if severity meets the minimum requirement
+// Severity levels: CRITICAL > HIGH > MEDIUM > LOW > UNKNOWN
+func (f *Filter) meetsMinSeverity(severity, minSeverity string) bool {
+	severityLevels := map[string]int{
+		"CRITICAL": 5,
+		"HIGH":     4,
+		"MEDIUM":   3,
+		"LOW":      2,
+		"UNKNOWN":  1,
+	}
+
+	severityUpper := strings.ToUpper(severity)
+	minSeverityUpper := strings.ToUpper(minSeverity)
+
+	severityLevel, ok1 := severityLevels[severityUpper]
+	minLevel, ok2 := severityLevels[minSeverityUpper]
+
+	if !ok1 || !ok2 {
+		// Unknown severity - allow by default (conservative)
+		return true
+	}
+
+	return severityLevel >= minLevel
+}
+
+// observationFields holds extracted fields from an observation
+type observationFields struct {
+	severity  string
+	eventType string
+	category  string
+	namespace string
+	kind      string
+	rule      string
+}
+
+// extractObservationFields extracts fields from observation for filtering
+func (f *Filter) extractObservationFields(observation *unstructured.Unstructured) observationFields {
 	severityVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "severity")
 	severity := strings.ToUpper(fmt.Sprintf("%v", severityVal))
 
@@ -221,50 +292,6 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 		namespace = "default"
 	}
 
-	// Apply global namespace filtering first (if enabled)
-	if config.GlobalNamespaceFilter != nil && config.GlobalNamespaceFilter.Enabled {
-		globalFilter := config.GlobalNamespaceFilter
-		// Check excluded namespaces
-		if len(globalFilter.ExcludedNamespaces) > 0 {
-			for _, excluded := range globalFilter.ExcludedNamespaces {
-				if strings.EqualFold(namespace, excluded) {
-					if f.metrics != nil {
-						f.metrics.FilterDecisions.WithLabelValues(source, "filter", "global_exclude_namespace").Inc()
-					}
-					logger := sdklog.NewLogger("zen-watcher-filter")
-					logger.Debug("Namespace excluded by global filter",
-						sdklog.Operation("filter_check"),
-						sdklog.String("source", source),
-						sdklog.String("namespace", namespace),
-						sdklog.String("reason", "global_exclude_namespace"))
-					return false, "global_exclude_namespace"
-				}
-			}
-		}
-		// Check included namespaces (if set, only these are allowed)
-		if len(globalFilter.IncludedNamespaces) > 0 {
-			allowed := false
-			for _, included := range globalFilter.IncludedNamespaces {
-				if strings.EqualFold(namespace, included) {
-					allowed = true
-					break
-				}
-			}
-			if !allowed {
-				if f.metrics != nil {
-					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "global_include_namespace").Inc()
-				}
-				logger := sdklog.NewLogger("zen-watcher-filter")
-				logger.Debug("Namespace not in global include list",
-					sdklog.Operation("filter_check"),
-					sdklog.String("source", source),
-					sdklog.String("namespace", namespace),
-					sdklog.String("reason", "global_include_namespace"))
-				return false, "global_include_namespace"
-			}
-		}
-	}
-
 	// Extract kind from resource
 	kind := ""
 	if resourceVal != nil {
@@ -282,9 +309,66 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 		}
 	}
 
-	// Apply filters
+	return observationFields{
+		severity:  severity,
+		eventType: eventType,
+		category:  category,
+		namespace: namespace,
+		kind:      kind,
+		rule:      rule,
+	}
+}
 
-	// 1. IncludeSeverity filter (takes precedence over MinSeverity if set)
+// checkGlobalNamespaceFilter checks global namespace filter
+func (f *Filter) checkGlobalNamespaceFilter(config *FilterConfig, namespace, source string) (bool, string) {
+	if config.GlobalNamespaceFilter == nil || !config.GlobalNamespaceFilter.Enabled {
+		return true, ""
+	}
+	globalFilter := config.GlobalNamespaceFilter
+	// Check excluded namespaces
+	if len(globalFilter.ExcludedNamespaces) > 0 {
+		for _, excluded := range globalFilter.ExcludedNamespaces {
+			if strings.EqualFold(namespace, excluded) {
+				if f.metrics != nil {
+					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "global_exclude_namespace").Inc()
+				}
+				logger := sdklog.NewLogger("zen-watcher-filter")
+				logger.Debug("Namespace excluded by global filter",
+					sdklog.Operation("filter_check"),
+					sdklog.String("source", source),
+					sdklog.String("namespace", namespace),
+					sdklog.String("reason", "global_exclude_namespace"))
+				return false, "global_exclude_namespace"
+			}
+		}
+	}
+	// Check included namespaces (if set, only these are allowed)
+	if len(globalFilter.IncludedNamespaces) > 0 {
+		allowed := false
+		for _, included := range globalFilter.IncludedNamespaces {
+			if strings.EqualFold(namespace, included) {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			if f.metrics != nil {
+				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "global_include_namespace").Inc()
+			}
+			logger := sdklog.NewLogger("zen-watcher-filter")
+			logger.Debug("Namespace not in global include list",
+				sdklog.Operation("filter_check"),
+				sdklog.String("source", source),
+				sdklog.String("namespace", namespace),
+				sdklog.String("reason", "global_include_namespace"))
+			return false, "global_include_namespace"
+		}
+	}
+	return true, ""
+}
+
+// checkSeverityFilter checks severity filters
+func (f *Filter) checkSeverityFilter(sourceFilter *SourceFilter, severity, source string) (bool, string) {
 	if len(sourceFilter.IncludeSeverity) > 0 {
 		allowed := false
 		for _, included := range sourceFilter.IncludeSeverity {
@@ -307,7 +391,6 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			return false, "include_severity"
 		}
 	} else if sourceFilter.MinSeverity != "" {
-		// MinSeverity filter (only if IncludeSeverity is not set)
 		if !f.meetsMinSeverity(severity, sourceFilter.MinSeverity) {
 			if f.metrics != nil {
 				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "min_severity").Inc()
@@ -322,8 +405,11 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			return false, "min_severity"
 		}
 	}
+	return true, ""
+}
 
-	// 2. EventType filters
+// checkEventTypeFilter checks event type filters
+func (f *Filter) checkEventTypeFilter(sourceFilter *SourceFilter, eventType, source string) (bool, string) {
 	if len(sourceFilter.ExcludeEventTypes) > 0 {
 		for _, excluded := range sourceFilter.ExcludeEventTypes {
 			if strings.EqualFold(eventType, excluded) {
@@ -361,8 +447,11 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			return false, "include_event_type"
 		}
 	}
+	return true, ""
+}
 
-	// 3. Namespace filters
+// checkNamespaceFilter checks namespace filters
+func (f *Filter) checkNamespaceFilter(sourceFilter *SourceFilter, namespace, source string) (bool, string) {
 	if len(sourceFilter.ExcludeNamespaces) > 0 {
 		for _, excluded := range sourceFilter.ExcludeNamespaces {
 			if strings.EqualFold(namespace, excluded) {
@@ -400,8 +489,11 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			return false, "include_namespace"
 		}
 	}
+	return true, ""
+}
 
-	// 4. Kind filters
+// checkKindFilter checks kind filters
+func (f *Filter) checkKindFilter(sourceFilter *SourceFilter, kind, source string) (bool, string) {
 	if len(sourceFilter.ExcludeKinds) > 0 {
 		for _, excluded := range sourceFilter.ExcludeKinds {
 			if strings.EqualFold(kind, excluded) {
@@ -439,20 +531,23 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			return false, "include_kind"
 		}
 	}
+	return true, ""
+}
 
-	// 5. Category filters
+// checkCategoryFilter checks category filters
+func (f *Filter) checkCategoryFilter(sourceFilter *SourceFilter, category, source string) (bool, string) {
 	if len(sourceFilter.ExcludeCategories) > 0 {
 		for _, excluded := range sourceFilter.ExcludeCategories {
 			if strings.EqualFold(category, excluded) {
-			if f.metrics != nil {
-				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_category").Inc()
-			}
-			logger := sdklog.NewLogger("zen-watcher-filter")
-			logger.Debug("Category excluded, filtering out observation",
-				sdklog.Operation("filter_check"),
-				sdklog.String("source", source),
-				sdklog.String("category", category),
-				sdklog.String("reason", "exclude_category"))
+				if f.metrics != nil {
+					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_category").Inc()
+				}
+				logger := sdklog.NewLogger("zen-watcher-filter")
+				logger.Debug("Category excluded, filtering out observation",
+					sdklog.Operation("filter_check"),
+					sdklog.String("source", source),
+					sdklog.String("category", category),
+					sdklog.String("reason", "exclude_category"))
 				return false, "exclude_category"
 			}
 		}
@@ -478,8 +573,11 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			return false, "include_category"
 		}
 	}
+	return true, ""
+}
 
-	// 6. Rule filters (for sources like Kyverno)
+// checkRuleFilter checks rule filters
+func (f *Filter) checkRuleFilter(sourceFilter *SourceFilter, rule, source string) (bool, string) {
 	if len(sourceFilter.ExcludeRules) > 0 && rule != "" {
 		for _, excluded := range sourceFilter.ExcludeRules {
 			if strings.EqualFold(rule, excluded) {
@@ -496,35 +594,5 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			}
 		}
 	}
-
-	// All filters passed
-	if f.metrics != nil {
-		f.metrics.FilterDecisions.WithLabelValues(source, "allow", "all_passed").Inc()
-	}
 	return true, ""
-}
-
-// meetsMinSeverity checks if severity meets the minimum requirement
-// Severity levels: CRITICAL > HIGH > MEDIUM > LOW > UNKNOWN
-func (f *Filter) meetsMinSeverity(severity, minSeverity string) bool {
-	severityLevels := map[string]int{
-		"CRITICAL": 5,
-		"HIGH":     4,
-		"MEDIUM":   3,
-		"LOW":      2,
-		"UNKNOWN":  1,
-	}
-
-	severityUpper := strings.ToUpper(severity)
-	minSeverityUpper := strings.ToUpper(minSeverity)
-
-	severityLevel, ok1 := severityLevels[severityUpper]
-	minLevel, ok2 := severityLevels[minSeverityUpper]
-
-	if !ok1 || !ok2 {
-		// Unknown severity - allow by default (conservative)
-		return true
-	}
-
-	return severityLevel >= minLevel
 }

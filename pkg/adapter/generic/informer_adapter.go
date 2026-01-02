@@ -96,13 +96,38 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 	informer := a.manager.GetInformer(gvr, resyncPeriod)
 
 	// Add event handlers
-	_, err := informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, err := informer.AddEventHandler(a.createEventHandlers(ctx, events, config.Source, gvr))
+	if err != nil {
+		return nil, fmt.Errorf("failed to add event handlers: %w", err)
+	}
+
+	// Start informer manager
+	a.manager.Start(ctx)
+	// Wait for cache sync via manager
+	if err := a.manager.WaitForCacheSync(ctx); err != nil {
+		return nil, fmt.Errorf("failed to sync informer cache for %s: %w", gvr.String(), err)
+	}
+
+	logger := sdklog.NewLogger("zen-watcher-adapter")
+	logger.Info("Informer adapter started",
+		sdklog.Operation("informer_start"),
+		sdklog.String("source", config.Source),
+		sdklog.String("gvr", gvr.String()),
+		sdklog.String("namespace", config.Informer.Namespace),
+		sdklog.Duration("resync_period", resyncPeriod))
+
+	return events, nil
+}
+
+// createEventHandlers creates event handlers for the informer
+func (a *InformerAdapter) createEventHandlers(ctx context.Context, events chan<- RawEvent, source string, gvr schema.GroupVersionResource) cache.ResourceEventHandlerFuncs {
+	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			u := obj.(*unstructured.Unstructured)
 			event := RawEvent{
-				Source:    config.Source,
+				Source:    source,
 				Timestamp: time.Now(),
-				RawData:   u.Object, // ALL data preserved
+				RawData:   u.Object,
 				Metadata: map[string]interface{}{
 					"event":     "add",
 					"namespace": u.GetNamespace(),
@@ -119,9 +144,9 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			u := newObj.(*unstructured.Unstructured)
 			event := RawEvent{
-				Source:    config.Source,
+				Source:    source,
 				Timestamp: time.Now(),
-				RawData:   u.Object, // ALL data preserved
+				RawData:   u.Object,
 				Metadata: map[string]interface{}{
 					"event":     "update",
 					"namespace": u.GetNamespace(),
@@ -148,9 +173,9 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 				}
 			}
 			event := RawEvent{
-				Source:    config.Source,
+				Source:    source,
 				Timestamp: time.Now(),
-				RawData:   u.Object, // ALL data preserved
+				RawData:   u.Object,
 				Metadata: map[string]interface{}{
 					"event":     "delete",
 					"namespace": u.GetNamespace(),
@@ -164,27 +189,7 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 				return
 			}
 		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("failed to add event handlers: %w", err)
 	}
-
-	// Start informer manager
-	a.manager.Start(ctx)
-	// Wait for cache sync via manager
-	if err := a.manager.WaitForCacheSync(ctx); err != nil {
-		return nil, fmt.Errorf("failed to sync informer cache for %s: %w", gvr.String(), err)
-	}
-
-	logger := sdklog.NewLogger("zen-watcher-adapter")
-	logger.Info("Informer adapter started",
-		sdklog.Operation("informer_start"),
-		sdklog.String("source", config.Source),
-		sdklog.String("gvr", gvr.String()),
-		sdklog.String("namespace", config.Informer.Namespace),
-		sdklog.Duration("resync_period", resyncPeriod))
-
-	return events, nil
 }
 
 // processQueue processes items from the workqueue and emits RawEvents
