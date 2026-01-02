@@ -557,7 +557,7 @@ All archive documents include banners explaining their non-canonical status.
 
 ### Prerequisites
 
-- **Go 1.24+** (zen-watcher requires Go 1.24)
+- **Go 1.25+** (zen-watcher requires Go 1.24)
 - **Kubernetes cluster** (k3d, kind, or minikube) for integration tests
 - **kubectl** configured to access your cluster
 - **helm** (optional, for deployment)
@@ -625,7 +625,7 @@ make zen-demo-down
 See `make zen-demo-up`, `make zen-demo-validate`, and `make zen-demo-down` for details.
 
 ### Prerequisites
-- Go 1.24+ (tested on 1.24)
+- Go 1.25+ (tested on 1.24)
 - Make (optional, but recommended)
 
 ### Running Tests
