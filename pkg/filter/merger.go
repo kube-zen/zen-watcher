@@ -17,12 +17,9 @@ package filter
 import (
 	"strings"
 	
-	sdkfilter "github.com/kube-zen/zen-sdk/pkg/filter"
 )
 
 // Type aliases for compatibility
-type FilterConfig = sdkfilter.FilterConfig
-type SourceFilter = sdkfilter.SourceFilter
 
 // MergeFilterConfigs merges multiple FilterConfig objects into a single config.
 // When multiple filters exist for the same source, they are merged with the following rules:

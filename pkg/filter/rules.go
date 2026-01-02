@@ -36,13 +36,10 @@ var (
 	filterLogger = sdklog.NewLogger("zen-watcher-filter")
 )
 
-// Filter provides filtering functionality for observations
-// Thread-safe: config can be updated dynamically via UpdateConfig()
+// Filter wraps zen-sdk Filter with zen-watcher metrics support
 type Filter struct {
-	mu          sync.RWMutex
-	config      *FilterConfig
-	metrics     *metrics.Metrics // Optional metrics
-	sourceCache sync.Map          // Cache for lowercased source strings (map[string]string)
+	*sdkfilter.Filter
+	metrics *metrics.Metrics
 }
 
 // NewFilter creates a new filter with the given configuration
@@ -52,8 +49,12 @@ func NewFilter(config *FilterConfig) *Filter {
 
 // NewFilterWithMetrics creates a new filter with metrics support
 func NewFilterWithMetrics(config *FilterConfig, m *metrics.Metrics) *Filter {
+	var metricsAdapter sdkfilter.FilterMetrics
+	if m != nil {
+		metricsAdapter = NewMetricsAdapter(m)
+	}
 	return &Filter{
-		config:  config,
+		Filter:  sdkfilter.NewFilterWithMetrics(config, metricsAdapter),
 		metrics: m,
 	}
 }
