@@ -516,66 +516,7 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 	}
 
 	// Extract destinations and resolve GVRs
-	config.Destinations = make([]DestinationConfig, 0, len(destinations))
-	for _, dest := range destinations {
-		if destMap, ok := dest.(map[string]interface{}); ok {
-			destType := getString(destMap, "type")
-			destValue := getString(destMap, "value")
-
-			if destType == "crd" {
-				var gvr schema.GroupVersionResource
-
-				// Check if full GVR is specified
-				if gvrMap, ok := destMap["gvr"].(map[string]interface{}); ok {
-					group := getString(gvrMap, "group")
-					version := getString(gvrMap, "version")
-					resource := getString(gvrMap, "resource")
-
-					if version != "" && resource != "" {
-						// Validate GVR before using
-						if err := ValidateGVRConfig(group, version, resource); err != nil {
-							logger.Warn("Invalid GVR in destination configuration",
-								sdklog.Operation("ingester_convert"),
-								sdklog.String("source", source),
-								sdklog.String("group", group),
-								sdklog.String("version", version),
-								sdklog.String("resource", resource),
-								sdklog.Error(err))
-							continue
-						}
-						// Use specified GVR
-						gvr = schema.GroupVersionResource{
-							Group:    group,
-							Version:  version,
-							Resource: resource,
-						}
-					} else if destValue != "" {
-						// Fallback to resolving from value
-						gvr = ResolveDestinationGVR(destValue)
-					} else {
-						logger.Warn("Destination has neither gvr nor value",
-							sdklog.Operation("ingester_convert"),
-							sdklog.String("source", source))
-						continue
-					}
-				} else if destValue != "" {
-					// Resolve GVR from destination value
-					gvr = ResolveDestinationGVR(destValue)
-				} else {
-					logger.Warn("Destination has neither gvr nor value",
-						sdklog.Operation("ingester_convert"),
-						sdklog.String("source", source))
-					continue
-				}
-
-				config.Destinations = append(config.Destinations, DestinationConfig{
-					Type:  destType,
-					Value: destValue,
-					GVR:   gvr,
-				})
-			}
-		}
-	}
+	config.Destinations = extractDestinations(destinations, logger)
 
 	// Ensure at least one destination was extracted
 	if len(config.Destinations) == 0 {
@@ -1222,63 +1163,7 @@ func (ii *IngesterInformer) extractSharedConfig(spec map[string]interface{}, nam
 	}
 
 	// Extract destinations and resolve GVRs
-	config.Destinations = make([]DestinationConfig, 0, len(destinations))
-	for _, dest := range destinations {
-		if destMap, ok := dest.(map[string]interface{}); ok {
-			destType := getString(destMap, "type")
-			destValue := getString(destMap, "value")
-
-			if destType == "crd" {
-				var gvr schema.GroupVersionResource
-
-				// Check if full GVR is specified
-				if gvrMap, ok := destMap["gvr"].(map[string]interface{}); ok {
-					group := getString(gvrMap, "group")
-					version := getString(gvrMap, "version")
-					resource := getString(gvrMap, "resource")
-
-					if version != "" && resource != "" {
-						// Validate GVR before using
-						if err := ValidateGVRConfig(group, version, resource); err != nil {
-							logger.Warn("Invalid GVR in destination configuration",
-								sdklog.Operation("ingester_convert"),
-								sdklog.String("group", group),
-								sdklog.String("version", version),
-								sdklog.String("resource", resource),
-								sdklog.Error(err))
-							continue
-						}
-						// Use specified GVR
-						gvr = schema.GroupVersionResource{
-							Group:    group,
-							Version:  version,
-							Resource: resource,
-						}
-					} else if destValue != "" {
-						// Fallback to resolving from value
-						gvr = ResolveDestinationGVR(destValue)
-					} else {
-						logger.Warn("Destination has neither gvr nor value",
-							sdklog.Operation("ingester_convert"))
-						continue
-					}
-				} else if destValue != "" {
-					// Resolve GVR from destination value
-					gvr = ResolveDestinationGVR(destValue)
-				} else {
-						logger.Warn("Destination has neither gvr nor value",
-							sdklog.Operation("ingester_convert"))
-					continue
-				}
-
-				config.Destinations = append(config.Destinations, DestinationConfig{
-					Type:  destType,
-					Value: destValue,
-					GVR:   gvr,
-				})
-			}
-		}
-	}
+	config.Destinations = extractDestinations(destinations, logger)
 
 	// Ensure at least one destination was extracted
 	if len(config.Destinations) == 0 {
@@ -1289,222 +1174,327 @@ func (ii *IngesterInformer) extractSharedConfig(spec map[string]interface{}, nam
 	}
 
 	// Extract normalization config
-	if norm, ok := spec["normalization"].(map[string]interface{}); ok {
-		config.Normalization = &NormalizationConfig{
-			Domain:   getString(norm, "domain"),
-			Type:     getString(norm, "type"),
-			Priority: make(map[string]float64),
-		}
-		if priority, ok := norm["priority"].(map[string]interface{}); ok {
-			for k, v := range priority {
-				if f, ok := v.(float64); ok {
-					config.Normalization.Priority[k] = f
-				}
-			}
-		}
-		if fieldMapping, ok := norm["fieldMapping"].([]interface{}); ok {
-			for _, fm := range fieldMapping {
-				if fmMap, ok := fm.(map[string]interface{}); ok {
-					config.Normalization.FieldMapping = append(config.Normalization.FieldMapping, FieldMapping{
-						From:      getString(fmMap, "from"),
-						To:        getString(fmMap, "to"),
-						Transform: getString(fmMap, "transform"),
+	config.Normalization = extractNormalization(spec)
+
+	// Extract processing config (filter and dedup)
+	config.Processing, config.Filter, config.Dedup = extractProcessingConfig(spec)
+
+	// Extract optimization config
+	config.Optimization = extractOptimizationConfig(spec)
+
+	return config
+}
+
+// extractDestinations extracts and validates destination configurations
+func extractDestinations(destinations []interface{}, logger *sdklog.Logger) []DestinationConfig {
+	result := make([]DestinationConfig, 0, len(destinations))
+	for _, dest := range destinations {
+		if destMap, ok := dest.(map[string]interface{}); ok {
+			destType := getString(destMap, "type")
+			destValue := getString(destMap, "value")
+
+			if destType == "crd" {
+				gvr := resolveDestinationGVR(destMap, destValue, logger)
+				if gvr.Resource != "" {
+					result = append(result, DestinationConfig{
+						Type:  destType,
+						Value: destValue,
+						GVR:   gvr,
 					})
 				}
 			}
 		}
 	}
+	return result
+}
 
-	// Extract dedup and filter configs (reuse existing logic from ConvertToIngesterConfig)
-	var dedupConfig *DedupConfig
+// resolveDestinationGVR resolves GVR from destination map
+func resolveDestinationGVR(destMap map[string]interface{}, destValue string, logger *sdklog.Logger) schema.GroupVersionResource {
+	var gvr schema.GroupVersionResource
+	if gvrMap, ok := destMap["gvr"].(map[string]interface{}); ok {
+		group := getString(gvrMap, "group")
+		version := getString(gvrMap, "version")
+		resource := getString(gvrMap, "resource")
+
+		if version != "" && resource != "" {
+			if err := ValidateGVRConfig(group, version, resource); err != nil {
+				logger.Warn("Invalid GVR in destination configuration",
+					sdklog.Operation("ingester_convert"),
+					sdklog.String("group", group),
+					sdklog.String("version", version),
+					sdklog.String("resource", resource),
+					sdklog.Error(err))
+				return gvr
+			}
+			gvr = schema.GroupVersionResource{
+				Group:    group,
+				Version:  version,
+				Resource: resource,
+			}
+		} else if destValue != "" {
+			gvr = ResolveDestinationGVR(destValue)
+		} else {
+			logger.Warn("Destination has neither gvr nor value",
+				sdklog.Operation("ingester_convert"))
+		}
+	} else if destValue != "" {
+		gvr = ResolveDestinationGVR(destValue)
+	} else {
+		logger.Warn("Destination has neither gvr nor value",
+			sdklog.Operation("ingester_convert"))
+	}
+	return gvr
+}
+
+// extractNormalization extracts normalization configuration
+func extractNormalization(spec map[string]interface{}) *NormalizationConfig {
+	norm, ok := spec["normalization"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	config := &NormalizationConfig{
+		Domain:   getString(norm, "domain"),
+		Type:     getString(norm, "type"),
+		Priority: make(map[string]float64),
+	}
+	if priority, ok := norm["priority"].(map[string]interface{}); ok {
+		for k, v := range priority {
+			if f, ok := v.(float64); ok {
+				config.Priority[k] = f
+			}
+		}
+	}
+	if fieldMapping, ok := norm["fieldMapping"].([]interface{}); ok {
+		for _, fm := range fieldMapping {
+			if fmMap, ok := fm.(map[string]interface{}); ok {
+				config.FieldMapping = append(config.FieldMapping, FieldMapping{
+					From:      getString(fmMap, "from"),
+					To:        getString(fmMap, "to"),
+					Transform: getString(fmMap, "transform"),
+				})
+			}
+		}
+	}
+	return config
+}
+
+// extractProcessingConfig extracts processing configuration (filter and dedup)
+func extractProcessingConfig(spec map[string]interface{}) (*ProcessingConfig, *FilterConfig, *DedupConfig) {
+	var processingConfig *ProcessingConfig
 	var filterConfig *FilterConfig
+	var dedupConfig *DedupConfig
 
-	// First, try spec.processing (canonical v1.1+ location)
 	if processing, ok := spec["processing"].(map[string]interface{}); ok {
-		// Extract processing-level config (order only)
-		config.Processing = &ProcessingConfig{
+		processingConfig = &ProcessingConfig{
 			Order: getString(processing, "order"),
 		}
-
-		// Extract filter from processing.filter (canonical location)
-		if filter, ok := processing["filter"].(map[string]interface{}); ok {
-			filterConfig = &FilterConfig{}
-			// Check for expression (v1.1 feature)
-			if expression, ok := filter["expression"].(string); ok && expression != "" {
-				filterConfig.Expression = expression
-			}
-			// Legacy fields (only used if expression is not set)
-			if minPriority, ok := filter["minPriority"].(float64); ok {
-				filterConfig.MinPriority = minPriority
-			}
-			if includeNS, ok := filter["includeNamespaces"].([]interface{}); ok {
-				for _, ns := range includeNS {
-					if nsStr, ok := ns.(string); ok {
-						filterConfig.IncludeNamespaces = append(filterConfig.IncludeNamespaces, nsStr)
-					}
-				}
-			}
-			if excludeNS, ok := filter["excludeNamespaces"].([]interface{}); ok {
-				for _, ns := range excludeNS {
-					if nsStr, ok := ns.(string); ok {
-						filterConfig.ExcludeNamespaces = append(filterConfig.ExcludeNamespaces, nsStr)
-					}
-				}
-			}
-		}
-
-		// Extract dedup from processing.dedup (canonical location)
-		if dedup, ok := processing["dedup"].(map[string]interface{}); ok {
-			dedupConfig = &DedupConfig{
-				Enabled: true, // Default enabled
-			}
-			if enabled, ok := dedup["enabled"].(bool); ok {
-				dedupConfig.Enabled = enabled
-			}
-			dedupConfig.Window = getString(dedup, "window")
-			dedupConfig.Strategy = getString(dedup, "strategy")
-			if dedupConfig.Strategy == "" {
-				dedupConfig.Strategy = "fingerprint" // Default strategy
-			}
-			if fields, ok := dedup["fields"].([]interface{}); ok {
-				for _, f := range fields {
-					if fStr, ok := f.(string); ok {
-						dedupConfig.Fields = append(dedupConfig.Fields, fStr)
-					}
-				}
-			}
-			if maxEvents, ok := dedup["maxEventsPerWindow"].(float64); ok {
-				dedupConfig.MaxEventsPerWindow = int(maxEvents)
-			}
-		}
+		filterConfig = extractFilterFromProcessing(processing)
+		dedupConfig = extractDedupFromProcessing(processing)
 	}
 
 	// Fallback to legacy locations
 	if dedupConfig == nil {
-		if dedup, ok := spec["deduplication"].(map[string]interface{}); ok {
-			dedupConfig = &DedupConfig{
-				Enabled: getBool(dedup, "enabled"),
-			}
-			dedupConfig.Window = getString(dedup, "window")
-			dedupConfig.Strategy = getString(dedup, "strategy")
-			if dedupConfig.Strategy == "" {
-				dedupConfig.Strategy = "fingerprint"
-			}
-			if fields, ok := dedup["fields"].([]interface{}); ok {
-				for _, f := range fields {
-					if fStr, ok := f.(string); ok {
-						dedupConfig.Fields = append(dedupConfig.Fields, fStr)
-					}
-				}
-			}
-		}
+		dedupConfig = extractDedupFromLegacy(spec)
 	}
 	if filterConfig == nil {
-		if filter, ok := spec["filters"].(map[string]interface{}); ok {
-			filterConfig = &FilterConfig{}
-			if expression, ok := filter["expression"].(string); ok && expression != "" {
-				filterConfig.Expression = expression
-			}
-			if minPriority, ok := filter["minPriority"].(float64); ok {
-				filterConfig.MinPriority = minPriority
-			}
-			if includeNS, ok := filter["includeNamespaces"].([]interface{}); ok {
-				for _, ns := range includeNS {
-					if nsStr, ok := ns.(string); ok {
-						filterConfig.IncludeNamespaces = append(filterConfig.IncludeNamespaces, nsStr)
-					}
-				}
-			}
-			if excludeNS, ok := filter["excludeNamespaces"].([]interface{}); ok {
-				for _, ns := range excludeNS {
-					if nsStr, ok := ns.(string); ok {
-						filterConfig.ExcludeNamespaces = append(filterConfig.ExcludeNamespaces, nsStr)
-					}
-				}
+		filterConfig = extractFilterFromLegacy(spec)
+	}
+
+	return processingConfig, filterConfig, dedupConfig
+}
+
+// extractFilterFromProcessing extracts filter config from processing.filter
+func extractFilterFromProcessing(processing map[string]interface{}) *FilterConfig {
+	filter, ok := processing["filter"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	config := &FilterConfig{}
+	if expression, ok := filter["expression"].(string); ok && expression != "" {
+		config.Expression = expression
+	}
+	if minPriority, ok := filter["minPriority"].(float64); ok {
+		config.MinPriority = minPriority
+	}
+	if includeNS, ok := filter["includeNamespaces"].([]interface{}); ok {
+		for _, ns := range includeNS {
+			if nsStr, ok := ns.(string); ok {
+				config.IncludeNamespaces = append(config.IncludeNamespaces, nsStr)
 			}
 		}
 	}
-
-	config.Dedup = dedupConfig
-	config.Filter = filterConfig
-
-	// Extract optimization config (reuse existing logic)
-	if optimization, ok := spec["optimization"].(map[string]interface{}); ok {
-		config.Optimization = &OptimizationConfig{
-			Order:      getString(optimization, "order"),
-			Processing: make(map[string]*ProcessingThreshold),
-		}
-
-		// Extract thresholds
-		if thresholds, ok := optimization["thresholds"].(map[string]interface{}); ok {
-			config.Optimization.Thresholds = &OptimizationThresholds{}
-
-			if dedupEff, ok := thresholds["dedupEffectiveness"].(map[string]interface{}); ok {
-				config.Optimization.Thresholds.DedupEffectiveness = &ThresholdRange{}
-				if w, ok := dedupEff["warning"].(float64); ok {
-					config.Optimization.Thresholds.DedupEffectiveness.Warning = w
-				}
-				if c, ok := dedupEff["critical"].(float64); ok {
-					config.Optimization.Thresholds.DedupEffectiveness.Critical = c
-				}
-			}
-
-			if lowSev, ok := thresholds["lowSeverityPercent"].(map[string]interface{}); ok {
-				config.Optimization.Thresholds.LowSeverityPercent = &ThresholdRange{}
-				if w, ok := lowSev["warning"].(float64); ok {
-					config.Optimization.Thresholds.LowSeverityPercent.Warning = w
-				}
-				if c, ok := lowSev["critical"].(float64); ok {
-					config.Optimization.Thresholds.LowSeverityPercent.Critical = c
-				}
-			}
-
-			if obsPerMin, ok := thresholds["observationsPerMinute"].(map[string]interface{}); ok {
-				config.Optimization.Thresholds.ObservationsPerMinute = &ThresholdRange{}
-				if w, ok := obsPerMin["warning"].(float64); ok {
-					config.Optimization.Thresholds.ObservationsPerMinute.Warning = w
-				}
-				if c, ok := obsPerMin["critical"].(float64); ok {
-					config.Optimization.Thresholds.ObservationsPerMinute.Critical = c
-				}
-			}
-
-			if custom, ok := thresholds["custom"].([]interface{}); ok {
-				for _, c := range custom {
-					if cMap, ok := c.(map[string]interface{}); ok {
-						ct := CustomThreshold{
-							Name:     getString(cMap, "name"),
-							Field:    getString(cMap, "field"),
-							Operator: getString(cMap, "operator"),
-							Value:    getString(cMap, "value"),
-							Message:  getString(cMap, "message"),
-						}
-						config.Optimization.Thresholds.Custom = append(config.Optimization.Thresholds.Custom, ct)
-					}
-				}
-			}
-		}
-
-		if processing, ok := optimization["processing"].(map[string]interface{}); ok {
-			for key, val := range processing {
-				if pMap, ok := val.(map[string]interface{}); ok {
-					pt := &ProcessingThreshold{
-						Action:      getString(pMap, "action"),
-						Description: getString(pMap, "description"),
-					}
-					if w, ok := pMap["warning"].(float64); ok {
-						pt.Warning = w
-					}
-					if c, ok := pMap["critical"].(float64); ok {
-						pt.Critical = c
-					}
-					config.Optimization.Processing[key] = pt
-				}
+	if excludeNS, ok := filter["excludeNamespaces"].([]interface{}); ok {
+		for _, ns := range excludeNS {
+			if nsStr, ok := ns.(string); ok {
+				config.ExcludeNamespaces = append(config.ExcludeNamespaces, nsStr)
 			}
 		}
 	}
-
 	return config
+}
+
+// extractDedupFromProcessing extracts dedup config from processing.dedup
+func extractDedupFromProcessing(processing map[string]interface{}) *DedupConfig {
+	dedup, ok := processing["dedup"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	config := &DedupConfig{
+		Enabled: true,
+	}
+	if enabled, ok := dedup["enabled"].(bool); ok {
+		config.Enabled = enabled
+	}
+	config.Window = getString(dedup, "window")
+	config.Strategy = getString(dedup, "strategy")
+	if config.Strategy == "" {
+		config.Strategy = "fingerprint"
+	}
+	if fields, ok := dedup["fields"].([]interface{}); ok {
+		for _, f := range fields {
+			if fStr, ok := f.(string); ok {
+				config.Fields = append(config.Fields, fStr)
+			}
+		}
+	}
+	if maxEvents, ok := dedup["maxEventsPerWindow"].(float64); ok {
+		config.MaxEventsPerWindow = int(maxEvents)
+	}
+	return config
+}
+
+// extractDedupFromLegacy extracts dedup config from legacy location
+func extractDedupFromLegacy(spec map[string]interface{}) *DedupConfig {
+	dedup, ok := spec["deduplication"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	config := &DedupConfig{
+		Enabled: getBool(dedup, "enabled"),
+	}
+	config.Window = getString(dedup, "window")
+	config.Strategy = getString(dedup, "strategy")
+	if config.Strategy == "" {
+		config.Strategy = "fingerprint"
+	}
+	if fields, ok := dedup["fields"].([]interface{}); ok {
+		for _, f := range fields {
+			if fStr, ok := f.(string); ok {
+				config.Fields = append(config.Fields, fStr)
+			}
+		}
+	}
+	return config
+}
+
+// extractFilterFromLegacy extracts filter config from legacy location
+func extractFilterFromLegacy(spec map[string]interface{}) *FilterConfig {
+	filter, ok := spec["filters"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	config := &FilterConfig{}
+	if expression, ok := filter["expression"].(string); ok && expression != "" {
+		config.Expression = expression
+	}
+	if minPriority, ok := filter["minPriority"].(float64); ok {
+		config.MinPriority = minPriority
+	}
+	if includeNS, ok := filter["includeNamespaces"].([]interface{}); ok {
+		for _, ns := range includeNS {
+			if nsStr, ok := ns.(string); ok {
+				config.IncludeNamespaces = append(config.IncludeNamespaces, nsStr)
+			}
+		}
+	}
+	if excludeNS, ok := filter["excludeNamespaces"].([]interface{}); ok {
+		for _, ns := range excludeNS {
+			if nsStr, ok := ns.(string); ok {
+				config.ExcludeNamespaces = append(config.ExcludeNamespaces, nsStr)
+			}
+		}
+	}
+	return config
+}
+
+// extractOptimizationConfig extracts optimization configuration
+func extractOptimizationConfig(spec map[string]interface{}) *OptimizationConfig {
+	optimization, ok := spec["optimization"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	config := &OptimizationConfig{
+		Order:      getString(optimization, "order"),
+		Processing: make(map[string]*ProcessingThreshold),
+	}
+	if thresholds, ok := optimization["thresholds"].(map[string]interface{}); ok {
+		config.Thresholds = extractOptimizationThresholds(thresholds)
+	}
+	if processing, ok := optimization["processing"].(map[string]interface{}); ok {
+		for key, val := range processing {
+			if pMap, ok := val.(map[string]interface{}); ok {
+				pt := &ProcessingThreshold{
+					Action:      getString(pMap, "action"),
+					Description: getString(pMap, "description"),
+				}
+				if w, ok := pMap["warning"].(float64); ok {
+					pt.Warning = w
+				}
+				if c, ok := pMap["critical"].(float64); ok {
+					pt.Critical = c
+				}
+				config.Processing[key] = pt
+			}
+		}
+	}
+	return config
+}
+
+// extractOptimizationThresholds extracts optimization thresholds
+func extractOptimizationThresholds(thresholds map[string]interface{}) *OptimizationThresholds {
+	result := &OptimizationThresholds{}
+	if dedupEff, ok := thresholds["dedupEffectiveness"].(map[string]interface{}); ok {
+		result.DedupEffectiveness = &ThresholdRange{}
+		if w, ok := dedupEff["warning"].(float64); ok {
+			result.DedupEffectiveness.Warning = w
+		}
+		if c, ok := dedupEff["critical"].(float64); ok {
+			result.DedupEffectiveness.Critical = c
+		}
+	}
+	if lowSev, ok := thresholds["lowSeverityPercent"].(map[string]interface{}); ok {
+		result.LowSeverityPercent = &ThresholdRange{}
+		if w, ok := lowSev["warning"].(float64); ok {
+			result.LowSeverityPercent.Warning = w
+		}
+		if c, ok := lowSev["critical"].(float64); ok {
+			result.LowSeverityPercent.Critical = c
+		}
+	}
+	if obsPerMin, ok := thresholds["observationsPerMinute"].(map[string]interface{}); ok {
+		result.ObservationsPerMinute = &ThresholdRange{}
+		if w, ok := obsPerMin["warning"].(float64); ok {
+			result.ObservationsPerMinute.Warning = w
+		}
+		if c, ok := obsPerMin["critical"].(float64); ok {
+			result.ObservationsPerMinute.Critical = c
+		}
+	}
+	if custom, ok := thresholds["custom"].([]interface{}); ok {
+		for _, c := range custom {
+			if cMap, ok := c.(map[string]interface{}); ok {
+				ct := CustomThreshold{
+					Name:     getString(cMap, "name"),
+					Field:    getString(cMap, "field"),
+					Operator: getString(cMap, "operator"),
+					Value:    getString(cMap, "value"),
+					Message:  getString(cMap, "message"),
+				}
+				result.Custom = append(result.Custom, ct)
+			}
+		}
+	}
+	return result
 }
 
 // Helper functions for extracting values from unstructured maps
