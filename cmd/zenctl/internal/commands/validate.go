@@ -59,14 +59,14 @@ func NewValidateCommand() *cobra.Command {
 			}
 
 			// Validate sourceKey contracts if CRDs are available
-			if err == nil {
+			if len(failures) == 0 {
 				cmd.Println("\nValidating sourceKey contracts...")
 				sourceKeyFailures := validateSourceKeyContracts(ctx, dynClient, resolver, opts.Namespace, opts.AllNamespaces)
 				failures = append(failures, sourceKeyFailures...)
 			}
 
 			// Validate DeliveryFlow target groups if CRDs are available
-			if err == nil {
+			if len(failures) == 0 {
 				cmd.Println("\nValidating DeliveryFlow target groups...")
 				targetFailures := validateDeliveryFlowTargets(ctx, dynClient, resolver, opts.Namespace, opts.AllNamespaces)
 				failures = append(failures, targetFailures...)
@@ -98,7 +98,7 @@ func validateSourceKeyContracts(ctx context.Context, dynClient dynamic.Interface
 		return failures // CRD not available, skip
 	}
 
-	// sourceKey pattern: namespace/ingesterName/sourceName
+	// sourceKey pattern: namespace/ingesterName/sourceName (K8s DNS subdomain format)
 	sourceKeyPattern := regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`)
 
 	var listOpts metav1.ListOptions
@@ -238,4 +238,3 @@ func validateFlowTargetStructure(flow *unstructured.Unstructured) []string {
 
 	return failures
 }
-
