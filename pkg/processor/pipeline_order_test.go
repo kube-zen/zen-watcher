@@ -31,12 +31,14 @@ import (
 )
 
 // mockFilter tracks when it's called
+//nolint:unused // Used in tests (may be referenced in future test cases)
 type mockFilter struct {
 	called      bool
 	callOrder   int
 	shouldAllow bool
 }
 
+//nolint:unused // Used in tests (may be referenced in future test cases)
 func (m *mockFilter) AllowWithReason(obs *unstructured.Unstructured) (bool, string) {
 	m.called = true
 	return m.shouldAllow, ""

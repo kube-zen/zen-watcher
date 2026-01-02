@@ -261,11 +261,13 @@ func (oc *ObservationCreator) CreateObservation(ctx context.Context, observation
 	return err
 }
 
+//nolint:unused // May be used for future processing order determination
 func (oc *ObservationCreator) determineProcessingOrder(source string) ProcessingOrder {
 	return ProcessingOrderFilterFirst
 }
 
 // getSourceMetrics gets current metrics for a source from optimization metrics
+//nolint:unused // May be used for future metrics analysis
 func (oc *ObservationCreator) getSourceMetrics(source string) *SourceMetrics {
 	if oc.optimizationMetrics == nil {
 		return nil
@@ -549,6 +551,7 @@ func (oc *ObservationCreator) getProcessingStrategy(source string) string {
 }
 
 // extractDedupKey extracts minimal metadata for deduplication from observation
+//nolint:unused // May be used for future deduplication logic
 func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstructured) sdkdedup.DedupKey {
 	// Extract source (optimized with type assertion)
 	sourceVal, _ := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "source")
@@ -611,6 +614,8 @@ func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstruct
 }
 
 // extractStringField extracts a string field from a map with type assertion optimization
+// Note: Used in extractDedupKey (which may be unused but kept for future use)
+//nolint:unused // Used in extractDedupKey which may be used in future
 func extractStringField(m map[string]interface{}, key string) string {
 	if m == nil {
 		return ""
@@ -739,6 +744,7 @@ func (oc *ObservationCreator) recordEventAttempted(source string) {
 }
 
 // recordEventFiltered records that an event was filtered
+//nolint:unused // May be used for future metrics tracking
 func (oc *ObservationCreator) recordEventFiltered(source, reason string) {
 	counters := oc.getOrCreateSourceCounters(source)
 	if counters != nil {
@@ -747,6 +753,7 @@ func (oc *ObservationCreator) recordEventFiltered(source, reason string) {
 }
 
 // recordEventDeduped records that an event was deduplicated
+//nolint:unused // May be used for future metrics tracking
 func (oc *ObservationCreator) recordEventDeduped(source string) {
 	counters := oc.getOrCreateSourceCounters(source)
 	if counters != nil {

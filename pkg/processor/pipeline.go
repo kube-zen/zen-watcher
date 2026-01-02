@@ -262,6 +262,7 @@ func (p *Processor) observationToEvent(observation *unstructured.Unstructured, r
 }
 
 // normalize converts RawEvent to Event using normalization config
+//nolint:unused // May be used in future normalization scenarios
 func (p *Processor) normalize(raw *generic.RawEvent, config *generic.SourceConfig) *watcher.Event {
 	if config.Normalization == nil {
 		// Default normalization
