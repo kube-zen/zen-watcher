@@ -22,7 +22,7 @@ import (
 
 	"github.com/kube-zen/zen-watcher/internal/kubernetes"
 	"github.com/kube-zen/zen-watcher/pkg/cli"
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 )
 
 func main() {
@@ -35,11 +35,12 @@ func main() {
 	)
 	flag.Parse()
 
-	// Initialize logger
-	if err := logger.Init(*logLevel, false); err != nil {
-		fmt.Fprintf(os.Stderr, "Failed to initialize logger: %v\n", err)
-		os.Exit(1)
+	// Set log level via environment variable (zen-sdk reads LOG_LEVEL)
+	if *logLevel != "" {
+		os.Setenv("LOG_LEVEL", *logLevel)
 	}
+	// zen-sdk logger initializes automatically, no explicit Init() needed
+	_ = sdklog.NewLogger("zen-watcher-optimize")
 
 	// Initialize Kubernetes clients
 	clients, err := kubernetes.NewClients()

@@ -21,7 +21,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/kube-zen/zen-watcher/pkg/advisor"
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"k8s.io/client-go/dynamic"
 )
 
@@ -41,12 +41,10 @@ func NewOptimizeCLI(dynClient dynamic.Interface, advisor *advisor.Advisor) *Opti
 
 // Analyze analyzes a source and shows optimization suggestions
 func (cli *OptimizeCLI) Analyze(ctx context.Context, source string) error {
+	logger := sdklog.NewLogger("zen-watcher-cli")
 	logger.Info("Analyzing optimization opportunities",
-		logger.Fields{
-			Component: "cli",
-			Operation: "analyze",
-			Source:    source,
-		})
+		sdklog.Operation("analyze"),
+		sdklog.String("source", source))
 
 	// Get current metrics (simplified - would query Prometheus in production)
 	// For now, show config-based analysis
@@ -78,15 +76,11 @@ func (cli *OptimizeCLI) Analyze(ctx context.Context, source string) error {
 
 // Apply applies a suggestion by index
 func (cli *OptimizeCLI) Apply(ctx context.Context, source string, suggestionIndex int) error {
+	logger := sdklog.NewLogger("zen-watcher-cli")
 	logger.Info("Applying optimization suggestion",
-		logger.Fields{
-			Component: "cli",
-			Operation: "apply",
-			Source:    source,
-			Additional: map[string]interface{}{
-				"suggestion_index": suggestionIndex,
-			},
-		})
+		sdklog.Operation("apply"),
+		sdklog.String("source", source),
+		sdklog.Int("suggestion_index", suggestionIndex))
 
 	// In production, this would:
 	// 1. Get suggestions from advisor
@@ -110,12 +104,10 @@ func (cli *OptimizeCLI) Auto(ctx context.Context, enable bool) error {
 
 // History shows optimization history for a source
 func (cli *OptimizeCLI) History(ctx context.Context, source string) error {
+	logger := sdklog.NewLogger("zen-watcher-cli")
 	logger.Info("Showing optimization history",
-		logger.Fields{
-			Component: "cli",
-			Operation: "history",
-			Source:    source,
-		})
+		sdklog.Operation("history"),
+		sdklog.String("source", source))
 
 	fmt.Printf("\n=== Optimization History for Source: %s ===\n\n", source)
 

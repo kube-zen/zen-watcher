@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 )
 
 // EventBatch represents a batch of events from the same source
@@ -190,26 +190,20 @@ func (bp *BatchProcessor) processBatch(ctx context.Context, source string, batch
 	// but batching reduces channel overhead and allows better scheduling
 	for _, event := range events {
 		if err := bp.processor.ProcessEvent(ctx, event, config); err != nil {
+			logger := sdklog.NewLogger("zen-watcher-processor")
 			logger.Warn("Batch event processing failed",
-				logger.Fields{
-					Component: "processor",
-					Operation: "batch_event_process",
-					Source:    source,
-					Error:     err,
-				})
+				sdklog.Operation("batch_event_process"),
+				sdklog.String("source", source),
+				sdklog.Error(err))
 			// Continue processing other events in batch
 		}
 	}
 
+	logger := sdklog.NewLogger("zen-watcher-processor")
 	logger.Debug("Processed event batch",
-		logger.Fields{
-			Component: "processor",
-			Operation: "batch_processed",
-			Source:    source,
-			Additional: map[string]interface{}{
-				"batch_size": len(events),
-			},
-		})
+		sdklog.Operation("batch_processed"),
+		sdklog.String("source", source),
+		sdklog.Int("batch_size", len(events)))
 
 	return nil
 }

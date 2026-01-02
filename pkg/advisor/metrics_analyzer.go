@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	v1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 )
@@ -48,13 +48,11 @@ func (ma *MetricsAnalyzer) Analyze(ctx context.Context) ([]Opportunity, error) {
 	for _, source := range ma.sources {
 		sourceOpps, err := ma.analyzeSource(ctx, source)
 		if err != nil {
+			logger := sdklog.NewLogger("zen-watcher-advisor")
 			logger.Debug("Failed to analyze source",
-				logger.Fields{
-					Component: "advisor",
-					Operation: "analyze_source",
-					Source:    source,
-					Error:     err,
-				})
+				sdklog.Operation("analyze_source"),
+				sdklog.String("source", source),
+				sdklog.Error(err))
 			continue
 		}
 		opportunities = append(opportunities, sourceOpps...)
@@ -192,14 +190,10 @@ func (ma *MetricsAnalyzer) QueryPrometheus(ctx context.Context, query string) (m
 		return nil, err
 	}
 	if len(warnings) > 0 {
+		logger := sdklog.NewLogger("zen-watcher-advisor")
 		logger.Debug("Prometheus query warnings",
-			logger.Fields{
-				Component: "advisor",
-				Operation: "prometheus_query",
-				Additional: map[string]interface{}{
-					"warnings": warnings,
-				},
-			})
+			sdklog.Operation("prometheus_query"),
+			sdklog.Strings("warnings", warnings))
 	}
 	return result, nil
 }

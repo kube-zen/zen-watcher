@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	sdkttl "github.com/kube-zen/zen-sdk/pkg/gc/ttl"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -93,15 +93,11 @@ func NewCollector(
 
 // Start starts the garbage collection loop
 func (gc *Collector) Start(ctx context.Context) {
+	logger := sdklog.NewLogger("zen-watcher-gc")
 	logger.Info("Starting Observation garbage collector",
-		logger.Fields{
-			Component: "gc",
-			Operation: "gc_start",
-			Additional: map[string]interface{}{
-				"ttl_days": gc.ttlDays,
-				"interval": gc.gcInterval.String(),
-			},
-		})
+		sdklog.Operation("gc_start"),
+		sdklog.Int("ttl_days", gc.ttlDays),
+		sdklog.Duration("interval", gc.gcInterval))
 
 	ticker := time.NewTicker(gc.gcInterval)
 	defer ticker.Stop()
@@ -112,11 +108,9 @@ func (gc *Collector) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			logger := sdklog.NewLogger("zen-watcher-gc")
 			logger.Info("Observation garbage collector stopped",
-				logger.Fields{
-					Component: "gc",
-					Operation: "gc_stop",
-				})
+				sdklog.Operation("gc_stop"))
 			return
 		case <-ticker.C:
 			gc.runGC(ctx)
@@ -138,14 +132,10 @@ func (gc *Collector) runGC(ctx context.Context) {
 		gc.gcRunsTotal.Inc()
 	}
 
+	logger := sdklog.NewLogger("zen-watcher-gc")
 	logger.Debug("Running garbage collection",
-		logger.Fields{
-			Component: "gc",
-			Operation: "gc_run",
-			Additional: map[string]interface{}{
-				"ttl_days": gc.ttlDays,
-			},
-		})
+		sdklog.Operation("gc_run"),
+		sdklog.Int("ttl_days", gc.ttlDays))
 
 	// Add timeout for GC operations to prevent hangs
 	gcTimeout := DefaultGCTimeout
@@ -173,27 +163,21 @@ func (gc *Collector) runGC(ctx context.Context) {
 		if err != nil {
 			// Check if timeout occurred
 			if gcCtx.Err() == context.DeadlineExceeded {
+				logger := sdklog.NewLogger("zen-watcher-gc")
 				logger.Warn("GC run timed out",
-					logger.Fields{
-						Component: "gc",
-						Operation: "gc_run",
-						Namespace: ns,
-						Error:     err,
-						Additional: map[string]interface{}{
-							"timeout": gcTimeout.String(),
-						},
-					})
+					sdklog.Operation("gc_run"),
+					sdklog.String("namespace", ns),
+					sdklog.Error(err),
+					sdklog.Duration("timeout", gcTimeout))
 				if gc.gcErrors != nil {
 					gc.gcErrors.WithLabelValues("timeout", "gc_timeout").Inc()
 				}
 			} else {
+				logger := sdklog.NewLogger("zen-watcher-gc")
 				logger.Warn("Failed to collect Observations in namespace",
-					logger.Fields{
-						Component: "gc",
-						Operation: "gc_run",
-						Namespace: ns,
-						Error:     err,
-					})
+					sdklog.Operation("gc_run"),
+					sdklog.String("namespace", ns),
+					sdklog.Error(err))
 			}
 			continue
 		}
@@ -201,21 +185,15 @@ func (gc *Collector) runGC(ctx context.Context) {
 	}
 
 	if totalDeleted > 0 {
+		logger := sdklog.NewLogger("zen-watcher-gc")
 		logger.Info("Garbage collection completed",
-			logger.Fields{
-				Component: "gc",
-				Operation: "gc_run",
-				Count:     totalDeleted,
-				Additional: map[string]interface{}{
-					"deleted": totalDeleted,
-				},
-			})
+			sdklog.Operation("gc_run"),
+			sdklog.Int("count", totalDeleted),
+			sdklog.Int("deleted", totalDeleted))
 	} else {
+		logger := sdklog.NewLogger("zen-watcher-gc")
 		logger.Debug("Garbage collection completed, no Observations to delete",
-			logger.Fields{
-				Component: "gc",
-				Operation: "gc_run",
-			})
+			sdklog.Operation("gc_run"))
 	}
 }
 
@@ -277,16 +255,14 @@ func (gc *Collector) collectNamespace(ctx context.Context, namespace string) (in
 					}
 					gc.gcErrors.WithLabelValues("delete", errorType).Inc()
 				}
+				logger := sdklog.NewLogger("zen-watcher-gc")
 				logger.Warn("Failed to delete Observation",
-					logger.Fields{
-						Component:    "gc",
-						Operation:    "gc_delete",
-						Namespace:    namespace,
-						ResourceName: name,
-						Source:       source,
-						Reason:       reason,
-						Error:        err,
-					})
+					sdklog.Operation("gc_delete"),
+					sdklog.String("namespace", namespace),
+					sdklog.String("resource_name", name),
+					sdklog.String("source", source),
+					sdklog.String("reason", reason),
+					sdklog.Error(err))
 				continue
 			}
 
@@ -294,15 +270,13 @@ func (gc *Collector) collectNamespace(ctx context.Context, namespace string) (in
 			if gc.observationsDeleted != nil {
 				gc.observationsDeleted.WithLabelValues(source, reason).Inc()
 			}
+			logger := sdklog.NewLogger("zen-watcher-gc")
 			logger.Debug("Deleted Observation",
-				logger.Fields{
-					Component:    "gc",
-					Operation:    "gc_delete",
-					Namespace:    namespace,
-					ResourceName: name,
-					Source:       source,
-					Reason:       reason,
-				})
+				sdklog.Operation("gc_delete"),
+				sdklog.String("namespace", namespace),
+				sdklog.String("resource_name", name),
+				sdklog.String("source", source),
+				sdklog.String("reason", reason))
 		}
 
 		// Check for more results
@@ -378,16 +352,14 @@ func (gc *Collector) collectAllNamespaces(ctx context.Context) (int, error) {
 					}
 					gc.gcErrors.WithLabelValues("delete", errorType).Inc()
 				}
+				logger := sdklog.NewLogger("zen-watcher-gc")
 				logger.Warn("Failed to delete Observation",
-					logger.Fields{
-						Component:    "gc",
-						Operation:    "gc_delete",
-						Namespace:    namespace,
-						ResourceName: name,
-						Source:       source,
-						Reason:       reason,
-						Error:        err,
-					})
+					sdklog.Operation("gc_delete"),
+					sdklog.String("namespace", namespace),
+					sdklog.String("resource_name", name),
+					sdklog.String("source", source),
+					sdklog.String("reason", reason),
+					sdklog.Error(err))
 				continue
 			}
 
@@ -395,15 +367,13 @@ func (gc *Collector) collectAllNamespaces(ctx context.Context) (int, error) {
 			if gc.observationsDeleted != nil {
 				gc.observationsDeleted.WithLabelValues(source, reason).Inc()
 			}
+			logger := sdklog.NewLogger("zen-watcher-gc")
 			logger.Debug("Deleted Observation",
-				logger.Fields{
-					Component:    "gc",
-					Operation:    "gc_delete",
-					Namespace:    namespace,
-					ResourceName: name,
-					Source:       source,
-					Reason:       reason,
-				})
+				sdklog.Operation("gc_delete"),
+				sdklog.String("namespace", namespace),
+				sdklog.String("resource_name", name),
+				sdklog.String("source", source),
+				sdklog.String("reason", reason))
 		}
 
 		// Check for more results

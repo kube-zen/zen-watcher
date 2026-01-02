@@ -22,7 +22,7 @@ import (
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/config"
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/processor"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -98,11 +98,9 @@ func NewGenericOrchestratorWithMetrics(
 
 // Start starts the orchestrator and watches for Ingester CRD changes
 func (o *GenericOrchestrator) Start(ctx context.Context) error {
+	logger := sdklog.NewLogger("zen-watcher-orchestrator")
 	logger.Info("Starting generic adapter orchestrator",
-		logger.Fields{
-			Component: "orchestrator",
-			Operation: "start",
-		})
+		sdklog.Operation("start"))
 
 	// Load initial configs
 	o.reloadAdapters()
@@ -137,12 +135,9 @@ func (o *GenericOrchestrator) reloadAdapters() {
 	// Load all Ingester CRDs
 	configs, err := o.dynClient.Resource(config.IngesterGVR).List(o.ctx, metav1.ListOptions{})
 	if err != nil {
-		logger.Error("Failed to list Ingester CRDs",
-			logger.Fields{
-				Component: "orchestrator",
-				Operation: "reload_adapters",
-				Error:     err,
-			})
+		logger := sdklog.NewLogger("zen-watcher-orchestrator")
+		logger.Error(err, "Failed to list Ingester CRDs",
+			sdklog.Operation("reload_adapters"))
 		return
 	}
 
@@ -160,15 +155,11 @@ func (o *GenericOrchestrator) reloadAdapters() {
 		ii := config.NewIngesterInformer(store, o.dynClient)
 		ingesterConfigs := ii.ConvertToIngesterConfigs(&item)
 		if len(ingesterConfigs) == 0 {
+			logger := sdklog.NewLogger("zen-watcher-orchestrator")
 			logger.Warn("Failed to convert Ingester CRD",
-				logger.Fields{
-					Component: "orchestrator",
-					Operation: "convert_ingester",
-					Additional: map[string]interface{}{
-						"name":      item.GetName(),
-						"namespace": item.GetNamespace(),
-					},
-				})
+				sdklog.Operation("convert_ingester"),
+				sdklog.String("name", item.GetName()),
+				sdklog.String("namespace", item.GetNamespace()))
 			continue
 		}
 
@@ -180,12 +171,10 @@ func (o *GenericOrchestrator) reloadAdapters() {
 				if o.metrics != nil {
 					o.metrics.IngestersConfigErrors.WithLabelValues(ingesterConfig.Source, "convert_to_generic_failed").Inc()
 				}
+				logger := sdklog.NewLogger("zen-watcher-orchestrator")
 				logger.Warn("Failed to convert IngesterConfig to generic.SourceConfig",
-					logger.Fields{
-						Component: "orchestrator",
-						Operation: "convert_to_generic",
-						Source:    ingesterConfig.Source,
-					})
+					sdklog.Operation("convert_to_generic"),
+					sdklog.String("source", ingesterConfig.Source))
 				continue
 			}
 
@@ -225,13 +214,10 @@ func (o *GenericOrchestrator) reloadAdapters() {
 					o.metrics.IngestersConfigErrors.WithLabelValues(source, "create_adapter_failed").Inc()
 					o.metrics.IngestersStatus.WithLabelValues(source).Set(-1) // -1 = error
 				}
-				logger.Error("Failed to create adapter",
-					logger.Fields{
-						Component: "orchestrator",
-						Operation: "create_adapter",
-						Source:    source,
-						Error:     err,
-					})
+				logger := sdklog.NewLogger("zen-watcher-orchestrator")
+				logger.Error(err, "Failed to create adapter",
+					sdklog.Operation("create_adapter"),
+					sdklog.String("source", source))
 				continue
 			}
 
@@ -244,13 +230,10 @@ func (o *GenericOrchestrator) reloadAdapters() {
 					o.metrics.IngestersConfigErrors.WithLabelValues(source, "validation_failed").Inc()
 					o.metrics.IngestersStatus.WithLabelValues(source).Set(-1) // -1 = error
 				}
-				logger.Error("Adapter validation failed",
-					logger.Fields{
-						Component: "orchestrator",
-						Operation: "validate_adapter",
-						Source:    source,
-						Error:     err,
-					})
+				logger := sdklog.NewLogger("zen-watcher-orchestrator")
+				logger.Error(err, "Adapter validation failed",
+					sdklog.Operation("validate_adapter"),
+					sdklog.String("source", source))
 				continue
 			}
 
@@ -264,13 +247,10 @@ func (o *GenericOrchestrator) reloadAdapters() {
 					o.metrics.IngestersConfigErrors.WithLabelValues(source, "start_failed").Inc()
 					o.metrics.IngestersStatus.WithLabelValues(source).Set(-1) // -1 = error
 				}
-				logger.Error("Failed to start adapter",
-					logger.Fields{
-						Component: "orchestrator",
-						Operation: "start_adapter",
-						Source:    source,
-						Error:     err,
-					})
+				logger := sdklog.NewLogger("zen-watcher-orchestrator")
+				logger.Error(err, "Failed to start adapter",
+					sdklog.Operation("start_adapter"),
+					sdklog.String("source", source))
 				continue
 			}
 
@@ -291,17 +271,13 @@ func (o *GenericOrchestrator) reloadAdapters() {
 			// Process events from this adapter
 			go o.processEvents(source, genericConfig, events)
 
+			logger := sdklog.NewLogger("zen-watcher-orchestrator")
 			logger.Info("Generic adapter started",
-				logger.Fields{
-					Component: "orchestrator",
-					Operation: "adapter_started",
-					Source:    source,
-					Additional: map[string]interface{}{
-						"ingester": genericConfig.Ingester,
-						"namespace": item.GetNamespace(),
-						"name": item.GetName(),
-					},
-				})
+				sdklog.Operation("adapter_started"),
+				sdklog.String("source", source),
+				sdklog.String("ingester", genericConfig.Ingester),
+				sdklog.String("namespace", item.GetNamespace()),
+				sdklog.String("name", item.GetName()))
 		}
 	}
 
@@ -330,12 +306,10 @@ func (o *GenericOrchestrator) reloadAdapters() {
 				}
 				o.metrics.IngestersStatus.WithLabelValues(source).Set(0) // 0 = inactive
 			}
+			logger := sdklog.NewLogger("zen-watcher-orchestrator")
 			logger.Info("Generic adapter stopped",
-				logger.Fields{
-					Component: "orchestrator",
-					Operation: "adapter_stopped",
-					Source:    source,
-				})
+				sdklog.Operation("adapter_stopped"),
+				sdklog.String("source", source))
 		}
 	}
 }
@@ -353,13 +327,10 @@ func (o *GenericOrchestrator) processEvents(source string, config *generic.Sourc
 				if o.metrics != nil {
 					o.metrics.IngesterErrorsTotal.WithLabelValues(source, "batch_add_failed", "batch").Inc()
 				}
-				logger.Error("Failed to add event to batch",
-					logger.Fields{
-						Component: "orchestrator",
-						Operation: "batch_add_event",
-						Source:    source,
-						Error:     err,
-					})
+				logger := sdklog.NewLogger("zen-watcher-orchestrator")
+				logger.Error(err, "Failed to add event to batch",
+					sdklog.Operation("batch_add_event"),
+					sdklog.String("source", source))
 			} else {
 				eventCount++
 				if o.metrics != nil {
@@ -391,13 +362,10 @@ func (o *GenericOrchestrator) processEvents(source string, config *generic.Sourc
 				if o.metrics != nil {
 					o.metrics.IngesterErrorsTotal.WithLabelValues(source, "process_failed", "processor").Inc()
 				}
-				logger.Error("Failed to process event",
-					logger.Fields{
-						Component: "orchestrator",
-						Operation: "process_event",
-						Source:    source,
-						Error:     err,
-					})
+				logger := sdklog.NewLogger("zen-watcher-orchestrator")
+				logger.Error(err, "Failed to process event",
+					sdklog.Operation("process_event"),
+					sdklog.String("source", source))
 			} else {
 				eventCount++
 				if o.metrics != nil {
@@ -512,16 +480,12 @@ func (o *GenericOrchestrator) updateAllIngesterStatus(ctx context.Context) {
 		parts := strings.Split(key, "/")
 		if len(parts) == 2 {
 			if err := o.statusUpdater.UpdateStatus(ctx, parts[0], parts[1]); err != nil {
+				logger := sdklog.NewLogger("zen-watcher-orchestrator")
 				logger.Warn("Failed to update Ingester status",
-					logger.Fields{
-						Component: "orchestrator",
-						Operation: "update_status",
-						Namespace: parts[0],
-						Additional: map[string]interface{}{
-							"name":  parts[1],
-							"error": err.Error(),
-						},
-					})
+					sdklog.Operation("update_status"),
+					sdklog.String("namespace", parts[0]),
+					sdklog.String("name", parts[1]),
+					sdklog.Error(err))
 			}
 		}
 	}

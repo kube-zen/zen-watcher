@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 )
 
 // OptimizationEngine orchestrates the optimization process for all sources
@@ -73,14 +73,10 @@ func (oe *OptimizationEngine) Start(ctx context.Context) error {
 
 	go oe.optimizationLoop(optimizationCtx)
 
+	logger := sdklog.NewLogger("zen-watcher-optimization")
 	logger.Info("Optimization engine started",
-		logger.Fields{
-			Component: "optimization",
-			Operation: "engine_start",
-			Additional: map[string]interface{}{
-				"interval": oe.optimizationInterval.String(),
-			},
-		})
+		sdklog.Operation("engine_start"),
+		sdklog.Duration("interval", oe.optimizationInterval))
 
 	return nil
 }
@@ -103,11 +99,9 @@ func (oe *OptimizationEngine) Stop() {
 	// Wait for goroutines to finish
 	oe.wg.Wait()
 
+	logger := sdklog.NewLogger("zen-watcher-optimization")
 	logger.Info("Optimization engine stopped",
-		logger.Fields{
-			Component: "optimization",
-			Operation: "engine_stop",
-		})
+		sdklog.Operation("engine_stop"))
 }
 
 // optimizationLoop runs the continuous optimization loop
@@ -124,11 +118,9 @@ func (oe *OptimizationEngine) optimizationLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			logger := sdklog.NewLogger("zen-watcher-optimization")
 			logger.Info("Optimization loop received shutdown signal",
-				logger.Fields{
-					Component: "optimization",
-					Operation: "loop_shutdown",
-				})
+				sdklog.Operation("loop_shutdown"))
 			return
 		case <-ticker.C:
 			oe.runOptimizationCycle(ctx)

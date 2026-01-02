@@ -17,7 +17,7 @@ package watcher
 import (
 	"context"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -104,13 +104,11 @@ func (al *AdapterLauncher) Start(ctx context.Context) error {
 		adapter := adapter // Capture for goroutine
 		go func() {
 			if err := adapter.Run(ctx, al.eventCh); err != nil {
+				logger := sdklog.NewLogger("zen-watcher")
 				logger.Warn("Adapter stopped",
-					logger.Fields{
-						Component: "watcher",
-						Operation: "adapter_stopped",
-						Source:    adapter.Name(),
-						Error:     err,
-					})
+					sdklog.Operation("adapter_stopped"),
+					sdklog.String("source", adapter.Name()),
+					sdklog.Error(err))
 			}
 		}()
 	}
@@ -129,13 +127,11 @@ func (al *AdapterLauncher) Start(ctx context.Context) error {
 					observationCreator: al.observationCreator,
 				}
 				if err := al.workerPool.EnqueueBlocking(ctx, workItem); err != nil {
+					logger := sdklog.NewLogger("zen-watcher")
 					logger.Warn("Failed to enqueue event for processing",
-						logger.Fields{
-							Component: "watcher",
-							Operation: "adapter_event_enqueue",
-							Source:    event.Source,
-							Error:     err,
-						})
+						sdklog.Operation("adapter_event_enqueue"),
+						sdklog.String("source", event.Source),
+						sdklog.Error(err))
 				}
 			} else {
 				// Process synchronously (original behavior)
@@ -153,13 +149,11 @@ func (al *AdapterLauncher) processEvent(ctx context.Context, event *Event) {
 		// Use centralized observation creator (handles filter, dedup, metrics)
 		err := al.observationCreator.CreateObservation(ctx, observation)
 		if err != nil {
+			logger := sdklog.NewLogger("zen-watcher")
 			logger.Warn("Failed to create Observation from adapter event",
-				logger.Fields{
-					Component: "watcher",
-					Operation: "adapter_observation_create",
-					Source:    event.Source,
-					Error:     err,
-				})
+				sdklog.Operation("adapter_observation_create"),
+				sdklog.String("source", event.Source),
+				sdklog.Error(err))
 		}
 	}
 }

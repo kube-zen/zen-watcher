@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/config"
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
@@ -226,18 +226,14 @@ func (isu *IngesterStatusUpdater) UpdateStatus(ctx context.Context, namespace, n
 		return fmt.Errorf("failed to update Ingester status: %w", err)
 	}
 
+	logger := sdklog.NewLogger("zen-watcher-orchestrator")
 	logger.Debug("Updated Ingester status",
-		logger.Fields{
-			Component: "orchestrator",
-			Operation: "update_status",
-			Namespace: namespace,
-			Additional: map[string]interface{}{
-				"name":           name,
-				"sourceCount":    len(sourceStatuses),
-				"ready":          ready,
-				"readyReason":    readyReason,
-			},
-		})
+		sdklog.Operation("update_status"),
+		sdklog.String("namespace", namespace),
+		sdklog.String("name", name),
+		sdklog.Int("source_count", len(sourceStatuses)),
+		sdklog.Bool("ready", ready),
+		sdklog.String("ready_reason", readyReason))
 
 	return nil
 }

@@ -19,7 +19,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -52,12 +52,10 @@ func (a *K8sEventsAdapter) Name() string {
 func (a *K8sEventsAdapter) Run(ctx context.Context, out chan<- *Event) error {
 	a.ctx, a.cancel = context.WithCancel(ctx)
 
+	logger := sdklog.NewLogger("zen-watcher")
 	logger.Info("Starting Kubernetes Events watcher",
-		logger.Fields{
-			Component: "watcher",
-			Operation: "k8s_events_adapter_start",
-			Source:    "kubernetes-events",
-		})
+		sdklog.Operation("k8s_events_adapter_start"),
+		sdklog.String("source", "kubernetes-events"))
 
 	// Create a field selector to filter events
 	// Focus on Warning/Error type events which are more likely to be security-relevant
@@ -71,13 +69,10 @@ func (a *K8sEventsAdapter) Run(ctx context.Context, out chan<- *Event) error {
 		Watch:         true,
 	})
 	if err != nil {
-		logger.Error("Failed to create Kubernetes Events watcher",
-			logger.Fields{
-				Component: "watcher",
-				Operation: "k8s_events_watcher_create",
-				Source:    "kubernetes-events",
-				Error:     err,
-			})
+		logger := sdklog.NewLogger("zen-watcher")
+		logger.Error(err, "Failed to create Kubernetes Events watcher",
+			sdklog.Operation("k8s_events_watcher_create"),
+			sdklog.String("source", "kubernetes-events"))
 		return err
 	}
 	a.watcher = watcher
@@ -91,12 +86,10 @@ func (a *K8sEventsAdapter) Run(ctx context.Context, out chan<- *Event) error {
 				return
 			case event, ok := <-watcher.ResultChan():
 				if !ok {
+					logger := sdklog.NewLogger("zen-watcher")
 					logger.Warn("Kubernetes Events watcher channel closed",
-						logger.Fields{
-							Component: "watcher",
-							Operation: "k8s_events_watcher_closed",
-							Source:    "kubernetes-events",
-						})
+						sdklog.Operation("k8s_events_watcher_closed"),
+						sdklog.String("source", "kubernetes-events"))
 					return
 				}
 

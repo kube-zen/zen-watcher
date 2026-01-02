@@ -24,7 +24,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"golang.org/x/time/rate"
 )
 
@@ -149,16 +149,12 @@ func (c *HardenedHTTPClient) Do(req *http.Request) (*http.Response, error) {
 
 	// Log request if enabled
 	if c.config.LoggingEnabled {
+		logger := sdklog.NewLogger("zen-watcher-http-client")
 		logger.Debug("HTTP request",
-			logger.Fields{
-				Component: "http_client",
-				Operation: "http_request",
-				Additional: map[string]interface{}{
-					"method":  req.Method,
-					"url":     req.URL.String(),
-					"service": c.service,
-				},
-			})
+			sdklog.Operation("http_request"),
+			sdklog.String("method", req.Method),
+			sdklog.String("url", req.URL.String()),
+			sdklog.String("service", c.service))
 	}
 
 	start := time.Now()
@@ -167,35 +163,27 @@ func (c *HardenedHTTPClient) Do(req *http.Request) (*http.Response, error) {
 
 	if err != nil {
 		if c.config.LoggingEnabled {
+			logger := sdklog.NewLogger("zen-watcher-http-client")
 			logger.Warn("HTTP request failed",
-				logger.Fields{
-					Component: "http_client",
-					Operation: "http_request",
-					Error:     err,
-					Additional: map[string]interface{}{
-						"method":   req.Method,
-						"url":      req.URL.String(),
-						"duration": duration.String(),
-						"service":  c.service,
-					},
-				})
+				sdklog.Operation("http_request"),
+				sdklog.Error(err),
+				sdklog.String("method", req.Method),
+				sdklog.String("url", req.URL.String()),
+				sdklog.Duration("duration", duration),
+				sdklog.String("service", c.service))
 		}
 		return nil, err
 	}
 
 	if c.config.LoggingEnabled {
+		logger := sdklog.NewLogger("zen-watcher-http-client")
 		logger.Debug("HTTP response",
-			logger.Fields{
-				Component: "http_client",
-				Operation: "http_response",
-				Additional: map[string]interface{}{
-					"method":      req.Method,
-					"url":         req.URL.String(),
-					"status_code": resp.StatusCode,
-					"duration":    duration.String(),
-					"service":     c.service,
-				},
-			})
+			sdklog.Operation("http_response"),
+			sdklog.String("method", req.Method),
+			sdklog.String("url", req.URL.String()),
+			sdklog.Int("status_code", resp.StatusCode),
+			sdklog.Duration("duration", duration),
+			sdklog.String("service", c.service))
 	}
 
 	return resp, nil

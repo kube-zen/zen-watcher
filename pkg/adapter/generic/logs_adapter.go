@@ -22,7 +22,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -100,17 +100,13 @@ func (a *LogsAdapter) Start(ctx context.Context, config *SourceConfig) (<-chan R
 	// Start pod watcher
 	go a.watchPods(ctx, config, compiledPatterns, pollInterval)
 
+	logger := sdklog.NewLogger("zen-watcher-adapter")
 	logger.Info("Logs adapter started",
-		logger.Fields{
-			Component: "adapter",
-			Operation: "logs_start",
-			Source:    config.Source,
-			Additional: map[string]interface{}{
-				"podSelector":  config.Logs.PodSelector,
-				"patterns":     len(compiledPatterns),
-				"pollInterval": pollInterval.String(),
-			},
-		})
+		sdklog.Operation("logs_start"),
+		sdklog.String("source", config.Source),
+		sdklog.String("pod_selector", config.Logs.PodSelector),
+		sdklog.Int("patterns", len(compiledPatterns)),
+		sdklog.Duration("poll_interval", pollInterval))
 
 	return a.events, nil
 }
@@ -130,13 +126,11 @@ func (a *LogsAdapter) watchPods(ctx context.Context, config *SourceConfig, patte
 				LabelSelector: config.Logs.PodSelector,
 			})
 			if err != nil {
+				logger := sdklog.NewLogger("zen-watcher-adapter")
 				logger.Debug("Failed to list pods",
-					logger.Fields{
-						Component: "adapter",
-						Operation: "logs_list_pods",
-						Source:    config.Source,
-						Error:     err,
-					})
+					sdklog.Operation("logs_list_pods"),
+					sdklog.String("source", config.Source),
+					sdklog.Error(err))
 				continue
 			}
 
@@ -193,18 +187,14 @@ func (a *LogsAdapter) streamPodLogs(ctx context.Context, pod corev1.Pod, config 
 	req := a.clientSet.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, opts)
 	stream, err := req.Stream(ctx)
 	if err != nil {
+		logger := sdklog.NewLogger("zen-watcher-adapter")
 		logger.Debug("Failed to stream pod logs",
-			logger.Fields{
-				Component: "adapter",
-				Operation: "logs_stream",
-				Source:    config.Source,
-				Namespace: pod.Namespace,
-				Additional: map[string]interface{}{
-					"pod":       pod.Name,
-					"container": container,
-				},
-				Error: err,
-			})
+			sdklog.Operation("logs_stream"),
+			sdklog.String("source", config.Source),
+			sdklog.String("namespace", pod.Namespace),
+			sdklog.String("pod", pod.Name),
+			sdklog.String("container", container),
+			sdklog.Error(err))
 		return
 	}
 	defer stream.Close()
@@ -258,13 +248,11 @@ func (a *LogsAdapter) streamPodLogs(ctx context.Context, pod corev1.Pod, config 
 	}
 
 	if err := scanner.Err(); err != nil {
+		logger := sdklog.NewLogger("zen-watcher-adapter")
 		logger.Debug("Log scanner error",
-			logger.Fields{
-				Component: "adapter",
-				Operation: "logs_scanner",
-				Source:    config.Source,
-				Error:     err,
-			})
+			sdklog.Operation("logs_scanner"),
+			sdklog.String("source", config.Source),
+			sdklog.Error(err))
 	}
 }
 

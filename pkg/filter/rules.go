@@ -20,7 +20,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -58,11 +58,9 @@ func (f *Filter) UpdateConfig(config *FilterConfig) {
 		config.Sources = make(map[string]SourceFilter)
 	}
 	f.config = config
+	logger := sdklog.NewLogger("zen-watcher-filter")
 	logger.Debug("Filter configuration updated dynamically",
-		logger.Fields{
-			Component: "filter",
-			Operation: "config_update",
-		})
+		sdklog.Operation("config_update"))
 }
 
 // getConfig returns the current filter configuration (thread-safe read)
@@ -130,28 +128,20 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	if config.Expression != "" {
 		exprFilter, err := NewExpressionFilter(config.Expression)
 		if err != nil {
+			logger := sdklog.NewLogger("zen-watcher-filter")
 			logger.Debug("Failed to parse filter expression, falling back to list-based filters",
-				logger.Fields{
-					Component: "filter",
-					Operation: "filter_check",
-					Reason:    "expression_parse_error",
-					Additional: map[string]interface{}{
-						"error": err.Error(),
-					},
-				})
+				sdklog.Operation("filter_check"),
+				sdklog.String("reason", "expression_parse_error"),
+				sdklog.String("error", err.Error()))
 			// Fall through to legacy filtering
 		} else {
 			result, err := exprFilter.Evaluate(observation)
 			if err != nil {
+				logger := sdklog.NewLogger("zen-watcher-filter")
 				logger.Debug("Failed to evaluate filter expression, falling back to list-based filters",
-					logger.Fields{
-						Component: "filter",
-						Operation: "filter_check",
-						Reason:    "expression_eval_error",
-						Additional: map[string]interface{}{
-							"error": err.Error(),
-						},
-					})
+					sdklog.Operation("filter_check"),
+					sdklog.String("reason", "expression_eval_error"),
+					sdklog.String("error", err.Error()))
 				// Fall through to list-based filtering
 			} else {
 				if !result {
@@ -198,13 +188,11 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 		if f.metrics != nil {
 			f.metrics.FilterDecisions.WithLabelValues(source, "filter", "source_disabled").Inc()
 		}
+		logger := sdklog.NewLogger("zen-watcher-filter")
 		logger.Debug("Source disabled, filtering out observation",
-			logger.Fields{
-				Component: "filter",
-				Operation: "filter_check",
-				Source:    source,
-				Reason:    "source_disabled",
-			})
+			sdklog.Operation("filter_check"),
+			sdklog.String("source", source),
+			sdklog.String("reason", "source_disabled"))
 		return false, "source_disabled"
 	}
 
@@ -243,14 +231,12 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 					if f.metrics != nil {
 						f.metrics.FilterDecisions.WithLabelValues(source, "filter", "global_exclude_namespace").Inc()
 					}
+					logger := sdklog.NewLogger("zen-watcher-filter")
 					logger.Debug("Namespace excluded by global filter",
-						logger.Fields{
-							Component: "filter",
-							Operation: "filter_check",
-							Source:    source,
-							Namespace: namespace,
-							Reason:    "global_exclude_namespace",
-						})
+						sdklog.Operation("filter_check"),
+						sdklog.String("source", source),
+						sdklog.String("namespace", namespace),
+						sdklog.String("reason", "global_exclude_namespace"))
 					return false, "global_exclude_namespace"
 				}
 			}
@@ -268,14 +254,12 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 				if f.metrics != nil {
 					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "global_include_namespace").Inc()
 				}
+				logger := sdklog.NewLogger("zen-watcher-filter")
 				logger.Debug("Namespace not in global include list",
-					logger.Fields{
-						Component: "filter",
-						Operation: "filter_check",
-						Source:    source,
-						Namespace: namespace,
-						Reason:    "global_include_namespace",
-					})
+					sdklog.Operation("filter_check"),
+					sdklog.String("source", source),
+					sdklog.String("namespace", namespace),
+					sdklog.String("reason", "global_include_namespace"))
 				return false, "global_include_namespace"
 			}
 		}
@@ -313,17 +297,13 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			if f.metrics != nil {
 				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "include_severity").Inc()
 			}
+			logger := sdklog.NewLogger("zen-watcher-filter")
 			logger.Debug("Severity not in include list, filtering out observation",
-				logger.Fields{
-					Component: "filter",
-					Operation: "filter_check",
-					Source:    source,
-					Severity:  severity,
-					Reason:    "include_severity",
-					Additional: map[string]interface{}{
-						"include_severity": sourceFilter.IncludeSeverity,
-					},
-				})
+				sdklog.Operation("filter_check"),
+				sdklog.String("source", source),
+				sdklog.String("severity", severity),
+				sdklog.String("reason", "include_severity"),
+				sdklog.Strings("include_severity", sourceFilter.IncludeSeverity))
 			return false, "include_severity"
 		}
 	} else if sourceFilter.MinSeverity != "" {
@@ -332,17 +312,13 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			if f.metrics != nil {
 				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "min_severity").Inc()
 			}
+			logger := sdklog.NewLogger("zen-watcher-filter")
 			logger.Debug("Severity below minimum, filtering out observation",
-				logger.Fields{
-					Component: "filter",
-					Operation: "filter_check",
-					Source:    source,
-					Severity:  severity,
-					Reason:    "min_severity",
-					Additional: map[string]interface{}{
-						"min_severity": sourceFilter.MinSeverity,
-					},
-				})
+				sdklog.Operation("filter_check"),
+				sdklog.String("source", source),
+				sdklog.String("severity", severity),
+				sdklog.String("reason", "min_severity"),
+				sdklog.String("min_severity", sourceFilter.MinSeverity))
 			return false, "min_severity"
 		}
 	}
@@ -354,14 +330,12 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 				if f.metrics != nil {
 					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_event_type").Inc()
 				}
+				logger := sdklog.NewLogger("zen-watcher-filter")
 				logger.Debug("EventType excluded, filtering out observation",
-					logger.Fields{
-						Component: "filter",
-						Operation: "filter_check",
-						Source:    source,
-						EventType: eventType,
-						Reason:    "exclude_event_type",
-					})
+					sdklog.Operation("filter_check"),
+					sdklog.String("source", source),
+					sdklog.String("event_type", eventType),
+					sdklog.String("reason", "exclude_event_type"))
 				return false, "exclude_event_type"
 			}
 		}
@@ -378,14 +352,12 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			if f.metrics != nil {
 				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "include_event_type").Inc()
 			}
+			logger := sdklog.NewLogger("zen-watcher-filter")
 			logger.Debug("EventType not in include list, filtering out observation",
-				logger.Fields{
-					Component: "filter",
-					Operation: "filter_check",
-					Source:    source,
-					EventType: eventType,
-					Reason:    "include_event_type",
-				})
+				sdklog.Operation("filter_check"),
+				sdklog.String("source", source),
+				sdklog.String("event_type", eventType),
+				sdklog.String("reason", "include_event_type"))
 			return false, "include_event_type"
 		}
 	}
@@ -397,14 +369,12 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 				if f.metrics != nil {
 					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_namespace").Inc()
 				}
+				logger := sdklog.NewLogger("zen-watcher-filter")
 				logger.Debug("Namespace excluded, filtering out observation",
-					logger.Fields{
-						Component: "filter",
-						Operation: "filter_check",
-						Source:    source,
-						Namespace: namespace,
-						Reason:    "exclude_namespace",
-					})
+					sdklog.Operation("filter_check"),
+					sdklog.String("source", source),
+					sdklog.String("namespace", namespace),
+					sdklog.String("reason", "exclude_namespace"))
 				return false, "exclude_namespace"
 			}
 		}
@@ -421,14 +391,12 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			if f.metrics != nil {
 				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "include_namespace").Inc()
 			}
+			logger := sdklog.NewLogger("zen-watcher-filter")
 			logger.Debug("Namespace not in include list, filtering out observation",
-				logger.Fields{
-					Component: "filter",
-					Operation: "filter_check",
-					Source:    source,
-					Namespace: namespace,
-					Reason:    "include_namespace",
-				})
+				sdklog.Operation("filter_check"),
+				sdklog.String("source", source),
+				sdklog.String("namespace", namespace),
+				sdklog.String("reason", "include_namespace"))
 			return false, "include_namespace"
 		}
 	}
@@ -440,14 +408,12 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 				if f.metrics != nil {
 					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_kind").Inc()
 				}
+				logger := sdklog.NewLogger("zen-watcher-filter")
 				logger.Debug("Kind excluded, filtering out observation",
-					logger.Fields{
-						Component:    "filter",
-						Operation:    "filter_check",
-						Source:       source,
-						ResourceKind: kind,
-						Reason:       "exclude_kind",
-					})
+					sdklog.Operation("filter_check"),
+					sdklog.String("source", source),
+					sdklog.String("resource_kind", kind),
+					sdklog.String("reason", "exclude_kind"))
 				return false, "exclude_kind"
 			}
 		}
@@ -464,14 +430,12 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			if f.metrics != nil {
 				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "include_kind").Inc()
 			}
+			logger := sdklog.NewLogger("zen-watcher-filter")
 			logger.Debug("Kind not in include list, filtering out observation",
-				logger.Fields{
-					Component:    "filter",
-					Operation:    "filter_check",
-					Source:       source,
-					ResourceKind: kind,
-					Reason:       "include_kind",
-				})
+				sdklog.Operation("filter_check"),
+				sdklog.String("source", source),
+				sdklog.String("resource_kind", kind),
+				sdklog.String("reason", "include_kind"))
 			return false, "include_kind"
 		}
 	}
@@ -480,19 +444,15 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	if len(sourceFilter.ExcludeCategories) > 0 {
 		for _, excluded := range sourceFilter.ExcludeCategories {
 			if strings.EqualFold(category, excluded) {
-				if f.metrics != nil {
-					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_category").Inc()
-				}
-				logger.Debug("Category excluded, filtering out observation",
-					logger.Fields{
-						Component: "filter",
-						Operation: "filter_check",
-						Source:    source,
-						Additional: map[string]interface{}{
-							"category": category,
-						},
-						Reason: "exclude_category",
-					})
+			if f.metrics != nil {
+				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_category").Inc()
+			}
+			logger := sdklog.NewLogger("zen-watcher-filter")
+			logger.Debug("Category excluded, filtering out observation",
+				sdklog.Operation("filter_check"),
+				sdklog.String("source", source),
+				sdklog.String("category", category),
+				sdklog.String("reason", "exclude_category"))
 				return false, "exclude_category"
 			}
 		}
@@ -509,16 +469,12 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 			if f.metrics != nil {
 				f.metrics.FilterDecisions.WithLabelValues(source, "filter", "include_category").Inc()
 			}
+			logger := sdklog.NewLogger("zen-watcher-filter")
 			logger.Debug("Category not in include list, filtering out observation",
-				logger.Fields{
-					Component: "filter",
-					Operation: "filter_check",
-					Source:    source,
-					Additional: map[string]interface{}{
-						"category": category,
-					},
-					Reason: "include_category",
-				})
+				sdklog.Operation("filter_check"),
+				sdklog.String("source", source),
+				sdklog.String("category", category),
+				sdklog.String("reason", "include_category"))
 			return false, "include_category"
 		}
 	}
@@ -530,16 +486,12 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 				if f.metrics != nil {
 					f.metrics.FilterDecisions.WithLabelValues(source, "filter", "exclude_rule").Inc()
 				}
+				logger := sdklog.NewLogger("zen-watcher-filter")
 				logger.Debug("Rule excluded, filtering out observation",
-					logger.Fields{
-						Component: "filter",
-						Operation: "filter_check",
-						Source:    source,
-						Additional: map[string]interface{}{
-							"rule": rule,
-						},
-						Reason: "exclude_rule",
-					})
+					sdklog.Operation("filter_check"),
+					sdklog.String("source", source),
+					sdklog.String("rule", rule),
+					sdklog.String("reason", "exclude_rule"))
 				return false, "exclude_rule"
 			}
 		}

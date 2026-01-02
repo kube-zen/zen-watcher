@@ -2,7 +2,7 @@
 
 ## Overview
 
-Zen Watcher uses structured logging with [zap](https://github.com/uber-go/zap) for production-grade observability. All logs follow a consistent schema with structured fields for easy parsing, filtering, and correlation.
+Zen Watcher uses structured logging via **zen-sdk/pkg/logging** for production-grade observability. All logs follow a consistent schema with structured fields for easy parsing, filtering, and correlation. The logger provides context-aware logging with automatic extraction of request IDs and trace IDs.
 
 ## Log Schema
 
@@ -200,6 +200,67 @@ env:
 }
 ```
 
+## Code Examples
+
+### Basic Logger Setup
+
+```go
+package main
+
+import (
+    "context"
+    sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+)
+
+func main() {
+    // Create a logger (automatically initializes from environment)
+    logger := sdklog.NewLogger("zen-watcher")
+    
+    logger.Info("Starting zen-watcher",
+        sdklog.Operation("startup"),
+        sdklog.String("component", "main"),
+    )
+}
+```
+
+### Context-Aware Logging
+
+```go
+func handleWebhook(ctx context.Context, logger *sdklog.Logger) {
+    // Context-aware methods automatically extract request_id, trace_id, etc.
+    logger.InfoC(ctx, "Webhook received",
+        sdklog.Operation("webhook_receive"),
+        sdklog.String("source", "falco"),
+    )
+    
+    // Process request...
+    
+    if err != nil {
+        logger.ErrorC(ctx, err, "Failed to process webhook",
+            sdklog.Operation("webhook_process"),
+            sdklog.String("source", "falco"),
+        )
+    }
+}
+```
+
+### Field Helpers
+
+The zen-sdk logger provides type-safe field helpers:
+
+```go
+logger.Info("Observation created",
+    sdklog.Operation("observation_create"),    // Special operation field
+    sdklog.String("component", "watcher"),     // String field
+    sdklog.String("source", "falco"),          // String field
+    sdklog.String("namespace", "default"),     // String field
+    sdklog.Int("count", 42),                   // Integer field
+    sdklog.Float64("duration_seconds", 1.234), // Float field
+    sdklog.Duration("duration", time.Second),  // Duration field
+    sdklog.Strings("tags", []string{"a", "b"}), // String slice field
+)
+```
+
 ## Correlation IDs
 
 Correlation IDs are automatically generated for webhook requests and can be propagated through the processing pipeline. This enables tracing a single event through all processing stages.
@@ -212,11 +273,26 @@ Correlation IDs are automatically generated for webhook requests and can be prop
 ### Using Correlation IDs
 
 ```go
-ctx := logger.WithCorrelationID(ctx, "my-correlation-id")
-logger.Info("Processing event", logger.Fields{
-    Component:     "watcher",
-    CorrelationID:  logger.GetCorrelationID(ctx),
-})
+import sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+
+logger := sdklog.NewLogger("zen-watcher")
+
+// Add correlation ID to context
+ctx := sdklog.WithRequestID(ctx, "my-correlation-id")
+
+// Log with context (automatically extracts request_id)
+logger.InfoC(ctx, "Processing event",
+    sdklog.Operation("process_event"),
+    sdklog.String("component", "watcher"),
+)
+
+// Or extract request ID explicitly
+requestID := sdklog.GetRequestID(ctx)
+logger.Info("Processing event",
+    sdklog.Operation("process_event"),
+    sdklog.String("component", "watcher"),
+    sdklog.String("request_id", requestID),
+)
 ```
 
 ## Log Aggregation
@@ -243,15 +319,17 @@ LOG_DEVELOPMENT=true ./zen-watcher
 
 ✅ **Good:**
 ```go
+import sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+
+logger := sdklog.NewLogger("zen-watcher")
 logger.Info("Observation created",
-    logger.Fields{
-        Component:      "watcher",
-        Operation:      "observation_create",
-        Source:         "falco",
-        Namespace:      "default",
-        ObservationID:  "obs-123",
-        Severity:       "HIGH",
-    })
+    sdklog.Operation("observation_create"),
+    sdklog.String("component", "watcher"),
+    sdklog.String("source", "falco"),
+    sdklog.String("namespace", "default"),
+    sdklog.String("observation_id", "obs-123"),
+    sdklog.String("severity", "HIGH"),
+)
 ```
 
 ❌ **Bad:**
@@ -261,15 +339,26 @@ log.Printf("Created observation obs-123 for falco in default namespace with HIGH
 
 ### 2. Include Correlation IDs
 
-Always include correlation IDs for request tracing:
+Always include correlation IDs for request tracing. Use context-aware logging methods when a context is available:
 
 ```go
-correlationID := logger.GetCorrelationID(ctx)
+import sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+
+logger := sdklog.NewLogger("zen-watcher")
+
+// Context-aware logging (automatically extracts request_id from context)
+logger.InfoC(ctx, "Processing event",
+    sdklog.Operation("process_event"),
+    sdklog.String("component", "watcher"),
+)
+
+// Or extract request ID explicitly
+requestID := sdklog.GetRequestID(ctx)
 logger.Info("Processing event",
-    logger.Fields{
-        Component:     "watcher",
-        CorrelationID: correlationID,
-    })
+    sdklog.Operation("process_event"),
+    sdklog.String("component", "watcher"),
+    sdklog.String("request_id", requestID),
+)
 ```
 
 ### 3. Use Appropriate Log Levels
@@ -286,33 +375,51 @@ Never log sensitive information:
 
 ❌ **Bad:**
 ```go
-logger.Info("Processing secret", logger.Fields{
-    Additional: map[string]interface{}{
-        "secret_value": secretValue, // DON'T DO THIS
-    },
-})
+logger.Info("Processing secret",
+    sdklog.Operation("process_secret"),
+    sdklog.String("secret_value", secretValue), // DON'T DO THIS
+)
 ```
 
 ✅ **Good:**
 ```go
-logger.Info("Processing secret", logger.Fields{
-    ResourceName: secretName,
-    Namespace:    namespace,
-})
+logger.Info("Processing secret",
+    sdklog.Operation("process_secret"),
+    sdklog.String("component", "watcher"),
+    sdklog.String("resource_name", secretName),
+    sdklog.String("namespace", namespace),
+)
 ```
 
 ### 5. Include Error Context
 
-Always include error details:
+Always include error details. The Error method automatically adds error categorization:
+
+```go
+import sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+
+logger := sdklog.NewLogger("zen-watcher")
+
+if err != nil {
+    logger.Error(err, "Failed to create observation",
+        sdklog.Operation("observation_create"),
+        sdklog.String("component", "watcher"),
+        sdklog.String("source", "falco"),
+        sdklog.String("namespace", namespace),
+    )
+}
+```
+
+When using context-aware logging:
 
 ```go
 if err != nil {
-    logger.Error("Failed to create observation",
-        logger.Fields{
-            Component: "watcher",
-            Operation: "observation_create",
-            Error:     err,
-        })
+    logger.ErrorC(ctx, err, "Failed to create observation",
+        sdklog.Operation("observation_create"),
+        sdklog.String("component", "watcher"),
+        sdklog.String("source", "falco"),
+        sdklog.String("namespace", namespace),
+    )
 }
 ```
 

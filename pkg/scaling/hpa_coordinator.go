@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/config"
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 )
 
@@ -184,19 +184,15 @@ func (c *HPACoordinator) ExecuteScalingDecision(decision *ScalingDecision) {
 	}
 
 	// Log the scaling decision
+	logger := sdklog.NewLogger("zen-watcher-scaling")
 	logger.Info("Scaling decision made",
-		logger.Fields{
-			Component: "scaling",
-			Operation: "scaling_decision",
-			Additional: map[string]interface{}{
-				"action":         decision.Action,
-				"reason":         decision.Reason,
-				"current_cpu":    decision.CurrentCPU,
-				"target_cpu":     decision.TargetCPU,
-				"queue_depth":    decision.QueueDepth,
-				"events_per_sec": decision.EventsPerSec,
-			},
-		})
+		sdklog.Operation("scaling_decision"),
+		sdklog.String("action", decision.Action),
+		sdklog.String("reason", decision.Reason),
+		sdklog.Float64("current_cpu", decision.CurrentCPU),
+		sdklog.Int("target_cpu", decision.TargetCPU),
+		sdklog.Int("queue_depth", decision.QueueDepth),
+		sdklog.Float64("events_per_sec", decision.EventsPerSec))
 
 	// Record in metrics
 	if c.haMetrics != nil {

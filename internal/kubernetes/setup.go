@@ -19,7 +19,7 @@ import (
 
 	"github.com/kube-zen/zen-watcher/internal/informers"
 	"github.com/kube-zen/zen-watcher/pkg/config"
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
@@ -43,11 +43,9 @@ type GVRs struct {
 
 // NewClients creates Kubernetes clients from in-cluster config
 func NewClients() (*Clients, error) {
+	logger := sdklog.NewLogger("zen-watcher-kubernetes")
 	logger.Info("Initializing Kubernetes client",
-		logger.Fields{
-			Component: "kubernetes",
-			Operation: "client_init",
-		})
+		sdklog.Operation("client_init"))
 
 	config, err := rest.InClusterConfig()
 	if err != nil {
@@ -65,10 +63,7 @@ func NewClients() (*Clients, error) {
 	}
 
 	logger.Info("Kubernetes client ready",
-		logger.Fields{
-			Component: "kubernetes",
-			Operation: "client_init",
-		})
+		sdklog.Operation("client_init"))
 
 	return &Clients{
 		Dynamic:  dynClient,

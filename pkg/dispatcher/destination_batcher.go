@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
@@ -171,28 +171,20 @@ func (db *DestinationBatcher) flushBatch(ctx context.Context, destinationKey str
 
 	// Call flush function
 	if err := db.flushFunc(ctx, destinationKey, observations); err != nil {
+		logger := sdklog.NewLogger("zen-watcher-dispatcher")
 		logger.Warn("Failed to flush observation batch",
-			logger.Fields{
-				Component: "dispatcher",
-				Operation: "batch_flush",
-				Error:     err,
-				Additional: map[string]interface{}{
-					"destination": destinationKey,
-					"batch_size":  len(observations),
-				},
-			})
+			sdklog.Operation("batch_flush"),
+			sdklog.Error(err),
+			sdklog.String("destination", destinationKey),
+			sdklog.Int("batch_size", len(observations)))
 		return err
 	}
 
+	logger := sdklog.NewLogger("zen-watcher-dispatcher")
 	logger.Debug("Flushed observation batch",
-		logger.Fields{
-			Component: "dispatcher",
-			Operation: "batch_flushed",
-			Additional: map[string]interface{}{
-				"destination": destinationKey,
-				"batch_size":  len(observations),
-			},
-		})
+		sdklog.Operation("batch_flushed"),
+		sdklog.String("destination", destinationKey),
+		sdklog.Int("batch_size", len(observations)))
 
 	return nil
 }

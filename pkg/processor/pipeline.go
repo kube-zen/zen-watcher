@@ -25,7 +25,7 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/hooks"
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/monitoring"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
@@ -109,12 +109,10 @@ func (p *Processor) ProcessEvent(ctx context.Context, raw *generic.RawEvent, con
 		dedupKey := p.extractDedupKey(observation, raw)
 		shouldCreate := p.shouldCreateWithStrategy(dedupKey, observation.Object, config)
 		if !shouldCreate {
+			logger := sdklog.NewLogger("zen-watcher-processor")
 			logger.Debug("Event deduplicated",
-				logger.Fields{
-					Component: "processor",
-					Operation: "dedup",
-					Source:    raw.Source,
-				})
+				sdklog.Operation("dedup"),
+				sdklog.String("source", raw.Source))
 			deduped = true
 		}
 
@@ -122,13 +120,11 @@ func (p *Processor) ProcessEvent(ctx context.Context, raw *generic.RawEvent, con
 		if !deduped && p.filter != nil {
 			allowed, reason := p.filter.AllowWithReason(observation)
 			if !allowed {
+				logger := sdklog.NewLogger("zen-watcher-processor")
 				logger.Debug("Event filtered",
-					logger.Fields{
-						Component: "processor",
-						Operation: "filter",
-						Source:    raw.Source,
-						Reason:    reason,
-					})
+					sdklog.Operation("filter"),
+					sdklog.String("source", raw.Source),
+					sdklog.String("reason", reason))
 				filtered = true
 			}
 		}
@@ -137,13 +133,11 @@ func (p *Processor) ProcessEvent(ctx context.Context, raw *generic.RawEvent, con
 		if p.filter != nil {
 			allowed, reason := p.filter.AllowWithReason(observation)
 			if !allowed {
+				logger := sdklog.NewLogger("zen-watcher-processor")
 				logger.Debug("Event filtered",
-					logger.Fields{
-						Component: "processor",
-						Operation: "filter",
-						Source:    raw.Source,
-						Reason:    reason,
-					})
+					sdklog.Operation("filter"),
+					sdklog.String("source", raw.Source),
+					sdklog.String("reason", reason))
 				filtered = true
 			}
 		}
@@ -153,12 +147,10 @@ func (p *Processor) ProcessEvent(ctx context.Context, raw *generic.RawEvent, con
 			dedupKey := p.extractDedupKey(observation, raw)
 			shouldCreate := p.shouldCreateWithStrategy(dedupKey, observation.Object, config)
 			if !shouldCreate {
+				logger := sdklog.NewLogger("zen-watcher-processor")
 				logger.Debug("Event deduplicated",
-					logger.Fields{
-						Component: "processor",
-						Operation: "dedup",
-						Source:    raw.Source,
-					})
+					sdklog.Operation("dedup"),
+					sdklog.String("source", raw.Source))
 				deduped = true
 			}
 		}

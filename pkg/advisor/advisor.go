@@ -19,7 +19,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 )
 
 // Advisor coordinates optimization analysis, suggestions, and impact tracking
@@ -68,14 +68,10 @@ func (a *Advisor) Start(ctx context.Context) error {
 	a.running = true
 	a.mu.Unlock()
 
+	logger := sdklog.NewLogger("zen-watcher-advisor")
 	logger.Info("Optimization advisor started",
-		logger.Fields{
-			Component: "advisor",
-			Operation: "advisor_start",
-			Additional: map[string]interface{}{
-				"analysis_interval_minutes": a.analysisInterval.Minutes(),
-			},
-		})
+		sdklog.Operation("advisor_start"),
+		sdklog.Float64("analysis_interval_minutes", a.analysisInterval.Minutes()))
 
 	ticker := time.NewTicker(a.analysisInterval)
 	defer ticker.Stop()
@@ -89,11 +85,9 @@ func (a *Advisor) Start(ctx context.Context) error {
 			a.mu.Lock()
 			a.running = false
 			a.mu.Unlock()
+			logger := sdklog.NewLogger("zen-watcher-advisor")
 			logger.Info("Optimization advisor stopped",
-				logger.Fields{
-					Component: "advisor",
-					Operation: "advisor_stop",
-				})
+				sdklog.Operation("advisor_stop"))
 			return ctx.Err()
 		case <-ticker.C:
 			a.runAnalysis(ctx)
@@ -103,30 +97,21 @@ func (a *Advisor) Start(ctx context.Context) error {
 
 // runAnalysis performs a full optimization analysis cycle
 func (a *Advisor) runAnalysis(ctx context.Context) {
+	logger := sdklog.NewLogger("zen-watcher-advisor")
 	logger.Debug("Starting optimization analysis",
-		logger.Fields{
-			Component: "advisor",
-			Operation: "analysis_start",
-		})
+		sdklog.Operation("analysis_start"))
 
 	// Step 1: Analyze metrics to find opportunities
 	opportunities, err := a.metricsAnalyzer.Analyze(ctx)
 	if err != nil {
-		logger.Error("Failed to analyze metrics",
-			logger.Fields{
-				Component: "advisor",
-				Operation: "analysis_metrics",
-				Error:     err,
-			})
+		logger.Error(err, "Failed to analyze metrics",
+			sdklog.Operation("analysis_metrics"))
 		return
 	}
 
 	if len(opportunities) == 0 {
 		logger.Debug("No optimization opportunities found",
-			logger.Fields{
-				Component: "advisor",
-				Operation: "analysis_complete",
-			})
+			sdklog.Operation("analysis_complete"))
 		return
 	}
 
@@ -142,14 +127,9 @@ func (a *Advisor) runAnalysis(ctx context.Context) {
 	a.logSummary(opportunities, suggestions)
 
 	logger.Debug("Optimization analysis complete",
-		logger.Fields{
-			Component: "advisor",
-			Operation: "analysis_complete",
-			Additional: map[string]interface{}{
-				"opportunities": len(opportunities),
-				"suggestions":   len(suggestions),
-			},
-		})
+		sdklog.Operation("analysis_complete"),
+		sdklog.Int("opportunities", len(opportunities)),
+		sdklog.Int("suggestions", len(suggestions)))
 }
 
 // processSuggestion handles a generated suggestion
@@ -182,31 +162,22 @@ func (a *Advisor) logSummary(opportunities []Opportunity, suggestions []Suggesti
 		// Aggregate stats per source
 	}
 
+	logger := sdklog.NewLogger("zen-watcher-advisor")
 	logger.Info("Optimization summary",
-		logger.Fields{
-			Component: "advisor",
-			Operation: "optimization_summary",
-			Additional: map[string]interface{}{
-				"opportunities": len(opportunities),
-				"suggestions":   len(suggestions),
-				"sources":       sourceStats,
-			},
-		})
+		sdklog.Operation("optimization_summary"),
+		sdklog.Int("opportunities", len(opportunities)),
+		sdklog.Int("suggestions", len(suggestions)))
 }
 
 // ApplySuggestion applies a suggestion
 func (a *Advisor) ApplySuggestion(ctx context.Context, suggestion Suggestion) error {
+	logger := sdklog.NewLogger("zen-watcher-advisor")
 	logger.Info("Applying suggestion",
-		logger.Fields{
-			Component: "advisor",
-			Operation: "apply_suggestion",
-			Source:    suggestion.Source,
-			Additional: map[string]interface{}{
-				"type":       suggestion.Type,
-				"confidence": suggestion.Confidence,
-				"command":    suggestion.Command,
-			},
-		})
+		sdklog.Operation("apply_suggestion"),
+		sdklog.String("source", suggestion.Source),
+		sdklog.String("type", suggestion.Type),
+		sdklog.Float64("confidence", suggestion.Confidence),
+		sdklog.String("command", suggestion.Command))
 
 	// Track application
 	a.impactTracker.RecordApplication(suggestion)

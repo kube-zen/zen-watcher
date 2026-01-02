@@ -27,7 +27,7 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/config"
 	"github.com/kube-zen/zen-watcher/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/optimization"
 	"github.com/prometheus/client_golang/prometheus"
@@ -303,6 +303,7 @@ func (oc *ObservationCreator) getSourceMetrics(source string) *SourceMetrics {
 
 // createObservation creates the observation (extracted from original CreateObservation)
 func (oc *ObservationCreator) createObservation(ctx context.Context, observation *unstructured.Unstructured, source string) error {
+	logger := sdklog.NewLogger("zen-watcher")
 
 	// Extract namespace from observation (optimized)
 	namespace, found := oc.fieldExtractor.ExtractString(observation.Object, "metadata", "namespace")
@@ -326,33 +327,26 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 		category = fmt.Sprintf("%v", categoryVal)
 	} else if !categoryFound {
 		logger.Debug("Category not found in spec",
-			logger.Fields{
-				Component: "watcher",
-				Operation: "observation_create",
-				Source:    source,
-			})
+			sdklog.Operation("observation_create"),
+			sdklog.String("source", source))
 	}
 	severity := ""
 	if severityVal != nil {
 		severity = fmt.Sprintf("%v", severityVal)
 	} else if !severityFound {
+		logger := sdklog.NewLogger("zen-watcher")
 		logger.Debug("Severity not found in spec",
-			logger.Fields{
-				Component: "watcher",
-				Operation: "observation_create",
-				Source:    source,
-			})
+			sdklog.Operation("observation_create"),
+			sdklog.String("source", source))
 	}
 	eventType := ""
 	if eventTypeVal != nil {
 		eventType = fmt.Sprintf("%v", eventTypeVal)
 	} else if !eventTypeFound {
+		logger := sdklog.NewLogger("zen-watcher")
 		logger.Debug("EventType not found in spec",
-			logger.Fields{
-				Component: "watcher",
-				Operation: "observation_create",
-				Source:    source,
-			})
+			sdklog.Operation("observation_create"),
+			sdklog.String("source", source))
 	}
 
 	// Normalize severity to uppercase for consistency
@@ -471,42 +465,30 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 
 		oc.eventsTotal.WithLabelValues(source, category, severity, eventType, resourceNamespace, resourceKind, strategy).Inc()
 		logger.Debug("Metric incremented after observation creation",
-			logger.Fields{
-				Component: "watcher",
-				Operation: "observation_create",
-				Source:    source,
-				Additional: map[string]interface{}{
-					"category":              category,
-					"severity":              severity,
-					"eventType":             eventType,
-					"observation_name":      createdObservation.GetName(),
-					"observation_namespace": namespace,
-					"resource_namespace":    resourceNamespace,
-					"resource_kind":         resourceKind,
-				},
-			})
+			sdklog.Operation("observation_create"),
+			sdklog.String("source", source),
+			sdklog.String("category", category),
+			sdklog.String("severity", severity),
+			sdklog.String("eventType", eventType),
+			sdklog.String("observation_name", createdObservation.GetName()),
+			sdklog.String("observation_namespace", namespace),
+			sdklog.String("resource_namespace", resourceNamespace),
+			sdklog.String("resource_kind", resourceKind))
 	} else {
-		logger.Error("eventsTotal metric is nil, metrics will not be incremented",
-			logger.Fields{
-				Component: "watcher",
-				Operation: "observation_create",
-				Source:    source,
-			})
+		logger := sdklog.NewLogger("zen-watcher")
+		logger.Error(fmt.Errorf("eventsTotal metric is nil"), "eventsTotal metric is nil, metrics will not be incremented",
+			sdklog.Operation("observation_create"),
+			sdklog.String("source", source))
 	}
 
 	// STEP 3: LOG SUCCESS
 	logger.Debug("Observation created successfully",
-		logger.Fields{
-			Component: "watcher",
-			Operation: "observation_create",
-			Source:    source,
-			Namespace: namespace,
-			Additional: map[string]interface{}{
-				"observation_name": createdObservation.GetName(),
-				"category":         category,
-				"severity":         severity,
-			},
-		})
+		sdklog.Operation("observation_create"),
+		sdklog.String("source", source),
+		sdklog.String("namespace", namespace),
+		sdklog.String("observation_name", createdObservation.GetName()),
+		sdklog.String("category", category),
+		sdklog.String("severity", severity))
 
 	return nil
 }
@@ -625,6 +607,8 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 		return
 	}
 
+	logger := sdklog.NewLogger("zen-watcher")
+
 	// Get default TTL from environment variable (in seconds)
 	// Convert from days (OBSERVATION_TTL_DAYS) or use OBSERVATION_TTL_SECONDS if set
 	var defaultTTLSeconds int64 = 7 * 24 * 60 * 60 // Default: 7 days in seconds
@@ -639,56 +623,39 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 			defaultTTLSeconds = ttlSeconds
 		} else {
 			logger.Warn("Failed to parse OBSERVATION_TTL_SECONDS, using default",
-				logger.Fields{
-					Component: "watcher",
-					Operation: "ttl_parsing",
-					Error:     err,
-					Additional: map[string]interface{}{
-						"value": ttlSecondsStr,
-					},
-				})
+				sdklog.Operation("ttl_parsing"),
+				sdklog.String("value", ttlSecondsStr),
+				sdklog.Error(err))
 		}
 	} else if ttlDaysStr := os.Getenv("OBSERVATION_TTL_DAYS"); ttlDaysStr != "" {
 		// Fallback to days (for backward compatibility)
 		if ttlDays, err := strconv.Atoi(ttlDaysStr); err == nil && ttlDays > 0 {
 			defaultTTLSeconds = int64(ttlDays) * 24 * 60 * 60
 		} else {
+			logger := sdklog.NewLogger("zen-watcher")
 			logger.Warn("Failed to parse OBSERVATION_TTL_DAYS, using default",
-				logger.Fields{
-					Component: "watcher",
-					Operation: "ttl_parsing",
-					Error:     err,
-					Additional: map[string]interface{}{
-						"value": ttlDaysStr,
-					},
-				})
+				sdklog.Operation("ttl_parsing"),
+				sdklog.String("value", ttlDaysStr),
+				sdklog.Error(err))
 		}
 	}
 
 	// Validate TTL bounds
 	if defaultTTLSeconds < MinTTLSeconds {
+		logger := sdklog.NewLogger("zen-watcher")
 		logger.Warn("TTL value too small, using minimum",
-			logger.Fields{
-				Component: "watcher",
-				Operation: "ttl_validation",
-				Additional: map[string]interface{}{
-					"requested_ttl": defaultTTLSeconds,
-					"minimum_ttl":   MinTTLSeconds,
-					"applied_ttl":   MinTTLSeconds,
-				},
-			})
+			sdklog.Operation("ttl_validation"),
+			sdklog.Int64("requested_ttl", defaultTTLSeconds),
+			sdklog.Int64("minimum_ttl", MinTTLSeconds),
+			sdklog.Int64("applied_ttl", MinTTLSeconds))
 		defaultTTLSeconds = MinTTLSeconds
 	} else if defaultTTLSeconds > MaxTTLSeconds {
+		logger := sdklog.NewLogger("zen-watcher")
 		logger.Warn("TTL value too large, using maximum",
-			logger.Fields{
-				Component: "watcher",
-				Operation: "ttl_validation",
-				Additional: map[string]interface{}{
-					"requested_ttl": defaultTTLSeconds,
-					"maximum_ttl":   MaxTTLSeconds,
-					"applied_ttl":   MaxTTLSeconds,
-				},
-			})
+			sdklog.Operation("ttl_validation"),
+			sdklog.Int64("requested_ttl", defaultTTLSeconds),
+			sdklog.Int64("maximum_ttl", MaxTTLSeconds),
+			sdklog.Int64("applied_ttl", MaxTTLSeconds))
 		defaultTTLSeconds = MaxTTLSeconds
 	}
 

@@ -20,7 +20,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -34,7 +34,6 @@ import (
 type CRDCreator struct {
 	dynClient dynamic.Interface
 	gvr       schema.GroupVersionResource
-	logger    *logger.Logger
 }
 
 // NewCRDCreator creates a new generic CRD creator that can write to any GVR.
@@ -42,7 +41,6 @@ func NewCRDCreator(dynClient dynamic.Interface, gvr schema.GroupVersionResource)
 	return &CRDCreator{
 		dynClient: dynClient,
 		gvr:       gvr,
-		logger:    logger.GetLogger(),
 	}
 }
 
@@ -66,35 +64,26 @@ func (cc *CRDCreator) CreateCRD(ctx context.Context, observation *unstructured.U
 
 	if err != nil {
 		errorType := classifyError(err)
-		cc.logger.Error("Failed to create resource",
-			logger.Fields{
-				Component: "watcher",
-				Operation: "crd_create",
-				Error:     err,
-				Additional: map[string]interface{}{
-					"gvr":        cc.gvr.String(),
-					"group":      cc.gvr.Group,
-					"version":    cc.gvr.Version,
-					"resource":   cc.gvr.Resource,
-					"namespace":  namespace,
-					"error_type": errorType,
-				},
-			})
+		logger := sdklog.NewLogger("zen-watcher")
+		logger.Error(err, "Failed to create resource",
+			sdklog.Operation("crd_create"),
+			sdklog.String("gvr", cc.gvr.String()),
+			sdklog.String("group", cc.gvr.Group),
+			sdklog.String("version", cc.gvr.Version),
+			sdklog.String("resource", cc.gvr.Resource),
+			sdklog.String("namespace", namespace),
+			sdklog.String("error_type", errorType))
 		return fmt.Errorf("failed to create resource %s/%s/%s in namespace %s: %w",
 			cc.gvr.Group, cc.gvr.Version, cc.gvr.Resource, namespace, err)
 	}
 
-	cc.logger.Debug("Created CRD successfully",
-		logger.Fields{
-			Component: "watcher",
-			Operation: "crd_create",
-			Additional: map[string]interface{}{
-				"gvr":                  cc.gvr.String(),
-				"namespace":            namespace,
-				"name":                 createdCRD.GetName(),
-				"delivery_duration_ms": deliveryDuration.Milliseconds(),
-			},
-		})
+	logger := sdklog.NewLogger("zen-watcher")
+	logger.Debug("Created CRD successfully",
+		sdklog.Operation("crd_create"),
+		sdklog.String("gvr", cc.gvr.String()),
+		sdklog.String("namespace", namespace),
+		sdklog.String("name", createdCRD.GetName()),
+		sdklog.Int64("delivery_duration_ms", deliveryDuration.Milliseconds()))
 
 	return nil
 }

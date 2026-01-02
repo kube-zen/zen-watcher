@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -52,14 +52,10 @@ func NewThresholdMonitor(
 
 // Start begins monitoring thresholds
 func (tm *ThresholdMonitor) Start(ctx context.Context) error {
+	logger := sdklog.NewLogger("zen-watcher-monitoring")
 	logger.Info("Threshold monitor started",
-		logger.Fields{
-			Component: "monitoring",
-			Operation: "threshold_monitor_start",
-			Additional: map[string]interface{}{
-				"check_interval_seconds": tm.checkInterval.Seconds(),
-			},
-		})
+		sdklog.Operation("threshold_monitor_start"),
+		sdklog.Float64("check_interval_seconds", tm.checkInterval.Seconds()))
 
 	ticker := time.NewTicker(tm.checkInterval)
 	defer ticker.Stop()
@@ -67,11 +63,9 @@ func (tm *ThresholdMonitor) Start(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			logger := sdklog.NewLogger("zen-watcher-monitoring")
 			logger.Info("Threshold monitor stopped",
-				logger.Fields{
-					Component: "monitoring",
-					Operation: "threshold_monitor_stop",
-				})
+				sdklog.Operation("threshold_monitor_stop"))
 			return ctx.Err()
 		case <-ticker.C:
 			// Check thresholds periodically
@@ -104,35 +98,27 @@ func (tm *ThresholdMonitor) CheckThreshold(source string, metricName string, val
 	if value >= criticalThreshold {
 		severity = "critical"
 		tm.recordThresholdExceeded(source, metricName, severity)
+		logger := sdklog.NewLogger("zen-watcher-monitoring")
 		logger.Warn("Critical threshold exceeded",
-			logger.Fields{
-				Component: "monitoring",
-				Operation: "threshold_exceeded",
-				Source:    source,
-				Additional: map[string]interface{}{
-					"metric":             metricName,
-					"value":              value,
-					"critical_threshold": criticalThreshold,
-					"severity":           severity,
-					"message":            "Threshold exceeded - this is a warning only, event will still be processed",
-				},
-			})
+			sdklog.Operation("threshold_exceeded"),
+			sdklog.String("source", source),
+			sdklog.String("metric", metricName),
+			sdklog.Float64("value", value),
+			sdklog.Float64("critical_threshold", criticalThreshold),
+			sdklog.String("severity", severity),
+			sdklog.String("message", "Threshold exceeded - this is a warning only, event will still be processed"))
 	} else if value >= warningThreshold {
 		severity = "warning"
 		tm.recordThresholdExceeded(source, metricName, severity)
+		logger := sdklog.NewLogger("zen-watcher-monitoring")
 		logger.Warn("Warning threshold exceeded",
-			logger.Fields{
-				Component: "monitoring",
-				Operation: "threshold_exceeded",
-				Source:    source,
-				Additional: map[string]interface{}{
-					"metric":            metricName,
-					"value":             value,
-					"warning_threshold": warningThreshold,
-					"severity":          severity,
-					"message":           "Threshold exceeded - this is a warning only, event will still be processed",
-				},
-			})
+			sdklog.Operation("threshold_exceeded"),
+			sdklog.String("source", source),
+			sdklog.String("metric", metricName),
+			sdklog.Float64("value", value),
+			sdklog.Float64("warning_threshold", warningThreshold),
+			sdklog.String("severity", severity),
+			sdklog.String("message", "Threshold exceeded - this is a warning only, event will still be processed"))
 	}
 
 	// Always allow (thresholds are warnings only, not blockers)

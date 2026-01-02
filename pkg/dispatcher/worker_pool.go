@@ -23,7 +23,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -143,15 +143,11 @@ func (wp *WorkerPool) UpdateConfig(newConfig WorkerPoolConfig) {
 	if newConfig.Size != wp.workers {
 		// Note: Dynamic resizing would require more complex logic
 		// For now, we log a warning and keep existing workers
+		logger := sdklog.NewLogger("zen-watcher-dispatcher")
 		logger.Warn("Worker pool size change requires restart",
-			logger.Fields{
-				Component: "dispatcher",
-				Operation: "worker_pool_update",
-				Additional: map[string]interface{}{
-					"old_size": wp.workers,
-					"new_size": newConfig.Size,
-				},
-			})
+			sdklog.Operation("worker_pool_update"),
+			sdklog.Int("old_size", wp.workers),
+			sdklog.Int("new_size", newConfig.Size))
 	}
 
 	// Update queue size if changed (requires recreation)
@@ -168,11 +164,9 @@ func (wp *WorkerPool) UpdateConfig(newConfig WorkerPoolConfig) {
 					select {
 					case wp.workQueue <- item:
 					default:
+						logger := sdklog.NewLogger("zen-watcher-dispatcher")
 						logger.Warn("Dropped work item during queue resize",
-							logger.Fields{
-								Component: "dispatcher",
-								Operation: "queue_resize",
-							})
+							sdklog.Operation("queue_resize"))
 					}
 				default:
 					return
@@ -285,15 +279,11 @@ func (wp *WorkerPool) worker(id int) {
 
 			// Handle errors
 			if err != nil {
+				logger := sdklog.NewLogger("zen-watcher-dispatcher")
 				logger.Warn("Work item processing failed",
-					logger.Fields{
-						Component: "dispatcher",
-						Operation: "worker_process",
-						Error:     err,
-						Additional: map[string]interface{}{
-							"worker_id": id,
-						},
-					})
+					sdklog.Operation("worker_process"),
+					sdklog.Error(err),
+					sdklog.Int("worker_id", id))
 			}
 
 		case <-wp.ctx.Done():

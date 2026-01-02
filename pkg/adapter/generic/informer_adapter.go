@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/internal/informers"
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/tools/cache"
@@ -84,13 +84,11 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 		var err error
 		resyncPeriod, err = time.ParseDuration(config.Informer.ResyncPeriod)
 		if err != nil {
+			logger := sdklog.NewLogger("zen-watcher-adapter")
 			logger.Warn("Invalid resync period, using default",
-				logger.Fields{
-					Component: "adapter",
-					Operation: "informer_start",
-					Source:    config.Source,
-					Error:     err,
-				})
+				sdklog.Operation("informer_start"),
+				sdklog.String("source", config.Source),
+				sdklog.Error(err))
 		}
 	}
 
@@ -178,17 +176,13 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 		return nil, fmt.Errorf("failed to sync informer cache for %s: %w", gvr.String(), err)
 	}
 
+	logger := sdklog.NewLogger("zen-watcher-adapter")
 	logger.Info("Informer adapter started",
-		logger.Fields{
-			Component: "adapter",
-			Operation: "informer_start",
-			Source:    config.Source,
-			Additional: map[string]interface{}{
-				"gvr":          gvr.String(),
-				"namespace":    config.Informer.Namespace,
-				"resyncPeriod": resyncPeriod.String(),
-			},
-		})
+		sdklog.Operation("informer_start"),
+		sdklog.String("source", config.Source),
+		sdklog.String("gvr", gvr.String()),
+		sdklog.String("namespace", config.Informer.Namespace),
+		sdklog.Duration("resync_period", resyncPeriod))
 
 	return events, nil
 }
@@ -208,12 +202,10 @@ func (a *InformerAdapter) processQueue(ctx context.Context, events chan<- RawEve
 			// Process the event
 			event, ok := item.(RawEvent)
 			if !ok {
-				logger.Warn("Unexpected item type in queue",
-					logger.Fields{
-						Component: "adapter",
-						Operation: "process_queue",
-						Source:    source,
-					})
+			logger := sdklog.NewLogger("zen-watcher-adapter")
+			logger.Warn("Unexpected item type in queue",
+				sdklog.Operation("process_queue"),
+				sdklog.String("source", source))
 				a.queue.Done(item)
 				continue
 			}

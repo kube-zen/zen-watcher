@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
-	"github.com/kube-zen/zen-watcher/pkg/logger"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"golang.org/x/time/rate"
 )
 
@@ -57,15 +57,11 @@ func (gtm *GenericThresholdMonitor) CheckEvent(raw *generic.RawEvent, config *ge
 	// Check rate limiting
 	if config.RateLimit != nil && config.RateLimit.ObservationsPerMinute > 0 {
 		if !gtm.allowRateLimit(raw.Source, config.RateLimit.ObservationsPerMinute, config.RateLimit.Burst) {
+			logger := sdklog.NewLogger("zen-watcher-monitoring")
 			logger.Warn("Event rate limited",
-				logger.Fields{
-					Component: "monitoring",
-					Operation: "rate_limit",
-					Source:    raw.Source,
-					Additional: map[string]interface{}{
-						"message": "Event dropped due to rate limiting",
-					},
-				})
+				sdklog.Operation("rate_limit"),
+				sdklog.String("source", raw.Source),
+				sdklog.String("message", "Event dropped due to rate limiting"))
 			return false // Rate limited - drop event
 		}
 	}
@@ -74,29 +70,21 @@ func (gtm *GenericThresholdMonitor) CheckEvent(raw *generic.RawEvent, config *ge
 	if config.Thresholds != nil && config.Thresholds.ObservationsPerMinute != nil {
 		rate := gtm.getObservationRate(raw.Source)
 		if rate > float64(config.Thresholds.ObservationsPerMinute.Critical) {
+			logger := sdklog.NewLogger("zen-watcher-monitoring")
 			logger.Warn("Critical observation rate threshold exceeded",
-				logger.Fields{
-					Component: "monitoring",
-					Operation: "threshold_warning",
-					Source:    raw.Source,
-					Additional: map[string]interface{}{
-						"rate":               rate,
-						"critical_threshold": config.Thresholds.ObservationsPerMinute.Critical,
-						"message":            "High observation rate detected - consider adjusting filters or dedup window",
-					},
-				})
+				sdklog.Operation("threshold_warning"),
+				sdklog.String("source", raw.Source),
+				sdklog.Float64("rate", rate),
+				sdklog.Int("critical_threshold", config.Thresholds.ObservationsPerMinute.Critical),
+				sdklog.String("message", "High observation rate detected - consider adjusting filters or dedup window"))
 		} else if rate > float64(config.Thresholds.ObservationsPerMinute.Warning) {
+			logger := sdklog.NewLogger("zen-watcher-monitoring")
 			logger.Warn("Warning observation rate threshold exceeded",
-				logger.Fields{
-					Component: "monitoring",
-					Operation: "threshold_warning",
-					Source:    raw.Source,
-					Additional: map[string]interface{}{
-						"rate":              rate,
-						"warning_threshold": config.Thresholds.ObservationsPerMinute.Warning,
-						"message":           "Observation rate is high - monitor for potential issues",
-					},
-				})
+				sdklog.Operation("threshold_warning"),
+				sdklog.String("source", raw.Source),
+				sdklog.Float64("rate", rate),
+				sdklog.Int("warning_threshold", config.Thresholds.ObservationsPerMinute.Warning),
+				sdklog.String("message", "Observation rate is high - monitor for potential issues"))
 		}
 	}
 
@@ -183,18 +171,14 @@ func (gtm *GenericThresholdMonitor) checkCustomThresholds(raw *generic.RawEvent,
 	for _, threshold := range config.Thresholds.Custom {
 		value := gtm.extractField(raw.RawData, threshold.Field)
 		if gtm.evaluateThreshold(value, threshold.Operator, threshold.Value) {
+			logger := sdklog.NewLogger("zen-watcher-monitoring")
 			logger.Warn("Custom threshold exceeded",
-				logger.Fields{
-					Component: "monitoring",
-					Operation: "custom_threshold_warning",
-					Source:    raw.Source,
-					Additional: map[string]interface{}{
-						"threshold_name": threshold.Name,
-						"field":          threshold.Field,
-						"value":          value,
-						"message":        threshold.Message,
-					},
-				})
+				sdklog.Operation("custom_threshold_warning"),
+				sdklog.String("source", raw.Source),
+				sdklog.String("threshold_name", threshold.Name),
+				sdklog.String("field", threshold.Field),
+				sdklog.String("value", fmt.Sprintf("%v", value)),
+				sdklog.String("message", threshold.Message))
 		}
 	}
 }
