@@ -265,5 +265,11 @@ func (a *LogsAdapter) Stop() {
 		cancel()
 	}
 	a.watchers = make(map[string]context.CancelFunc)
-	close(a.events)
+	// Use select to prevent double close panic
+	select {
+	case <-a.events:
+		// Already closed
+	default:
+		close(a.events)
+	}
 }

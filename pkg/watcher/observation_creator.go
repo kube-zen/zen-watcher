@@ -521,7 +521,7 @@ func (oc *ObservationCreator) extractResourceInfo(observation *unstructured.Unst
 		}
 		if k, ok := resourceVal["kind"].(string); ok && k != "" {
 			resourceKind = k
-		} else if k, ok := resourceVal["kind"].(interface{}); ok {
+		} else if k := resourceVal["kind"]; k != nil {
 			resourceKind = fmt.Sprintf("%v", k)
 		}
 	}

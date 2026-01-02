@@ -205,6 +205,12 @@ func (a *InformerAdapter) processQueue(ctx context.Context, events chan<- RawEve
 				return
 			}
 
+			// Check for nil item (workqueue can return nil in some edge cases)
+			if item == nil {
+				a.queue.Done(item)
+				continue
+			}
+
 			// Process the event (no type assertion needed with TypedRateLimitingInterface)
 			event := *item
 
@@ -225,7 +231,13 @@ func (a *InformerAdapter) Stop() {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 
-	close(a.stopCh)
+	// Use select to prevent double close panic
+	select {
+	case <-a.stopCh:
+		// Already closed
+	default:
+		close(a.stopCh)
+	}
 	if a.queue != nil {
 		a.queue.ShutDown()
 	}

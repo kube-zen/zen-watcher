@@ -16,6 +16,7 @@ package watcher
 
 import (
 	"context"
+	"sync"
 
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"k8s.io/client-go/kubernetes"
@@ -68,6 +69,7 @@ type AdapterLauncher struct {
 	eventCh            chan *Event
 	workerPool         WorkerPoolInterface
 	useWorkerPool      bool
+	adapterWg          sync.WaitGroup // Tracks adapter goroutines
 }
 
 // NewAdapterLauncher creates a new adapter launcher
@@ -102,7 +104,9 @@ func (al *AdapterLauncher) Start(ctx context.Context) error {
 	// Start all adapters
 	for _, adapter := range al.adapters {
 		adapter := adapter // Capture for goroutine
+		al.adapterWg.Add(1)
 		go func() {
+			defer al.adapterWg.Done()
 			if err := adapter.Run(ctx, al.eventCh); err != nil {
 				logger := sdklog.NewLogger("zen-watcher")
 				logger.Warn("Adapter stopped",

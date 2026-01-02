@@ -164,7 +164,9 @@ func (bp *BatchProcessor) processAllBatches() {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
 
-	ctx := context.Background()
+	// Use the batch processor's context instead of Background()
+	// This allows proper cancellation when the processor is stopped
+	ctx := bp.ctx
 
 	for source, batch := range bp.batches {
 		if batch.IsReadyForProcessing() && !batch.IsEmpty() {

@@ -89,6 +89,8 @@ type WorkerPool struct {
 	ctx           context.Context
 	cancel        context.CancelFunc
 	activeWorkers int64 // Atomic counter for active workers
+	stopOnce      sync.Once // Protects against double close
+	drainWg       sync.WaitGroup // Tracks drain goroutines
 }
 
 // NewWorkerPool creates a new worker pool
@@ -157,7 +159,9 @@ func (wp *WorkerPool) UpdateConfig(newConfig WorkerPoolConfig) {
 		wp.maxQueueSize = newConfig.QueueSize
 
 		// Drain old queue into new queue (non-blocking)
+		wp.drainWg.Add(1)
 		go func() {
+			defer wp.drainWg.Done()
 			for {
 				select {
 				case item := <-oldQueue:
@@ -202,9 +206,12 @@ func (wp *WorkerPool) IsRunning() bool {
 
 // Stop gracefully stops all workers
 func (wp *WorkerPool) Stop() {
-	close(wp.workQueue)
-	wp.cancel()
-	wp.wg.Wait()
+	wp.stopOnce.Do(func() {
+		close(wp.workQueue)
+		wp.cancel()
+		wp.wg.Wait()
+		wp.drainWg.Wait() // Wait for any drain goroutines to complete
+	})
 }
 
 // Enqueue adds a work item to the queue
