@@ -839,7 +839,7 @@ func (oc *ObservationCreator) extractReasonFromDetails(detailsVal map[string]int
 		if r, ok := detailsVal[field].(string); ok && r != "" {
 			return r
 		}
-		if r, ok := detailsVal[field].(interface{}); ok {
+		if r := detailsVal[field]; r != nil {
 			return fmt.Sprintf("%v", r)
 		}
 	}
@@ -857,7 +857,7 @@ func (oc *ObservationCreator) extractMessage(detailsVal map[string]interface{}) 
 		if msg, ok := detailsVal[field].(string); ok && msg != "" {
 			return msg
 		}
-		if msg, ok := detailsVal[field].(interface{}); ok {
+		if msg := detailsVal[field]; msg != nil {
 			return fmt.Sprintf("%v", msg)
 		}
 	}

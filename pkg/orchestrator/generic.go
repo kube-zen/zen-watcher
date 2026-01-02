@@ -21,9 +21,9 @@ import (
 	"sync"
 	"time"
 
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/config"
-	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/processor"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -89,7 +89,7 @@ func NewGenericOrchestratorWithMetrics(
 		dynClient:          dynClient,
 		processor:          proc,
 		batchProcessor:     batchProcessor,
-		adapterManager: NewAdapterManager(),
+		adapterManager:     NewAdapterManager(),
 		ctx:                ctx,
 		cancel:             cancel,
 		enableBatching:     enableBatching,

@@ -118,4 +118,3 @@ func (am *AdapterManager) Count() int {
 	defer am.mu.RUnlock()
 	return len(am.activeAdapters)
 }
-

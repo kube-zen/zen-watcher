@@ -405,7 +405,7 @@ func (ii *IngesterInformer) onDelete(obj interface{}) {
 	if !ok {
 		// Handle DeletedFinalStateUnknown
 		if deleted, ok := obj.(cache.DeletedFinalStateUnknown); ok {
-			u, ok = deleted.Obj.(*unstructured.Unstructured)
+			u, _ = deleted.Obj.(*unstructured.Unstructured)
 		}
 		if !ok {
 			configLogger.Warn("Failed to convert deleted Ingester CRD to unstructured",

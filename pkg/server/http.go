@@ -145,11 +145,16 @@ func (s *Server) registerHandlers(mux *http.ServeMux) {
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"status":    "alive",
 			"service":   "zen-watcher",
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
-		})
+		}); err != nil {
+			logger := sdklog.NewLogger("zen-watcher-server")
+			logger.Warn("Failed to encode healthz response",
+				sdklog.Operation("healthz"),
+				sdklog.Error(err))
+		}
 	})
 
 	// Legacy /health endpoint (kept for backward compatibility)
@@ -167,15 +172,25 @@ func (s *Server) registerHandlers(mux *http.ServeMux) {
 		if ready {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{
 				"status": "ready",
-			})
+			}); err != nil {
+				logger := sdklog.NewLogger("zen-watcher-server")
+				logger.Warn("Failed to encode readyz response",
+					sdklog.Operation("readyz"),
+					sdklog.Error(err))
+			}
 		} else {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusServiceUnavailable)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			if err := json.NewEncoder(w).Encode(map[string]interface{}{
 				"status": "not_ready",
-			})
+			}); err != nil {
+				logger := sdklog.NewLogger("zen-watcher-server")
+				logger.Warn("Failed to encode readyz response",
+					sdklog.Operation("readyz"),
+					sdklog.Error(err))
+			}
 		}
 	})
 

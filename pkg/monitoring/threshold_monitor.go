@@ -18,8 +18,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
