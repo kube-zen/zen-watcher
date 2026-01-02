@@ -315,7 +315,12 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 	metadata, _ := oc.fieldExtractor.ExtractMap(observation.Object, "metadata")
 	if metadata == nil {
 		metadata = make(map[string]interface{})
-		unstructured.SetNestedMap(observation.Object, metadata, "metadata")
+		if err := unstructured.SetNestedMap(observation.Object, metadata, "metadata"); err != nil {
+			logger := sdklog.NewLogger("zen-watcher-observation-creator")
+			logger.Warn("Failed to set metadata",
+				sdklog.Operation("ensure_metadata"),
+				sdklog.Error(err))
+		}
 	}
 
 	// Extract category, severity, and eventType from spec for metrics BEFORE creation (optimized)

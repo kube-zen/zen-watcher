@@ -296,10 +296,33 @@ func (ef *ExpressionFilter) compareSeverity(left, right interface{}) int {
 // evaluateComparisonOperator evaluates a comparison operator
 func (ef *ExpressionFilter) evaluateComparisonOperator(op string, leftVal, rightVal interface{}) (bool, error) {
 	switch op {
-	case "=":
-		return ef.compareEqual(leftVal, rightVal), nil
-	case "!=":
-		return !ef.compareEqual(leftVal, rightVal), nil
+	case "=", "!=":
+		return ef.evaluateEqualityOperator(op, leftVal, rightVal)
+	case ">", ">=", "<", "<=":
+		return ef.evaluateNumericComparisonOperator(op, leftVal, rightVal)
+	case "IN", "NOT IN":
+		return ef.evaluateInOperator(op, leftVal, rightVal)
+	case "CONTAINS", "STARTS_WITH", "ENDS_WITH":
+		return ef.evaluateStringOperator(op, leftVal, rightVal)
+	case "EXISTS", "NOT EXISTS":
+		return ef.evaluateExistenceOperator(op, leftVal)
+	default:
+		return false, fmt.Errorf("unknown comparison operator: %s", op)
+	}
+}
+
+// evaluateEqualityOperator evaluates equality operators
+func (ef *ExpressionFilter) evaluateEqualityOperator(op string, leftVal, rightVal interface{}) (bool, error) {
+	result := ef.compareEqual(leftVal, rightVal)
+	if op == "!=" {
+		return !result, nil
+	}
+	return result, nil
+}
+
+// evaluateNumericComparisonOperator evaluates comparison operators (>, >=, <, <=)
+func (ef *ExpressionFilter) evaluateNumericComparisonOperator(op string, leftVal, rightVal interface{}) (bool, error) {
+	switch op {
 	case ">":
 		return ef.compareGreater(leftVal, rightVal), nil
 	case ">=":
@@ -312,23 +335,39 @@ func (ef *ExpressionFilter) evaluateComparisonOperator(op string, leftVal, right
 		eq := ef.compareEqual(leftVal, rightVal)
 		gt := ef.compareGreater(rightVal, leftVal)
 		return eq || gt, nil
-	case "IN":
-		return ef.compareIn(leftVal, rightVal), nil
-	case "NOT IN":
-		return !ef.compareIn(leftVal, rightVal), nil
+	}
+	return false, fmt.Errorf("unknown comparison operator: %s", op)
+}
+
+// evaluateInOperator evaluates IN/NOT IN operators
+func (ef *ExpressionFilter) evaluateInOperator(op string, leftVal, rightVal interface{}) (bool, error) {
+	result := ef.compareIn(leftVal, rightVal)
+	if op == "NOT IN" {
+		return !result, nil
+	}
+	return result, nil
+}
+
+// evaluateStringOperator evaluates string operators
+func (ef *ExpressionFilter) evaluateStringOperator(op string, leftVal, rightVal interface{}) (bool, error) {
+	switch op {
 	case "CONTAINS":
 		return ef.compareContains(leftVal, rightVal), nil
 	case "STARTS_WITH":
 		return ef.compareStartsWith(leftVal, rightVal), nil
 	case "ENDS_WITH":
 		return ef.compareEndsWith(leftVal, rightVal), nil
-	case "EXISTS":
-		return leftVal != nil, nil
-	case "NOT EXISTS":
-		return leftVal == nil, nil
-	default:
-		return false, fmt.Errorf("unknown comparison operator: %s", op)
 	}
+	return false, fmt.Errorf("unknown string operator: %s", op)
+}
+
+// evaluateExistenceOperator evaluates EXISTS/NOT EXISTS operators
+func (ef *ExpressionFilter) evaluateExistenceOperator(op string, leftVal interface{}) (bool, error) {
+	exists := leftVal != nil
+	if op == "NOT EXISTS" {
+		return !exists, nil
+	}
+	return exists, nil
 }
 
 // evaluateLogicalOperator evaluates a logical operator

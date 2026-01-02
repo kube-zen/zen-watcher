@@ -79,18 +79,8 @@ func ValidateIngester(ingester *Ingester) error {
 	}
 
 	// Validate destinations
-	for i, dest := range spec.Destinations {
-		if dest.Type != "crd" {
-			return &ValidationError{Field: fmt.Sprintf("spec.destinations[%d].type", i), Message: "only 'crd' is supported in v1"}
-		}
-
-		if dest.Value == "" {
-			return &ValidationError{Field: fmt.Sprintf("spec.destinations[%d].value", i), Message: "is required for type 'crd'"}
-		}
-
-		if !matchesPattern(dest.Value, `^[a-z0-9-]+$`) {
-			return &ValidationError{Field: fmt.Sprintf("spec.destinations[%d].value", i), Message: "must match pattern ^[a-z0-9-]+$"}
-		}
+	if err := validateDestinations(spec.Destinations); err != nil {
+		return err
 	}
 
 	// Validate deduplication if present
@@ -107,6 +97,24 @@ func ValidateIngester(ingester *Ingester) error {
 		}
 	}
 
+	return nil
+}
+
+// validateDestinations validates destination configurations
+func validateDestinations(destinations []Destination) error {
+	for i, dest := range destinations {
+		if dest.Type != "crd" {
+			return &ValidationError{Field: fmt.Sprintf("spec.destinations[%d].type", i), Message: "only 'crd' is supported in v1"}
+		}
+
+		if dest.Value == "" {
+			return &ValidationError{Field: fmt.Sprintf("spec.destinations[%d].value", i), Message: "is required for type 'crd'"}
+		}
+
+		if !matchesPattern(dest.Value, `^[a-z0-9-]+$`) {
+			return &ValidationError{Field: fmt.Sprintf("spec.destinations[%d].value", i), Message: "must match pattern ^[a-z0-9-]+$"}
+		}
+	}
 	return nil
 }
 

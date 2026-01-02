@@ -125,47 +125,8 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	}()
 
 	// Check if expression-based filtering is enabled
-	if config.Expression != "" {
-		exprFilter, err := NewExpressionFilter(config.Expression)
-		if err != nil {
-			logger := sdklog.NewLogger("zen-watcher-filter")
-			logger.Debug("Failed to parse filter expression, falling back to list-based filters",
-				sdklog.Operation("filter_check"),
-				sdklog.String("reason", "expression_parse_error"),
-				sdklog.String("error", err.Error()))
-			// Fall through to legacy filtering
-		} else {
-			result, err := exprFilter.Evaluate(observation)
-			if err != nil {
-				logger := sdklog.NewLogger("zen-watcher-filter")
-				logger.Debug("Failed to evaluate filter expression, falling back to list-based filters",
-					sdklog.Operation("filter_check"),
-					sdklog.String("reason", "expression_eval_error"),
-					sdklog.String("error", err.Error()))
-				// Fall through to list-based filtering
-			} else {
-				if !result {
-					if f.metrics != nil {
-						sourceVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
-						source := "unknown"
-						if sourceVal != nil {
-							source = strings.ToLower(fmt.Sprintf("%v", sourceVal))
-						}
-						f.metrics.FilterDecisions.WithLabelValues(source, "filter", "expression_filtered").Inc()
-					}
-					return false, "expression_filtered"
-				}
-				if f.metrics != nil {
-					sourceVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
-					source := "unknown"
-					if sourceVal != nil {
-						source = strings.ToLower(fmt.Sprintf("%v", sourceVal))
-					}
-					f.metrics.FilterDecisions.WithLabelValues(source, "allow", "expression_passed").Inc()
-				}
-				return true, ""
-			}
-		}
+	if allowed, reason := f.checkExpressionFilter(config, observation); reason != "" {
+		return allowed, reason
 	}
 
 	// Extract source from observation
@@ -593,6 +554,52 @@ func (f *Filter) checkRuleFilter(sourceFilter *SourceFilter, rule, source string
 				return false, "exclude_rule"
 			}
 		}
+	}
+	return true, ""
+}
+
+// checkExpressionFilter checks expression-based filtering
+func (f *Filter) checkExpressionFilter(config *FilterConfig, observation *unstructured.Unstructured) (bool, string) {
+	if config.Expression == "" {
+		return true, "" // No expression, continue to list-based filtering
+	}
+
+	exprFilter, err := NewExpressionFilter(config.Expression)
+	if err != nil {
+		logger := sdklog.NewLogger("zen-watcher-filter")
+		logger.Debug("Failed to parse filter expression, falling back to list-based filters",
+			sdklog.Operation("filter_check"),
+			sdklog.String("reason", "expression_parse_error"),
+			sdklog.String("error", err.Error()))
+		return true, "" // Fall through to legacy filtering
+	}
+
+	result, err := exprFilter.Evaluate(observation)
+	if err != nil {
+		logger := sdklog.NewLogger("zen-watcher-filter")
+		logger.Debug("Failed to evaluate filter expression, falling back to list-based filters",
+			sdklog.Operation("filter_check"),
+			sdklog.String("reason", "expression_eval_error"),
+			sdklog.String("error", err.Error()))
+		return true, "" // Fall through to list-based filtering
+	}
+
+	// Extract source for metrics
+	sourceVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
+	source := "unknown"
+	if sourceVal != nil {
+		source = strings.ToLower(fmt.Sprintf("%v", sourceVal))
+	}
+
+	if !result {
+		if f.metrics != nil {
+			f.metrics.FilterDecisions.WithLabelValues(source, "filter", "expression_filtered").Inc()
+		}
+		return false, "expression_filtered"
+	}
+
+	if f.metrics != nil {
+		f.metrics.FilterDecisions.WithLabelValues(source, "allow", "expression_passed").Inc()
 	}
 	return true, ""
 }

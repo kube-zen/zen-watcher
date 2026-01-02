@@ -527,90 +527,10 @@ func (ii *IngesterInformer) ConvertToIngesterConfig(u *unstructured.Unstructured
 		return nil
 	}
 
-	// Extract informer config
-	if informer, ok := spec["informer"].(map[string]interface{}); ok {
-		config.Informer = &InformerConfig{}
-		if gvr, ok := informer["gvr"].(map[string]interface{}); ok {
-			config.Informer.GVR = GVRConfig{
-				Group:    getString(gvr, "group"),
-				Version:  getString(gvr, "version"),
-				Resource: getString(gvr, "resource"),
-			}
-		}
-		config.Informer.Namespace = getString(informer, "namespace")
-		config.Informer.LabelSelector = getString(informer, "labelSelector")
-		config.Informer.ResyncPeriod = getString(informer, "resyncPeriod")
-	}
-
-	// Extract webhook config
-	if webhook, ok := spec["webhook"].(map[string]interface{}); ok {
-		config.Webhook = &WebhookConfig{
-			Path: getString(webhook, "path"),
-		}
-		if auth, ok := webhook["auth"].(map[string]interface{}); ok {
-			config.Webhook.Auth = &AuthConfig{
-				Type:      getString(auth, "type"),
-				SecretRef: getString(auth, "secretRef"),
-			}
-		}
-		if rateLimit, ok := webhook["rateLimit"].(map[string]interface{}); ok {
-			if rpm, ok := rateLimit["requestsPerMinute"].(int); ok {
-				config.Webhook.RateLimit = &RateLimitConfig{
-					RequestsPerMinute: rpm,
-				}
-			}
-		}
-	}
-
-	// Extract logs config
-	logs, logsOk := spec["logs"]
-	if logsOk {
-		logger.Info("Found logs section in spec",
-			sdklog.Operation("ingester_convert"),
-			sdklog.String("source", config.Source),
-			sdklog.String("logs_type", fmt.Sprintf("%T", logs)))
-	}
-	if logs, ok := spec["logs"].(map[string]interface{}); ok {
-		config.Logs = &LogsConfig{
-			PodSelector:  getString(logs, "podSelector"),
-			Container:    getString(logs, "container"),
-			PollInterval: getString(logs, "pollInterval"),
-		}
-		// Default poll interval if not set
-		if config.Logs.PollInterval == "" {
-			config.Logs.PollInterval = "1s"
-		}
-		// Default sinceSeconds if not set
-		if sinceSeconds, ok := logs["sinceSeconds"].(int); ok {
-			config.Logs.SinceSeconds = sinceSeconds
-		} else if sinceSeconds, ok := logs["sinceSeconds"].(float64); ok {
-			config.Logs.SinceSeconds = int(sinceSeconds)
-		} else {
-			config.Logs.SinceSeconds = DefaultLogsSinceSeconds
-		}
-		// Extract patterns
-		if patterns, ok := logs["patterns"].([]interface{}); ok {
-			for _, p := range patterns {
-				if patternMap, ok := p.(map[string]interface{}); ok {
-					pattern := LogPattern{
-						Regex: getString(patternMap, "regex"),
-						Type:  getString(patternMap, "type"),
-					}
-					if priority, ok := patternMap["priority"].(float64); ok {
-						pattern.Priority = priority
-					}
-					config.Logs.Patterns = append(config.Logs.Patterns, pattern)
-				}
-			}
-		}
-		logger.Info("Extracted logs config",
-			sdklog.Operation("ingester_convert"),
-			sdklog.String("source", config.Source),
-			sdklog.String("podSelector", config.Logs.PodSelector),
-			sdklog.String("container", config.Logs.Container),
-			sdklog.Int("patterns", len(config.Logs.Patterns)),
-			sdklog.String("pollInterval", config.Logs.PollInterval))
-	}
+	// Extract source-specific configs
+	config.Informer = extractInformerConfig(spec)
+	config.Webhook = extractWebhookConfig(spec)
+	config.Logs = extractLogsConfig(spec, logger, config.Source)
 
 	// Extract normalization config
 	config.Normalization = extractNormalization(spec)
@@ -678,79 +598,9 @@ func (ii *IngesterInformer) convertMultiSourceIngester(u *unstructured.Unstructu
 		}
 
 		// Extract source-specific config
-		switch sourceType {
-		case "informer":
-			if informer, ok := sourceMap["informer"].(map[string]interface{}); ok {
-				config.Informer = &InformerConfig{}
-				if gvr, ok := informer["gvr"].(map[string]interface{}); ok {
-					config.Informer.GVR = GVRConfig{
-						Group:    getString(gvr, "group"),
-						Version:  getString(gvr, "version"),
-						Resource: getString(gvr, "resource"),
-					}
-				}
-				config.Informer.Namespace = getString(informer, "namespace")
-				config.Informer.LabelSelector = getString(informer, "labelSelector")
-				config.Informer.ResyncPeriod = getString(informer, "resyncPeriod")
-			}
-		case "logs":
-			if logs, ok := sourceMap["logs"].(map[string]interface{}); ok {
-				config.Logs = &LogsConfig{
-					PodSelector:  getString(logs, "podSelector"),
-					Container:    getString(logs, "container"),
-					PollInterval: getString(logs, "pollInterval"),
-				}
-				if config.Logs.PollInterval == "" {
-					config.Logs.PollInterval = "1s"
-				}
-				if sinceSeconds, ok := logs["sinceSeconds"].(int); ok {
-					config.Logs.SinceSeconds = sinceSeconds
-				} else if sinceSeconds, ok := logs["sinceSeconds"].(float64); ok {
-					config.Logs.SinceSeconds = int(sinceSeconds)
-				} else {
-					config.Logs.SinceSeconds = DefaultLogsSinceSeconds
-				}
-				if patterns, ok := logs["patterns"].([]interface{}); ok {
-					for _, p := range patterns {
-						if patternMap, ok := p.(map[string]interface{}); ok {
-							pattern := LogPattern{
-								Regex: getString(patternMap, "regex"),
-								Type:  getString(patternMap, "type"),
-							}
-							if priority, ok := patternMap["priority"].(float64); ok {
-								pattern.Priority = priority
-							}
-							config.Logs.Patterns = append(config.Logs.Patterns, pattern)
-						}
-					}
-				}
-			}
-		case "webhook":
-			if webhook, ok := sourceMap["webhook"].(map[string]interface{}); ok {
-				config.Webhook = &WebhookConfig{
-					Path: getString(webhook, "path"),
-				}
-				if auth, ok := webhook["auth"].(map[string]interface{}); ok {
-					config.Webhook.Auth = &AuthConfig{
-						Type:      getString(auth, "type"),
-						SecretRef: getString(auth, "secretRef"),
-					}
-				}
-				if rateLimit, ok := webhook["rateLimit"].(map[string]interface{}); ok {
-					if rpm, ok := rateLimit["requestsPerMinute"].(int); ok {
-						config.Webhook.RateLimit = &RateLimitConfig{
-							RequestsPerMinute: rpm,
-						}
-					}
-				}
-			}
-		default:
-			logger.Warn("Unknown source type",
-				sdklog.Operation("ingester_convert"),
-				sdklog.String("namespace", namespace),
-				sdklog.String("name", name),
-				sdklog.String("sourceName", sourceName),
-				sdklog.String("sourceType", sourceType))
+		extractSourceConfig(config, sourceMap, sourceType, logger, namespace, name, sourceName)
+		if config.Informer == nil && config.Logs == nil && config.Webhook == nil {
+			// No valid source config extracted, skip this source
 			continue
 		}
 
@@ -816,67 +666,8 @@ func (ii *IngesterInformer) convertLegacyIngester(u *unstructured.Unstructured, 
 		return nil
 	}
 
-	// Extract destinations and resolve GVRs (reuse existing logic from ConvertToIngesterConfig)
-	config.Destinations = make([]DestinationConfig, 0, len(destinations))
-	for _, dest := range destinations {
-		if destMap, ok := dest.(map[string]interface{}); ok {
-			destType := getString(destMap, "type")
-			destValue := getString(destMap, "value")
-
-			if destType == "crd" {
-				var gvr schema.GroupVersionResource
-
-				// Check if full GVR is specified
-				if gvrMap, ok := destMap["gvr"].(map[string]interface{}); ok {
-					group := getString(gvrMap, "group")
-					version := getString(gvrMap, "version")
-					resource := getString(gvrMap, "resource")
-
-					if version != "" && resource != "" {
-						// Validate GVR before using
-						if err := ValidateGVRConfig(group, version, resource); err != nil {
-							logger.Warn("Invalid GVR in destination configuration",
-								sdklog.Operation("ingester_convert"),
-								sdklog.String("source", source),
-								sdklog.String("group", group),
-								sdklog.String("version", version),
-								sdklog.String("resource", resource),
-								sdklog.Error(err))
-							continue
-						}
-						// Use specified GVR
-						gvr = schema.GroupVersionResource{
-							Group:    group,
-							Version:  version,
-							Resource: resource,
-						}
-					} else if destValue != "" {
-						// Fallback to resolving from value
-						gvr = ResolveDestinationGVR(destValue)
-					} else {
-						logger.Warn("Destination has neither gvr nor value",
-							sdklog.Operation("ingester_convert"),
-							sdklog.String("source", source))
-						continue
-					}
-				} else if destValue != "" {
-					// Resolve GVR from destination value
-					gvr = ResolveDestinationGVR(destValue)
-				} else {
-					logger.Warn("Destination has neither gvr nor value",
-						sdklog.Operation("ingester_convert"),
-						sdklog.String("source", source))
-					continue
-				}
-
-				config.Destinations = append(config.Destinations, DestinationConfig{
-					Type:  destType,
-					Value: destValue,
-					GVR:   gvr,
-				})
-			}
-		}
-	}
+	// Extract destinations and resolve GVRs (reuse existing logic)
+	config.Destinations = extractDestinations(destinations, logger)
 
 	// Ensure at least one destination was extracted
 	if len(config.Destinations) == 0 {
@@ -888,8 +679,6 @@ func (ii *IngesterInformer) convertLegacyIngester(u *unstructured.Unstructured, 
 	}
 
 	// Extract other configs (informer, webhook, logs, etc.) - reuse existing logic
-	// This is handled by the rest of ConvertToIngesterConfig, so we'll call it
-	// But we need to extract shared config first, so let's create extractSharedConfig
 	sharedConfig := ii.extractSharedConfig(spec, u.GetNamespace(), u.GetName())
 	if sharedConfig != nil {
 		config.Normalization = sharedConfig.Normalization
@@ -899,76 +688,10 @@ func (ii *IngesterInformer) convertLegacyIngester(u *unstructured.Unstructured, 
 		config.Optimization = sharedConfig.Optimization
 	}
 
-	// Extract informer config
-	if informer, ok := spec["informer"].(map[string]interface{}); ok {
-		config.Informer = &InformerConfig{}
-		if gvr, ok := informer["gvr"].(map[string]interface{}); ok {
-			config.Informer.GVR = GVRConfig{
-				Group:    getString(gvr, "group"),
-				Version:  getString(gvr, "version"),
-				Resource: getString(gvr, "resource"),
-			}
-		}
-		config.Informer.Namespace = getString(informer, "namespace")
-		config.Informer.LabelSelector = getString(informer, "labelSelector")
-		config.Informer.ResyncPeriod = getString(informer, "resyncPeriod")
-	}
-
-	// Extract webhook config
-	if webhook, ok := spec["webhook"].(map[string]interface{}); ok {
-		config.Webhook = &WebhookConfig{
-			Path: getString(webhook, "path"),
-		}
-		if auth, ok := webhook["auth"].(map[string]interface{}); ok {
-			config.Webhook.Auth = &AuthConfig{
-				Type:      getString(auth, "type"),
-				SecretRef: getString(auth, "secretRef"),
-			}
-		}
-		if rateLimit, ok := webhook["rateLimit"].(map[string]interface{}); ok {
-			if rpm, ok := rateLimit["requestsPerMinute"].(int); ok {
-				config.Webhook.RateLimit = &RateLimitConfig{
-					RequestsPerMinute: rpm,
-				}
-			}
-		}
-	}
-
-	// Extract logs config
-	if logs, ok := spec["logs"].(map[string]interface{}); ok {
-		config.Logs = &LogsConfig{
-			PodSelector:  getString(logs, "podSelector"),
-			Container:    getString(logs, "container"),
-			PollInterval: getString(logs, "pollInterval"),
-		}
-		// Default poll interval if not set
-		if config.Logs.PollInterval == "" {
-			config.Logs.PollInterval = "1s"
-		}
-		// Default sinceSeconds if not set
-		if sinceSeconds, ok := logs["sinceSeconds"].(int); ok {
-			config.Logs.SinceSeconds = sinceSeconds
-		} else if sinceSeconds, ok := logs["sinceSeconds"].(float64); ok {
-			config.Logs.SinceSeconds = int(sinceSeconds)
-		} else {
-			config.Logs.SinceSeconds = DefaultLogsSinceSeconds
-		}
-		// Extract patterns
-		if patterns, ok := logs["patterns"].([]interface{}); ok {
-			for _, p := range patterns {
-				if patternMap, ok := p.(map[string]interface{}); ok {
-					pattern := LogPattern{
-						Regex: getString(patternMap, "regex"),
-						Type:  getString(patternMap, "type"),
-					}
-					if priority, ok := patternMap["priority"].(float64); ok {
-						pattern.Priority = priority
-					}
-					config.Logs.Patterns = append(config.Logs.Patterns, pattern)
-				}
-			}
-		}
-	}
+	// Extract source-specific configs
+	config.Informer = extractInformerConfig(spec)
+	config.Webhook = extractWebhookConfig(spec)
+	config.Logs = extractLogsConfig(spec, logger, source)
 
 	return config
 }
@@ -1349,6 +1072,165 @@ func getSpecKeys(spec map[string]interface{}) []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+// extractSourceConfig extracts source-specific configuration for multi-source ingester
+func extractSourceConfig(config *IngesterConfig, sourceMap map[string]interface{}, sourceType string, logger *sdklog.Logger, namespace, name, sourceName string) {
+	switch sourceType {
+	case "informer":
+		config.Informer = extractInformerConfigFromMap(sourceMap)
+	case "logs":
+		config.Logs = extractLogsConfigFromMap(sourceMap)
+	case "webhook":
+		config.Webhook = extractWebhookConfigFromMap(sourceMap)
+	default:
+		logger.Warn("Unknown source type",
+			sdklog.Operation("ingester_convert"),
+			sdklog.String("namespace", namespace),
+			sdklog.String("name", name),
+			sdklog.String("sourceName", sourceName),
+			sdklog.String("sourceType", sourceType))
+	}
+}
+
+// extractInformerConfigFromMap extracts informer config from a map
+func extractInformerConfigFromMap(sourceMap map[string]interface{}) *InformerConfig {
+	informer, ok := sourceMap["informer"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	config := &InformerConfig{}
+	if gvr, ok := informer["gvr"].(map[string]interface{}); ok {
+		config.GVR = GVRConfig{
+			Group:    getString(gvr, "group"),
+			Version:  getString(gvr, "version"),
+			Resource: getString(gvr, "resource"),
+		}
+	}
+	config.Namespace = getString(informer, "namespace")
+	config.LabelSelector = getString(informer, "labelSelector")
+	config.ResyncPeriod = getString(informer, "resyncPeriod")
+	return config
+}
+
+// extractLogsConfigFromMap extracts logs config from a map
+func extractLogsConfigFromMap(sourceMap map[string]interface{}) *LogsConfig {
+	logs, ok := sourceMap["logs"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	config := &LogsConfig{
+		PodSelector:  getString(logs, "podSelector"),
+		Container:    getString(logs, "container"),
+		PollInterval: getString(logs, "pollInterval"),
+	}
+	if config.PollInterval == "" {
+		config.PollInterval = "1s"
+	}
+	if sinceSeconds, ok := logs["sinceSeconds"].(int); ok {
+		config.SinceSeconds = sinceSeconds
+	} else if sinceSeconds, ok := logs["sinceSeconds"].(float64); ok {
+		config.SinceSeconds = int(sinceSeconds)
+	} else {
+		config.SinceSeconds = DefaultLogsSinceSeconds
+	}
+	if patterns, ok := logs["patterns"].([]interface{}); ok {
+		for _, p := range patterns {
+			if patternMap, ok := p.(map[string]interface{}); ok {
+				pattern := LogPattern{
+					Regex: getString(patternMap, "regex"),
+					Type:  getString(patternMap, "type"),
+				}
+				if priority, ok := patternMap["priority"].(float64); ok {
+					pattern.Priority = priority
+				}
+				config.Patterns = append(config.Patterns, pattern)
+			}
+		}
+	}
+	return config
+}
+
+// extractWebhookConfigFromMap extracts webhook config from a map
+func extractWebhookConfigFromMap(sourceMap map[string]interface{}) *WebhookConfig {
+	webhook, ok := sourceMap["webhook"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	config := &WebhookConfig{
+		Path: getString(webhook, "path"),
+	}
+	if auth, ok := webhook["auth"].(map[string]interface{}); ok {
+		config.Auth = &AuthConfig{
+			Type:      getString(auth, "type"),
+			SecretRef: getString(auth, "secretRef"),
+		}
+	}
+	if rateLimit, ok := webhook["rateLimit"].(map[string]interface{}); ok {
+		if rpm, ok := rateLimit["requestsPerMinute"].(int); ok {
+			config.RateLimit = &RateLimitConfig{
+				RequestsPerMinute: rpm,
+			}
+		}
+	}
+	return config
+}
+
+// extractInformerConfig extracts informer config from spec
+func extractInformerConfig(spec map[string]interface{}) *InformerConfig {
+	informer, ok := spec["informer"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	config := &InformerConfig{}
+	if gvr, ok := informer["gvr"].(map[string]interface{}); ok {
+		config.GVR = GVRConfig{
+			Group:    getString(gvr, "group"),
+			Version:  getString(gvr, "version"),
+			Resource: getString(gvr, "resource"),
+		}
+	}
+	config.Namespace = getString(informer, "namespace")
+	config.LabelSelector = getString(informer, "labelSelector")
+	config.ResyncPeriod = getString(informer, "resyncPeriod")
+	return config
+}
+
+// extractWebhookConfig extracts webhook config from spec
+func extractWebhookConfig(spec map[string]interface{}) *WebhookConfig {
+	webhook, ok := spec["webhook"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	config := &WebhookConfig{
+		Path: getString(webhook, "path"),
+	}
+	if auth, ok := webhook["auth"].(map[string]interface{}); ok {
+		config.Auth = &AuthConfig{
+			Type:      getString(auth, "type"),
+			SecretRef: getString(auth, "secretRef"),
+		}
+	}
+	if rateLimit, ok := webhook["rateLimit"].(map[string]interface{}); ok {
+		if rpm, ok := rateLimit["requestsPerMinute"].(int); ok {
+			config.RateLimit = &RateLimitConfig{
+				RequestsPerMinute: rpm,
+			}
+		}
+	}
+	return config
+}
+
+// extractLogsConfig extracts logs config from spec
+func extractLogsConfig(spec map[string]interface{}, logger *sdklog.Logger, source string) *LogsConfig {
+	logs, logsOk := spec["logs"]
+	if logsOk {
+		logger.Info("Found logs section in spec",
+			sdklog.Operation("ingester_convert"),
+			sdklog.String("source", source),
+			sdklog.String("logs_type", fmt.Sprintf("%T", logs)))
+	}
+	return extractLogsConfigFromMap(spec)
 }
 
 // ResolveDestinationGVR is now defined in gvrs.go to use configurable API group

@@ -198,7 +198,13 @@ func (fm *FieldMapper) setField(observation *unstructured.Unstructured, fieldPat
 	spec, _ := fm.fieldExtractor.ExtractMap(observation.Object, "spec")
 	if spec == nil {
 		spec = make(map[string]interface{})
-		unstructured.SetNestedMap(observation.Object, spec, "spec")
+		if err := unstructured.SetNestedMap(observation.Object, spec, "spec"); err != nil {
+			logger := sdklog.NewLogger("zen-watcher-field-mapper")
+			logger.Warn("Failed to set spec",
+				sdklog.Operation("set_field"),
+				sdklog.Error(err))
+			return err
+		}
 	}
 
 	// Handle nested paths (e.g., "ttl" or "resource.name")
@@ -221,7 +227,13 @@ func (fm *FieldMapper) setField(observation *unstructured.Unstructured, fieldPat
 		current[parts[len(parts)-1]] = value
 	}
 
-	unstructured.SetNestedMap(observation.Object, spec, "spec")
+	if err := unstructured.SetNestedMap(observation.Object, spec, "spec"); err != nil {
+		logger := sdklog.NewLogger("zen-watcher-field-mapper")
+		logger.Warn("Failed to set spec",
+			sdklog.Operation("set_field"),
+			sdklog.Error(err))
+		return err
+	}
 	return nil
 }
 
