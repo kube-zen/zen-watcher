@@ -32,13 +32,6 @@ zen-watcher/
 │   ├── Dockerfile                # Multi-stage Dockerfile
 │   └── .dockerignore             # Docker ignore rules
 │
-├── charts/                       # Helm charts
-│   └── zen-watcher/              # Main Helm chart
-│       ├── Chart.yaml            # Chart metadata
-│       ├── values.yaml           # Default values
-│       ├── templates/            # K8s templates
-│       └── README.md             # Chart documentation
-│
 ├── config/                       # Configuration files
 │   ├── dashboards/               # Grafana dashboards
 │   ├── monitoring/               # Monitoring configs
