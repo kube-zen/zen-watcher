@@ -166,7 +166,7 @@ func (o *GenericOrchestrator) reloadAdapters() {
 
 		// Process each config (one per source in multi-source mode)
 		for _, ingesterConfig := range ingesterConfigs {
-			o.processIngesterConfigItem(ingesterConfig, item, activeSources)
+			o.processIngesterConfigItem(ingesterConfig, &item, activeSources)
 		}
 	}
 
