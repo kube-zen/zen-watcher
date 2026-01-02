@@ -217,7 +217,8 @@ func intersectStringLists(list1, list2 []string) []string {
 	}
 
 	// Find items in list2 that are also in list1
-	result := make([]string, 0)
+	// Optimized: pre-allocate slice with estimated capacity
+	result := make([]string, 0, len(list2))
 	for _, item := range list2 {
 		lower := strings.ToLower(item)
 		if orig, exists := seen[lower]; exists {

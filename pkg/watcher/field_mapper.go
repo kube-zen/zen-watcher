@@ -219,7 +219,8 @@ func (fm *FieldMapper) setField(observation *unstructured.Unstructured, fieldPat
 			if nested, ok := current[part].(map[string]interface{}); ok {
 				current = nested
 			} else {
-				newNested := make(map[string]interface{})
+				// Optimized: pre-allocate nested map with small capacity
+				newNested := make(map[string]interface{}, 4)
 				current[part] = newNested
 				current = newNested
 			}

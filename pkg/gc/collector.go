@@ -235,9 +235,14 @@ func (gc *Collector) collectNamespace(ctx context.Context, namespace string) (in
 			}
 
 			// Extract source for metrics
+			// Optimized: use type assertion first, fallback to formatting only when needed
 			source := "unknown"
 			if sourceVal, _, _ := unstructured.NestedFieldCopy(obs.Object, "spec", "source"); sourceVal != nil {
-				source = fmt.Sprintf("%v", sourceVal)
+				if str, ok := sourceVal.(string); ok {
+					source = str
+				} else {
+					source = fmt.Sprintf("%v", sourceVal)
+				}
 			}
 
 			// Delete the Observation

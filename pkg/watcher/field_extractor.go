@@ -21,18 +21,19 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// Note: sync.Map is used instead of map[string][]string with RWMutex
+// for better concurrent read performance (lock-free reads)
+
 // FieldExtractor provides optimized field extraction with caching
 type FieldExtractor struct {
 	// Cache for compiled field paths to reduce map navigation overhead
-	fieldPathCache map[string][]string
-	mu             sync.RWMutex
+	// Using sync.Map for lock-free reads and better concurrent performance
+	fieldPathCache sync.Map // map[string][]string
 }
 
 // NewFieldExtractor creates a new field extractor with caching
 func NewFieldExtractor() *FieldExtractor {
-	return &FieldExtractor{
-		fieldPathCache: make(map[string][]string),
-	}
+	return &FieldExtractor{}
 }
 
 // ExtractString extracts a string field using cached path
@@ -42,20 +43,18 @@ func (fe *FieldExtractor) ExtractString(obj map[string]interface{}, path ...stri
 	}
 
 	// Use cached path if available (optimized key generation)
+	// Using sync.Map for lock-free reads
 	cacheKey := strings.Join(path, ":")
-	fe.mu.RLock()
-	cachedPath, exists := fe.fieldPathCache[cacheKey]
-	fe.mu.RUnlock()
-
-	if !exists {
-		// Cache the path for future use
-		fe.mu.Lock()
-		fe.fieldPathCache[cacheKey] = path
-		fe.mu.Unlock()
-		cachedPath = path
+	if cachedPath, exists := fe.fieldPathCache.Load(cacheKey); exists {
+		val, found, _ := unstructured.NestedString(obj, cachedPath.([]string)...)
+		return val, found
 	}
 
-	val, found, _ := unstructured.NestedString(obj, cachedPath...)
+	// Cache the path for future use (only if not already cached by another goroutine)
+	fe.fieldPathCache.LoadOrStore(cacheKey, path)
+
+	// Use the path (either newly cached or already cached)
+	val, found, _ := unstructured.NestedString(obj, path...)
 	return val, found
 }
 
@@ -66,19 +65,18 @@ func (fe *FieldExtractor) ExtractMap(obj map[string]interface{}, path ...string)
 	}
 
 	// Use cached path if available (optimized key generation)
+	// Using sync.Map for lock-free reads
 	cacheKey := strings.Join(path, ":")
-	fe.mu.RLock()
-	cachedPath, exists := fe.fieldPathCache[cacheKey]
-	fe.mu.RUnlock()
-
-	if !exists {
-		fe.mu.Lock()
-		fe.fieldPathCache[cacheKey] = path
-		fe.mu.Unlock()
-		cachedPath = path
+	if cachedPath, exists := fe.fieldPathCache.Load(cacheKey); exists {
+		val, found, _ := unstructured.NestedMap(obj, cachedPath.([]string)...)
+		return val, found
 	}
 
-	val, found, _ := unstructured.NestedMap(obj, cachedPath...)
+	// Cache the path for future use (only if not already cached by another goroutine)
+	fe.fieldPathCache.LoadOrStore(cacheKey, path)
+
+	// Use the path (either newly cached or already cached)
+	val, found, _ := unstructured.NestedMap(obj, path...)
 	return val, found
 }
 
@@ -89,19 +87,18 @@ func (fe *FieldExtractor) ExtractFieldCopy(obj map[string]interface{}, path ...s
 	}
 
 	// Use cached path if available (optimized key generation)
+	// Using sync.Map for lock-free reads
 	cacheKey := strings.Join(path, ":")
-	fe.mu.RLock()
-	cachedPath, exists := fe.fieldPathCache[cacheKey]
-	fe.mu.RUnlock()
-
-	if !exists {
-		fe.mu.Lock()
-		fe.fieldPathCache[cacheKey] = path
-		fe.mu.Unlock()
-		cachedPath = path
+	if cachedPath, exists := fe.fieldPathCache.Load(cacheKey); exists {
+		val, found, _ := unstructured.NestedFieldCopy(obj, cachedPath.([]string)...)
+		return val, found
 	}
 
-	val, found, _ := unstructured.NestedFieldCopy(obj, cachedPath...)
+	// Cache the path for future use (only if not already cached by another goroutine)
+	fe.fieldPathCache.LoadOrStore(cacheKey, path)
+
+	// Use the path (either newly cached or already cached)
+	val, found, _ := unstructured.NestedFieldCopy(obj, path...)
 	return val, found
 }
 
@@ -112,18 +109,17 @@ func (fe *FieldExtractor) ExtractInt64(obj map[string]interface{}, path ...strin
 	}
 
 	// Use cached path if available (optimized key generation)
+	// Using sync.Map for lock-free reads
 	cacheKey := strings.Join(path, ":")
-	fe.mu.RLock()
-	cachedPath, exists := fe.fieldPathCache[cacheKey]
-	fe.mu.RUnlock()
-
-	if !exists {
-		fe.mu.Lock()
-		fe.fieldPathCache[cacheKey] = path
-		fe.mu.Unlock()
-		cachedPath = path
+	if cachedPath, exists := fe.fieldPathCache.Load(cacheKey); exists {
+		val, found, _ := unstructured.NestedInt64(obj, cachedPath.([]string)...)
+		return val, found
 	}
 
-	val, found, _ := unstructured.NestedInt64(obj, cachedPath...)
+	// Cache the path for future use (only if not already cached by another goroutine)
+	fe.fieldPathCache.LoadOrStore(cacheKey, path)
+
+	// Use the path (either newly cached or already cached)
+	val, found, _ := unstructured.NestedInt64(obj, path...)
 	return val, found
 }

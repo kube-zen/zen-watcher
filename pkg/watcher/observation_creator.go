@@ -387,7 +387,12 @@ func (oc *ObservationCreator) extractMetricsFields(observation *unstructured.Uns
 	
 	category := ""
 	if categoryVal != nil {
-		category = fmt.Sprintf("%v", categoryVal)
+		// Optimize: use type assertion first, fallback to formatting only when needed
+		if str, ok := categoryVal.(string); ok {
+			category = str
+		} else {
+			category = fmt.Sprintf("%v", categoryVal)
+		}
 	} else if !categoryFound {
 		logger.Debug("Category not found in spec",
 			sdklog.Operation("observation_create"),
@@ -396,7 +401,12 @@ func (oc *ObservationCreator) extractMetricsFields(observation *unstructured.Uns
 	
 	severity := ""
 	if severityVal != nil {
-		severity = fmt.Sprintf("%v", severityVal)
+		// Optimize: use type assertion first, fallback to formatting only when needed
+		if str, ok := severityVal.(string); ok {
+			severity = str
+		} else {
+			severity = fmt.Sprintf("%v", severityVal)
+		}
 	} else if !severityFound {
 		logger.Debug("Severity not found in spec",
 			sdklog.Operation("observation_create"),
@@ -405,7 +415,12 @@ func (oc *ObservationCreator) extractMetricsFields(observation *unstructured.Uns
 	
 	eventType := ""
 	if eventTypeVal != nil {
-		eventType = fmt.Sprintf("%v", eventTypeVal)
+		// Optimize: use type assertion first, fallback to formatting only when needed
+		if str, ok := eventTypeVal.(string); ok {
+			eventType = str
+		} else {
+			eventType = fmt.Sprintf("%v", eventTypeVal)
+		}
 	} else if !eventTypeFound {
 		logger.Debug("EventType not found in spec",
 			sdklog.Operation("observation_create"),
@@ -570,7 +585,12 @@ func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstruct
 	if reason == "" {
 		eventTypeVal, _ := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "eventType")
 		if eventTypeVal != nil {
-			reason = fmt.Sprintf("%v", eventTypeVal)
+			// Optimize: use type assertion first, fallback to formatting only when needed
+			if str, ok := eventTypeVal.(string); ok {
+				reason = str
+			} else {
+				reason = fmt.Sprintf("%v", eventTypeVal)
+			}
 		}
 	}
 

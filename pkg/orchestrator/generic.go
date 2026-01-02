@@ -16,6 +16,7 @@ package orchestrator
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -412,7 +413,8 @@ func (o *GenericOrchestrator) Stop() {
 // Source format: namespace/name/sourceName (multi-source) or legacy source string
 func (o *GenericOrchestrator) extractSourceName(source, namespace, name string) string {
 	// Check if source is in multi-source format: namespace/name/sourceName
-	expectedPrefix := namespace + "/" + name + "/"
+	// Optimized: use fmt.Sprintf instead of string concatenation
+	expectedPrefix := fmt.Sprintf("%s/%s/", namespace, name)
 	if len(source) > len(expectedPrefix) && source[:len(expectedPrefix)] == expectedPrefix {
 		return source[len(expectedPrefix):]
 	}
@@ -448,28 +450,33 @@ func (o *GenericOrchestrator) statusUpdateLoop(ctx context.Context) {
 }
 
 // updateAllIngesterStatus updates status for all tracked Ingesters
+// Optimized: parse during map construction to avoid repeated strings.Split calls
 func (o *GenericOrchestrator) updateAllIngesterStatus(ctx context.Context) {
 	o.mu.RLock()
-	ingesterMap := make(map[string]bool) // namespace/name -> true
+	// Store parsed values to avoid repeated strings.Split
+	ingesterList := make([]struct {
+		namespace string
+		name      string
+	}, 0, len(o.activeAdapters))
 	for source := range o.activeAdapters {
 		namespace, name, _ := o.parseSourceIdentifier(source)
 		if namespace != "" && name != "" {
-			ingesterMap[namespace+"/"+name] = true
+			ingesterList = append(ingesterList, struct {
+				namespace string
+				name      string
+			}{namespace, name})
 		}
 	}
 	o.mu.RUnlock()
 
-	for key := range ingesterMap {
-		parts := strings.Split(key, "/")
-		if len(parts) == 2 {
-			if err := o.statusUpdater.UpdateStatus(ctx, parts[0], parts[1]); err != nil {
-				logger := sdklog.NewLogger("zen-watcher-orchestrator")
-				logger.Warn("Failed to update Ingester status",
-					sdklog.Operation("update_status"),
-					sdklog.String("namespace", parts[0]),
-					sdklog.String("name", parts[1]),
-					sdklog.Error(err))
-			}
+	for _, ingester := range ingesterList {
+		if err := o.statusUpdater.UpdateStatus(ctx, ingester.namespace, ingester.name); err != nil {
+			logger := sdklog.NewLogger("zen-watcher-orchestrator")
+			logger.Warn("Failed to update Ingester status",
+				sdklog.Operation("update_status"),
+				sdklog.String("namespace", ingester.namespace),
+				sdklog.String("name", ingester.name),
+				sdklog.Error(err))
 		}
 	}
 }

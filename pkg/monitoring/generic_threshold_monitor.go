@@ -16,6 +16,7 @@ package monitoring
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -202,24 +203,12 @@ func (gtm *GenericThresholdMonitor) extractField(data map[string]interface{}, pa
 }
 
 // splitPath splits a JSONPath-like path
+// Optimized: use strings.Split instead of string concatenation in loop
 func splitPath(path string) []string {
-	// Simplified - just split by "."
-	result := make([]string, 0)
-	current := ""
-	for _, char := range path {
-		if char == '.' {
-			if current != "" {
-				result = append(result, current)
-				current = ""
-			}
-		} else {
-			current += string(char)
-		}
+	if path == "" {
+		return []string{}
 	}
-	if current != "" {
-		result = append(result, current)
-	}
-	return result
+	return strings.Split(path, ".")
 }
 
 // evaluateThreshold evaluates a threshold condition
