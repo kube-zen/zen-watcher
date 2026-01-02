@@ -25,7 +25,7 @@ import (
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/config"
-	"github.com/kube-zen/zen-watcher/pkg/dedup"
+	sdkdedup "github.com/kube-zen/zen-sdk/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
@@ -53,7 +53,7 @@ type ObservationCreator struct {
 	observationsFiltered     *prometheus.CounterVec
 	observationsDeduped      prometheus.Counter
 	observationsCreateErrors *prometheus.CounterVec
-	deduper                  *dedup.Deduper
+	deduper                  *sdkdedup.Deduper
 	filter                   *filter.Filter
 	// Optimization metrics (optional)
 	optimizationMetrics *OptimizationMetrics
@@ -116,7 +116,7 @@ func NewOptimizationMetrics(filterPassRate, dedupEffectiveness, lowSeverityPerce
 }
 
 // GetDeduper returns a reference to the deduper for dynamic configuration updates
-func (oc *ObservationCreator) GetDeduper() *dedup.Deduper {
+func (oc *ObservationCreator) GetDeduper() *sdkdedup.Deduper {
 	return oc.deduper
 }
 
@@ -180,7 +180,7 @@ func NewObservationCreatorWithOptimization(
 		observationsFiltered:     observationsFiltered,
 		observationsDeduped:      observationsDeduped,
 		observationsCreateErrors: observationsCreateErrors,
-		deduper:                  dedup.NewDeduper(windowSeconds, maxSize),
+		deduper:                  sdkdedup.NewDeduper(windowSeconds, maxSize),
 		filter:                   filter,
 		optimizationMetrics:      optimizationMetrics,
 		currentOrder:             make(map[string]ProcessingOrder),
@@ -534,7 +534,7 @@ func (oc *ObservationCreator) getProcessingStrategy(source string) string {
 }
 
 // extractDedupKey extracts minimal metadata for deduplication from observation
-func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstructured) dedup.DedupKey {
+func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstructured) sdkdedup.DedupKey {
 	// Extract source (optimized with type assertion)
 	sourceVal, _ := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "source")
 	source := ""
@@ -578,9 +578,9 @@ func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstruct
 	message := oc.extractMessage(detailsVal)
 
 	// Hash message
-	messageHash := dedup.HashMessage(message)
+	messageHash := sdkdedup.HashMessage(message)
 
-	return dedup.DedupKey{
+	return sdkdedup.DedupKey{
 		Source:      source,
 		Namespace:   namespace,
 		Kind:        kind,

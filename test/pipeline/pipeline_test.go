@@ -63,7 +63,7 @@ func setupPipeline(t *testing.T, dynamicClient dynamic.Interface) *processor.Pro
 	f := filter.NewFilter(filterConfig)
 
 	// Create deduper
-	deduper := sdksdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+	deduper := sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 
 	// Create observation creator
 	creator := watcher.NewObservationCreator(

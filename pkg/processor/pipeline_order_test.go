@@ -20,7 +20,7 @@ import (
 	"time"
 
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
-	"github.com/kube-zen/zen-watcher/pkg/dedup"
+	sdkdedup "github.com/kube-zen/zen-sdk/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,7 +81,7 @@ func TestPipelineOrder_FilterFirst(t *testing.T) {
 
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
-	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+	deduper := sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 
 	creator := watcher.NewObservationCreator(
 		dynamicClient,
@@ -172,7 +172,7 @@ func TestPipelineOrder_DedupFirst(t *testing.T) {
 
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
-	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+	deduper := sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 
 	creator := watcher.NewObservationCreator(
 		dynamicClient,
@@ -257,7 +257,7 @@ func TestPipelineOrder_NormalizationAfterFilterDedup(t *testing.T) {
 
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
-	deduper := dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+	deduper := sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
 
 	creator := watcher.NewObservationCreator(
 		dynamicClient,
@@ -346,7 +346,7 @@ func TestObservationCreator_NoFilterDedupReRun(t *testing.T) {
 	// Create filter and deduper with call tracking
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
-	_ = dedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000 (unused in this test)
+	_ = sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000 (unused in this test)
 
 	creator := watcher.NewObservationCreator(
 		dynamicClient,
