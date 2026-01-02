@@ -20,8 +20,8 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/kube-zen/zen-watcher/pkg/advisor"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+	"github.com/kube-zen/zen-watcher/pkg/advisor"
 	"k8s.io/client-go/dynamic"
 )
 

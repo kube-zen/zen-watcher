@@ -33,7 +33,7 @@ import (
 type InformerAdapter struct {
 	manager *informers.Manager
 	stopCh chan struct{}
-	queue  workqueue.RateLimitingInterface // Internal queue for backpressure
+	queue  workqueue.TypedRateLimitingInterface[interface{}] // Internal queue for backpressure
 	mu     sync.Mutex
 }
 

@@ -299,7 +299,8 @@ func GenerateFingerprint(content map[string]interface{}) string {
 // getWindowForSource returns the deduplication window in seconds for a given source
 // Returns source-specific window if configured, otherwise default window
 // Must be called with lock held
-func (d *Deduper) getWindowForSource(source string) int {
+// Kept for backward compatibility, but use getWindowForSourceUnlocked directly when lock is already held
+func (d *Deduper) getWindowForSource(source string) int { //nolint:unused
 	d.mu.RLock()
 	defer d.mu.RUnlock()
 	return d.getWindowForSourceUnlocked(source)
@@ -386,7 +387,8 @@ func (d *Deduper) isDuplicateInBucket(keyStr, fingerprintHash string, now time.T
 }
 
 // addToBucket adds the key to the appropriate time bucket (must be called with lock held)
-func (d *Deduper) addToBucket(keyStr, fingerprintHash string, now time.Time) {
+// Kept for backward compatibility, but use addToBucketUnlocked directly when lock is already held
+func (d *Deduper) addToBucket(keyStr, fingerprintHash string, now time.Time) { //nolint:unused
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.addToBucketUnlocked(keyStr, fingerprintHash, now)

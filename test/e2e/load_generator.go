@@ -96,7 +96,7 @@ func (lg *LoadGenerator) sendWebhookViaKubectl(endpoint string, jsonData []byte)
 	if clusterName == "" {
 		clusterName = "test-cluster"
 	}
-	
+
 	// Get kubeconfig path
 	home, _ := os.UserHomeDir()
 	kubeconfig := filepath.Join(home, ".config", "k3d", "kubeconfig-"+clusterName+".yaml")

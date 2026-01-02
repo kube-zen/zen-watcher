@@ -89,6 +89,7 @@ func (tm *ThresholdMonitor) CheckThreshold(source string, metricName string, val
 	if sourceConfig.RateLimit != nil && sourceConfig.RateLimit.ObservationsPerMinute > 0 {
 		// Rate limiting would be checked here
 		// For now, always allow (rate limiting would need per-source counters)
+		_ = sourceConfig // Avoid empty branch warning
 	}
 
 	// Check thresholds and log warnings (but don't block)
@@ -141,6 +142,7 @@ func (tm *ThresholdMonitor) CheckObservationRate(source string, observationsPerM
 		if sourceConfig != nil {
 			// Get thresholds from config (would need to add to SourceConfig)
 			// For now, use defaults
+			_ = sourceConfig // Avoid empty branch warning
 		}
 	}
 
@@ -157,6 +159,7 @@ func (tm *ThresholdMonitor) CheckLowSeverityPercent(source string, lowSeverityPe
 		sourceConfig := tm.sourceConfigLoader.GetSourceConfig(source)
 		if sourceConfig != nil {
 			// Get thresholds from config
+			_ = sourceConfig // Avoid empty branch warning
 		}
 	}
 

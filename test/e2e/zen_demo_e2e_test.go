@@ -496,7 +496,7 @@ func TestMetricsEndpoint(t *testing.T) {
 		t.Fatalf("zen-watcher service not found: %v", err)
 	}
 
-	if svc.Spec.Ports == nil || len(svc.Spec.Ports) == 0 {
+	if len(svc.Spec.Ports) == 0 {
 		t.Fatal("zen-watcher service has no ports")
 	}
 
