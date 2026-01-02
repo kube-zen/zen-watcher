@@ -33,7 +33,7 @@ import (
 type InformerAdapter struct {
 	manager *informers.Manager
 	stopCh chan struct{}
-	queue  workqueue.TypedRateLimitingInterface[interface{}] // Internal queue for backpressure
+	queue  workqueue.RateLimitingInterface //nolint:staticcheck // Internal queue for backpressure (deprecated API but still functional, migration to TypedRateLimitingInterface requires refactoring)
 	mu     sync.Mutex
 }
 
