@@ -122,7 +122,7 @@ func main() {
 	_, leaderElectedCh := setupLeaderElection(clients, namespace, setupLog)
 
 	// Initialize adapters and orchestrator
-	genericOrchestrator, ingesterStore, ingesterInformer, httpServer, falcoAlertsChan, auditEventsChan := initializeAdapters(clients, proc, m, gvrs, observationCreator, setupLog)
+	genericOrchestrator, _, ingesterInformer, httpServer, falcoAlertsChan, auditEventsChan := initializeAdapters(clients, proc, m, gvrs, observationCreator, setupLog)
 
 	// Start all services
 	var wg sync.WaitGroup
