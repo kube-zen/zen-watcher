@@ -512,3 +512,9 @@ oss-boundary:
 	@echo "$(GREEN)Running OSS boundary gate...$(NC)"
 	@bash scripts/test/oss-boundary-gate.sh .
 	@echo "$(GREEN)✅ OSS boundary check passed$(NC)"
+
+## oss-boundary-strict: Run OSS boundary gate in strict mode (includes _test.go and scripts/)
+oss-boundary-strict:
+	@echo "$(GREEN)Running OSS boundary gate (STRICT MODE)...$(NC)"
+	@OSS_BOUNDARY_STRICT=1 bash scripts/test/oss-boundary-gate.sh .
+	@echo "$(GREEN)✅ OSS boundary check passed (strict mode)$(NC)"
