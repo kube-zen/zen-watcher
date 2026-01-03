@@ -1,5 +1,8 @@
 # golangci-lint configuration for OSS repos
 # Based on Kubernetes and OSS best practices
+# Compatible with golangci-lint v2.7.2 (same format as zen-flow)
+
+version: "2"
 
 run:
   timeout: 5m
@@ -9,65 +12,14 @@ run:
 linters:
   enable:
     # Essential linters
-    - gofmt          # Checks whether code was gofmt-ed
-    - govet          # Vet examines Go source code and reports suspicious constructs
-    - errcheck       # Checks for unchecked errors
-    - staticcheck    # Staticcheck is a go vet on steroids
-    - unused         # Checks for unused constants, variables, functions and types
-    - gosimple       # Linter for Go source code that specializes in simplifying code
-    - ineffassign    # Detects when assignments to existing variables are not used
-    - misspell       # Finds commonly misspelled English words in comments
-    - gocyclo        # Computes and checks the cyclomatic complexity of functions
-    - gosec          # Inspects source code for security problems
-    - goimports      # Goimports does everything that gofmt does plus imports sorting
-
-issues:
-  exclude-rules:
-    # Exclude test files from some checks
-    - path: _test\.go
-      linters:
-        - gocyclo
-        - errcheck
-        - gosec
-    
-    # Exclude generated files
-    - path: zz_generated\.deepcopy\.go
-      linters:
-        - all
-    - path: .*_generated\.go$
-      linters:
-        - all
-    - path: .*\.pb\.go$
-      linters:
-        - all
-    
-    # Exclude directories
-    - path: vendor/.*
-      linters:
-        - all
-    - path: third_party/.*
-      linters:
-        - all
-    - path: testdata/.*
-      linters:
-        - all
-    - path: examples/.*
-      linters:
-        - all
-    - path: tmp/.*
-      linters:
-        - all
-    - path: bin/.*
-      linters:
-        - all
-    - path: deploy/.*
-      linters:
-        - all
-    - path: charts/.*
-      linters:
-        - all
-    - path: \.github/.*
-      linters:
-        - all
-  max-issues-per-linter: 0
-  max-same-issues: 0
+    - gofmt
+    - govet
+    - errcheck
+    - staticcheck
+    - unused
+    - gosimple
+    - ineffassign
+    - misspell
+    - gocyclo
+    - gosec
+    - goimports
