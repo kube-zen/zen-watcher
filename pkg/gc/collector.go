@@ -22,9 +22,9 @@ import (
 	"strings"
 	"time"
 
+	sdkttl "github.com/kube-zen/zen-sdk/pkg/gc/ttl"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/prometheus/client_golang/prometheus"
-	sdkttl "github.com/kube-zen/zen-sdk/pkg/gc/ttl"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"

@@ -407,7 +407,6 @@ func TestFilter_Allow_Enabled(t *testing.T) {
 	}
 }
 
-
 // Helper functions to create test observations
 
 func createObservation(source, category, severity, namespace, kind, name string) *unstructured.Unstructured {
