@@ -46,8 +46,8 @@ type Templating struct {
 }
 
 type Variable struct {
-	Name  string `json:"name,omitempty"`
-	Query string `json:"query,omitempty"`
+	Name  string      `json:"name,omitempty"`
+	Query interface{} `json:"query,omitempty"` // Can be string or object
 }
 
 // TestDashboardQueriesSyntax validates that all dashboard JSON files are valid
