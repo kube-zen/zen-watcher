@@ -216,7 +216,6 @@ Exit codes:
 					if err := encoder.Encode(jsonReport); err != nil {
 						cmd.PrintErrln("ERROR: Failed to encode report:", err)
 					}
-						}
 					}
 					for _, warn := range selectWarnings {
 						cmd.PrintErrln("WARNING:", warn)
@@ -249,8 +248,6 @@ Exit codes:
 					if err := encoder.Encode(jsonReport); err != nil {
 								encoder := json.NewEncoder(os.Stdout)
 								encoder.SetIndent("", "  ")
-								encoder.SetIndent("", "  ")
-								encoder := json.NewEncoder(os.Stdout)
 								encoder.SetIndent("", "  ")
 								encoder.SetIndent("", "  ")
 					}
