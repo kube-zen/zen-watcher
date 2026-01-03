@@ -1,6 +1,8 @@
 # golangci-lint configuration for OSS repos
 # Based on Kubernetes and OSS best practices
 
+version: "2"
+
 run:
   timeout: 5m
   tests: true
