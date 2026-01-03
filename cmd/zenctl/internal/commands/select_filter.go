@@ -221,4 +221,3 @@ func formatPattern(pattern SelectPattern) string {
 	}
 	return strings.Join(parts, "/")
 }
-
