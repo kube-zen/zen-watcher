@@ -19,8 +19,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	sdkdedup "github.com/kube-zen/zen-sdk/pkg/dedup"
+	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +31,7 @@ import (
 )
 
 // mockFilter tracks when it's called
+//
 //nolint:unused // Used in tests (may be referenced in future test cases)
 type mockFilter struct {
 	called      bool
