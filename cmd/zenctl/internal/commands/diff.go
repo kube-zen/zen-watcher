@@ -80,17 +80,94 @@ Exit codes:
 				return fmt.Errorf("failed to load manifests: %w", err)
 			}
 
-			var drifts []string
-			var errorMessages []string
-			var resourceReports []ResourceReport
 			clusterContext := opts.Context
 			if clusterContext == "" {
 				clusterContext = "default"
 			}
 
+			// Parse and apply select patterns
+			var selectPatternsParsed []SelectPattern
+			var selectWarnings []string
+			var filtersApplied *FiltersApplied
+			var filteredObjects []*unstructured.Unstructured
+
+			if len(selectPatterns) > 0 {
+				parsed, warnings, parseErr := NormalizeSelectPatterns(selectPatterns)
+				if parseErr != nil {
+					return fmt.Errorf("failed to parse select patterns: %w", parseErr)
+				}
+				selectPatternsParsed = parsed
+
+				// Filter by select patterns
+				filteredObjects, selectWarnings = FilterObjectsBySelect(desiredObjects, selectPatternsParsed)
+				if len(filteredObjects) == 0 {
+					// All selections missed - emit JSON if requested, then exit 1
+					if reportFormat == "json" {
+						filtersApplied = &FiltersApplied{Select: selectPatterns}
+						jsonReport := buildDiffReport(clusterContext, []ResourceReport{}, filtersApplied, selectWarnings)
+						if reportFilePath != "" {
+							if err := writeReportFile(jsonReport, reportFilePath); err != nil {
+								cmd.PrintErrln("ERROR: Failed to write report file:", err)
+							}
+						} else {
+							encoder := json.NewEncoder(os.Stdout)
+							encoder.SetIndent("", "  ")
+							encoder.Encode(jsonReport)
+						}
+					}
+					for _, warn := range selectWarnings {
+						cmd.PrintErrln("WARNING:", warn)
+					}
+					return clierrors.NewExitError(1, fmt.Errorf("all select patterns matched no resources"))
+				}
+			} else {
+				filteredObjects = desiredObjects
+			}
+
+			// Apply label selector
+			if labelSelector != "" {
+				var labelErr error
+				filteredObjects, labelErr = FilterObjectsByLabelSelector(filteredObjects, labelSelector)
+				if labelErr != nil {
+					return fmt.Errorf("label selector error: %w", labelErr)
+				}
+				if len(filteredObjects) == 0 && len(selectPatterns) == 0 {
+					// Only label selector, no matches
+					if reportFormat == "json" {
+						filtersApplied = &FiltersApplied{LabelSelector: labelSelector}
+						jsonReport := buildDiffReport(clusterContext, []ResourceReport{}, filtersApplied, []string{})
+						if reportFilePath != "" {
+							if err := writeReportFile(jsonReport, reportFilePath); err != nil {
+								cmd.PrintErrln("ERROR: Failed to write report file:", err)
+							}
+						} else {
+							encoder := json.NewEncoder(os.Stdout)
+							encoder.SetIndent("", "  ")
+							encoder.Encode(jsonReport)
+						}
+					}
+					return clierrors.NewExitError(1, fmt.Errorf("label selector matched no resources"))
+				}
+			}
+
+			// Build filtersApplied for JSON report
+			if len(selectPatterns) > 0 || labelSelector != "" {
+				filtersApplied = &FiltersApplied{}
+				if len(selectPatterns) > 0 {
+					filtersApplied.Select = selectPatterns
+				}
+				if labelSelector != "" {
+					filtersApplied.LabelSelector = labelSelector
+				}
+			}
+
+			var drifts []string
+			var errorMessages []string
+			var resourceReports []ResourceReport
+
 			// Compare each desired object with live state
 			drifts, resourceReports, errorMessages = compareObjects(
-				ctx, desiredObjects, dynClient, resolver,
+				ctx, filteredObjects, dynClient, resolver,
 				ignoreStatus, ignoreAnnotations, outputFormat)
 
 			// Sort resources for determinism
