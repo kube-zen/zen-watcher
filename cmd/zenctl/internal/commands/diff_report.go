@@ -14,35 +14,35 @@ import (
 
 // DiffReport represents the JSON report structure for drift detection
 type DiffReport struct {
-	SchemaVersion  string         `json:"schemaVersion"`
-	GeneratedAt    string         `json:"generatedAt"`
-	ClusterContext string         `json:"clusterContext"`
-	Summary        ReportSummary  `json:"summary"`
+	SchemaVersion  string           `json:"schemaVersion"`
+	GeneratedAt    string           `json:"generatedAt"`
+	ClusterContext string           `json:"clusterContext"`
+	Summary        ReportSummary    `json:"summary"`
 	Resources      []ResourceReport `json:"resources"`
 }
 
 // ReportSummary contains aggregate statistics
 type ReportSummary struct {
-	Total        int `json:"total"`
-	Drifted      int `json:"drifted"`
-	NoDrift      int `json:"noDrift"`
-	Errors       int `json:"errors"`
-	SpecDrift    int `json:"specDrift"`
+	Total         int `json:"total"`
+	Drifted       int `json:"drifted"`
+	NoDrift       int `json:"noDrift"`
+	Errors        int `json:"errors"`
+	SpecDrift     int `json:"specDrift"`
 	MetadataDrift int `json:"metadataDrift"`
 }
 
 // ResourceReport contains information about a single resource
 type ResourceReport struct {
-	Group     string    `json:"group"`
-	Version   string    `json:"version"`
-	Kind      string    `json:"kind"`
-	Namespace string    `json:"namespace"`
-	Name      string    `json:"name"`
-	Status    string    `json:"status"` // no_drift, drift, error
-	DriftType string    `json:"driftType"` // spec, metadata, mixed, none, unknown
+	Group     string     `json:"group"`
+	Version   string     `json:"version"`
+	Kind      string     `json:"kind"`
+	Namespace string     `json:"namespace"`
+	Name      string     `json:"name"`
+	Status    string     `json:"status"`    // no_drift, drift, error
+	DriftType string     `json:"driftType"` // spec, metadata, mixed, none, unknown
 	DiffStats *DiffStats `json:"diffStats,omitempty"`
-	Redacted  bool      `json:"redacted"`
-	Error     string    `json:"error,omitempty"` // Present only if status=error
+	Redacted  bool       `json:"redacted"`
+	Error     string     `json:"error,omitempty"` // Present only if status=error
 }
 
 // DiffStats contains line counts for diff statistics
@@ -57,7 +57,7 @@ func buildDiffReport(ctx string, resources []ResourceReport) *DiffReport {
 	summary := ReportSummary{
 		Total: len(resources),
 	}
-	
+
 	for _, res := range resources {
 		switch res.Status {
 		case "drift":
@@ -76,7 +76,7 @@ func buildDiffReport(ctx string, resources []ResourceReport) *DiffReport {
 			summary.Errors++
 		}
 	}
-	
+
 	return &DiffReport{
 		SchemaVersion:  "1.0",
 		GeneratedAt:    time.Now().UTC().Format(time.RFC3339),
@@ -89,17 +89,17 @@ func buildDiffReport(ctx string, resources []ResourceReport) *DiffReport {
 // writeReportFile writes the report to a file atomically (temp file → fsync → rename)
 func writeReportFile(report *DiffReport, filePath string) error {
 	dir := filepath.Dir(filePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
+	if err := os.MkdirAll(dir, 0755); err != nil { //nolint:gosec // G301: directory permissions are acceptable for report output
 		return fmt.Errorf("failed to create report directory: %w", err)
 	}
-	
+
 	// Create temp file in same directory
 	tmpFile, err := os.CreateTemp(dir, filepath.Base(filePath)+".tmp.")
 	if err != nil {
 		return fmt.Errorf("failed to create temp file: %w", err)
 	}
 	tmpPath := tmpFile.Name()
-	
+
 	// Write JSON
 	encoder := json.NewEncoder(tmpFile)
 	encoder.SetIndent("", "  ")
@@ -108,25 +108,25 @@ func writeReportFile(report *DiffReport, filePath string) error {
 		os.Remove(tmpPath)
 		return fmt.Errorf("failed to encode report: %w", err)
 	}
-	
+
 	// Sync to disk
 	if err := tmpFile.Sync(); err != nil {
 		tmpFile.Close()
 		os.Remove(tmpPath)
 		return fmt.Errorf("failed to sync report: %w", err)
 	}
-	
+
 	if err := tmpFile.Close(); err != nil {
 		os.Remove(tmpPath)
 		return fmt.Errorf("failed to close temp file: %w", err)
 	}
-	
+
 	// Atomic rename
 	if err := os.Rename(tmpPath, filePath); err != nil {
 		os.Remove(tmpPath)
 		return fmt.Errorf("failed to rename temp file: %w", err)
 	}
-	
+
 	return nil
 }
 
@@ -134,7 +134,7 @@ func writeReportFile(report *DiffReport, filePath string) error {
 func sortResources(resources []ResourceReport) []ResourceReport {
 	sorted := make([]ResourceReport, len(resources))
 	copy(sorted, resources)
-	
+
 	sort.Slice(sorted, func(i, j int) bool {
 		if sorted[i].Group != sorted[j].Group {
 			return sorted[i].Group < sorted[j].Group
@@ -147,7 +147,7 @@ func sortResources(resources []ResourceReport) []ResourceReport {
 		}
 		return sorted[i].Name < sorted[j].Name
 	})
-	
+
 	return sorted
 }
 
@@ -155,7 +155,7 @@ func sortResources(resources []ResourceReport) []ResourceReport {
 func calculateDiffStats(diff string) *DiffStats {
 	stats := &DiffStats{}
 	lines := splitLines(diff)
-	
+
 	for _, line := range lines {
 		if len(line) > 0 {
 			switch line[0] {
@@ -170,13 +170,13 @@ func calculateDiffStats(diff string) *DiffStats {
 			}
 		}
 	}
-	
+
 	// Changed lines are approximated as the minimum of added/removed
 	stats.Changed = stats.Added
 	if stats.Removed < stats.Added {
 		stats.Changed = stats.Removed
 	}
-	
+
 	return stats
 }
 
@@ -195,4 +195,3 @@ func isSecretResource(obj *unstructured.Unstructured) bool {
 	}
 	return obj.GetKind() == "Secret"
 }
-

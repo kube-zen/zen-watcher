@@ -13,9 +13,9 @@ import (
 )
 
 type CheckResult struct {
-	Check      string
-	Status     string // PASS, WARN, FAIL
-	Message    string
+	Check       string
+	Status      string // PASS, WARN, FAIL
+	Message     string
 	Remediation string
 }
 
@@ -189,4 +189,3 @@ func checkStatusSubresource(ctx context.Context, discClient interface{}, gvr int
 	_ = gvr
 	return nil // Assume OK for now (best-effort)
 }
-
