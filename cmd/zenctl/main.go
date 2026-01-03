@@ -29,9 +29,9 @@ Zen Kubernetes resources including DeliveryFlows, Destinations, and Ingesters.`,
 	// Store global options in command context
 	rootCmd.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		cmd.SetContext(commands.WithOptions(cmd.Context(), commands.Options{
-			Kubeconfig:   kubeconfig,
-			Context:      context,
-			Namespace:    namespace,
+			Kubeconfig:    kubeconfig,
+			Context:       context,
+			Namespace:     namespace,
 			AllNamespaces: allNamespaces,
 		}))
 	}
@@ -56,4 +56,3 @@ Zen Kubernetes resources including DeliveryFlows, Destinations, and Ingesters.`,
 		os.Exit(1)
 	}
 }
-

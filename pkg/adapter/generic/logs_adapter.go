@@ -192,9 +192,9 @@ func (a *LogsAdapter) streamPodLogs(ctx context.Context, pod corev1.Pod, config 
 			sdklog.Operation("logs_stream"),
 			sdklog.String("source", config.Source),
 			sdklog.String("namespace", pod.Namespace),
-		sdklog.String("pod", pod.Name),
-		sdklog.String("container", container),
-		sdklog.Error(err))
+			sdklog.String("pod", pod.Name),
+			sdklog.String("container", container),
+			sdklog.Error(err))
 		return
 	}
 	defer func() { _ = stream.Close() }()
