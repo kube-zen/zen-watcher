@@ -63,9 +63,9 @@ func applySelectPatternFilter(
 			} else {
 				encoder := json.NewEncoder(os.Stdout)
 				encoder.SetIndent("", "  ")
-				if err := encoder.Encode(jsonReport); err != nil {
-					cmd.PrintErrln("ERROR: Failed to encode report:", err)
-				}
+    if err := encoder.Encode(jsonReport); err != nil {
+        cmd.PrintErrln("ERROR: Failed to encode report:", err)
+    }
 			}
 		}
 		for _, warn := range selectWarnings {
@@ -110,9 +110,9 @@ func applyLabelSelectorFilter(
 			} else {
 				encoder := json.NewEncoder(os.Stdout)
 				encoder.SetIndent("", "  ")
-				if err := encoder.Encode(jsonReport); err != nil {
-					cmd.PrintErrln("ERROR: Failed to encode report:", err)
-				}
+    if err := encoder.Encode(jsonReport); err != nil {
+        cmd.PrintErrln("ERROR: Failed to encode report:", err)
+    }
 			}
 		}
 		return nil, filtersApplied, clierrors.NewExitError(1, fmt.Errorf("label selector matched no resources"))
@@ -213,9 +213,9 @@ Exit codes:
 						} else {
 							encoder := json.NewEncoder(os.Stdout)
 							encoder.SetIndent("", "  ")
-							if err := encoder.Encode(jsonReport); err != nil {
-								cmd.PrintErrln("ERROR: Failed to encode report:", err)
-							}
+       if err := encoder.Encode(jsonReport); err != nil {
+           cmd.PrintErrln("ERROR: Failed to encode report:", err)
+       }
 						}
 					}
 					for _, warn := range selectWarnings {
@@ -246,15 +246,12 @@ Exit codes:
 						} else {
 							encoder := json.NewEncoder(os.Stdout)
 							encoder.SetIndent("", "  ")
-							if err := encoder.Encode(jsonReport); err != nil {
+       if err := encoder.Encode(jsonReport); err != nil {
+								encoder := json.NewEncoder(os.Stdout)
+								encoder.SetIndent("", "  ")
 
 								encoder := json.NewEncoder(os.Stdout)
 								encoder.SetIndent("", "  ")
-								cmd.PrintErrln("ERROR: Failed to encode report:", err)
-
-								encoder := json.NewEncoder(os.Stdout)
-								encoder.SetIndent("", "  ")
-							}
 						}
 					}
 					return clierrors.NewExitError(1, fmt.Errorf("label selector matched no resources"))
@@ -301,9 +298,8 @@ Exit codes:
 					// Write JSON to stdout, suppress human output
 					encoder := json.NewEncoder(os.Stdout)
 					encoder.SetIndent("", "  ")
-					if err := encoder.Encode(jsonReport); err != nil {
-						return fmt.Errorf("failed to encode report: %w", err)
-					}
+     if err := encoder.Encode(jsonReport); err != nil {
+     }
 					// Human output suppressed when JSON to stdout
 				}
 			}
