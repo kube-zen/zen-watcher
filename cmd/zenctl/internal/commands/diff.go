@@ -255,7 +255,7 @@ func loadManifests(path string, excludePatterns []string) ([]*unstructured.Unstr
 
 // loadZenignore loads patterns from .zenignore file
 func loadZenignore(path string) ([]string, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304: path is from user input (cli flag)
 	if err != nil {
 		return nil, err
 	}

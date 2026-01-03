@@ -39,7 +39,7 @@ func TestObservationCRDSchemaFileExists(t *testing.T) {
 	for _, path := range possiblePaths {
 		if _, err := os.Stat(path); err == nil {
 			crdPath = path
-			crdYAML, err = os.ReadFile(path)
+			crdYAML, err = os.ReadFile(path) //nolint:gosec // G304: path is from trusted source (test fixtures)
 			if err == nil {
 				break
 			}
