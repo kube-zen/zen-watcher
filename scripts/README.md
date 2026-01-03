@@ -29,8 +29,7 @@ scripts/
 │   ├── build.sh
 │   ├── test.sh
 │   ├── release.sh
-│   ├── e2e-test.sh
-│   └── watcher-connectivity-smoke.sh
+│   └── e2e-test.sh
 ├── benchmark/
 │   ├── quick-bench.sh
 │   └── scale-test.sh

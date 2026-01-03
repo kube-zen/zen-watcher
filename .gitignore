@@ -5,7 +5,6 @@ bin/
 *.so
 *.dylib
 zen-watcher
-zenctl
 
 # Test binary
 *.test

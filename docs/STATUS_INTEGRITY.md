@@ -10,8 +10,6 @@ All controllers update CRD status using the **status subresource** (`/status` en
 
 - **Ingester CRD**: Updated via `UpdateStatus()` method on dynamic client
 - **Observation CRD**: Status is read-only for end users (created by controllers)
-- **DeliveryFlow CRD** (zen-platform): Updated via `UpdateStatus()` method
-- **Destination CRD** (zen-platform): Status updates via status subresource
 
 ### Implementation
 
@@ -157,9 +155,7 @@ kubectl logs -n kube-system -l component=kube-apiserver | grep "ingesters/status
 Status fields serve as a **trust anchor** for:
 
 - **Operational visibility**: Source health, last seen timestamps
-- **Billing signals**: Bytes/events sent (via metrics, not status)
-- **Failover tracking**: Active targets, failover reasons
-- **Entitlement state**: Entitled condition for commercial features
+- **Processing state**: Event processing status, error tracking
 
 **Status integrity is critical** - compromised status can lead to:
 - Incorrect operational decisions

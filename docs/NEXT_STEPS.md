@@ -132,12 +132,10 @@
 **Effort**: Medium
 
 **Potential Optimizations**:
-- Event batching for high-volume destinations (from zen-bridge patterns)
+- Event batching for high-volume destinations
 - DAG computation caching (if applicable)
 - Connection pooling improvements
 - Async dispatch with worker pools
-
-**Reference**: `docs/ZEN_BRIDGE_FEATURES_TO_INCORPORATE.md`
 
 ---
 

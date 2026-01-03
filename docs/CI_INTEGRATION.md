@@ -34,14 +34,6 @@ Use this for:
 - Release validation
 - Periodic audits
 
-## Safety Tests
-
-The `zenctl-oss` safety test ensures no SaaS-only commands are registered:
-
-```bash
-GOWORK=off go test ./cmd/zenctl/internal/commands -run TestZenctlOSSRemainsSaaSFree
-```
-
 ## Recommended CI Steps
 
 For `zen-watcher` repository:
@@ -52,10 +44,6 @@ steps:
   - name: OSS Boundary Check (Strict)
     run: |
       make oss-boundary-strict
-
-  - name: zenctl-oss Safety Test
-    run: |
-      GOWORK=off go test ./cmd/zenctl/internal/commands -run TestZenctlOSSRemainsSaaSFree
 ```
 
 For `zen-sdk` repository:

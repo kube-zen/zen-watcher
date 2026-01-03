@@ -60,7 +60,7 @@ spec:
       endpoint: "/events/trivy"
 ```
 
-**Note**: The `saas` type is a generic external sink. Platform-specific behavior (zen-platform, zen-bridge) is documented in platform-specific docs, not in OSS docs.
+**Note**: The `saas` type is a generic external sink for external HTTP endpoints.
 
 ## Supported Ingester Types
 
@@ -287,7 +287,7 @@ If `spec.processing.dedup.strategy` is not set, the default `fingerprint` strate
 - Order is implementation-defined (typically filter → dedup → normalize → destinations)
 - No optimization engine in OSS base
 
-**Note**: Optimization engine (auto-choosing filter_first vs dedup_first based on traffic patterns) is a commercial feature and not part of OSS base Ingester CRD. See zen-platform docs for commercial optimization features.
+**Note**: The processing order is implementation-defined and optimized for performance.
 
 ## Destination Types
 

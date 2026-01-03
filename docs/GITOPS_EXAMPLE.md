@@ -6,7 +6,6 @@ This example demonstrates deploying 20 Ingesters via ArgoCD, showing both the ha
 
 - ArgoCD installed and configured
 - zen-watcher CRDs installed (`crds.enabled=true` or managed separately)
-- zen-platform DeliveryFlow CRDs installed (for commercial routing)
 
 ## Example: 20 Ingesters via ArgoCD
 
@@ -116,69 +115,6 @@ spec:
 
 *(Continue with 17 more ingester configurations...)*
 
-## Commercial Routing with Entitlement Gating
-
-### DeliveryFlow with Entitlement Check
-
-**File: `delivery-flows/production-routing.yaml`**
-```yaml
-apiVersion: routing.zen.kube-zen.io/v1alpha1
-kind: DeliveryFlow
-metadata:
-  name: production-routing
-  namespace: zen-system
-spec:
-  sources:
-    - namespace: zen-system
-      name: pod-events
-      sourceName: pod-informer
-  outputs:
-    - name: primary-siem
-      targets:
-        - destinationRef:
-            name: siem-destination
-            namespace: zen-system
-          role: primary
-        - destinationRef:
-            name: siem-standby
-            namespace: zen-system
-          role: standby
-      failoverPolicy:
-        switchAfter: 30s
-        cooldown: 5m
-        maxSwitchesPerHour: 10
-status:
-  conditions:
-    - type: Entitled
-      status: "False"  # Not paid - delivery blocked
-      reason: UnpaidSubscription
-      message: Tenant subscription is not active
-    - type: Ready
-      status: "False"
-      reason: NotEntitled
-  outputs:
-    - name: primary-siem
-      activeTarget:
-        destinationRef:
-          name: siem-destination
-          namespace: zen-system
-        role: primary
-      linkHealth:
-        - destinationRef:
-            name: siem-destination
-            namespace: zen-system
-          healthy: false
-          lastError: "Delivery blocked: subscription not active"
-```
-
-### Behavior
-
-1. **Resources Apply Cleanly**: All Ingester and DeliveryFlow CRs are created successfully
-2. **Entitlement Check**: DeliveryFlow controller checks tenant entitlement
-3. **Status Update**: `status.conditions[].type=Entitled` set to `False` when not paid
-4. **Delivery Blocked**: Events are not delivered to destinations, but CRs remain valid
-5. **GitOps Safe**: No CR rejection - entitlement only affects delivery behavior
-
 ### Verifying Status
 
 ```bash
@@ -186,11 +122,6 @@ status:
 kubectl get ingesters -n zen-system
 kubectl describe ingester pod-events -n zen-system
 # Shows: status.sources[] with name, type, state, lastError, lastSeen
-
-# Check DeliveryFlow entitlement
-kubectl get deliveryflows -n zen-system
-kubectl describe deliveryflow production-routing -n zen-system
-# Shows: status.conditions[].type=Entitled status=False
 ```
 
 ## Key Points
@@ -198,8 +129,7 @@ kubectl describe deliveryflow production-routing -n zen-system
 1. **All examples use v1alpha1**: No v1 or v2 references
 2. **Multi-source support**: `spec.sources[]` array for multiple input sources
 3. **Status tracking**: Per-source status in `status.sources[]`
-4. **Entitlement gating**: GitOps-safe - CRs apply, delivery is gated
-5. **Failover support**: Primary/standby targets with automatic failover
+4. **GitOps-friendly**: All CRs apply cleanly and can be managed via ArgoCD
 
 ---
 
