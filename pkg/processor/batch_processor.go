@@ -19,8 +19,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 )
 
 // Package-level logger shared with pipeline.go (same package)
