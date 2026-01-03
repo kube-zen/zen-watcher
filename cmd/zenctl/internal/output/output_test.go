@@ -100,4 +100,3 @@ func TestParseFormat(t *testing.T) {
 		})
 	}
 }
-

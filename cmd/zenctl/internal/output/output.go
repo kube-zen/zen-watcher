@@ -110,4 +110,3 @@ func FormatActiveTarget(namespace, name string) string {
 	}
 	return "—"
 }
-
