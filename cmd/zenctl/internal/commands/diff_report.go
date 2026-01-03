@@ -52,7 +52,6 @@ type DiffStats struct {
 	Changed int `json:"changed"`
 }
 
-//nolint:unused // Reserved for future use in diff command JSON output
 // buildDiffReport constructs a DiffReport from comparison results
 func buildDiffReport(ctx string, resources []ResourceReport) *DiffReport {
 	summary := ReportSummary{
@@ -89,6 +88,7 @@ func buildDiffReport(ctx string, resources []ResourceReport) *DiffReport {
 }
 
 // writeReportFile writes the report to a file atomically (temp file → fsync → rename)
+//nolint:unused // Reserved for future use in diff command JSON output
 func writeReportFile(report *DiffReport, filePath string) error {
 	dir := filepath.Dir(filePath)
 	if err := os.MkdirAll(dir, 0755); err != nil { //nolint:gosec // G301: directory permissions are acceptable for report output
@@ -133,6 +133,7 @@ func writeReportFile(report *DiffReport, filePath string) error {
 }
 
 // sortResources ensures deterministic ordering of resources
+//nolint:unused // Reserved for future use in diff command JSON output
 func sortResources(resources []ResourceReport) []ResourceReport {
 	sorted := make([]ResourceReport, len(resources))
 	copy(sorted, resources)
@@ -154,6 +155,7 @@ func sortResources(resources []ResourceReport) []ResourceReport {
 }
 
 // calculateDiffStats calculates diff statistics from diff string
+//nolint:unused // Reserved for future use in diff command JSON output
 func calculateDiffStats(diff string) *DiffStats {
 	stats := &DiffStats{}
 	lines := splitLines(diff)
@@ -183,6 +185,7 @@ func calculateDiffStats(diff string) *DiffStats {
 }
 
 // splitLines splits a string into lines (handles both \n and \r\n)
+//nolint:unused // Reserved for future use in diff command JSON output
 func splitLines(s string) []string {
 	if s == "" {
 		return []string{}
@@ -191,6 +194,7 @@ func splitLines(s string) []string {
 }
 
 // isSecretResource checks if a resource is a Secret
+//nolint:unused // Reserved for future use in diff command JSON output
 func isSecretResource(obj *unstructured.Unstructured) bool {
 	if obj == nil {
 		return false

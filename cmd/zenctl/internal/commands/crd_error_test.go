@@ -25,7 +25,7 @@ func TestCRDErrorMessages(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.resourceName, func(t *testing.T) {
 			errMsg := tc.err.Error()
-			
+
 			// Verify the remediation message is included
 			if !strings.Contains(errMsg, tc.expectedMsg) {
 				t.Errorf("Expected error message to contain remediation '%s', got: %s", tc.expectedMsg, errMsg)
@@ -47,10 +47,10 @@ func TestCRDErrorMessages(t *testing.T) {
 // TestFlowsCommandCRDError verifies that flows command returns correct error for missing CRD
 func TestFlowsCommandCRDError(t *testing.T) {
 	expectedErrorMsg := "DeliveryFlow CRD not installed; enable crds.enabled or apply CRDs separately"
-	
+
 	// Verify the error message format matches what's in flows.go
 	testError := fmt.Errorf("%s: %w", expectedErrorMsg, fmt.Errorf("discovery error"))
-	
+
 	if !strings.Contains(testError.Error(), expectedErrorMsg) {
 		t.Errorf("Error message should contain: %s", expectedErrorMsg)
 	}
@@ -60,4 +60,3 @@ func TestFlowsCommandCRDError(t *testing.T) {
 		t.Error("Error message should contain remediation instruction")
 	}
 }
-
