@@ -104,22 +104,35 @@ func (f *Filter) GetConfig() *FilterConfig {
 // This is called BEFORE normalization and deduplication
 // Delegates to zen-sdk filter
 func (f *Filter) Allow(observation *unstructured.Unstructured) bool {
-	if f == nil || f.sdkFilter == nil {
+	if f == nil {
 		return true
 	}
-	return f.sdkFilter.Allow(observation)
+	f.mu.RLock()
+	sdkFilter := f.sdkFilter
+	f.mu.RUnlock()
+	if sdkFilter == nil {
+		return true
+	}
+	return sdkFilter.Allow(observation)
 }
 
 // AllowWithReason checks if an observation should be allowed and returns the reason if filtered
 // Returns (true, "") if allowed, (false, reason) if filtered
 // Delegates to zen-sdk filter but maintains custom metrics tracking
 func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, string) {
-	if f == nil || f.sdkFilter == nil {
+	if f == nil {
+		return true, ""
+	}
+	f.mu.RLock()
+	sdkFilter := f.sdkFilter
+	metrics := f.metrics
+	f.mu.RUnlock()
+	if sdkFilter == nil {
 		return true, ""
 	}
 	// Use SDK filter for actual filtering logic
 	// Note: SDK filter doesn't have AllowWithReason, so we use Allow and track metrics separately
-	allowed := f.sdkFilter.Allow(observation)
+	allowed := sdkFilter.Allow(observation)
 	if !allowed {
 		// Extract source for metrics
 		sourceVal, _, _ := unstructured.NestedFieldCopy(observation.Object, "spec", "source")
@@ -131,8 +144,8 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 				source = fmt.Sprintf("%v", sourceVal)
 			}
 		}
-		if f.metrics != nil {
-			f.metrics.FilterDecisions.WithLabelValues(source, "filter", "sdk_filtered").Inc()
+		if metrics != nil {
+			metrics.FilterDecisions.WithLabelValues(source, "filter", "sdk_filtered").Inc()
 		}
 		return false, "sdk_filtered"
 	}
