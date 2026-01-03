@@ -61,7 +61,7 @@ type DiffStats struct {
 }
 
 // buildDiffReport constructs a DiffReport from comparison results
-func buildDiffReport(ctx string, resources []ResourceReport) *DiffReport {
+func buildDiffReport(ctx string, resources []ResourceReport, filtersApplied *FiltersApplied, warnings []string) *DiffReport {
 	summary := ReportSummary{
 		Total: len(resources),
 	}

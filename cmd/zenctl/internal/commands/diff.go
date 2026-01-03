@@ -92,9 +92,12 @@ Exit codes:
 			var filteredObjects []*unstructured.Unstructured
 
 			if len(selectPatterns) > 0 {
-				parsed, warnings, parseErr := NormalizeSelectPatterns(selectPatterns)
+				parsed, parseWarnings, parseErr := NormalizeSelectPatterns(selectPatterns)
 				if parseErr != nil {
 					return fmt.Errorf("failed to parse select patterns: %w", parseErr)
+				}
+				if len(parseWarnings) > 0 {
+					return fmt.Errorf("select pattern parse errors: %s", strings.Join(parseWarnings, "; "))
 				}
 				selectPatternsParsed = parsed
 
