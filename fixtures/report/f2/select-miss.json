@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "<NORMALIZED>",
+  "clusterContext": "default",
+  "summary": {
+    "total": 0,
+    "drifted": 0,
+    "noDrift": 0,
+    "errors": 0,
+    "specDrift": 0,
+    "metadataDrift": 0
+  },
+  "resources": [],
+  "filtersApplied": {
+    "select": [
+      "ConfigMap/nonexistent"
+    ]
+  },
+  "warnings": [
+    "select pattern matched no resources: ConfigMap/nonexistent"
+  ]
+}
+
