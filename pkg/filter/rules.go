@@ -18,8 +18,8 @@ import (
 	"fmt"
 	"sync"
 
-	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	sdkfilter "github.com/kube-zen/zen-sdk/pkg/filter"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -39,8 +39,8 @@ var (
 type Filter struct {
 	mu        sync.RWMutex
 	config    *FilterConfig
-	metrics   *metrics.Metrics        // Optional metrics
-	sdkFilter *sdkfilter.Filter       // Internal zen-sdk filter
+	metrics   *metrics.Metrics  // Optional metrics
+	sdkFilter *sdkfilter.Filter // Internal zen-sdk filter
 }
 
 // NewFilter creates a new filter with the given configuration
@@ -138,4 +138,3 @@ func (f *Filter) AllowWithReason(observation *unstructured.Unstructured) (bool, 
 	}
 	return true, ""
 }
-
