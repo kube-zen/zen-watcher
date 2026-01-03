@@ -180,6 +180,101 @@ Exit codes:
 	return cmd
 }
 
+// compareObjects compares desired objects with live cluster state
+func compareObjects(
+	ctx context.Context,
+	desiredObjects []*unstructured.Unstructured,
+	dynClient dynamic.Interface,
+	resolver *discovery.ResourceResolver,
+	ignoreStatus, ignoreAnnotations bool,
+	outputFormat string,
+) ([]string, []ResourceReport, []string) {
+	var drifts []string
+	var errorMessages []string
+	var resourceReports []ResourceReport
+
+	for _, desired := range desiredObjects {
+		// Resolve GVR
+		gvk := schema.GroupVersionKind{
+			Group:   desired.GetAPIVersion(),
+			Version: "", // Will be parsed from APIVersion
+			Kind:    desired.GetKind(),
+		}
+		if parts := strings.Split(desired.GetAPIVersion(), "/"); len(parts) == 2 {
+			gvk.Group = parts[0]
+			gvk.Version = parts[1]
+		} else {
+			gvk.Version = desired.GetAPIVersion()
+		}
+
+		objNS := desired.GetNamespace()
+		if objNS == "" {
+			objNS = "default"
+		}
+
+		// Create base ResourceReport
+		resourceReport := ResourceReport{
+			Group:     gvk.Group,
+			Version:   gvk.Version,
+			Kind:      gvk.Kind,
+			Namespace: objNS,
+			Name:      desired.GetName(),
+			Status:    "no_drift",
+			DriftType: "none",
+			Redacted:  isSecretResource(desired),
+		}
+
+		// Try to resolve GVR and fetch live object
+		gvr, err := resolver.ResolveGVR(gvk)
+		if err != nil {
+			resourceReport.Status = "error"
+			resourceReport.DriftType = "unknown"
+			resourceReport.Error = fmt.Sprintf("CRD not found: %v", err)
+			resourceReports = append(resourceReports, resourceReport)
+			errorMessages = append(errorMessages, fmt.Sprintf("%s %s/%s: CRD not found: %v", gvk.Kind, objNS, desired.GetName(), err))
+			continue
+		}
+
+		live, err := dynClient.Resource(gvr).Namespace(objNS).Get(ctx, desired.GetName(), metav1.GetOptions{})
+		if err != nil {
+			resourceReport.Status = "error"
+			resourceReport.DriftType = "unknown"
+			resourceReport.Error = fmt.Sprintf("Resource not found: %v", err)
+			resourceReports = append(resourceReports, resourceReport)
+			errorMessages = append(errorMessages, fmt.Sprintf("%s %s/%s: not found in cluster: %v", gvk.Kind, objNS, desired.GetName(), err))
+			continue
+		}
+
+		// Check if live object is also a Secret
+		resourceReport.Redacted = isSecretResource(desired) || isSecretResource(live)
+
+		// Normalize both objects
+		desiredNormalized := normalizeForDiff(desired, ignoreStatus, ignoreAnnotations)
+		liveNormalized := normalizeForDiff(live, ignoreStatus, ignoreAnnotations)
+
+		// Generate diff
+		format := outputFormat
+		if format == "" {
+			format = "unified"
+		}
+		diff, driftType := generateDiff(desiredNormalized, liveNormalized, fmt.Sprintf("%s/%s/%s", gvk.Kind, objNS, desired.GetName()), format)
+
+		if diff != "" {
+			resourceReport.Status = "drift"
+			resourceReport.DriftType = driftType
+			resourceReport.DiffStats = calculateDiffStats(diff)
+			drifts = append(drifts, diff)
+		} else {
+			resourceReport.Status = "no_drift"
+			resourceReport.DriftType = "none"
+		}
+
+		resourceReports = append(resourceReports, resourceReport)
+	}
+
+	return drifts, resourceReports, errorMessages
+}
+
 // loadManifests loads YAML manifests from file or directory with exclusions
 func loadManifests(path string, excludePatterns []string) ([]*unstructured.Unstructured, error) {
 	var objects []*unstructured.Unstructured
