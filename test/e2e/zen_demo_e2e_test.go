@@ -483,7 +483,7 @@ spec:
 	if err := applyCmd.Run(); err != nil {
 		t.Fatalf("Failed to apply test Ingester: %v", err)
 	}
-	defer runKubectl("delete", "ingester", "test-metrics-ingester", "-n", testNamespace, "--ignore-not-found=true")
+	defer func() { _, _ = runKubectl("delete", "ingester", "test-metrics-ingester", "-n", testNamespace, "--ignore-not-found=true") }()
 
 	// Wait for Ingester to be processed (explicit timeout)
 	waitForIngesterReady(t, "test-metrics-ingester", testNamespace, 15*time.Second)

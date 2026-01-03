@@ -134,7 +134,7 @@ func (cli *OptimizeCLI) History(ctx context.Context, source string) error {
 	if !impact.LastOptimizedAt.IsZero() {
 		fmt.Fprintf(w, "Last Optimized\t%s\n", impact.LastOptimizedAt.Format("2006-01-02 15:04:05"))
 	}
-	w.Flush()
+	_ = w.Flush()
 
 	return nil
 }
