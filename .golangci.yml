@@ -11,8 +11,7 @@ run:
 
 linters:
   enable:
-    # Essential linters
-    - gofmt
+    # Linters only (formatters like gofmt/goimports not allowed with version: "2")
     - govet
     - errcheck
     - staticcheck
@@ -22,4 +21,3 @@ linters:
     - misspell
     - gocyclo
     - gosec
-    - goimports
