@@ -625,7 +625,7 @@ make zen-demo-down
 See `make zen-demo-up`, `make zen-demo-validate`, and `make zen-demo-down` for details.
 
 ### Prerequisites
-- Go 1.25+ (tested on 1.24)
+- Go 1.25+ (tested on 1.25)
 - Make (optional, but recommended)
 
 ### Running Tests
