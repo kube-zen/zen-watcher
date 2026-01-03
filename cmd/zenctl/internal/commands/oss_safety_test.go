@@ -40,6 +40,7 @@ func TestZenctlOSSRemainsSaaSFree(t *testing.T) {
 		"e2e",
 		"export",
 		"validate",
+		"diff",
 		"version",
 		"completion",
 	}
@@ -95,6 +96,7 @@ func newRootCommandForTest() *cobra.Command {
 	rootCmd.AddCommand(NewE2ECommand())
 	rootCmd.AddCommand(NewExportCommand())
 	rootCmd.AddCommand(NewValidateCommand())
+	rootCmd.AddCommand(NewDiffCommand())
 	rootCmd.AddCommand(NewCompletionCommand(rootCmd))
 
 	return rootCmd
