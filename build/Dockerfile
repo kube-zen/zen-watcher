@@ -8,28 +8,15 @@ RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /build
 
-# Copy zen-sdk first (needed for tagged version resolution during build)
-# Build context should be from parent directory (zen/)
-COPY zen-sdk /build/zen-sdk
-
 # Copy go.mod and go.sum first for better layer caching
 # This allows Docker to cache dependencies if code changes but deps don't
-COPY zen-watcher/go.mod zen-watcher/go.sum* ./
+COPY go.mod go.sum* ./
 
-# Download dependencies first (will fail for zen-sdk but that's ok due to checksum DB delay)
-RUN go mod download || true
-
-# Add temporary replace directive for local build (go.mod stays clean with tagged version)
-# Path is relative to /build (where go.mod is)
-RUN go mod edit -replace github.com/kube-zen/zen-sdk=./zen-sdk
+# Download dependencies
+RUN go mod download
 
 # Copy source code
-COPY zen-watcher/ .
-
-# Update go.sum with local zen-sdk (replace directive makes this use local path)
-# This is safe because replace takes precedence over the tagged version
-RUN go mod tidy || true
-RUN go mod download || true
+COPY . .
 
 # Build with aggressive optimizations for production
 # CGO_ENABLED=0: Static binary, no C dependencies
@@ -45,9 +32,7 @@ ARG VERSION=1.0.0-alpha
 ARG COMMIT=unknown
 ARG BUILD_DATE=unknown
 
-# Disable checksum verification for zen-sdk (new tag not yet in checksum DB)
-# Use -mod=mod to allow automatic dependency fetching (replace directive handles zen-sdk)
-RUN GOSUMDB=off CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -mod=mod \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -ldflags="-w -s -X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.BuildDate=${BUILD_DATE}" \
     -tags netgo \
     -installsuffix cgo \

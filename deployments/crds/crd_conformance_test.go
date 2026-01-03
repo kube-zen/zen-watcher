@@ -249,7 +249,8 @@ func validateManifest(t *testing.T, manifest string, crdType string) error {
 		if strings.Contains(outputStr, "no matches for kind") ||
 			strings.Contains(outputStr, "the server could not find the requested resource") ||
 			strings.Contains(outputStr, "resource mapping not found") ||
-			strings.Contains(outputStr, "ensure CRDs are installed") {
+			strings.Contains(outputStr, "ensure CRDs are installed") ||
+			strings.Contains(outputStr, "NotFound") {
 			// Fall back to client-side validation
 			cmd = exec.Command("kubectl", "apply", "--dry-run=client", "-f", tmpFile) //nolint:gosec // G204: kubectl is trusted test tool
 			output, err = cmd.CombinedOutput()
@@ -259,7 +260,8 @@ func validateManifest(t *testing.T, manifest string, crdType string) error {
 				if strings.Contains(outputStr, "no matches for kind") ||
 					strings.Contains(outputStr, "NotFound") ||
 					strings.Contains(outputStr, "resource mapping not found") ||
-					strings.Contains(outputStr, "ensure CRDs are installed") {
+					strings.Contains(outputStr, "ensure CRDs are installed") ||
+					strings.Contains(outputStr, "the server could not find the requested resource") {
 					t.Skipf("CRD not available for validation (expected in unit tests): %s", outputStr)
 					return nil
 				}
