@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 // DiffReport represents the JSON report structure for drift detection
@@ -184,5 +186,13 @@ func splitLines(s string) []string {
 		return []string{}
 	}
 	return strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n")
+}
+
+// isSecretResource checks if a resource is a Secret or contains secret patterns
+func isSecretResource(obj *unstructured.Unstructured) bool {
+	if obj == nil {
+		return false
+	}
+	return obj.GetKind() == "Secret"
 }
 
