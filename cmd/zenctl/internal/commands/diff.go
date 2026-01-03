@@ -299,7 +299,7 @@ Exit codes:
 					encoder := json.NewEncoder(os.Stdout)
 					encoder.SetIndent("", "  ")
      if err := encoder.Encode(jsonReport); err != nil {
-     	cmd.PrintErrln("ERROR: Failed to encode report:", err)
+         cmd.PrintErrln("ERROR: Failed to encode report:", err)
      }
 					// Human output suppressed when JSON to stdout
 				}
