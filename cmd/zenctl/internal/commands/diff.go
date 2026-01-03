@@ -77,14 +77,12 @@ Exit codes:
 			}
 
 			var drifts []string
-			var errors []string
-			var driftSummary struct {
-				totalResources   int
-				driftedResources int
-				specDrifts       int
-				metadataDrifts   int
+			var errorMessages []string
+			var resourceReports []ResourceReport
+			clusterContext := opts.Context
+			if clusterContext == "" {
+				clusterContext = "default"
 			}
-			driftSummary.totalResources = len(desiredObjects)
 
 			// Compare each desired object with live state
 			for _, desired := range desiredObjects {
@@ -101,22 +99,46 @@ Exit codes:
 					gvk.Version = desired.GetAPIVersion()
 				}
 
-				gvr, err := resolver.ResolveGVR(gvk)
-				if err != nil {
-					errors = append(errors, fmt.Sprintf("%s %s/%s: CRD not found: %v", gvk.Kind, desired.GetNamespace(), desired.GetName(), err))
-					continue
-				}
-
-				// Get live object
 				objNS := desired.GetNamespace()
 				if objNS == "" {
 					objNS = "default"
 				}
-				live, err := dynClient.Resource(gvr).Namespace(objNS).Get(ctx, desired.GetName(), metav1.GetOptions{})
+
+				// Create base ResourceReport
+				resourceReport := ResourceReport{
+					Group:     gvk.Group,
+					Version:   gvk.Version,
+					Kind:      gvk.Kind,
+					Namespace: objNS,
+					Name:      desired.GetName(),
+					Status:    "no_drift",
+					DriftType: "none",
+					Redacted:  isSecretResource(desired),
+				}
+
+				// Try to resolve GVR and fetch live object
+				gvr, err := resolver.ResolveGVR(gvk)
 				if err != nil {
-					errors = append(errors, fmt.Sprintf("%s %s/%s: not found in cluster: %v", gvk.Kind, objNS, desired.GetName(), err))
+					resourceReport.Status = "error"
+					resourceReport.DriftType = "unknown"
+					resourceReport.Error = fmt.Sprintf("CRD not found: %v", err)
+					resourceReports = append(resourceReports, resourceReport)
+					errorMessages = append(errorMessages, fmt.Sprintf("%s %s/%s: CRD not found: %v", gvk.Kind, objNS, desired.GetName(), err))
 					continue
 				}
+
+				live, err := dynClient.Resource(gvr).Namespace(objNS).Get(ctx, desired.GetName(), metav1.GetOptions{})
+				if err != nil {
+					resourceReport.Status = "error"
+					resourceReport.DriftType = "unknown"
+					resourceReport.Error = fmt.Sprintf("Resource not found: %v", err)
+					resourceReports = append(resourceReports, resourceReport)
+					errorMessages = append(errorMessages, fmt.Sprintf("%s %s/%s: not found in cluster: %v", gvk.Kind, objNS, desired.GetName(), err))
+					continue
+				}
+
+				// Check if live object is also a Secret
+				resourceReport.Redacted = isSecretResource(desired) || isSecretResource(live)
 
 				// Normalize both objects
 				desiredNormalized := normalizeForDiff(desired, ignoreStatus, ignoreAnnotations)
@@ -127,17 +149,22 @@ Exit codes:
 					outputFormat = "unified"
 				}
 				diff, driftType := generateDiff(desiredNormalized, liveNormalized, fmt.Sprintf("%s/%s/%s", gvk.Kind, objNS, desired.GetName()), outputFormat)
+				
 				if diff != "" {
+					resourceReport.Status = "drift"
+					resourceReport.DriftType = driftType
+					resourceReport.DiffStats = calculateDiffStats(diff)
 					drifts = append(drifts, diff)
-					driftSummary.driftedResources++
-					switch driftType {
-					case "spec":
-						driftSummary.specDrifts++
-					case "metadata":
-						driftSummary.metadataDrifts++
-					}
+				} else {
+					resourceReport.Status = "no_drift"
+					resourceReport.DriftType = "none"
 				}
+				
+				resourceReports = append(resourceReports, resourceReport)
 			}
+
+			// Sort resources for determinism
+			resourceReports = sortResources(resourceReports)
 
 			// Report errors
 			if len(errors) > 0 {

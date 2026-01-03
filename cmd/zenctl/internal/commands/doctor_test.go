@@ -32,7 +32,7 @@ func TestDoctorCommandRemediationMessages(t *testing.T) {
 		t.Run(tc.resourceName, func(t *testing.T) {
 			// Construct the expected error message format
 			expectedError := fmt.Sprintf("%s CRD not installed; %s", tc.resourceName, tc.expectedMsg)
-			
+
 			// Verify the remediation message is included
 			if !strings.Contains(expectedError, tc.expectedMsg) {
 				t.Errorf("Expected error message to contain remediation: %s", tc.expectedMsg)
@@ -57,4 +57,3 @@ func TestDoctorCommandExists(t *testing.T) {
 		t.Errorf("Expected command Use='doctor', got '%s'", cmd.Use)
 	}
 }
-

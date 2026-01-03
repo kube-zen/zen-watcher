@@ -557,7 +557,7 @@ All archive documents include banners explaining their non-canonical status.
 
 ### Prerequisites
 
-- **Go 1.25+** (zen-watcher requires Go 1.24)
+- **Go 1.25+**
 - **Kubernetes cluster** (k3d, kind, or minikube) for integration tests
 - **kubectl** configured to access your cluster
 - **helm** (optional, for deployment)
