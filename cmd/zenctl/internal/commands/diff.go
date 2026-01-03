@@ -248,7 +248,11 @@ func normalizeForDiff(obj *unstructured.Unstructured, ignoreStatus, ignoreAnnota
 	redactSecrets(normalized, "")
 
 	// Stable sort maps/slices
-	return stableSortObject(normalized)
+	sorted := stableSortObject(normalized)
+	if sortedMap, ok := sorted.(map[string]interface{}); ok {
+		return sortedMap
+	}
+	return normalized
 }
 
 // stableSortObject recursively sorts maps and slices for stable output
