@@ -424,7 +424,7 @@ func TestMetricsMovement(t *testing.T) {
 
 	context := getKubectlContext()
 	cmd := exec.CommandContext(ctx, "kubectl", "--context="+context,
-		"port-forward", "-n", namespace, "svc/zen-watcher", port+":8080")
+		"port-forward", "-n", namespace, "svc/zen-watcher", port+":8080") //nolint:gosec // G204: kubectl is trusted test tool
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
 	} else {
@@ -554,7 +554,7 @@ func TestMetricsEndpoint(t *testing.T) {
 
 	context := getKubectlContext()
 	cmd := exec.CommandContext(ctx, "kubectl", "--context="+context,
-		"port-forward", "-n", namespace, "svc/zen-watcher", port+":8080")
+		"port-forward", "-n", namespace, "svc/zen-watcher", port+":8080") //nolint:gosec // G204: kubectl is trusted test tool
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
 	} else {
