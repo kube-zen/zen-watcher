@@ -93,6 +93,8 @@ func newRootCommandForTest() *cobra.Command {
 	rootCmd.AddCommand(NewVersionCommand())
 	rootCmd.AddCommand(NewAdaptersCommand())
 	rootCmd.AddCommand(NewE2ECommand())
+	rootCmd.AddCommand(NewExportCommand())
+	rootCmd.AddCommand(NewValidateCommand())
 	rootCmd.AddCommand(NewCompletionCommand(rootCmd))
 
 	return rootCmd
