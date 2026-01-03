@@ -62,11 +62,12 @@ func buildDiffReport(ctx string, resources []ResourceReport) *DiffReport {
 		switch res.Status {
 		case "drift":
 			summary.Drifted++
-			if res.DriftType == "spec" {
+			switch res.DriftType {
+			case "spec":
 				summary.SpecDrift++
-			} else if res.DriftType == "metadata" {
+			case "metadata":
 				summary.MetadataDrift++
-			} else if res.DriftType == "mixed" {
+			case "mixed":
 				summary.SpecDrift++
 				summary.MetadataDrift++
 			}

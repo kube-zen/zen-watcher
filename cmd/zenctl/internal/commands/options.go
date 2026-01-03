@@ -3,9 +3,9 @@ package commands
 import "context"
 
 type Options struct {
-	Kubeconfig   string
-	Context      string
-	Namespace    string
+	Kubeconfig    string
+	Context       string
+	Namespace     string
 	AllNamespaces bool
 }
 
@@ -21,4 +21,3 @@ func OptionsFromContext(ctx context.Context) Options {
 	}
 	return Options{}
 }
-
