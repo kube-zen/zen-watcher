@@ -33,6 +33,7 @@ func NewDiffCommand() *cobra.Command {
 	var reportFilePath string
 	var selectPatterns []string
 	var labelSelector string
+	var quiet bool
 
 	cmd := &cobra.Command{
 		Use:   "diff -f <file|dir>",
@@ -268,6 +269,212 @@ Exit codes:
 	cmd.Flags().StringVar(&labelSelector, "label-selector", "", "Label selector (kubernetes label selector syntax)")
 
 	return cmd
+}
+
+// diffClients holds the clients needed for diff operations
+type diffClients struct {
+	dynClient dynamic.Interface
+	resolver  *discovery.ResourceResolver
+}
+
+// initializeDiffClients creates the necessary clients for diff operations
+func initializeDiffClients(opts *Options) (*diffClients, error) {
+	dynClient, config, err := client.NewDynamicClient(opts.Kubeconfig, opts.Context)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create client: %w", err)
+	}
+
+	discClient, err := disk.NewCachedDiscoveryClientForConfig(config, "", "", 0)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create discovery client: %w", err)
+	}
+
+	resolver, err := discovery.NewResourceResolver(discClient)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create resource resolver: %w", err)
+	}
+
+	return &diffClients{
+		dynClient: dynClient,
+		resolver:  resolver,
+	}, nil
+}
+
+// applySelectPatternFilter applies select pattern filtering and handles miss cases
+func applySelectPatternFilter(
+	selectPatterns []string,
+	desiredObjects []*unstructured.Unstructured,
+	clusterContext string,
+	reportFormat string,
+	reportFilePath string,
+	cmd *cobra.Command,
+) ([]*unstructured.Unstructured, []string, *FiltersApplied, error) {
+	if len(selectPatterns) == 0 {
+		return desiredObjects, nil, nil, nil
+	}
+
+	parsed, parseWarnings, parseErr := NormalizeSelectPatterns(selectPatterns)
+	if parseErr != nil {
+		return nil, nil, nil, fmt.Errorf("failed to parse select patterns: %w", parseErr)
+	}
+	if len(parseWarnings) > 0 {
+		return nil, nil, nil, fmt.Errorf("select pattern parse errors: %s", strings.Join(parseWarnings, "; "))
+	}
+
+	filteredObjects, selectWarnings := FilterObjectsBySelect(desiredObjects, parsed)
+	if len(filteredObjects) == 0 {
+		// All selections missed - emit JSON if requested, then exit 1
+		if reportFormat == "json" {
+			filtersApplied := &FiltersApplied{Select: selectPatterns}
+			jsonReport := buildDiffReport(clusterContext, []ResourceReport{}, filtersApplied, selectWarnings)
+			if err := emitJSONReport(jsonReport, reportFilePath, cmd); err != nil {
+				cmd.PrintErrln("ERROR: Failed to emit report:", err)
+			}
+		}
+		for _, warn := range selectWarnings {
+			cmd.PrintErrln("WARNING:", warn)
+		}
+		return nil, selectWarnings, nil, clierrors.NewExitError(1, fmt.Errorf("all select patterns matched no resources"))
+	}
+
+	return filteredObjects, selectWarnings, nil, nil
+}
+
+// applyLabelSelectorFilter applies label selector filtering and handles miss cases
+func applyLabelSelectorFilter(
+	labelSelector string,
+	filteredObjects []*unstructured.Unstructured,
+	selectPatterns []string,
+	clusterContext string,
+	reportFormat string,
+	reportFilePath string,
+	cmd *cobra.Command,
+) ([]*unstructured.Unstructured, *FiltersApplied, error) {
+	if labelSelector == "" {
+		return filteredObjects, nil, nil
+	}
+
+	var labelErr error
+	filteredObjects, labelErr = FilterObjectsByLabelSelector(filteredObjects, labelSelector)
+	if labelErr != nil {
+		return nil, nil, fmt.Errorf("label selector error: %w", labelErr)
+	}
+
+	if len(filteredObjects) == 0 && len(selectPatterns) == 0 {
+		// Only label selector, no matches
+		if reportFormat == "json" {
+			filtersApplied := &FiltersApplied{LabelSelector: labelSelector}
+			jsonReport := buildDiffReport(clusterContext, []ResourceReport{}, filtersApplied, []string{})
+			if err := emitJSONReport(jsonReport, reportFilePath, cmd); err != nil {
+				cmd.PrintErrln("ERROR: Failed to emit report:", err)
+			}
+		}
+		return nil, nil, clierrors.NewExitError(1, fmt.Errorf("label selector matched no resources"))
+	}
+
+	return filteredObjects, nil, nil
+}
+
+// emitJSONReport emits a JSON report to either a file or stdout
+func emitJSONReport(jsonReport *DiffReport, reportFilePath string, cmd *cobra.Command) error {
+	if reportFilePath != "" {
+		return writeReportFile(jsonReport, reportFilePath)
+	}
+
+	encoder := json.NewEncoder(os.Stdout)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(jsonReport); err != nil {
+		cmd.PrintErrln("ERROR: Failed to encode report:", err)
+		return err
+	}
+	return nil
+}
+
+// buildFiltersApplied builds the FiltersApplied struct for JSON reports
+func buildFiltersApplied(selectPatterns []string, labelSelector string) *FiltersApplied {
+	if len(selectPatterns) == 0 && labelSelector == "" {
+		return nil
+	}
+
+	filtersApplied := &FiltersApplied{}
+	if len(selectPatterns) > 0 {
+		filtersApplied.Select = selectPatterns
+	}
+	if labelSelector != "" {
+		filtersApplied.LabelSelector = labelSelector
+	}
+	return filtersApplied
+}
+
+// generateAndEmitJSONReport generates and emits a JSON report if requested
+func generateAndEmitJSONReport(
+	clusterContext string,
+	resourceReports []ResourceReport,
+	filtersApplied *FiltersApplied,
+	selectWarnings []string,
+	reportFormat string,
+	reportFilePath string,
+	cmd *cobra.Command,
+) error {
+	if reportFormat != "json" {
+		return nil
+	}
+
+	jsonReport := buildDiffReport(clusterContext, resourceReports, filtersApplied, selectWarnings)
+
+	if reportFilePath != "" {
+		if err := writeReportFile(jsonReport, reportFilePath); err != nil {
+			cmd.PrintErrln("ERROR: Failed to write report file:", err)
+			return fmt.Errorf("report write failed: %w", err)
+		}
+	} else {
+		encoder := json.NewEncoder(os.Stdout)
+		encoder.SetIndent("", "  ")
+		if err := encoder.Encode(jsonReport); err != nil {
+			return fmt.Errorf("failed to encode report: %w", err)
+		}
+	}
+	return nil
+}
+
+// determineExitStatus analyzes resource reports and determines exit status
+func determineExitStatus(resourceReports []ResourceReport) (hasErrors, hasDrift bool) {
+	for _, res := range resourceReports {
+		switch res.Status {
+		case "error":
+			hasErrors = true
+		case "drift":
+			hasDrift = true
+		}
+	}
+	return hasErrors, hasDrift
+}
+
+// reportDrifts outputs drift information to the user
+func reportDrifts(
+	drifts []string,
+	resourceReports []ResourceReport,
+	reportFormat string,
+	reportFilePath string,
+	cmd *cobra.Command,
+) {
+	if reportFormat == "json" && reportFilePath == "" {
+		return // JSON to stdout suppresses human output
+	}
+
+	cmd.Printf("Drift Summary:\n")
+	cmd.Printf("  Total resources: %d\n", len(resourceReports))
+	driftCount := 0
+	for _, res := range resourceReports {
+		if res.Status == "drift" {
+			driftCount++
+		}
+	}
+	cmd.Printf("  Drifted resources: %d\n", driftCount)
+	cmd.Println("")
+	for _, drift := range drifts {
+		cmd.Println(drift)
+	}
 }
 
 // compareObjects compares desired objects with live cluster state
