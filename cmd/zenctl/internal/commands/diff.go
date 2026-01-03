@@ -176,7 +176,7 @@ Exit codes:
 			// Generate JSON report if requested
 			var jsonReport *DiffReport
 			if reportFormat == "json" {
-				jsonReport = buildDiffReport(clusterContext, resourceReports, filtersApplied, selectWarnings)
+				jsonReport = buildDiffReport(clusterContext, resourceReports)
 
 				// Handle output precedence
 				if reportFilePath != "" {
@@ -257,6 +257,8 @@ Exit codes:
 	cmd.Flags().StringArrayVar(&excludePatterns, "exclude", []string{}, "Exclude pattern (repeatable, gitignore-style)")
 	cmd.Flags().StringVar(&reportFormat, "report", "", "Report format (json)")
 	cmd.Flags().StringVar(&reportFilePath, "report-file", "", "Path to write JSON report (atomic write)")
+	cmd.Flags().StringArrayVar(&selectPatterns, "select", []string{}, "Select pattern (repeatable, format: Kind/name, Kind/namespace/name, Group/Kind/name, or Group/Kind/namespace/name)")
+	cmd.Flags().StringVar(&labelSelector, "label-selector", "", "Label selector (kubernetes label selector syntax)")
 
 	return cmd
 }
