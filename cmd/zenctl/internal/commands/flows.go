@@ -67,9 +67,9 @@ Columns: NAMESPACE | NAME | ACTIVE_TARGET | ENTITLEMENT | ENTITLEMENT_REASON | R
 
 			// Print table format
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			defer w.Flush()
+			defer func() { _ = w.Flush() }()
 
-			fmt.Fprintln(w, "NAMESPACE\tNAME\tACTIVE_TARGET\tENTITLEMENT\tENTITLEMENT_REASON\tREADY\tAGE")
+			_, _ = fmt.Fprintln(w, "NAMESPACE\tNAME\tACTIVE_TARGET\tENTITLEMENT\tENTITLEMENT_REASON\tREADY\tAGE")
 			for _, f := range flows {
 				activeTarget := output.FormatActiveTarget(f.ActiveNamespace, f.ActiveTarget)
 				entitlement := output.FormatEntitlement(f.Entitlement, f.EntitlementReason)
@@ -77,7 +77,7 @@ Columns: NAMESPACE | NAME | ACTIVE_TARGET | ENTITLEMENT | ENTITLEMENT_REASON | R
 				if entitlementReason == "" || entitlementReason == "<none>" {
 					entitlementReason = "—"
 				}
-				fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 					f.Namespace, f.Name, activeTarget, entitlement, entitlementReason, f.Ready, output.FormatAge(f.Object.GetCreationTimestamp().Time))
 			}
 

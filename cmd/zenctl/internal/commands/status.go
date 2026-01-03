@@ -99,32 +99,32 @@ across the current or all namespaces.`,
 
 			// Print table format
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			defer w.Flush()
+			defer func() { _ = w.Flush() }()
 
-			fmt.Fprintln(w, "\n=== DeliveryFlows ===")
+			_, _ = fmt.Fprintln(w, "\n=== DeliveryFlows ===")
 			if len(summary.DeliveryFlows) == 0 {
-				fmt.Fprintln(w, "No DeliveryFlows found")
+				_, _ = fmt.Fprintln(w, "No DeliveryFlows found")
 			} else {
-				fmt.Fprintln(w, "NAMESPACE\tNAME\tACTIVE TARGET\tENTITLEMENT\tREADY\tAGE")
+				_, _ = fmt.Fprintln(w, "NAMESPACE\tNAME\tACTIVE TARGET\tENTITLEMENT\tREADY\tAGE")
 				for _, f := range summary.DeliveryFlows {
 					activeTarget := output.FormatActiveTarget(f.ActiveNamespace, f.ActiveTarget)
 					entitlement := output.FormatEntitlement(f.Entitlement, f.EntitlementReason)
-					fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
+					_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n",
 						f.Namespace, f.Name, activeTarget, entitlement, f.Ready, output.FormatAge(f.Object.GetCreationTimestamp().Time))
 				}
 			}
 
-			fmt.Fprintln(w, "\n=== Destinations ===")
+			_, _ = fmt.Fprintln(w, "\n=== Destinations ===")
 			if len(summary.Destinations) == 0 {
-				fmt.Fprintln(w, "No Destinations found")
+				_, _ = fmt.Fprintln(w, "No Destinations found")
 			} else {
-				fmt.Fprintln(w, "NAMESPACE\tNAME\tTYPE\tTRANSPORT\tHEALTH\tREADY\tAGE")
+				_, _ = fmt.Fprintln(w, "NAMESPACE\tNAME\tTYPE\tTRANSPORT\tHEALTH\tREADY\tAGE")
 				for _, d := range summary.Destinations {
 					health := d.Health
 					if health == "" {
 						health = "—"
 					}
-					fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+					_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 						d.Namespace, d.Name, d.Type, d.Transport, health, d.Ready, output.FormatAge(d.Object.GetCreationTimestamp().Time))
 				}
 			}
