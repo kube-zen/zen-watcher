@@ -40,10 +40,17 @@ scripts/
 
 ## Quick Start
 
-### Full Demo Setup
+### Lightweight Quick Demo (Recommended for First-Time Users)
 ```bash
-./scripts/quick-demo.sh
+./scripts/quick-demo.sh k3d --non-interactive --deploy-mock-data
 ```
+Installs zen-watcher only (no monitoring stack) - ~2 minutes setup time.
+
+### Full Demo Setup (with Monitoring)
+```bash
+./scripts/demo.sh k3d --non-interactive --deploy-mock-data
+```
+Installs zen-watcher + Grafana + VictoriaMetrics - ~4 minutes setup time.
 
 ### Install Only
 ```bash
