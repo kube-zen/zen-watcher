@@ -194,16 +194,16 @@ func loadManifests(path string, excludePatterns []string) ([]*unstructured.Unstr
 	} else {
 		zenignorePath = filepath.Join(filepath.Dir(path), ".zenignore")
 	}
-	
+
 	ignorePatterns, err := loadZenignore(zenignorePath)
 	if err != nil {
 		// .zenignore not found is OK
 		ignorePatterns = []string{}
 	}
-	
+
 	// Merge CLI exclude patterns
 	ignorePatterns = append(ignorePatterns, excludePatterns...)
-	
+
 	// Add default excludes
 	defaultExcludes := []string{".git/", "node_modules/", "dist/", ".venv/", "vendor/", ".terraform/"}
 	ignorePatterns = append(ignorePatterns, defaultExcludes...)
@@ -213,20 +213,20 @@ func loadManifests(path string, excludePatterns []string) ([]*unstructured.Unstr
 			if err != nil {
 				return err
 			}
-			
+
 			// Check if path should be excluded
 			relPath, err := filepath.Rel(path, filePath)
 			if err != nil {
 				return err
 			}
-			
+
 			if shouldExclude(relPath, ignorePatterns) {
 				if d.IsDir() {
 					return filepath.SkipDir
 				}
 				return nil
 			}
-			
+
 			if d.IsDir() {
 				return nil
 			}
@@ -259,7 +259,7 @@ func loadZenignore(path string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	lines := strings.Split(string(data), "\n")
 	var patterns []string
 	for _, line := range lines {
@@ -423,12 +423,12 @@ func generateDiff(desired, live map[string]interface{}, resourceName string, for
 		var diff strings.Builder
 		diff.WriteString(fmt.Sprintf("--- desired: %s\n", resourceName))
 		diff.WriteString(fmt.Sprintf("+++ live: %s\n", resourceName))
-		
+
 		maxLen := len(desiredLines)
 		if len(liveLines) > maxLen {
 			maxLen = len(liveLines)
 		}
-		
+
 		for i := 0; i < maxLen; i++ {
 			if i < len(desiredLines) && i < len(liveLines) {
 				if desiredLines[i] != liveLines[i] {
@@ -459,4 +459,3 @@ func generateDiff(desired, live map[string]interface{}, resourceName string, for
 
 	return unifiedDiff, driftType
 }
-

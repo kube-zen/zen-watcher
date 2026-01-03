@@ -44,12 +44,12 @@ func SetupTestEnvWithNameGeneration(t *testing.T) dynamic.Interface {
 		Version:  "v1alpha1",
 		Resource: "ingesters",
 	}
-	
+
 	client := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{
 		observationGVR: "ObservationList",
 		ingesterGVR:    "IngesterList",
 	})
-	
+
 	// Wrap the client to handle generateName
 	return &nameGeneratingClient{
 		Interface: client,
@@ -82,7 +82,7 @@ func (r *nameGeneratingResource) Create(ctx context.Context, obj *unstructured.U
 	// Check if generateName is set but name is not
 	generateName, hasGenerateName, _ := unstructured.NestedString(obj.Object, "metadata", "generateName")
 	name, hasName, _ := unstructured.NestedString(obj.Object, "metadata", "name")
-	
+
 	if hasGenerateName && generateName != "" && (!hasName || name == "") {
 		// Generate a unique name
 		randomBytes := make([]byte, 8)
@@ -93,13 +93,13 @@ func (r *nameGeneratingResource) Create(ctx context.Context, obj *unstructured.U
 		} else {
 			name = generateName + hex.EncodeToString(randomBytes)
 		}
-		
+
 		// Set the generated name
 		if err := unstructured.SetNestedField(obj.Object, name, "metadata", "name"); err != nil {
 			r.t.Logf("Warning: failed to set generated name: %v", err)
 		}
 	}
-	
+
 	// Use the underlying client to create
 	return r.NamespaceableResourceInterface.Create(ctx, obj, options, subresources...)
 }
@@ -123,7 +123,7 @@ func (r *nameGeneratingNamespacedResource) Create(ctx context.Context, obj *unst
 	// Check if generateName is set but name is not
 	generateName, hasGenerateName, _ := unstructured.NestedString(obj.Object, "metadata", "generateName")
 	name, hasName, _ := unstructured.NestedString(obj.Object, "metadata", "name")
-	
+
 	if hasGenerateName && generateName != "" && (!hasName || name == "") {
 		// Generate a unique name
 		randomBytes := make([]byte, 8)
@@ -134,14 +134,13 @@ func (r *nameGeneratingNamespacedResource) Create(ctx context.Context, obj *unst
 		} else {
 			name = generateName + hex.EncodeToString(randomBytes)
 		}
-		
+
 		// Set the generated name
 		if err := unstructured.SetNestedField(obj.Object, name, "metadata", "name"); err != nil {
 			r.t.Logf("Warning: failed to set generated name: %v", err)
 		}
 	}
-	
+
 	// Use the underlying client to create
 	return r.ResourceInterface.Create(ctx, obj, options, subresources...)
 }
-
