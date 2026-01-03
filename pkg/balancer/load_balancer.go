@@ -190,7 +190,7 @@ func (lb *LoadBalancer) ShouldRebalance() bool {
 	}
 
 	// Find min and max load
-	var minLoad, maxLoad float64 = 1.0, 0.0
+	minLoad, maxLoad := 1.0, 0.0
 	for _, replica := range lb.replicas {
 		if replica.Healthy {
 			if replica.Load < minLoad {

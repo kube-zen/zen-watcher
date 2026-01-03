@@ -234,14 +234,14 @@ spec:
 func validateManifest(t *testing.T, manifest string, crdType string) error {
 	// Write manifest to temp file
 	tmpFile := filepath.Join(t.TempDir(), "manifest.yaml")
-	err := os.WriteFile(tmpFile, []byte(manifest), 0644)
+	err := os.WriteFile(tmpFile, []byte(manifest), 0644) //nolint:gosec // G306: 0644 is standard for test files
 	if err != nil {
 		return err
 	}
 
 	// Run kubectl apply --dry-run=client
 	// Use server-side validation if available, otherwise client-side
-	cmd := exec.Command("kubectl", "apply", "--dry-run=server", "-f", tmpFile)
+	cmd := exec.Command("kubectl", "apply", "--dry-run=server", "-f", tmpFile) //nolint:gosec // G204: kubectl is trusted test tool
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		outputStr := string(output)

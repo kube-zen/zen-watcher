@@ -55,7 +55,7 @@ func (p *Printer) Print(data interface{}) error {
 		return enc.Encode(data)
 	case FormatYAML:
 		enc := yaml.NewEncoder(os.Stdout)
-		defer enc.Close()
+		defer func() { _ = enc.Close() }()
 		return enc.Encode(data)
 	default:
 		return fmt.Errorf("unsupported format: %s", p.format)

@@ -115,9 +115,9 @@ Note: Currently lists known Zen CRDs as adapters. Full adapter detection may req
 
 			// Print table format
 			w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-			defer w.Flush()
+			defer func() { _ = w.Flush() }()
 
-			fmt.Fprintln(w, "NAMESPACE\tGROUP\tTYPE\tINSTANCES\tLAST SEEN\tHEALTH")
+			_, _ = fmt.Fprintln(w, "NAMESPACE\tGROUP\tTYPE\tINSTANCES\tLAST SEEN\tHEALTH")
 			for _, info := range adapterInfo {
 				lastSeen := info.LastSeen
 				if lastSeen == "" {
@@ -127,7 +127,7 @@ Note: Currently lists known Zen CRDs as adapters. Full adapter detection may req
 				if health == "" {
 					health = "—"
 				}
-				fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\t%s\n",
+				_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\t%s\n",
 					info.Namespace, info.Group, info.Type, info.Instances, lastSeen, health)
 			}
 

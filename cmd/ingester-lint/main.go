@@ -95,7 +95,7 @@ func main() {
 }
 
 func lintFile(filename string) LintResult {
-	data, err := os.ReadFile(filename)
+	data, err := os.ReadFile(filename) //nolint:gosec // G304: filename is validated before use
 	if err != nil {
 		return LintResult{
 			File: filename,
@@ -378,7 +378,7 @@ func isDuplicateProneSource(source string) bool {
 func matchesPattern(s, pattern string) bool {
 	// Simple pattern matching for ^[a-z0-9-]+$
 	for _, r := range s {
-		if !((r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-') {
+		if (r < 'a' || r > 'z') && (r < '0' || r > '9') && r != '-' {
 			return false
 		}
 	}

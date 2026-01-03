@@ -37,7 +37,7 @@ func main() {
 
 	// Set log level via environment variable (zen-sdk reads LOG_LEVEL)
 	if *logLevel != "" {
-		os.Setenv("LOG_LEVEL", *logLevel)
+		_ = os.Setenv("LOG_LEVEL", *logLevel)
 	}
 	// zen-sdk logger initializes automatically, no explicit Init() needed
 	_ = sdklog.NewLogger("zen-watcher-optimize")

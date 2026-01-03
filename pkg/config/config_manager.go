@@ -240,13 +240,14 @@ func (cm *ConfigManager) handleConfigMapDelete(obj interface{}) {
 	defer cm.mu.Unlock()
 
 	// Clear config if deleted
-	if cmConfig.Name == cm.baseConfigName {
+	switch cmConfig.Name {
+	case cm.baseConfigName:
 		cm.baseConfig = make(map[string]interface{})
 		logger := sdklog.NewLogger("zen-watcher-config")
 		logger.Info("Base ConfigMap deleted, using defaults",
 			sdklog.Operation("configmap_deleted"),
 			sdklog.String("configmap", cmConfig.Name))
-	} else if cmConfig.Name == cm.envConfigName {
+	case cm.envConfigName:
 		cm.envConfig = make(map[string]interface{})
 		logger := sdklog.NewLogger("zen-watcher-config")
 		logger.Info("Environment ConfigMap deleted, using base config only",
@@ -297,13 +298,14 @@ func (cm *ConfigManager) processConfigMap(cmConfig *corev1.ConfigMap) {
 	defer cm.mu.Unlock()
 
 	// Determine if this is base or environment config
-	if cmConfig.Name == cm.baseConfigName {
+	switch cmConfig.Name {
+	case cm.baseConfigName:
 		cm.baseConfig = parsedConfig
 		logger := sdklog.NewLogger("zen-watcher-config")
 		logger.Debug("Base configuration updated",
 			sdklog.Operation("base_config_updated"),
 			sdklog.String("configmap", cmConfig.Name))
-	} else if cmConfig.Name == cm.envConfigName {
+	case cm.envConfigName:
 		cm.envConfig = parsedConfig
 		logger := sdklog.NewLogger("zen-watcher-config")
 		logger.Debug("Environment configuration updated",

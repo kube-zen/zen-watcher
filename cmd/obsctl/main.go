@@ -147,8 +147,8 @@ func listObservations(ctx context.Context, client dynamic.Interface, selectorStr
 
 	// Table output
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "NAME\tSOURCE\tCATEGORY\tSEVERITY\tEVENT TYPE\tAGE")
-	fmt.Fprintln(w, "----\t------\t--------\t--------\t----------\t---")
+	_, _ = fmt.Fprintln(w, "NAME\tSOURCE\tCATEGORY\tSEVERITY\tEVENT TYPE\tAGE")
+	_, _ = fmt.Fprintln(w, "----\t------\t--------\t--------\t----------\t---")
 
 	for _, obs := range observations.Items {
 		name := obs.GetName()
@@ -158,10 +158,10 @@ func listObservations(ctx context.Context, client dynamic.Interface, selectorStr
 		eventType, _, _ := unstructured.NestedString(obs.Object, "spec", "eventType")
 		age := getAge(obs.GetCreationTimestamp().Time)
 
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", name, source, category, severity, eventType, age)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\n", name, source, category, severity, eventType, age)
 	}
 
-	w.Flush()
+	_ = w.Flush()
 	return nil
 }
 
@@ -197,17 +197,17 @@ func showStats(ctx context.Context, client dynamic.Interface, groupBy string) er
 
 	// Table output
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "SOURCE\tSEVERITY\tCOUNT")
-	fmt.Fprintln(w, "------\t--------\t-----")
+	_, _ = fmt.Fprintln(w, "SOURCE\tSEVERITY\tCOUNT")
+	_, _ = fmt.Fprintln(w, "------\t--------\t-----")
 
 	for key, count := range stats {
 		parts := strings.Split(key, "/")
 		if len(parts) == 2 {
-			fmt.Fprintf(w, "%s\t%s\t%d\n", parts[0], parts[1], count)
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%d\n", parts[0], parts[1], count)
 		}
 	}
 
-	w.Flush()
+	_ = w.Flush()
 	return nil
 }
 

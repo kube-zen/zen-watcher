@@ -524,3 +524,9 @@ drift-gate:
 	@echo "$(GREEN)Running drift gate...$(NC)"
 	@bash scripts/test/drift-gate.sh
 	@echo "$(GREEN)✅ Drift gate passed$(NC)"
+
+## drift-gate-fast: Run fast path tests (no cluster required)
+drift-gate-fast:
+	@echo "$(GREEN)Running drift gate (fast path)...$(NC)"
+	@bash scripts/test/drift-gate-fast.sh
+	@echo "$(GREEN)✅ Drift gate fast path passed$(NC)"

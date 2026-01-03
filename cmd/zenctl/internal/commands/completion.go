@@ -31,7 +31,7 @@ Fish:
   $ zenctl completion fish > ~/.config/fish/completions/zenctl.fish
 `,
 		ValidArgs: []string{"bash", "zsh", "fish"},
-		Args:      cobra.ExactValidArgs(1),
+		Args:      cobra.MatchAll(cobra.ExactArgs(1), cobra.OnlyValidArgs),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			shell := args[0]
 			switch shell {

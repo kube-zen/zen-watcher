@@ -126,9 +126,10 @@ Exit codes:
 				if diff != "" {
 					drifts = append(drifts, diff)
 					driftSummary.driftedResources++
-					if driftType == "spec" {
+					switch driftType {
+					case "spec":
 						driftSummary.specDrifts++
-					} else if driftType == "metadata" {
+					case "metadata":
 						driftSummary.metadataDrifts++
 					}
 				}
@@ -187,7 +188,7 @@ func loadManifests(path string, excludePatterns []string) ([]*unstructured.Unstr
 	}
 
 	// Load .zenignore if it exists
-	zenignorePath := filepath.Join(path, ".zenignore")
+	var zenignorePath string
 	if info.IsDir() {
 		zenignorePath = filepath.Join(path, ".zenignore")
 	} else {

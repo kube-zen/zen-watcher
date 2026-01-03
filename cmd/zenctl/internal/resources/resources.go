@@ -13,18 +13,18 @@ import (
 
 // DeliveryFlow represents a DeliveryFlow resource
 type DeliveryFlow struct {
-	Namespace       string
-	Name            string
-	ActiveTarget    string
-	ActiveNamespace string
-	Entitlement     string
+	Namespace         string
+	Name              string
+	ActiveTarget      string
+	ActiveNamespace   string
+	Entitlement       string
 	EntitlementReason string
-	Ready           string
-	Age             time.Duration
-	FailoverCount   int64
-	Sources         int64
-	Outputs         int64
-	Object          *unstructured.Unstructured
+	Ready             string
+	Age               time.Duration
+	FailoverCount     int64
+	Sources           int64
+	Outputs           int64
+	Object            *unstructured.Unstructured
 }
 
 // Destination represents a Destination resource
@@ -41,17 +41,17 @@ type Destination struct {
 
 // Ingester represents an Ingester resource
 type Ingester struct {
-	Namespace     string
-	Name          string
-	Sources       int64
-	Destinations  int64
-	Ready         string
-	SourceHealth  string
-	LastSeen      string
-	Entitled      string
-	Blocked       string
-	Age           time.Duration
-	Object        *unstructured.Unstructured
+	Namespace    string
+	Name         string
+	Sources      int64
+	Destinations int64
+	Ready        string
+	SourceHealth string
+	LastSeen     string
+	Entitled     string
+	Blocked      string
+	Age          time.Duration
+	Object       *unstructured.Unstructured
 }
 
 // ListDeliveryFlows lists DeliveryFlow resources
@@ -154,18 +154,18 @@ func parseDeliveryFlow(obj *unstructured.Unstructured) DeliveryFlow {
 	}
 
 	return DeliveryFlow{
-		Namespace:        ns,
-		Name:             name,
-		ActiveTarget:     activeTarget,
-		ActiveNamespace:  activeNamespace,
-		Entitlement:      entitlement,
+		Namespace:         ns,
+		Name:              name,
+		ActiveTarget:      activeTarget,
+		ActiveNamespace:   activeNamespace,
+		Entitlement:       entitlement,
 		EntitlementReason: entitlementReason,
-		Ready:            ready,
-		Age:              time.Since(created),
-		FailoverCount:    failoverCount,
-		Sources:          sourcesCount,
-		Outputs:          outputsCount,
-		Object:           obj,
+		Ready:             ready,
+		Age:               time.Since(created),
+		FailoverCount:     failoverCount,
+		Sources:           sourcesCount,
+		Outputs:           outputsCount,
+		Object:            obj,
 	}
 }
 
@@ -344,4 +344,3 @@ func parseIngester(obj *unstructured.Unstructured) Ingester {
 		Object:       obj,
 	}
 }
-
