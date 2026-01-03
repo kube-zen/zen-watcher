@@ -3,7 +3,8 @@ module github.com/kube-zen/zen-watcher
 go 1.25.0
 
 require (
-	github.com/kube-zen/zen-sdk v0.2.8-alpha
+	github.com/kube-zen/zen-sdk v0.1.2-alpha.0.20260103151153-a7f1de4a51e3
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/common v0.66.1
 	github.com/shirou/gopsutil/v3 v3.24.5
@@ -49,7 +50,6 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/peterbourgon/diskv v2.0.1+incompatible // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/procfs v0.16.1 // indirect
