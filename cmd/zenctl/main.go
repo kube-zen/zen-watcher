@@ -1,9 +1,11 @@
 package main
 
 import (
+	"errors"
 	"os"
 
 	"github.com/kube-zen/zen-watcher/cmd/zenctl/internal/commands"
+	clierrors "github.com/kube-zen/zen-watcher/cmd/zenctl/internal/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -53,6 +55,10 @@ Zen Kubernetes resources including DeliveryFlows, Destinations, and Ingesters.`,
 	rootCmd.AddCommand(commands.NewCompletionCommand(rootCmd))
 
 	if err := rootCmd.Execute(); err != nil {
+		var exitErr *clierrors.ExitError
+		if errors.As(err, &exitErr) {
+			os.Exit(exitErr.Code)
+		}
 		os.Exit(1)
 	}
 }

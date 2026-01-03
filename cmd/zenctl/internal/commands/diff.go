@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"os"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/kube-zen/zen-watcher/cmd/zenctl/internal/client"
 	"github.com/kube-zen/zen-watcher/cmd/zenctl/internal/discovery"
+	clierrors "github.com/kube-zen/zen-watcher/cmd/zenctl/internal/errors"
 	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
@@ -25,6 +27,8 @@ func NewDiffCommand() *cobra.Command {
 	var ignoreAnnotations bool
 	var outputFormat string
 	var excludePatterns []string
+	var reportFormat string
+	var reportFilePath string
 
 	cmd := &cobra.Command{
 		Use:   "diff -f <file|dir>",
@@ -174,6 +178,8 @@ Exit codes:
 	cmd.Flags().BoolVar(&ignoreAnnotations, "ignore-annotations", false, "Ignore annotations in diff")
 	cmd.Flags().StringVar(&outputFormat, "format", "unified", "Diff output format (unified or plain)")
 	cmd.Flags().StringArrayVar(&excludePatterns, "exclude", []string{}, "Exclude pattern (repeatable, gitignore-style)")
+	cmd.Flags().StringVar(&reportFormat, "report", "", "Report format (json)")
+	cmd.Flags().StringVar(&reportFilePath, "report-file", "", "Path to write JSON report (atomic write)")
 
 	return cmd
 }
