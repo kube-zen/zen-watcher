@@ -134,15 +134,7 @@ case "$PLATFORM" in
             exit 1
         fi
         
-        # Check if API port is available - fail if not (keep it simple)
-        if ! check_port "${KIND_API_PORT}" "kind API" 2>/dev/null; then
-            log_error "Port ${KIND_API_PORT} is already in use"
-            log_info "Please free the port or destroy existing clusters:"
-            log_info "  kind delete clusters"
-            exit 1
-        fi
-        
-        # Create kind cluster (simple - use default port 6443, no config needed)
+        # Create kind cluster (simple - let kind fail if port conflict)
         if [ "${KIND_API_PORT}" = "6443" ]; then
             # Use default port - no config needed
             if kind create cluster --name ${CLUSTER_NAME} --wait 2m 2>&1 | tee /tmp/kind-create.log; then
@@ -150,7 +142,12 @@ case "$PLATFORM" in
             else
                 exit_code=$?
                 log_error "Cluster creation failed"
-                log_info "Check logs: cat /tmp/kind-create.log"
+                if grep -q "port.*already allocated\|Bind.*failed.*port" /tmp/kind-create.log 2>/dev/null; then
+                    log_info "Port conflict detected. Please free port 6443 or destroy existing clusters:"
+                    log_info "  kind delete clusters"
+                else
+                    log_info "Check logs: cat /tmp/kind-create.log"
+                fi
                 exit 1
             fi
         else
@@ -168,7 +165,12 @@ EOF
                 exit_code=$?
                 rm -f /tmp/kind-config-${CLUSTER_NAME}.yaml
                 log_error "Cluster creation failed"
-                log_info "Check logs: cat /tmp/kind-create.log"
+                if grep -q "port.*already allocated\|Bind.*failed.*port" /tmp/kind-create.log 2>/dev/null; then
+                    log_info "Port conflict detected. Please free port ${KIND_API_PORT} or destroy existing clusters:"
+                    log_info "  kind delete clusters"
+                else
+                    log_info "Check logs: cat /tmp/kind-create.log"
+                fi
                 exit 1
             fi
         fi
