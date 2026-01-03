@@ -166,36 +166,78 @@ Exit codes:
 			// Sort resources for determinism
 			resourceReports = sortResources(resourceReports)
 
-			// Report errors
-			if len(errors) > 0 {
-				for _, errMsg := range errors {
+			// Generate JSON report if requested
+			var jsonReport *DiffReport
+			if reportFormat == "json" {
+				jsonReport = buildDiffReport(clusterContext, resourceReports)
+				
+				// Handle output precedence
+				if reportFilePath != "" {
+					// Write JSON to file (atomic)
+					if err := writeReportFile(jsonReport, reportFilePath); err != nil {
+						cmd.PrintErrln("ERROR: Failed to write report file:", err)
+						return fmt.Errorf("report write failed: %w", err)
+					}
+					// Human output to stdout (preserved)
+				} else {
+					// Write JSON to stdout, suppress human output
+					encoder := json.NewEncoder(os.Stdout)
+					encoder.SetIndent("", "  ")
+					if err := encoder.Encode(jsonReport); err != nil {
+						return fmt.Errorf("failed to encode report: %w", err)
+					}
+					// Human output suppressed when JSON to stdout
+				}
+			}
+
+			// Determine exit code based on resource reports
+			hasErrors := false
+			hasDrift := false
+			for _, res := range resourceReports {
+				if res.Status == "error" {
+					hasErrors = true
+				} else if res.Status == "drift" {
+					hasDrift = true
+				}
+			}
+
+			// Report errors (always to stderr)
+			if len(errorMessages) > 0 {
+				for _, errMsg := range errorMessages {
 					cmd.PrintErrln("ERROR:", errMsg)
 				}
-				return fmt.Errorf("validation failed: %d error(s)", len(errors))
 			}
 
-			// Report drifts
-			if len(drifts) > 0 {
-				// Print summary header
-				cmd.Printf("Drift Summary:\n")
-				cmd.Printf("  Total resources: %d\n", driftSummary.totalResources)
-				cmd.Printf("  Drifted resources: %d\n", driftSummary.driftedResources)
-				if driftSummary.specDrifts > 0 {
-					cmd.Printf("  Spec drifts: %d\n", driftSummary.specDrifts)
-				}
-				if driftSummary.metadataDrifts > 0 {
-					cmd.Printf("  Metadata drifts: %d\n", driftSummary.metadataDrifts)
-				}
-				cmd.Println("")
-
-				for _, drift := range drifts {
-					cmd.Println(drift)
-				}
-				// Exit code 2 for drift detected
-				os.Exit(2)
+			// Handle exit codes
+			if hasErrors {
+				return clierrors.NewExitError(1, fmt.Errorf("validation failed: %d error(s)", len(errorMessages)))
 			}
 
-			cmd.Println("No drift detected")
+			// Report drifts (to stdout if not JSON to stdout)
+			if hasDrift {
+				if reportFormat != "json" || reportFilePath != "" {
+					// Human output enabled
+					cmd.Printf("Drift Summary:\n")
+					cmd.Printf("  Total resources: %d\n", len(resourceReports))
+					driftCount := 0
+					for _, res := range resourceReports {
+						if res.Status == "drift" {
+							driftCount++
+						}
+					}
+					cmd.Printf("  Drifted resources: %d\n", driftCount)
+					cmd.Println("")
+					for _, drift := range drifts {
+						cmd.Println(drift)
+					}
+				}
+				return clierrors.NewExitError(2, fmt.Errorf("drift detected"))
+			}
+
+			// No drift
+			if reportFormat != "json" || reportFilePath != "" {
+				cmd.Println("No drift detected")
+			}
 			return nil
 		},
 	}
