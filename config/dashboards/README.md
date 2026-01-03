@@ -119,11 +119,11 @@ Zen Watcher includes 6 pre-built Grafana dashboards for monitoring and analysis.
 
 ## Quick Start
 
-After running `./scripts/quick-demo.sh`, the dashboards are automatically available:
+After running `./scripts/demo.sh` (full demo with monitoring), the dashboards are automatically available:
 
 ```bash
 # Run the demo
-./scripts/quick-demo.sh --non-interactive --deploy-mock-data
+./scripts/demo.sh --non-interactive --deploy-mock-data
 
 # Access Grafana (credentials shown at end of demo)
 # URL: http://localhost:8080/grafana/
@@ -331,5 +331,6 @@ Alerts are visualized in dashboards via:
 - **Metrics Documentation**: `../../docs/PERFORMANCE.md`
 - **Deduplication**: `../../docs/DEDUPLICATION.md`
 - **Alert Rules**: `../monitoring/prometheus-rules.yaml`
-- **Quick Demo Script**: `../../scripts/quick-demo.sh`
+- **Full Demo Script**: `../../scripts/demo.sh` (includes monitoring)
+- **Quick Demo Script**: `../../scripts/quick-demo.sh` (lightweight, no monitoring)
 - **Architecture**: `../../docs/ARCHITECTURE.md`

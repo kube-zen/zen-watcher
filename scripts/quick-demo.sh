@@ -1,8 +1,9 @@
 #!/bin/bash
 #
-# Zen Watcher - Quick Demo Setup
+# Zen Watcher - Quick Demo Setup (Lightweight)
 # 
-# Complete demo setup: cluster + installation + mock data
+# Lightweight demo: cluster + zen-watcher only (no monitoring stack)
+# For full demo with Grafana/VictoriaMetrics, use: ./scripts/demo.sh
 #
 # Usage: 
 #   ./scripts/quick-demo.sh                                    # Uses k3d (interactive)
@@ -20,7 +21,7 @@
 #   --install-kyverno                      # Install Kyverno
 #   --install-checkov                      # Install Checkov
 #   --install-kube-bench                   # Install kube-bench
-#   --skip-monitoring                      # Skip observability stack
+#   --with-monitoring                      # Include observability stack (Grafana/VictoriaMetrics)
 #   --no-docker-login                      # Don't use docker login credentials
 #   --offline                              # Skip Helm repo updates (for air-gapped environments)
 #   --skip-repo-update                     # Skip Helm repo updates (repos must already exist)
@@ -38,7 +39,7 @@ NON_INTERACTIVE=false
 USE_EXISTING_CLUSTER=false
 SKIP_MOCK_DATA=false
 DEPLOY_MOCK_DATA=false
-SKIP_MONITORING=false
+WITH_MONITORING=false
 
 INSTALL_ARGS=()
 for arg in "$@"; do
@@ -57,9 +58,8 @@ for arg in "$@"; do
         --deploy-mock-data)
             DEPLOY_MOCK_DATA=true
             ;;
-        --skip-monitoring|--skip-observability)
-            SKIP_MONITORING=true
-            INSTALL_ARGS+=("$arg")
+        --with-monitoring|--with-observability)
+            WITH_MONITORING=true
             ;;
         --install-trivy|--install-falco|--install-kyverno|--install-checkov|--install-kube-bench|--no-docker-login|--offline|--skip-repo-update)
             INSTALL_ARGS+=("$arg")
@@ -70,6 +70,11 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+# Default: skip monitoring for lightweight quick demo
+if [ "$WITH_MONITORING" != true ]; then
+    INSTALL_ARGS+=("--skip-monitoring")
+fi
 
 # Configuration
 CLUSTER_NAME="${ZEN_CLUSTER_NAME:-zen-demo}"
@@ -138,17 +143,22 @@ if cluster_exists "$PLATFORM" "$CLUSTER_NAME"; then
 fi
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}  Zen Watcher - Quick Demo Setup${NC}"
+echo -e "${BLUE}  Zen Watcher - Quick Demo Setup (Lightweight)${NC}"
 echo -e "${BLUE}  Platform: ${CYAN}${PLATFORM}${NC}"
 echo -e "${BLUE}  Cluster: ${CYAN}${CLUSTER_NAME}${NC}"
 if [ "$USE_EXISTING_CLUSTER" = true ]; then
     echo -e "${BLUE}  Mode: ${CYAN}Using existing cluster${NC}"
 fi
+if [ "$WITH_MONITORING" = true ]; then
+    echo -e "${BLUE}  Monitoring: ${CYAN}Enabled${NC}"
+else
+    echo -e "${BLUE}  Monitoring: ${CYAN}Disabled (lightweight mode)${NC}"
+fi
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
 # Step 1: Install (cluster + components)
-log_step "Installing Zen Watcher and components..."
+log_step "Installing Zen Watcher..."
 "${SCRIPT_DIR}/install.sh" "$PLATFORM" "${INSTALL_ARGS[@]}" || {
     log_error "Installation failed"
     exit 1
@@ -220,236 +230,13 @@ fi
 # Summary
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}  ✅ Demo environment is ready!${NC}"
+echo -e "${GREEN}  ✅ Quick demo environment is ready!${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Show endpoints and credentials
-if [ "$SKIP_MONITORING" != true ]; then
-    log_step "Setting up Grafana access..."
-    GRAFANA_PASSWORD=""
-    GRAFANA_USER="zen"
-    GRAFANA_PORT="${GRAFANA_PORT:-8080}"
-    
-    # Get kubectl context if available
-    KUBECTL_CMD="kubectl"
-    if [ -n "${KUBECONFIG:-}" ]; then
-        # Extract context from kubeconfig if possible
-        KUBECTL_CONTEXT=$(kubectl config current-context 2>/dev/null || echo "")
-        if [ -n "$KUBECTL_CONTEXT" ]; then
-            KUBECTL_CMD="kubectl --context ${KUBECTL_CONTEXT}"
-        fi
-    fi
-    
-    # Try to get password from Grafana secret (helmfile sets admin-password key)
-    if $KUBECTL_CMD get secret -n grafana grafana -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null > /tmp/grafana-password.txt 2>/dev/null; then
-        GRAFANA_PASSWORD=$(cat /tmp/grafana-password.txt 2>/dev/null || echo "")
-        rm -f /tmp/grafana-password.txt 2>/dev/null || true
-    fi
-    
-    # If password not found, try to get from helmfile values or generate one
-    if [ -z "$GRAFANA_PASSWORD" ]; then
-        # Try alternative secret name
-        if $KUBECTL_CMD get secret -n zen-system grafana -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d 2>/dev/null > /tmp/grafana-password.txt 2>/dev/null; then
-            GRAFANA_PASSWORD=$(cat /tmp/grafana-password.txt 2>/dev/null || echo "")
-            rm -f /tmp/grafana-password.txt 2>/dev/null || true
-        fi
-    fi
-    
-    # Wait for Grafana pod to be ready
-    log_info "Waiting for Grafana to be ready..."
-    if $KUBECTL_CMD wait --for=condition=ready pod -n grafana -l app.kubernetes.io/name=grafana --timeout=120s 2>/dev/null; then
-        log_success "Grafana is ready"
-    else
-        log_warn "Grafana may not be ready yet, continuing anyway..."
-    fi
-    
-    # Ensure Grafana ingress exists
-    if ! $KUBECTL_CMD get ingress -n grafana grafana >/dev/null 2>&1; then
-        log_info "Creating Grafana ingress..."
-        $KUBECTL_CMD apply -f - <<EOF 2>/dev/null || true
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: grafana
-  namespace: grafana
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /\$2
-    nginx.ingress.kubernetes.io/use-regex: "true"
-spec:
-  ingressClassName: nginx
-  rules:
-  - host: localhost
-    http:
-      paths:
-      - path: /grafana(/|$)(.*)
-        pathType: ImplementationSpecific
-        backend:
-          service:
-            name: grafana
-            port:
-              number: 3000
-EOF
-        sleep 2
-    fi
-    
-    # Check if port is available and find alternative if needed
-    if command_exists "check_port" 2>/dev/null || type check_port >/dev/null 2>&1; then
-        # Use the check_port function from cluster/utils.sh if available
-        if ! check_port ${GRAFANA_PORT} "Grafana"; then
-            log_warn "Port ${GRAFANA_PORT} is already in use, finding alternative..."
-            if command_exists "find_available_port" 2>/dev/null || type find_available_port >/dev/null 2>&1; then
-                GRAFANA_PORT=$(find_available_port ${GRAFANA_PORT} "Grafana")
-                log_info "Using port ${GRAFANA_PORT} instead"
-            else
-                # Fallback: try ports 8080-8099
-                for port in $(seq ${GRAFANA_PORT} 8099); do
-                    if check_port $port "Grafana"; then
-                        GRAFANA_PORT=$port
-                        log_info "Using port ${GRAFANA_PORT} instead"
-                        break
-                    fi
-                done
-            fi
-        fi
-    else
-        # Fallback port checking using lsof/ss
-        if command -v lsof >/dev/null 2>&1; then
-            if lsof -Pi :${GRAFANA_PORT} -sTCP:LISTEN -t >/dev/null 2>&1; then
-                log_warn "Port ${GRAFANA_PORT} is already in use, finding alternative..."
-                for port in $(seq ${GRAFANA_PORT} 8099); do
-                    if ! lsof -Pi :${port} -sTCP:LISTEN -t >/dev/null 2>&1; then
-                        GRAFANA_PORT=$port
-                        log_info "Using port ${GRAFANA_PORT} instead"
-                        break
-                    fi
-                done
-            fi
-        elif command -v ss >/dev/null 2>&1; then
-            if ss -tlnp 2>/dev/null | grep -qE ":${GRAFANA_PORT}[[:space:]]|:${GRAFANA_PORT}$"; then
-                log_warn "Port ${GRAFANA_PORT} is already in use, finding alternative..."
-                for port in $(seq ${GRAFANA_PORT} 8099); do
-                    if ! ss -tlnp 2>/dev/null | grep -qE ":${port}[[:space:]]|:${port}$"; then
-                        GRAFANA_PORT=$port
-                        log_info "Using port ${GRAFANA_PORT} instead"
-                        break
-                    fi
-                done
-            fi
-        fi
-    fi
-    
-    # Get the actual ingress port being used
-    # For k3d, the port is mapped via loadbalancer, so we need to check the actual k3d port mapping
-    INGRESS_PORT=""
-    
-    # Try to get from k3d loadbalancer port mapping (most reliable for k3d)
-    if command -v k3d >/dev/null 2>&1 && k3d cluster list 2>/dev/null | grep -q "${CLUSTER_NAME}"; then
-        # Get the loadbalancer container ID
-        LB_CONTAINER=$(docker ps -q --filter "name=k3d-${CLUSTER_NAME}-serverlb" 2>/dev/null)
-        if [ -n "$LB_CONTAINER" ]; then
-            # Extract port mapping for port 80
-            K3D_PORT=$(docker port "$LB_CONTAINER" 2>/dev/null | grep "80/tcp" | awk -F: '{print $2}' | head -1)
-            if [ -n "$K3D_PORT" ] && [ "$K3D_PORT" != "0" ] && [ "$K3D_PORT" -gt 0 ] 2>/dev/null; then
-                INGRESS_PORT="$K3D_PORT"
-                log_info "Detected ingress port from k3d loadbalancer: ${INGRESS_PORT}"
-            fi
-        fi
-    fi
-    
-    # Fallback: try ingress-nginx service NodePort
-    if [ -z "$INGRESS_PORT" ]; then
-        NODE_PORT=$($KUBECTL_CMD get svc -n ingress-nginx ingress-nginx-controller -o jsonpath='{.spec.ports[?(@.name=="http")].nodePort}' 2>/dev/null)
-        if [ -n "$NODE_PORT" ] && [ "$NODE_PORT" != "null" ] && [ "$NODE_PORT" != "0" ]; then
-            INGRESS_PORT="$NODE_PORT"
-            log_info "Detected ingress port from service NodePort: ${INGRESS_PORT}"
-        fi
-    fi
-    
-    # Fallback: use environment variable from cluster creation
-    if [ -z "$INGRESS_PORT" ] && [ -n "${INGRESS_HTTP_PORT:-}" ]; then
-        INGRESS_PORT="${INGRESS_HTTP_PORT}"
-        log_info "Using ingress port from environment: ${INGRESS_PORT}"
-    fi
-    
-    # Final fallback: default
-    if [ -z "$INGRESS_PORT" ]; then
-        INGRESS_PORT="8080"
-        log_warn "Could not detect ingress port, using default: ${INGRESS_PORT}"
-    fi
-    
-    # Wait for ingress to be ready and Grafana API to respond via ingress
-    log_info "Waiting for Grafana to be accessible via ingress..."
-    GRAFANA_API_READY=false
-    for i in {1..90}; do
-        # Test with curl -L to follow redirects
-        if curl -sL http://localhost:${INGRESS_PORT}/grafana/api/health 2>/dev/null | grep -q "database\|ok"; then
-            # Also check if we can authenticate
-            if [ -n "$GRAFANA_PASSWORD" ]; then
-                if curl -sL -u "${GRAFANA_USER}:${GRAFANA_PASSWORD}" http://localhost:${INGRESS_PORT}/grafana/api/health 2>/dev/null | grep -q "database\|ok"; then
-                    GRAFANA_API_READY=true
-                    break
-                fi
-            else
-                GRAFANA_API_READY=true
-                break
-            fi
-        fi
-        sleep 2
-    done
-    
-    if [ "$GRAFANA_API_READY" = true ]; then
-        log_success "Grafana is accessible via ingress"
-    else
-        log_warn "Grafana may not be fully ready via ingress, continuing anyway..."
-        log_info "You can test manually: curl -sL http://localhost:${INGRESS_PORT}/grafana/api/health"
-    fi
-    
-    # Dashboards are automatically provisioned via ConfigMap (created in install.sh)
-    # No need for API-based import - they will appear automatically when Grafana starts
-    log_info "Dashboards are automatically provisioned via ConfigMap (no manual import needed)"
-    
-    # Build Grafana URL - use ingress path-based routing
-    # INGRESS_PORT should already be set from the detection above
-    # Only set it if it wasn't detected
-    if [ -z "${INGRESS_PORT:-}" ]; then
-        INGRESS_PORT="${INGRESS_HTTP_PORT:-8080}"
-    fi
-    GRAFANA_URL="http://localhost:${INGRESS_PORT}/grafana"
-    
-    echo ""
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${CYAN}  📊 Grafana Dashboard${NC}"
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo ""
-    echo -e "${YELLOW}Access Information:${NC}"
-    echo -e "  URL: ${CYAN}${GRAFANA_URL}${NC}"
-    if [ -n "$GRAFANA_PASSWORD" ]; then
-        echo -e "  Username: ${CYAN}${GRAFANA_USER}${NC}"
-        echo -e "  Password: ${CYAN}${GRAFANA_PASSWORD}${NC}"
-    else
-        echo -e "  Username: ${CYAN}${GRAFANA_USER}${NC}"
-        echo -e "  Password: ${CYAN}(check Grafana secret in cluster)${NC}"
-    fi
-    echo ""
-    
-    # Open browser automatically
-    if [ -n "$GRAFANA_PASSWORD" ]; then
-        log_info "Opening browser..."
-        if command -v xdg-open >/dev/null 2>&1; then
-            # Linux
-            xdg-open "${GRAFANA_URL}" >/dev/null 2>&1 &
-        elif command -v open >/dev/null 2>&1; then
-            # macOS
-            open "${GRAFANA_URL}" >/dev/null 2>&1 &
-        elif command -v start >/dev/null 2>&1; then
-            # Windows (Git Bash)
-            start "${GRAFANA_URL}" >/dev/null 2>&1 &
-        else
-            log_warn "Could not detect browser command, please open manually: ${GRAFANA_URL}"
-        fi
-        echo -e "${GREEN}✓ Browser opened! Login with credentials above.${NC}"
-    fi
+if [ "$WITH_MONITORING" = true ]; then
+    log_info "For Grafana access, check the output above or run:"
+    echo -e "  ${CYAN}kubectl port-forward -n grafana svc/grafana 3000:3000${NC}"
     echo ""
 fi
 
@@ -463,6 +250,21 @@ echo ""
 echo -e "${YELLOW}Watch observations:${NC}"
 echo -e "  ${CYAN}kubectl get observations -n ${NAMESPACE} --watch${NC}"
 echo ""
+echo -e "${YELLOW}Check zen-watcher status:${NC}"
+echo -e "  ${CYAN}kubectl get pods -n ${NAMESPACE}${NC}"
+echo ""
+echo -e "${YELLOW}View zen-watcher logs:${NC}"
+echo -e "  ${CYAN}kubectl logs -n ${NAMESPACE} -l app.kubernetes.io/name=zen-watcher${NC}"
+echo ""
+echo -e "${YELLOW}Access metrics (port-forward):${NC}"
+echo -e "  ${CYAN}kubectl port-forward -n ${NAMESPACE} svc/zen-watcher 8080:8080${NC}"
+echo -e "  ${CYAN}curl http://localhost:8080/metrics${NC}"
+echo ""
+if [ "$WITH_MONITORING" != true ]; then
+    echo -e "${YELLOW}For full demo with Grafana/VictoriaMetrics:${NC}"
+    echo -e "  ${CYAN}./scripts/demo.sh${NC}"
+    echo ""
+fi
 echo -e "${YELLOW}Clean up cluster:${NC}"
 echo -e "  ${CYAN}./scripts/cluster/destroy.sh${NC}"
 echo ""
