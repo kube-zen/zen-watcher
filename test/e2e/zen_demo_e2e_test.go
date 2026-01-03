@@ -386,7 +386,7 @@ spec:
 				// Check if Ingester was created (it shouldn't be)
 				time.Sleep(1 * time.Second)
 				context := getKubectlContext()
-				checkCmd := exec.Command("kubectl", "--context="+context, "get", "ingester", "-n", testNamespace, "-o", "name")
+				checkCmd := exec.Command("kubectl", "--context="+context, "get", "ingester", "-n", testNamespace, "-o", "name") //nolint:gosec // G204: kubectl is trusted test tool
 				if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
 					checkCmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
 				} else {
