@@ -472,8 +472,8 @@ spec:
     - type: crd
       value: observations
 `
-	context := getKubectlContext()
-	applyCmd := exec.Command("kubectl", "--context="+context, "apply", "-f", "-")
+	kubectlContext := getKubectlContext()
+	applyCmd := exec.Command("kubectl", "--context="+kubectlContext, "apply", "-f", "-")
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
 		applyCmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
 	} else {

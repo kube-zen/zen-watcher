@@ -1,8 +1,5 @@
 # golangci-lint configuration for OSS repos
 # Based on Kubernetes and OSS best practices
-# Compatible with golangci-lint v2.x
-
-version: 2
 
 run:
   timeout: 5m
@@ -67,11 +64,4 @@ issues:
     # Note: fmt.Print* should not be used in production code
     # Use structured logging (zen-sdk/pkg/logging) instead
     # This is enforced via CI checks, not linter rules
-
-output:
-  formats:
-    colored-line-number:
-      path: stdout
-  print-issued-lines: true
-  print-linter-name: true
 
