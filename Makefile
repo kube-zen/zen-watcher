@@ -518,3 +518,9 @@ oss-boundary-strict:
 	@echo "$(GREEN)Running OSS boundary gate (STRICT MODE)...$(NC)"
 	@OSS_BOUNDARY_STRICT=1 bash scripts/test/oss-boundary-gate.sh .
 	@echo "$(GREEN)✅ OSS boundary check passed (strict mode)$(NC)"
+
+## drift-gate: Run drift gate (bounded execution, validates zenctl diff contract)
+drift-gate:
+	@echo "$(GREEN)Running drift gate...$(NC)"
+	@bash scripts/test/drift-gate.sh
+	@echo "$(GREEN)✅ Drift gate passed$(NC)"

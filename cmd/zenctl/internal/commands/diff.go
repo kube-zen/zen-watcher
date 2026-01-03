@@ -10,6 +10,7 @@ import (
 
 	"github.com/kube-zen/zen-watcher/cmd/zenctl/internal/client"
 	"github.com/kube-zen/zen-watcher/cmd/zenctl/internal/discovery"
+	"github.com/pmezard/go-difflib/difflib"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -22,6 +23,8 @@ func NewDiffCommand() *cobra.Command {
 	var filePath string
 	var ignoreStatus bool
 	var ignoreAnnotations bool
+	var outputFormat string
+	var excludePatterns []string
 
 	cmd := &cobra.Command{
 		Use:   "diff -f <file|dir>",
@@ -63,14 +66,21 @@ Exit codes:
 				return fmt.Errorf("failed to create resource resolver: %w", err)
 			}
 
-			// Load desired manifests
-			desiredObjects, err := loadManifests(filePath)
+			// Load desired manifests with exclusions
+			desiredObjects, err := loadManifests(filePath, excludePatterns)
 			if err != nil {
 				return fmt.Errorf("failed to load manifests: %w", err)
 			}
 
 			var drifts []string
 			var errors []string
+			var driftSummary struct {
+				totalResources   int
+				driftedResources int
+				specDrifts       int
+				metadataDrifts   int
+			}
+			driftSummary.totalResources = len(desiredObjects)
 
 			// Compare each desired object with live state
 			for _, desired := range desiredObjects {
@@ -109,9 +119,18 @@ Exit codes:
 				liveNormalized := normalizeForDiff(live, ignoreStatus, ignoreAnnotations)
 
 				// Generate diff
-				diff := generateDiff(desiredNormalized, liveNormalized, fmt.Sprintf("%s/%s/%s", gvk.Kind, objNS, desired.GetName()))
+				if outputFormat == "" {
+					outputFormat = "unified"
+				}
+				diff, driftType := generateDiff(desiredNormalized, liveNormalized, fmt.Sprintf("%s/%s/%s", gvk.Kind, objNS, desired.GetName()), outputFormat)
 				if diff != "" {
 					drifts = append(drifts, diff)
+					driftSummary.driftedResources++
+					if driftType == "spec" {
+						driftSummary.specDrifts++
+					} else if driftType == "metadata" {
+						driftSummary.metadataDrifts++
+					}
 				}
 			}
 
@@ -125,6 +144,18 @@ Exit codes:
 
 			// Report drifts
 			if len(drifts) > 0 {
+				// Print summary header
+				cmd.Printf("Drift Summary:\n")
+				cmd.Printf("  Total resources: %d\n", driftSummary.totalResources)
+				cmd.Printf("  Drifted resources: %d\n", driftSummary.driftedResources)
+				if driftSummary.specDrifts > 0 {
+					cmd.Printf("  Spec drifts: %d\n", driftSummary.specDrifts)
+				}
+				if driftSummary.metadataDrifts > 0 {
+					cmd.Printf("  Metadata drifts: %d\n", driftSummary.metadataDrifts)
+				}
+				cmd.Println("")
+
 				for _, drift := range drifts {
 					cmd.Println(drift)
 				}
@@ -140,12 +171,14 @@ Exit codes:
 	cmd.Flags().StringVarP(&filePath, "file", "f", "", "Path to YAML file or directory (required)")
 	cmd.Flags().BoolVar(&ignoreStatus, "ignore-status", false, "Ignore status field in diff")
 	cmd.Flags().BoolVar(&ignoreAnnotations, "ignore-annotations", false, "Ignore annotations in diff")
+	cmd.Flags().StringVar(&outputFormat, "format", "unified", "Diff output format (unified or plain)")
+	cmd.Flags().StringArrayVar(&excludePatterns, "exclude", []string{}, "Exclude pattern (repeatable, gitignore-style)")
 
 	return cmd
 }
 
-// loadManifests loads YAML manifests from file or directory
-func loadManifests(path string) ([]*unstructured.Unstructured, error) {
+// loadManifests loads YAML manifests from file or directory with exclusions
+func loadManifests(path string, excludePatterns []string) ([]*unstructured.Unstructured, error) {
 	var objects []*unstructured.Unstructured
 
 	info, err := os.Stat(path)
@@ -153,11 +186,46 @@ func loadManifests(path string) ([]*unstructured.Unstructured, error) {
 		return nil, err
 	}
 
+	// Load .zenignore if it exists
+	zenignorePath := filepath.Join(path, ".zenignore")
+	if info.IsDir() {
+		zenignorePath = filepath.Join(path, ".zenignore")
+	} else {
+		zenignorePath = filepath.Join(filepath.Dir(path), ".zenignore")
+	}
+	
+	ignorePatterns, err := loadZenignore(zenignorePath)
+	if err != nil {
+		// .zenignore not found is OK
+		ignorePatterns = []string{}
+	}
+	
+	// Merge CLI exclude patterns
+	ignorePatterns = append(ignorePatterns, excludePatterns...)
+	
+	// Add default excludes
+	defaultExcludes := []string{".git/", "node_modules/", "dist/", ".venv/", "vendor/", ".terraform/"}
+	ignorePatterns = append(ignorePatterns, defaultExcludes...)
+
 	if info.IsDir() {
 		err = filepath.WalkDir(path, func(filePath string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
+			
+			// Check if path should be excluded
+			relPath, err := filepath.Rel(path, filePath)
+			if err != nil {
+				return err
+			}
+			
+			if shouldExclude(relPath, ignorePatterns) {
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			
 			if d.IsDir() {
 				return nil
 			}
@@ -182,6 +250,44 @@ func loadManifests(path string) ([]*unstructured.Unstructured, error) {
 	}
 
 	return objects, nil
+}
+
+// loadZenignore loads patterns from .zenignore file
+func loadZenignore(path string) ([]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	
+	lines := strings.Split(string(data), "\n")
+	var patterns []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		patterns = append(patterns, line)
+	}
+	return patterns, nil
+}
+
+// shouldExclude checks if a path matches any exclude pattern (gitignore-style)
+func shouldExclude(path string, patterns []string) bool {
+	for _, pattern := range patterns {
+		// Simple pattern matching (supports trailing / for directories)
+		if strings.HasSuffix(pattern, "/") {
+			// Directory pattern
+			if strings.HasPrefix(path, pattern) || strings.Contains(path, "/"+pattern) {
+				return true
+			}
+		} else {
+			// File or exact match
+			if strings.Contains(path, pattern) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // loadYAMLFile loads YAML file (supports multi-document)
@@ -279,50 +385,77 @@ func stableSortObject(obj interface{}) interface{} {
 	}
 }
 
-// generateDiff generates a text diff between desired and live objects
-func generateDiff(desired, live map[string]interface{}, resourceName string) string {
+// generateDiff generates a unified diff between desired and live objects
+// Returns: (diff string, drift type: "spec" or "metadata")
+func generateDiff(desired, live map[string]interface{}, resourceName string, format string) (string, string) {
 	desiredYAML, err := yaml.Marshal(desired)
 	if err != nil {
-		return fmt.Sprintf("%s: failed to marshal desired: %v", resourceName, err)
+		return fmt.Sprintf("%s: failed to marshal desired: %v", resourceName, err), "spec"
 	}
 
 	liveYAML, err := yaml.Marshal(live)
 	if err != nil {
-		return fmt.Sprintf("%s: failed to marshal live: %v", resourceName, err)
+		return fmt.Sprintf("%s: failed to marshal live: %v", resourceName, err), "spec"
 	}
 
 	if string(desiredYAML) == string(liveYAML) {
-		return ""
+		return "", ""
 	}
 
-	// Simple line-by-line diff
-	desiredLines := strings.Split(string(desiredYAML), "\n")
-	liveLines := strings.Split(string(liveYAML), "\n")
-
-	var diff strings.Builder
-	diff.WriteString(fmt.Sprintf("--- desired: %s\n", resourceName))
-	diff.WriteString(fmt.Sprintf("+++ live: %s\n", resourceName))
-
-	// For now, just show both versions
-	// In production, use a proper diff library
-	maxLen := len(desiredLines)
-	if len(liveLines) > maxLen {
-		maxLen = len(liveLines)
-	}
-
-	for i := 0; i < maxLen; i++ {
-		if i < len(desiredLines) && i < len(liveLines) {
-			if desiredLines[i] != liveLines[i] {
-				diff.WriteString(fmt.Sprintf("- %s\n", desiredLines[i]))
-				diff.WriteString(fmt.Sprintf("+ %s\n", liveLines[i]))
+	// Determine drift type (simple heuristic: check if spec changed)
+	driftType := "metadata"
+	if desiredSpec, ok := desired["spec"]; ok {
+		if liveSpec, ok := live["spec"]; ok {
+			desiredSpecYAML, _ := yaml.Marshal(desiredSpec)
+			liveSpecYAML, _ := yaml.Marshal(liveSpec)
+			if string(desiredSpecYAML) != string(liveSpecYAML) {
+				driftType = "spec"
 			}
-		} else if i < len(desiredLines) {
-			diff.WriteString(fmt.Sprintf("- %s\n", desiredLines[i]))
-		} else if i < len(liveLines) {
-			diff.WriteString(fmt.Sprintf("+ %s\n", liveLines[i]))
 		}
 	}
 
-	return diff.String()
+	desiredLines := strings.Split(string(desiredYAML), "\n")
+	liveLines := strings.Split(string(liveYAML), "\n")
+
+	if format == "plain" {
+		// Plain format (simple line-by-line)
+		var diff strings.Builder
+		diff.WriteString(fmt.Sprintf("--- desired: %s\n", resourceName))
+		diff.WriteString(fmt.Sprintf("+++ live: %s\n", resourceName))
+		
+		maxLen := len(desiredLines)
+		if len(liveLines) > maxLen {
+			maxLen = len(liveLines)
+		}
+		
+		for i := 0; i < maxLen; i++ {
+			if i < len(desiredLines) && i < len(liveLines) {
+				if desiredLines[i] != liveLines[i] {
+					diff.WriteString(fmt.Sprintf("- %s\n", desiredLines[i]))
+					diff.WriteString(fmt.Sprintf("+ %s\n", liveLines[i]))
+				}
+			} else if i < len(desiredLines) {
+				diff.WriteString(fmt.Sprintf("- %s\n", desiredLines[i]))
+			} else if i < len(liveLines) {
+				diff.WriteString(fmt.Sprintf("+ %s\n", liveLines[i]))
+			}
+		}
+		return diff.String(), driftType
+	}
+
+	// Unified diff format (default)
+	unifiedDiff, err := difflib.GetUnifiedDiffString(difflib.UnifiedDiff{
+		A:        desiredLines,
+		B:        liveLines,
+		FromFile: fmt.Sprintf("desired: %s", resourceName),
+		ToFile:   fmt.Sprintf("live: %s", resourceName),
+		Context:  3,
+	})
+	if err != nil {
+		// Fallback to plain format on error
+		return generateDiff(desired, live, resourceName, "plain")
+	}
+
+	return unifiedDiff, driftType
 }
 
