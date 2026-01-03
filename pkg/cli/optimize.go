@@ -124,8 +124,8 @@ func (cli *OptimizeCLI) History(ctx context.Context, source string) error {
 	}
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-	fmt.Fprintf(w, "Metric\tValue\n")
-	fmt.Fprintf(w, "---\t---\n")
+	_, _ = fmt.Fprintf(w, "Metric\tValue\n")
+	_, _ = fmt.Fprintf(w, "---\t---\n")
 	fmt.Fprintf(w, "Optimizations Applied\t%d\n", impact.OptimizationsApplied)
 	fmt.Fprintf(w, "Observations Reduced\t%d\n", impact.ObservationsReduced)
 	fmt.Fprintf(w, "Reduction Percentage\t%.1f%%\n", impact.ReductionPercent*100)
