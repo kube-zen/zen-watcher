@@ -195,7 +195,7 @@ func TestOptimizationStateManager_GetDecisionHistory(t *testing.T) {
 			Confidence: 0.5 + float64(i)*0.1,
 			Reason:     "Test decision",
 		}
-		osm.RecordDecision("test-source", decision)
+		_ = osm.RecordDecision("test-source", decision)
 	}
 
 	history := osm.GetDecisionHistory("test-source", 0) // Get all

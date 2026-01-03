@@ -59,7 +59,7 @@ func TestZenctlHelpOutputContainsOnlyOSSCommands(t *testing.T) {
 	// Generate help output
 	var helpOutput strings.Builder
 	rootCmd.SetOutput(&helpOutput)
-	rootCmd.Usage()
+	_ = rootCmd.Usage()
 
 	helpText := helpOutput.String()
 

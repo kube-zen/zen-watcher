@@ -435,6 +435,6 @@ func createObservation(source, category, severity, namespace, kind, name string)
 
 func createObservationWithEventType(source, category, severity, namespace, kind, name, eventType string) *unstructured.Unstructured {
 	obs := createObservation(source, category, severity, namespace, kind, name)
-	unstructured.SetNestedField(obs.Object, eventType, "spec", "eventType")
+	_ = unstructured.SetNestedField(obs.Object, eventType, "spec", "eventType")
 	return obs
 }

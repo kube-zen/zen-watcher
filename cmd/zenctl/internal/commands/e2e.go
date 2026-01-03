@@ -54,7 +54,7 @@ Artifacts are collected to a timestamped directory in the current working direct
 				artifactsDir = fmt.Sprintf("e2e-artifacts-%s", timestamp)
 			}
 
-			if err := os.MkdirAll(artifactsDir, 0755); err != nil {
+			if err := os.MkdirAll(artifactsDir, 0755); err != nil { //nolint:gosec // G301: 0755 is standard for test artifacts
 				return fmt.Errorf("failed to create artifacts directory: %w", err)
 			}
 
@@ -63,7 +63,7 @@ Artifacts are collected to a timestamped directory in the current working direct
 			cmd.Println("")
 
 			// Run the script
-			scriptCmd := exec.Command("bash", scriptPath)
+			scriptCmd := exec.Command("bash", scriptPath) //nolint:gosec // G204: scriptPath is from trusted source (test fixtures)
 			scriptCmd.Stdout = os.Stdout
 			scriptCmd.Stderr = os.Stderr
 			scriptCmd.Dir = filepath.Dir(scriptPath)

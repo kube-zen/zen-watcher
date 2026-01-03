@@ -59,4 +59,3 @@ func NewDynamicClient(kubeconfig, context string) (dynamic.Interface, *rest.Conf
 
 	return dynClient, config, nil
 }
-

@@ -150,11 +150,14 @@ func NewDoctorCommand() *cobra.Command {
 			fmt.Println()
 
 			for _, result := range results {
-				statusIcon := "✓"
-				if result.Status == "WARN" {
+				var statusIcon string
+				switch result.Status {
+				case "WARN":
 					statusIcon = "⚠"
-				} else if result.Status == "FAIL" {
+				case "FAIL":
 					statusIcon = "✗"
+				default:
+					statusIcon = "✓"
 				}
 
 				fmt.Printf("%s [%s] %s\n", statusIcon, result.Status, result.Check)

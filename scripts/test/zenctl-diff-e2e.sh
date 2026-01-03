@@ -27,11 +27,25 @@ CLUSTER_NAME="${K3D_CLUSTER_NAME:-zenctl-diff-test-$(date +%s)}"
 ZENCTL_BIN="${ZENCTL_BIN:-./zenctl}"
 KEEP_CLUSTER="${KEEP_CLUSTER:-false}"
 TEST_NS="zen-diff-test"
+REPEAT_COUNT="${REPEAT_COUNT:-1}"
 
 # Parse args
-if [ "${1:-}" = "--keep-cluster" ]; then
-	KEEP_CLUSTER=true
-fi
+while [[ $# -gt 0 ]]; do
+	case $1 in
+		--keep-cluster)
+			KEEP_CLUSTER=true
+			shift
+			;;
+		--repeat)
+			REPEAT_COUNT="$2"
+			shift 2
+			;;
+		*)
+			echo "Unknown option: $1"
+			exit 1
+			;;
+	esac
+done
 
 # Test results
 TESTS_PASSED=0

@@ -78,7 +78,7 @@ func (lg *LoadGenerator) SendWebhook(endpoint string, payload map[string]interfa
 		// If direct HTTP fails, try kubectl exec approach (reuse send-webhooks.sh pattern)
 		return lg.sendWebhookViaKubectl(endpoint, jsonData)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("webhook returned status %d", resp.StatusCode)

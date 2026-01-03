@@ -20,4 +20,3 @@ func Info() string {
 func VersionCommand() string {
 	return Info()
 }
-

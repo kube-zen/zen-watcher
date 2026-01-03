@@ -187,7 +187,7 @@ func TestConfigMapLoader_InvalidConfig(t *testing.T) {
 	select {
 	case err := <-errCh:
 		if err != nil && err != context.Canceled {
-			// Error is expected for invalid config
+			t.Logf("Expected error for invalid config: %v", err)
 		}
 	case <-time.After(2 * time.Second):
 		// Timeout is acceptable
@@ -246,7 +246,7 @@ func TestConfigMapLoader_MissingKey(t *testing.T) {
 	select {
 	case err := <-errCh:
 		if err != nil && err != context.Canceled {
-			// Error may occur for missing key
+			t.Logf("Error may occur for missing key: %v", err)
 		}
 	case <-time.After(2 * time.Second):
 		// Timeout is acceptable

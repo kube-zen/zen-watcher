@@ -224,7 +224,7 @@ spec:
 	}
 
 	// Cleanup
-	runKubectl("delete", "ingester", "test-e2e-ingester", "-n", testNamespace, "--ignore-not-found=true")
+	_ = runKubectl("delete", "ingester", "test-e2e-ingester", "-n", testNamespace, "--ignore-not-found=true")
 }
 
 // TestCanonicalSpecLocations verifies that spec.processing.filter and spec.processing.dedup are respected (W58, W33)
@@ -292,7 +292,7 @@ spec:
 	}
 
 	// Cleanup
-	runKubectl("delete", "ingester", "test-canonical-spec", "-n", testNamespace, "--ignore-not-found=true")
+	_ = runKubectl("delete", "ingester", "test-canonical-spec", "-n", testNamespace, "--ignore-not-found=true")
 }
 
 // TestRequiredFieldValidation verifies that required fields (source, ingester, destinations) are validated (W59)
@@ -405,7 +405,7 @@ spec:
 
 			// Cleanup
 			ingesterName := strings.TrimSpace(strings.Split(tt.ingesterYAML, "\n")[4])
-			runKubectl("delete", "ingester", ingesterName, "-n", testNamespace, "--ignore-not-found=true")
+			_ = runKubectl("delete", "ingester", ingesterName, "-n", testNamespace, "--ignore-not-found=true")
 		})
 	}
 }
@@ -434,7 +434,7 @@ func TestMetricsMovement(t *testing.T) {
 		t.Skipf("Failed to start port-forward (non-critical): %v", err)
 		return
 	}
-	defer cmd.Process.Kill()
+	defer func() { _ = cmd.Process.Kill() }()
 
 	// Wait for port-forward
 	time.Sleep(3 * time.Second)
@@ -563,7 +563,7 @@ func TestMetricsEndpoint(t *testing.T) {
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("Failed to start port-forward: %v", err)
 	}
-	defer cmd.Process.Kill()
+	defer func() { _ = cmd.Process.Kill() }()
 
 	// Wait for port-forward to be ready
 	time.Sleep(2 * time.Second)
