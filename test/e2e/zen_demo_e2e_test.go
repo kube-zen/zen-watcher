@@ -202,7 +202,7 @@ spec:
 
 	// Apply the Ingester
 	context := getKubectlContext()
-	cmd := exec.Command("kubectl", "--context="+context, "apply", "-f", "-")
+	cmd := exec.Command("kubectl", "--context="+context, "apply", "-f", "-") //nolint:gosec // G204: kubectl is trusted test tool
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
 	} else {
@@ -256,7 +256,7 @@ spec:
 
 	// Apply the Ingester
 	context := getKubectlContext()
-	cmd := exec.Command("kubectl", "--context="+context, "apply", "-f", "-")
+	cmd := exec.Command("kubectl", "--context="+context, "apply", "-f", "-") //nolint:gosec // G204: kubectl is trusted test tool
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
 	} else {

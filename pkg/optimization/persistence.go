@@ -28,7 +28,7 @@ type FileStatePersistence struct {
 
 // NewFileStatePersistence creates a new file-based state persistence
 func NewFileStatePersistence(baseDir string) (*FileStatePersistence, error) {
-	if err := os.MkdirAll(baseDir, 0755); err != nil {
+	if err := os.MkdirAll(baseDir, 0755); err != nil { //nolint:gosec // G301: 0755 is standard for state directory
 		return nil, fmt.Errorf("failed to create persistence directory: %w", err)
 	}
 	return &FileStatePersistence{baseDir: baseDir}, nil
