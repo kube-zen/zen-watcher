@@ -85,83 +85,9 @@ Exit codes:
 			}
 
 			// Compare each desired object with live state
-			for _, desired := range desiredObjects {
-				// Resolve GVR
-				gvk := schema.GroupVersionKind{
-					Group:   desired.GetAPIVersion(),
-					Version: "", // Will be parsed from APIVersion
-					Kind:    desired.GetKind(),
-				}
-				if parts := strings.Split(desired.GetAPIVersion(), "/"); len(parts) == 2 {
-					gvk.Group = parts[0]
-					gvk.Version = parts[1]
-				} else {
-					gvk.Version = desired.GetAPIVersion()
-				}
-
-				objNS := desired.GetNamespace()
-				if objNS == "" {
-					objNS = "default"
-				}
-
-				// Create base ResourceReport
-				resourceReport := ResourceReport{
-					Group:     gvk.Group,
-					Version:   gvk.Version,
-					Kind:      gvk.Kind,
-					Namespace: objNS,
-					Name:      desired.GetName(),
-					Status:    "no_drift",
-					DriftType: "none",
-					Redacted:  isSecretResource(desired),
-				}
-
-				// Try to resolve GVR and fetch live object
-				gvr, err := resolver.ResolveGVR(gvk)
-				if err != nil {
-					resourceReport.Status = "error"
-					resourceReport.DriftType = "unknown"
-					resourceReport.Error = fmt.Sprintf("CRD not found: %v", err)
-					resourceReports = append(resourceReports, resourceReport)
-					errorMessages = append(errorMessages, fmt.Sprintf("%s %s/%s: CRD not found: %v", gvk.Kind, objNS, desired.GetName(), err))
-					continue
-				}
-
-				live, err := dynClient.Resource(gvr).Namespace(objNS).Get(ctx, desired.GetName(), metav1.GetOptions{})
-				if err != nil {
-					resourceReport.Status = "error"
-					resourceReport.DriftType = "unknown"
-					resourceReport.Error = fmt.Sprintf("Resource not found: %v", err)
-					resourceReports = append(resourceReports, resourceReport)
-					errorMessages = append(errorMessages, fmt.Sprintf("%s %s/%s: not found in cluster: %v", gvk.Kind, objNS, desired.GetName(), err))
-					continue
-				}
-
-				// Check if live object is also a Secret
-				resourceReport.Redacted = isSecretResource(desired) || isSecretResource(live)
-
-				// Normalize both objects
-				desiredNormalized := normalizeForDiff(desired, ignoreStatus, ignoreAnnotations)
-				liveNormalized := normalizeForDiff(live, ignoreStatus, ignoreAnnotations)
-
-				// Generate diff
-				if outputFormat == "" {
-					outputFormat = "unified"
-				}
-				diff, driftType := generateDiff(desiredNormalized, liveNormalized, fmt.Sprintf("%s/%s/%s", gvk.Kind, objNS, desired.GetName()), outputFormat)
-				
-				if diff != "" {
-					resourceReport.Status = "drift"
-					resourceReport.DriftType = driftType
-					resourceReport.DiffStats = calculateDiffStats(diff)
-					drifts = append(drifts, diff)
-				} else {
-					resourceReport.Status = "no_drift"
-					resourceReport.DriftType = "none"
-				}
-				
-				resourceReports = append(resourceReports, resourceReport)
-			}
+			drifts, resourceReports, errorMessages = compareObjects(
+				ctx, desiredObjects, dynClient, resolver,
+				ignoreStatus, ignoreAnnotations, outputFormat)
 
 			// Sort resources for determinism
 			resourceReports = sortResources(resourceReports)
@@ -170,7 +96,7 @@ Exit codes:
 			var jsonReport *DiffReport
 			if reportFormat == "json" {
 				jsonReport = buildDiffReport(clusterContext, resourceReports)
-				
+
 				// Handle output precedence
 				if reportFilePath != "" {
 					// Write JSON to file (atomic)
@@ -194,9 +120,10 @@ Exit codes:
 			hasErrors := false
 			hasDrift := false
 			for _, res := range resourceReports {
-				if res.Status == "error" {
+				switch res.Status {
+				case "error":
 					hasErrors = true
-				} else if res.Status == "drift" {
+				case "drift":
 					hasDrift = true
 				}
 			}

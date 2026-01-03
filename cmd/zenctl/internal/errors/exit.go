@@ -25,4 +25,3 @@ func (e *ExitError) Unwrap() error {
 func NewExitError(code int, err error) *ExitError {
 	return &ExitError{Code: code, Err: err}
 }
-
