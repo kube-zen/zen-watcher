@@ -3,13 +3,12 @@
 # Zen Watcher - Quick Demo Setup (Lightweight)
 # 
 # Lightweight demo: cluster + zen-watcher only (no monitoring stack)
-# For full demo with Grafana/VictoriaMetrics, use: ./scripts/demo.sh
+# Uses kind for simplicity. For full demo with Grafana/VictoriaMetrics and
+# platform options (k3d/kind/minikube), use: ./scripts/demo.sh
 #
 # Usage: 
-#   ./scripts/quick-demo.sh                                    # Uses k3d (interactive)
-#   ./scripts/quick-demo.sh k3d --non-interactive --deploy-mock-data
-#   ./scripts/quick-demo.sh kind --non-interactive --deploy-mock-data
-#   ./scripts/quick-demo.sh minikube --non-interactive --deploy-mock-data
+#   ./scripts/quick-demo.sh                                    # Interactive mode
+#   ./scripts/quick-demo.sh --non-interactive --deploy-mock-data
 #
 # Flags:
 #   --non-interactive, --yes, -y          # Non-interactive mode
@@ -33,15 +32,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/utils/common.sh"
 source "${SCRIPT_DIR}/cluster/utils.sh" 2>/dev/null || true
 
+# Fixed platform: kind (simplified for quick demo)
+PLATFORM="kind"
+
 # Parse arguments
-PLATFORM="k3d"
 NON_INTERACTIVE=false
 USE_EXISTING_CLUSTER=false
 SKIP_MOCK_DATA=false
 DEPLOY_MOCK_DATA=false
 WITH_MONITORING=false
 
-INSTALL_ARGS=()
+INSTALL_ARGS=("kind")  # Always use kind
 for arg in "$@"; do
     case "$arg" in
         --non-interactive|--yes|-y)
@@ -64,9 +65,12 @@ for arg in "$@"; do
         --install-trivy|--install-falco|--install-kyverno|--install-checkov|--install-kube-bench|--no-docker-login|--offline|--skip-repo-update)
             INSTALL_ARGS+=("$arg")
             ;;
+        # Ignore platform arguments (k3d, kind, minikube) - we always use kind
         k3d|kind|minikube)
-            PLATFORM="$arg"
-            INSTALL_ARGS+=("$arg")
+            log_info "Platform selection ignored - quick-demo.sh always uses kind"
+            ;;
+        *)
+            log_warn "Unknown argument: $arg (ignored)"
             ;;
     esac
 done
@@ -88,29 +92,11 @@ fi
 
 # Validate required tools early
 log_step "Validating prerequisites..."
-case "$PLATFORM" in
-    k3d)
-        if ! command_exists "k3d"; then
-            log_error "k3d is not installed"
-            echo "  Install: https://k3d.io/#installation"
-            exit 1
-        fi
-        ;;
-    kind)
-        if ! command_exists "kind"; then
-            log_error "kind is not installed"
-            echo "  Install: https://kind.sigs.k8s.io/docs/user/quick-start/#installation"
-            exit 1
-        fi
-        ;;
-    minikube)
-        if ! command_exists "minikube"; then
-            log_error "minikube is not installed"
-            echo "  Install: https://minikube.sigs.k8s.io/docs/start/"
-            exit 1
-        fi
-        ;;
-esac
+if ! command_exists "kind"; then
+    log_error "kind is not installed"
+    echo "  Install: https://kind.sigs.k8s.io/docs/user/quick-start/#installation"
+    exit 1
+fi
 
 if ! command_exists "kubectl"; then
     log_error "kubectl is not installed"
@@ -144,7 +130,7 @@ fi
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${BLUE}  Zen Watcher - Quick Demo Setup (Lightweight)${NC}"
-echo -e "${BLUE}  Platform: ${CYAN}${PLATFORM}${NC}"
+echo -e "${BLUE}  Platform: ${CYAN}kind${NC} (fixed for simplicity)"
 echo -e "${BLUE}  Cluster: ${CYAN}${CLUSTER_NAME}${NC}"
 if [ "$USE_EXISTING_CLUSTER" = true ]; then
     echo -e "${BLUE}  Mode: ${CYAN}Using existing cluster${NC}"
@@ -164,25 +150,12 @@ log_step "Installing Zen Watcher..."
     exit 1
 }
 
-# Get kubeconfig
+# Get kubeconfig (kind-specific)
 if command_exists "get_kubeconfig_path" 2>/dev/null || type get_kubeconfig_path >/dev/null 2>&1; then
-    KUBECONFIG_FILE=$(get_kubeconfig_path "$PLATFORM" "$CLUSTER_NAME" 2>/dev/null || echo "${HOME}/.kube/${CLUSTER_NAME}-kubeconfig")
+    KUBECONFIG_FILE=$(get_kubeconfig_path "kind" "$CLUSTER_NAME" 2>/dev/null || echo "${HOME}/.kube/kind-${CLUSTER_NAME}-config")
 else
-    # Fallback if function not available
-    case "$PLATFORM" in
-        k3d)
-            KUBECONFIG_FILE="${HOME}/.kube/${CLUSTER_NAME}-kubeconfig"
-            ;;
-        kind)
-            KUBECONFIG_FILE="${HOME}/.kube/kind-${CLUSTER_NAME}-config"
-            ;;
-        minikube)
-            KUBECONFIG_FILE="${HOME}/.kube/config"
-            ;;
-        *)
-            KUBECONFIG_FILE="${HOME}/.kube/${CLUSTER_NAME}-kubeconfig"
-            ;;
-    esac
+    # Fallback for kind
+    KUBECONFIG_FILE="${HOME}/.kube/kind-${CLUSTER_NAME}-config"
 fi
 export KUBECONFIG="${KUBECONFIG_FILE}"
 

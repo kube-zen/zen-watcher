@@ -10,14 +10,13 @@
 
 ### Required Tools
 
-- **k3d, kind, or minikube**: One local Kubernetes cluster tool
-  - k3d: `curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash`
-  - kind: `curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64 && chmod +x ./kind && sudo mv ./kind /usr/local/bin/kind`
-  - minikube: `curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64 && sudo install minikube-linux-amd64 /usr/local/bin/minikube`
+- **kind**: Kubernetes cluster tool (required for quick-demo.sh)
+  - Install: `curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64 && chmod +x ./kind && sudo mv ./kind /usr/local/bin/kind`
+  - Note: For platform options (k3d/kind/minikube), use `./scripts/demo.sh` instead
 - **Docker**: Running and accessible (`docker ps` should work)
 - **kubectl**: Kubernetes CLI (`kubectl version --client`)
 - **helm**: Helm 3.8+ (`helm version`)
-- **Kubernetes cluster**: 1.26+ (created automatically by quick-demo.sh)
+- **Kubernetes cluster**: 1.26+ (created automatically by quick-demo.sh using kind)
 
 ### System Requirements
 
@@ -36,13 +35,13 @@
 git clone https://github.com/kube-zen/zen-watcher
 cd zen-watcher
 
-# Run lightweight quick demo (zen-watcher only, no monitoring)
-./scripts/quick-demo.sh k3d --non-interactive --deploy-mock-data
+# Run lightweight quick demo (zen-watcher only, no monitoring, uses kind)
+./scripts/quick-demo.sh --non-interactive --deploy-mock-data
 
 # For minimal resource usage:
-ZEN_DEMO_MINIMAL=1 ./scripts/quick-demo.sh k3d --non-interactive --deploy-mock-data
+ZEN_DEMO_MINIMAL=1 ./scripts/quick-demo.sh --non-interactive --deploy-mock-data
 
-# For full demo with Grafana/VictoriaMetrics:
+# For full demo with Grafana/VictoriaMetrics (supports k3d/kind/minikube):
 ./scripts/demo.sh k3d --non-interactive --deploy-mock-data
 
 # The quick-demo script will:
