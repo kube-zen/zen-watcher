@@ -1,7 +1,6 @@
 # golangci-lint configuration for OSS repos
 # Based on Kubernetes and OSS best practices
-
-version: "2"
+# Compatible with golangci-lint v2.7.2
 
 run:
   timeout: 5m
@@ -23,33 +22,7 @@ linters:
     - gosec          # Inspects source code for security problems
     - goimports      # Goimports does everything that gofmt does plus imports sorting
 
-linters-settings:
-  gofmt:
-    simplify: true
-  
-  gocyclo:
-    min-complexity: 15
-  
-  gosec:
-    excludes:
-      - G104  # Audit errors not checked (covered by errcheck)
-      - G204  # Subprocess launched with variable (acceptable for kubectl)
-
 issues:
-  exclude-dirs:
-    - vendor
-    - third_party
-    - testdata
-    - examples
-    - tmp
-    - bin
-    - deploy
-    - charts
-    - .github
-  exclude-files:
-    - ".*\\.pb\\.go$"
-    - ".*_generated\\.go$"
-    - "zz_generated\\.deepcopy\\.go$"
   exclude-rules:
     # Exclude test files from some checks
     - path: _test\.go
@@ -62,8 +35,40 @@ issues:
     - path: zz_generated\.deepcopy\.go
       linters:
         - all
+    - path: .*_generated\.go$
+      linters:
+        - all
+    - path: .*\.pb\.go$
+      linters:
+        - all
     
-    # Note: fmt.Print* should not be used in production code
-    # Use structured logging (zen-sdk/pkg/logging) instead
-    # This is enforced via CI checks, not linter rules
-
+    # Exclude directories
+    - path: vendor/.*
+      linters:
+        - all
+    - path: third_party/.*
+      linters:
+        - all
+    - path: testdata/.*
+      linters:
+        - all
+    - path: examples/.*
+      linters:
+        - all
+    - path: tmp/.*
+      linters:
+        - all
+    - path: bin/.*
+      linters:
+        - all
+    - path: deploy/.*
+      linters:
+        - all
+    - path: charts/.*
+      linters:
+        - all
+    - path: \.github/.*
+      linters:
+        - all
+  max-issues-per-linter: 0
+  max-same-issues: 0
