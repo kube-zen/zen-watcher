@@ -473,7 +473,7 @@ spec:
       value: observations
 `
 	kubectlContext := getKubectlContext()
-	applyCmd := exec.Command("kubectl", "--context="+kubectlContext, "apply", "-f", "-")
+	applyCmd := exec.Command("kubectl", "--context="+kubectlContext, "apply", "-f", "-") //nolint:gosec // G204: kubectl is trusted test tool
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
 		applyCmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
 	} else {
