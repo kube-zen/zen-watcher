@@ -129,11 +129,11 @@ across the current or all namespaces.`,
 				}
 			}
 
-			fmt.Fprintln(w, "\n=== Ingesters ===")
+			_, _ = fmt.Fprintln(w, "\n=== Ingesters ===")
 			if len(summary.Ingesters) == 0 {
-				fmt.Fprintln(w, "No Ingesters found")
+				_, _ = fmt.Fprintln(w, "No Ingesters found")
 			} else {
-				fmt.Fprintln(w, "NAMESPACE\tNAME\tSOURCES\tHEALTH\tLAST SEEN\tENTITLED\tBLOCKED\tREADY\tAGE")
+				_, _ = fmt.Fprintln(w, "NAMESPACE\tNAME\tSOURCES\tHEALTH\tLAST SEEN\tENTITLED\tBLOCKED\tREADY\tAGE")
 				for _, i := range summary.Ingesters {
 					health := i.SourceHealth
 					if health == "" {
@@ -151,7 +151,7 @@ across the current or all namespaces.`,
 					if blocked == "" {
 						blocked = "—"
 					}
-					fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
+					_, _ = fmt.Fprintf(w, "%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\t%s\n",
 						i.Namespace, i.Name, i.Sources, health, lastSeen, entitled, blocked, i.Ready, output.FormatAge(i.Object.GetCreationTimestamp().Time))
 				}
 			}

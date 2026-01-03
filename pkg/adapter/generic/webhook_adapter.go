@@ -81,7 +81,7 @@ func (a *WebhookAdapter) Start(ctx context.Context, config *SourceConfig) (<-cha
 		// Health check
 		mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "healthy")
+			_, _ = fmt.Fprintf(w, "healthy")
 		})
 
 		a.server = &http.Server{
