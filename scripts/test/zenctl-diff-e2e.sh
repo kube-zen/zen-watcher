@@ -99,6 +99,15 @@ export KUBECONFIG="$KUBECONFIG_FILE"
 log_step "Waiting for cluster to be ready..."
 kubectl wait --for=condition=Ready nodes --all --timeout=60s --context="k3d-${CLUSTER_NAME}" || true
 
+# Install CRDs if available
+log_step "Installing CRDs (if available)..."
+if [ -d "deployments/crds" ]; then
+	kubectl apply -f deployments/crds/ --context="k3d-${CLUSTER_NAME}" --server-side --force-conflicts || {
+		log_info "CRDs may already be installed or not available"
+	}
+	sleep 2
+fi
+
 # Create test namespace
 kubectl create namespace "${TEST_NS}" --context="k3d-${CLUSTER_NAME}" || true
 
