@@ -21,11 +21,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	sdkdedup "github.com/kube-zen/zen-sdk/pkg/dedup"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/hooks"
-	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/monitoring"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
@@ -265,6 +265,7 @@ func (p *Processor) observationToEvent(observation *unstructured.Unstructured, r
 }
 
 // normalize converts RawEvent to Event using normalization config
+//
 //nolint:unused // May be used in future normalization scenarios
 func (p *Processor) normalize(raw *generic.RawEvent, config *generic.SourceConfig) *watcher.Event {
 	if config.Normalization == nil {

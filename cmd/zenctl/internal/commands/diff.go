@@ -33,7 +33,6 @@ func NewDiffCommand() *cobra.Command {
 	var reportFilePath string
 	var selectPatterns []string
 	var labelSelector string
-	var quiet bool
 
 	cmd := &cobra.Command{
 		Use:   "diff -f <file|dir>",
@@ -59,20 +58,10 @@ Exit codes:
 				return fmt.Errorf("namespace must be specified with -n or use -A for all namespaces")
 			}
 
-			// Create client
-			dynClient, config, err := client.NewDynamicClient(opts.Kubeconfig, opts.Context)
+			// Initialize clients
+			clients, err := initializeDiffClients(opts)
 			if err != nil {
-				return fmt.Errorf("failed to create client: %w", err)
-			}
-
-			// Create discovery client and resolver
-			discClient, err := disk.NewCachedDiscoveryClientForConfig(config, "", "", 0)
-			if err != nil {
-				return fmt.Errorf("failed to create discovery client: %w", err)
-			}
-			resolver, err := discovery.NewResourceResolver(discClient)
-			if err != nil {
-				return fmt.Errorf("failed to create resource resolver: %w", err)
+				return err
 			}
 
 			// Load desired manifests with exclusions
@@ -86,88 +75,22 @@ Exit codes:
 				clusterContext = "default"
 			}
 
-			// Parse and apply select patterns
-			var selectPatternsParsed []SelectPattern
-			var selectWarnings []string
-			var filtersApplied *FiltersApplied
-			var filteredObjects []*unstructured.Unstructured
-
-			if len(selectPatterns) > 0 {
-				parsed, parseWarnings, parseErr := NormalizeSelectPatterns(selectPatterns)
-				if parseErr != nil {
-					return fmt.Errorf("failed to parse select patterns: %w", parseErr)
-				}
-				if len(parseWarnings) > 0 {
-					return fmt.Errorf("select pattern parse errors: %s", strings.Join(parseWarnings, "; "))
-				}
-				selectPatternsParsed = parsed
-
-				// Filter by select patterns
-				filteredObjects, selectWarnings = FilterObjectsBySelect(desiredObjects, selectPatternsParsed)
-				if len(filteredObjects) == 0 {
-					// All selections missed - emit JSON if requested, then exit 1
-					if reportFormat == "json" {
-						filtersApplied = &FiltersApplied{Select: selectPatterns}
-						jsonReport := buildDiffReport(clusterContext, []ResourceReport{}, filtersApplied, selectWarnings)
-						if reportFilePath != "" {
-							if err := writeReportFile(jsonReport, reportFilePath); err != nil {
-								cmd.PrintErrln("ERROR: Failed to write report file:", err)
-							}
-						} else {
-							encoder := json.NewEncoder(os.Stdout)
-							encoder.SetIndent("", "  ")
-							if err := encoder.Encode(jsonReport); err != nil {
-								cmd.PrintErrln("ERROR: Failed to encode report:", err)
-							}
-						}
-					}
-					for _, warn := range selectWarnings {
-						cmd.PrintErrln("WARNING:", warn)
-					}
-					return clierrors.NewExitError(1, fmt.Errorf("all select patterns matched no resources"))
-				}
-			} else {
-				filteredObjects = desiredObjects
+			// Apply select pattern filtering
+			filteredObjects, selectWarnings, _, err := applySelectPatternFilter(
+				selectPatterns, desiredObjects, clusterContext, reportFormat, reportFilePath, cmd)
+			if err != nil {
+				return err
 			}
 
-			// Apply label selector
-			if labelSelector != "" {
-				var labelErr error
-				filteredObjects, labelErr = FilterObjectsByLabelSelector(filteredObjects, labelSelector)
-				if labelErr != nil {
-					return fmt.Errorf("label selector error: %w", labelErr)
-				}
-				if len(filteredObjects) == 0 && len(selectPatterns) == 0 {
-					// Only label selector, no matches
-					if reportFormat == "json" {
-						filtersApplied = &FiltersApplied{LabelSelector: labelSelector}
-						jsonReport := buildDiffReport(clusterContext, []ResourceReport{}, filtersApplied, []string{})
-						if reportFilePath != "" {
-							if err := writeReportFile(jsonReport, reportFilePath); err != nil {
-								cmd.PrintErrln("ERROR: Failed to write report file:", err)
-							}
-						} else {
-							encoder := json.NewEncoder(os.Stdout)
-							encoder.SetIndent("", "  ")
-							if err := encoder.Encode(jsonReport); err != nil {
-								cmd.PrintErrln("ERROR: Failed to encode report:", err)
-							}
-						}
-					}
-					return clierrors.NewExitError(1, fmt.Errorf("label selector matched no resources"))
-				}
+			// Apply label selector filtering
+			filteredObjects, _, err = applyLabelSelectorFilter(
+				labelSelector, filteredObjects, selectPatterns, clusterContext, reportFormat, reportFilePath, cmd)
+			if err != nil {
+				return err
 			}
 
 			// Build filtersApplied for JSON report
-			if len(selectPatterns) > 0 || labelSelector != "" {
-				filtersApplied = &FiltersApplied{}
-				if len(selectPatterns) > 0 {
-					filtersApplied.Select = selectPatterns
-				}
-				if labelSelector != "" {
-					filtersApplied.LabelSelector = labelSelector
-				}
-			}
+			filtersApplied := buildFiltersApplied(selectPatterns, labelSelector)
 
 			var drifts []string
 			var errorMessages []string
@@ -175,47 +98,21 @@ Exit codes:
 
 			// Compare each desired object with live state
 			drifts, resourceReports, errorMessages = compareObjects(
-				ctx, filteredObjects, dynClient, resolver,
+				ctx, filteredObjects, clients.dynClient, clients.resolver,
 				ignoreStatus, ignoreAnnotations, outputFormat)
 
 			// Sort resources for determinism
 			resourceReports = sortResources(resourceReports)
 
-			// Generate JSON report if requested
-			var jsonReport *DiffReport
-			if reportFormat == "json" {
-				jsonReport = buildDiffReport(clusterContext, resourceReports, filtersApplied, selectWarnings)
-
-				// Handle output precedence
-				if reportFilePath != "" {
-					// Write JSON to file (atomic)
-					if err := writeReportFile(jsonReport, reportFilePath); err != nil {
-						cmd.PrintErrln("ERROR: Failed to write report file:", err)
-						return fmt.Errorf("report write failed: %w", err)
-					}
-					// Human output to stdout (preserved)
-				} else {
-					// Write JSON to stdout, suppress human output
-					encoder := json.NewEncoder(os.Stdout)
-					encoder.SetIndent("", "  ")
-					if err := encoder.Encode(jsonReport); err != nil {
-						return fmt.Errorf("failed to encode report: %w", err)
-					}
-					// Human output suppressed when JSON to stdout
-				}
+			// Generate and emit JSON report if requested
+			if err := generateAndEmitJSONReport(
+				clusterContext, resourceReports, filtersApplied, selectWarnings,
+				reportFormat, reportFilePath, cmd); err != nil {
+				return err
 			}
 
-			// Determine exit code based on resource reports
-			hasErrors := false
-			hasDrift := false
-			for _, res := range resourceReports {
-				switch res.Status {
-				case "error":
-					hasErrors = true
-				case "drift":
-					hasDrift = true
-				}
-			}
+			// Determine exit status
+			hasErrors, hasDrift := determineExitStatus(resourceReports)
 
 			// Report errors (always to stderr)
 			if len(errorMessages) > 0 {
@@ -229,24 +126,8 @@ Exit codes:
 				return clierrors.NewExitError(1, fmt.Errorf("validation failed: %d error(s)", len(errorMessages)))
 			}
 
-			// Report drifts (to stdout if not JSON to stdout)
 			if hasDrift {
-				if reportFormat != "json" || reportFilePath != "" {
-					// Human output enabled
-					cmd.Printf("Drift Summary:\n")
-					cmd.Printf("  Total resources: %d\n", len(resourceReports))
-					driftCount := 0
-					for _, res := range resourceReports {
-						if res.Status == "drift" {
-							driftCount++
-						}
-					}
-					cmd.Printf("  Drifted resources: %d\n", driftCount)
-					cmd.Println("")
-					for _, drift := range drifts {
-						cmd.Println(drift)
-					}
-				}
+				reportDrifts(drifts, resourceReports, reportFormat, reportFilePath, cmd)
 				return clierrors.NewExitError(2, fmt.Errorf("drift detected"))
 			}
 
