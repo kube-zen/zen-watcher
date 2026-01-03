@@ -213,9 +213,9 @@ Exit codes:
 						} else {
 							encoder := json.NewEncoder(os.Stdout)
 							encoder.SetIndent("", "  ")
-       if err := encoder.Encode(jsonReport); err != nil {
-           cmd.PrintErrln("ERROR: Failed to encode report:", err)
-       }
+					if err := encoder.Encode(jsonReport); err != nil {
+						cmd.PrintErrln("ERROR: Failed to encode report:", err)
+					}
 						}
 					}
 					for _, warn := range selectWarnings {
