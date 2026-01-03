@@ -23,8 +23,8 @@ func TestExpectedGVKs(t *testing.T) {
 func TestExpectedGVKValues(t *testing.T) {
 	// Verify specific GVK values match expected groups/versions
 	tests := []struct {
-		name         string
-		expectedGroup string
+		name            string
+		expectedGroup   string
 		expectedVersion string
 	}{
 		{"DeliveryFlow", "routing.zen.kube-zen.io", "v1alpha1"},
@@ -57,4 +57,3 @@ func TestGVKString(t *testing.T) {
 	}
 	_ = gvk.String() // Should not panic
 }
-
