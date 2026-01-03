@@ -251,7 +251,7 @@ func validateManifest(t *testing.T, manifest string, crdType string) error {
 			strings.Contains(outputStr, "resource mapping not found") ||
 			strings.Contains(outputStr, "ensure CRDs are installed") {
 			// Fall back to client-side validation
-			cmd = exec.Command("kubectl", "apply", "--dry-run=client", "-f", tmpFile)
+			cmd = exec.Command("kubectl", "apply", "--dry-run=client", "-f", tmpFile) //nolint:gosec // G204: kubectl is trusted test tool
 			output, err = cmd.CombinedOutput()
 			if err != nil {
 				outputStr = string(output)
