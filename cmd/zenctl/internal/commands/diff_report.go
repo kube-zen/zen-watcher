@@ -52,6 +52,7 @@ type DiffStats struct {
 	Changed int `json:"changed"`
 }
 
+//nolint:unused // Reserved for future use in diff command JSON output
 // buildDiffReport constructs a DiffReport from comparison results
 func buildDiffReport(ctx string, resources []ResourceReport) *DiffReport {
 	summary := ReportSummary{
