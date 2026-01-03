@@ -31,7 +31,7 @@ import (
 // TestConfigMapLoader_Integration tests ConfigMap loader with filter integration
 func TestConfigMapLoader_Integration(t *testing.T) {
 	// Create fake client
-	clientSet := fake.NewSimpleClientset()
+	clientSet := fake.NewSimpleClientset() //nolint:staticcheck // SA1019: NewClientset requires apply configurations
 
 	// Helper to create bool pointer
 	boolPtr := func(b bool) *bool { return &b }
