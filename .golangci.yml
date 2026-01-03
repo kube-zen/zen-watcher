@@ -11,13 +11,13 @@ run:
 
 linters:
   enable:
-    # Linters only (formatters like gofmt/goimports not allowed with version: "2")
+    - gofmt
     - govet
     - errcheck
     - staticcheck
     - unused
-    - gosimple
     - ineffassign
     - misspell
     - gocyclo
     - gosec
+    - goimports
