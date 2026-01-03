@@ -246,6 +246,7 @@ Exit codes:
 							encoder := json.NewEncoder(os.Stdout)
 							encoder.SetIndent("", "  ")
 					if err := encoder.Encode(jsonReport); err != nil {
+						cmd.PrintErrln("ERROR: Failed to encode report:", err)
 					}
 					return clierrors.NewExitError(1, fmt.Errorf("label selector matched no resources"))
 				}
