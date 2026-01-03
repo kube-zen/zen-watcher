@@ -23,11 +23,11 @@ import (
 	"sync"
 	"time"
 
+	sdkdedup "github.com/kube-zen/zen-sdk/pkg/dedup"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/config"
-	sdkdedup "github.com/kube-zen/zen-sdk/pkg/dedup"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
-	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	"github.com/kube-zen/zen-watcher/pkg/optimization"
 	"github.com/prometheus/client_golang/prometheus"
@@ -58,8 +58,8 @@ type ObservationCreator struct {
 
 	// Optimization components (optional)
 	optimizationMetrics *OptimizationMetrics
-	smartProcessor     *optimization.SmartProcessor
-	systemMetrics      interface {
+	smartProcessor      *optimization.SmartProcessor
+	systemMetrics       interface {
 		RecordEvent()
 		SetQueueDepth(int)
 	}
@@ -72,7 +72,7 @@ type ObservationCreator struct {
 	orderMu      sync.RWMutex
 
 	// Utilities
-	fieldExtractor    *FieldExtractor
+	fieldExtractor     *FieldExtractor
 	destinationMetrics *metrics.Metrics
 }
 
@@ -91,8 +91,8 @@ type OptimizationMetrics struct {
 
 // sourceCounters tracks counters per source for rate calculations
 type sourceCounters struct {
-	attempted int64 // Total events attempted
-	deduped   int64 // Events deduplicated
+	attempted   int64 // Total events attempted
+	deduped     int64 // Events deduplicated
 	created     int64 // Events created
 	lowSeverity int64 // LOW severity count
 	totalCount  int64 // Total count for severity distribution
@@ -172,15 +172,15 @@ func NewObservationCreatorWithOptimization(
 		}
 	}
 	return &ObservationCreator{
-		dynClient:   dynClient,
-		eventGVR:    eventGVR,
-		metrics:     NewMetricsTracker(eventsTotal, observationsCreated, observationsFiltered, observationsDeduped, observationsCreateErrors),
-		deduper:     sdkdedup.NewDeduper(windowSeconds, maxSize),
-		filter:      filter,
+		dynClient:           dynClient,
+		eventGVR:            eventGVR,
+		metrics:             NewMetricsTracker(eventsTotal, observationsCreated, observationsFiltered, observationsDeduped, observationsCreateErrors),
+		deduper:             sdkdedup.NewDeduper(windowSeconds, maxSize),
+		filter:              filter,
 		optimizationMetrics: optimizationMetrics,
-		currentOrder: make(map[string]ProcessingOrder),
-		smartProcessor: optimization.NewSmartProcessor(), // Created here, can be shared with optimizer
-		fieldExtractor: NewFieldExtractor(),
+		currentOrder:        make(map[string]ProcessingOrder),
+		smartProcessor:      optimization.NewSmartProcessor(), // Created here, can be shared with optimizer
+		fieldExtractor:      NewFieldExtractor(),
 	}
 }
 
@@ -262,6 +262,7 @@ func (oc *ObservationCreator) determineProcessingOrder(source string) Processing
 }
 
 // getSourceMetrics gets current metrics for a source from optimization metrics
+//
 //nolint:unused // May be used for future metrics analysis
 func (oc *ObservationCreator) getSourceMetrics(source string) *SourceMetrics {
 	if oc.optimizationMetrics == nil {
@@ -381,7 +382,7 @@ func (oc *ObservationCreator) extractMetricsFields(observation *unstructured.Uns
 	categoryVal, categoryFound := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "category")
 	severityVal, severityFound := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "severity")
 	eventTypeVal, eventTypeFound := oc.fieldExtractor.ExtractFieldCopy(observation.Object, "spec", "eventType")
-	
+
 	category := ""
 	if categoryVal != nil {
 		// Optimize: use type assertion first, fallback to formatting only when needed
@@ -395,7 +396,7 @@ func (oc *ObservationCreator) extractMetricsFields(observation *unstructured.Uns
 			sdklog.Operation("observation_create"),
 			sdklog.String("source", source))
 	}
-	
+
 	severity := ""
 	if severityVal != nil {
 		// Optimize: use type assertion first, fallback to formatting only when needed
@@ -409,7 +410,7 @@ func (oc *ObservationCreator) extractMetricsFields(observation *unstructured.Uns
 			sdklog.Operation("observation_create"),
 			sdklog.String("source", source))
 	}
-	
+
 	eventType := ""
 	if eventTypeVal != nil {
 		// Optimize: use type assertion first, fallback to formatting only when needed
@@ -428,7 +429,7 @@ func (oc *ObservationCreator) extractMetricsFields(observation *unstructured.Uns
 	if severity != "" {
 		severity = normalizeSeverity(severity)
 	}
-	
+
 	return category, severity, eventType
 }
 
@@ -546,6 +547,7 @@ func (oc *ObservationCreator) getProcessingStrategy(source string) string {
 }
 
 // extractDedupKey extracts minimal metadata for deduplication from observation
+//
 //nolint:unused // May be used for future deduplication logic
 func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstructured) sdkdedup.DedupKey {
 	// Extract source (optimized with type assertion)
@@ -610,6 +612,7 @@ func (oc *ObservationCreator) extractDedupKey(observation *unstructured.Unstruct
 
 // extractStringField extracts a string field from a map with type assertion optimization
 // Note: Used in extractDedupKey (which may be unused but kept for future use)
+//
 //nolint:unused // Used in extractDedupKey which may be used in future
 func extractStringField(m map[string]interface{}, key string) string {
 	if m == nil {
@@ -739,6 +742,7 @@ func (oc *ObservationCreator) recordEventAttempted(source string) {
 }
 
 // recordEventFiltered records that an event was filtered
+//
 //nolint:unused // May be used for future metrics tracking
 func (oc *ObservationCreator) recordEventFiltered(source, reason string) {
 	_ = oc.getOrCreateSourceCounters(source)
@@ -746,6 +750,7 @@ func (oc *ObservationCreator) recordEventFiltered(source, reason string) {
 }
 
 // recordEventDeduped records that an event was deduplicated
+//
 //nolint:unused // May be used for future metrics tracking
 func (oc *ObservationCreator) recordEventDeduped(source string) {
 	counters := oc.getOrCreateSourceCounters(source)

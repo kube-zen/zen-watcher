@@ -19,8 +19,8 @@ import "github.com/prometheus/client_golang/prometheus"
 // MetricsTracker groups all Prometheus metrics for observation creation
 type MetricsTracker struct {
 	EventsTotal              *prometheus.CounterVec
-	ObservationsCreated     *prometheus.CounterVec
-	ObservationsFiltered    *prometheus.CounterVec
+	ObservationsCreated      *prometheus.CounterVec
+	ObservationsFiltered     *prometheus.CounterVec
 	ObservationsDeduped      prometheus.Counter
 	ObservationsCreateErrors *prometheus.CounterVec
 }
@@ -37,8 +37,7 @@ func NewMetricsTracker(
 		EventsTotal:              eventsTotal,
 		ObservationsCreated:      observationsCreated,
 		ObservationsFiltered:     observationsFiltered,
-		ObservationsDeduped:       observationsDeduped,
+		ObservationsDeduped:      observationsDeduped,
 		ObservationsCreateErrors: observationsCreateErrors,
 	}
 }
-
