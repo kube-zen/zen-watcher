@@ -49,7 +49,6 @@ type SourceStatus struct {
 	LastSeen *metav1.Time `json:"lastSeen,omitempty" yaml:"lastSeen,omitempty"`
 }
 
-
 // IngesterSource represents a single source configuration in the multi-source array
 type IngesterSource struct {
 	// Name is the source name (DNS label)
