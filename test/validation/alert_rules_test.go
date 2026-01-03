@@ -119,7 +119,7 @@ func TestAlertRulesSyntax(t *testing.T) {
 
 	for _, file := range alertRuleFiles {
 		t.Run(filepath.Base(file), func(t *testing.T) {
-			data, err := os.ReadFile(file)
+			data, err := os.ReadFile(file) //nolint:gosec // G304: file is from trusted source (test fixtures)
 			if err != nil {
 				t.Fatalf("Failed to read file %s: %v", file, err)
 			}
@@ -153,7 +153,7 @@ func TestAlertRulesExpressions(t *testing.T) {
 
 	for _, file := range alertRuleFiles {
 		t.Run(filepath.Base(file), func(t *testing.T) {
-			data, err := os.ReadFile(file)
+			data, err := os.ReadFile(file) //nolint:gosec // G304: file is from trusted source (test fixtures)
 			if err != nil {
 				t.Fatalf("Failed to read file %s: %v", file, err)
 			}
@@ -208,7 +208,7 @@ func TestAlertRulesSeverityValues(t *testing.T) {
 
 	for _, file := range alertRuleFiles {
 		t.Run(filepath.Base(file), func(t *testing.T) {
-			data, err := os.ReadFile(file)
+			data, err := os.ReadFile(file) //nolint:gosec // G304: file is from trusted source (test fixtures)
 			if err != nil {
 				t.Fatalf("Failed to read file %s: %v", file, err)
 			}
@@ -247,7 +247,7 @@ func TestAlertRulesRequiredFields(t *testing.T) {
 
 	for _, file := range alertRuleFiles {
 		t.Run(filepath.Base(file), func(t *testing.T) {
-			data, err := os.ReadFile(file)
+			data, err := os.ReadFile(file) //nolint:gosec // G304: file is from trusted source (test fixtures)
 			if err != nil {
 				t.Fatalf("Failed to read file %s: %v", file, err)
 			}
