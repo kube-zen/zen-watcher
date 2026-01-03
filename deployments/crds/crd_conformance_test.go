@@ -289,7 +289,7 @@ func validateManifest(t *testing.T, manifest string, crdType string) error {
 		outputStr := string(output)
 		errStr := err.Error()
 		trimmed := strings.TrimSpace(outputStr)
-		
+
 		// Combine output and error message for better detection
 		combinedErr := outputStr
 		if outputStr == "" {
@@ -297,26 +297,26 @@ func validateManifest(t *testing.T, manifest string, crdType string) error {
 		} else if !strings.Contains(outputStr, errStr) {
 			combinedErr = outputStr + " " + errStr
 		}
-		
+
 		// If output is empty or minimal, it's likely a CRD/context/connection issue
 		// Default to skipping when we can't determine the error type
 		if trimmed == "" || len(trimmed) < 10 {
 			t.Skipf("kubectl validation not available (CRD may not be installed): %v", err)
 			return nil
 		}
-		
+
 		// Check for CRD not available errors first (check both output and error message)
 		if isCRDNotAvailableError(combinedErr) || isCRDNotAvailableError(errStr) {
 			// Fall back to client-side validation
 			return tryClientSideValidation(t, tmpFile)
 		}
-		
+
 		// Only return error for CLEAR validation failures
 		// If we can't clearly identify it as a validation error, skip (safe default for CI)
 		if isValidationError(combinedErr) || isValidationError(errStr) {
 			return err
 		}
-		
+
 		// For any other error (CRD not found, context issues, connection problems, etc.) - skip test
 		// Default to skipping rather than failing, as CRDs may not be available in test environments
 		// This is the safe default for CI environments where kubectl might fail for various reasons
