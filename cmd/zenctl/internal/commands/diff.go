@@ -31,8 +31,8 @@ func NewDiffCommand() *cobra.Command {
 	var excludePatterns []string
 	var reportFormat string
 	var reportFilePath string
-	var selectPatterns []string
-	var labelSelector string
+	// var selectPatterns []string  // Reserved for future use
+	// var labelSelector string      // Reserved for future use
 
 	cmd := &cobra.Command{
 		Use:   "diff -f <file|dir>",

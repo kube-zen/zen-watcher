@@ -211,5 +211,5 @@ Apache License 2.0 - See [LICENSE](LICENSE) for details.
 **Repository:** [github.com/kube-zen/zen-watcher](https://github.com/kube-zen/zen-watcher)  
 **Helm Charts:** [github.com/kube-zen/helm-charts](https://github.com/kube-zen/helm-charts)  
 **Version:** 1.0.0-alpha  
-**Go Version:** 1.24+ (tested on 1.24)  
+**Go Version:** 1.25+ (tested on 1.25)  
 **Kubernetes:** Client libs v0.28.15 (tested on clusters 1.26+)
