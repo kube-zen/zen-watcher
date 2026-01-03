@@ -516,4 +516,3 @@ func extractLogsConfig(spec map[string]interface{}, logger *sdklog.Logger, sourc
 	}
 	return extractLogsConfigFromMap(spec)
 }
-
