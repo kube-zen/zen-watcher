@@ -179,7 +179,7 @@ Exit codes:
 			// Generate JSON report if requested
 			var jsonReport *DiffReport
 			if reportFormat == "json" {
-				jsonReport = buildDiffReport(clusterContext, resourceReports)
+				jsonReport = buildDiffReport(clusterContext, resourceReports, filtersApplied, selectWarnings)
 
 				// Handle output precedence
 				if reportFilePath != "" {
