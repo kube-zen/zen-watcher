@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "<NORMALIZED>",
+  "clusterContext": "default",
+  "summary": {
+    "total": 1,
+    "drifted": 1,
+    "noDrift": 0,
+    "errors": 0,
+    "specDrift": 1,
+    "metadataDrift": 0
+  },
+  "resources": [
+    {
+      "group": "",
+      "version": "v1",
+      "kind": "ConfigMap",
+      "namespace": "default",
+      "name": "test-cm",
+      "status": "drift",
+      "driftType": "spec",
+      "diffStats": {
+        "added": 2,
+        "removed": 1,
+        "changed": 1
+      },
+      "redacted": false
+    }
+  ],
+  "filtersApplied": {
+    "select": [
+      "ConfigMap/test-cm"
+    ]
+  }
+}
+
