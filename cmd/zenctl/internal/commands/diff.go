@@ -293,7 +293,7 @@ func shouldExclude(path string, patterns []string) bool {
 
 // loadYAMLFile loads YAML file (supports multi-document)
 func loadYAMLFile(path string) ([]*unstructured.Unstructured, error) {
-	data, err := os.ReadFile(path)
+	data, err := os.ReadFile(path) //nolint:gosec // G304: path is from user input (cli flag)
 	if err != nil {
 		return nil, err
 	}
