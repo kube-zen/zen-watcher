@@ -23,104 +23,6 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-// applySelectPatternFilter applies select pattern filtering and handles miss cases
-func applySelectPatternFilter(
-	selectPatterns []string,
-	desiredObjects []*unstructured.Unstructured,
-	clusterContext string,
-	reportFormat string,
-	reportFilePath string,
-	cmd *cobra.Command,
-) ([]*unstructured.Unstructured, []string, *FiltersApplied, error) {
-	var selectPatternsParsed []SelectPattern
-	var selectWarnings []string
-	var filtersApplied *FiltersApplied
-
-	if len(selectPatterns) == 0 {
-		return desiredObjects, selectWarnings, filtersApplied, nil
-	}
-
-	parsed, parseWarnings, parseErr := NormalizeSelectPatterns(selectPatterns)
-	if parseErr != nil {
-		return nil, nil, nil, fmt.Errorf("failed to parse select patterns: %w", parseErr)
-	}
-	if len(parseWarnings) > 0 {
-		return nil, nil, nil, fmt.Errorf("select pattern parse errors: %s", strings.Join(parseWarnings, "; "))
-	}
-	selectPatternsParsed = parsed
-
-	// Filter by select patterns
-	filteredObjects, selectWarnings := FilterObjectsBySelect(desiredObjects, selectPatternsParsed)
-	if len(filteredObjects) == 0 {
-		// All selections missed - emit JSON if requested, then exit 1
-		if reportFormat == "json" {
-			filtersApplied = &FiltersApplied{Select: selectPatterns}
-			jsonReport := buildDiffReport(clusterContext, []ResourceReport{}, filtersApplied, selectWarnings)
-			if reportFilePath != "" {
-				if err := writeReportFile(jsonReport, reportFilePath); err != nil {
-					cmd.PrintErrln("ERROR: Failed to write report file:", err)
-				}
-			} else {
-				encoder := json.NewEncoder(os.Stdout)
-				encoder.SetIndent("", "  ")
-					if err := encoder.Encode(jsonReport); err != nil {
-						cmd.PrintErrln("ERROR: Failed to encode report:", err)
-					}
-			}
-		}
-		for _, warn := range selectWarnings {
-			cmd.PrintErrln("WARNING:", warn)
-		}
-		return nil, selectWarnings, filtersApplied, clierrors.NewExitError(1, fmt.Errorf("all select patterns matched no resources"))
-	}
-
-	return filteredObjects, selectWarnings, filtersApplied, nil
-}
-
-// applyLabelSelectorFilter applies label selector filtering and handles miss cases
-func applyLabelSelectorFilter(
-	labelSelector string,
-	filteredObjects []*unstructured.Unstructured,
-	selectPatterns []string,
-	clusterContext string,
-	reportFormat string,
-	reportFilePath string,
-	cmd *cobra.Command,
-) ([]*unstructured.Unstructured, *FiltersApplied, error) {
-	var filtersApplied *FiltersApplied
-
-	if labelSelector == "" {
-		return filteredObjects, filtersApplied, nil
-	}
-
-	var labelErr error
-	filteredObjects, labelErr = FilterObjectsByLabelSelector(filteredObjects, labelSelector)
-	if labelErr != nil {
-		return nil, nil, fmt.Errorf("label selector error: %w", labelErr)
-	}
-	if len(filteredObjects) == 0 && len(selectPatterns) == 0 {
-		// Only label selector, no matches
-		if reportFormat == "json" {
-			filtersApplied = &FiltersApplied{LabelSelector: labelSelector}
-			jsonReport := buildDiffReport(clusterContext, []ResourceReport{}, filtersApplied, []string{})
-			if reportFilePath != "" {
-				if err := writeReportFile(jsonReport, reportFilePath); err != nil {
-					cmd.PrintErrln("ERROR: Failed to write report file:", err)
-				}
-			} else {
-				encoder := json.NewEncoder(os.Stdout)
-				encoder.SetIndent("", "  ")
-					if err := encoder.Encode(jsonReport); err != nil {
-						cmd.PrintErrln("ERROR: Failed to encode report:", err)
-					}
-			}
-		}
-		return nil, filtersApplied, clierrors.NewExitError(1, fmt.Errorf("label selector matched no resources"))
-	}
-
-	return filteredObjects, filtersApplied, nil
-}
-
 func NewDiffCommand() *cobra.Command {
 	var filePath string
 	var ignoreStatus bool
@@ -213,9 +115,8 @@ Exit codes:
 						} else {
 							encoder := json.NewEncoder(os.Stdout)
 							encoder.SetIndent("", "  ")
-					if err := encoder.Encode(jsonReport); err != nil {
-						cmd.PrintErrln("ERROR: Failed to encode report:", err)
-					}
+							encoder.Encode(jsonReport)
+						}
 					}
 					for _, warn := range selectWarnings {
 						cmd.PrintErrln("WARNING:", warn)
@@ -245,9 +146,9 @@ Exit codes:
 						} else {
 							encoder := json.NewEncoder(os.Stdout)
 							encoder.SetIndent("", "  ")
-       if err := encoder.Encode(jsonReport); err != nil {
-           cmd.PrintErrln("ERROR: Failed to encode report:", err)
-       }
+							encoder.Encode(jsonReport)
+						}
+					}
 					return clierrors.NewExitError(1, fmt.Errorf("label selector matched no resources"))
 				}
 			}
@@ -293,7 +194,7 @@ Exit codes:
 					encoder := json.NewEncoder(os.Stdout)
 					encoder.SetIndent("", "  ")
 					if err := encoder.Encode(jsonReport); err != nil {
-						cmd.PrintErrln("ERROR: Failed to encode report:", err)
+						return fmt.Errorf("failed to encode report: %w", err)
 					}
 					// Human output suppressed when JSON to stdout
 				}
