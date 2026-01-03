@@ -117,9 +117,15 @@ func FuzzProcessEvent_ExtremeSizes(f *testing.F) {
 		}
 
 		// Generate event with specified size
+		// Use string instead of []byte to avoid deep copy issues with []uint8
 		eventData := make(map[string]interface{})
 		eventData["source"] = "fuzz-source"
-		eventData["data"] = make([]byte, size)
+		// Convert byte slice to string to avoid Kubernetes deep copy issues
+		dataBytes := make([]byte, size)
+		for i := range dataBytes {
+			dataBytes[i] = byte(i % 256)
+		}
+		eventData["data"] = string(dataBytes)
 
 		// Setup processor
 		observationGVR := schema.GroupVersionResource{

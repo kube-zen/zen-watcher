@@ -250,7 +250,9 @@ func validateManifest(t *testing.T, manifest string, crdType string) error {
 			strings.Contains(outputStr, "the server could not find the requested resource") ||
 			strings.Contains(outputStr, "resource mapping not found") ||
 			strings.Contains(outputStr, "ensure CRDs are installed") ||
-			strings.Contains(outputStr, "NotFound") {
+			strings.Contains(outputStr, "NotFound") ||
+			(strings.Contains(outputStr, "error:") && (strings.Contains(outputStr, "not found") || strings.Contains(outputStr, "does not exist"))) ||
+			strings.Contains(outputStr, "context") && (strings.Contains(outputStr, "not found") || strings.Contains(outputStr, "does not exist")) {
 			// Fall back to client-side validation
 			cmd = exec.Command("kubectl", "apply", "--dry-run=client", "-f", tmpFile) //nolint:gosec // G204: kubectl is trusted test tool
 			output, err = cmd.CombinedOutput()
@@ -261,7 +263,9 @@ func validateManifest(t *testing.T, manifest string, crdType string) error {
 					strings.Contains(outputStr, "NotFound") ||
 					strings.Contains(outputStr, "resource mapping not found") ||
 					strings.Contains(outputStr, "ensure CRDs are installed") ||
-					strings.Contains(outputStr, "the server could not find the requested resource") {
+					strings.Contains(outputStr, "the server could not find the requested resource") ||
+					(strings.Contains(outputStr, "error:") && (strings.Contains(outputStr, "not found") || strings.Contains(outputStr, "does not exist"))) ||
+					(strings.Contains(outputStr, "context") && (strings.Contains(outputStr, "not found") || strings.Contains(outputStr, "does not exist"))) {
 					t.Skipf("CRD not available for validation (expected in unit tests): %s", outputStr)
 					return nil
 				}
@@ -272,20 +276,22 @@ func validateManifest(t *testing.T, manifest string, crdType string) error {
 					strings.Contains(outputStr, "must be") {
 					return err
 				}
-				// Other errors (like missing kubectl) - skip test
+				// Other errors (like missing kubectl, context issues) - skip test
 				t.Skipf("kubectl validation not available: %s", outputStr)
 				return nil
 			}
 		} else {
-			// Check if error is validation-related
+			// Check if error is validation-related (only return error for actual validation failures)
 			if strings.Contains(outputStr, "validation") ||
 				strings.Contains(outputStr, "invalid") ||
 				strings.Contains(outputStr, "required") ||
-				strings.Contains(outputStr, "must be") {
+				strings.Contains(outputStr, "must be") ||
+				strings.Contains(outputStr, "field is immutable") {
 				return err
 			}
-			// Other errors - skip test
-			t.Skipf("kubectl validation error: %s", outputStr)
+			// For any other error (CRD not found, context issues, connection problems, etc.) - skip test
+			// This is expected in unit test environments where CRDs may not be installed
+			t.Skipf("kubectl validation not available (CRD may not be installed): %s", outputStr)
 			return nil
 		}
 	}

@@ -156,6 +156,7 @@ func EventToObservation(event *Event) *unstructured.Unstructured {
 		details := make(map[string]interface{})
 		for k, v := range event.Details {
 			// Convert numeric types to float64 for JSON compatibility
+			// Also convert byte slices to strings to avoid deep copy issues
 			switch val := v.(type) {
 			case int32:
 				details[k] = float64(val)
@@ -165,6 +166,10 @@ func EventToObservation(event *Event) *unstructured.Unstructured {
 				details[k] = float64(val)
 			case float32:
 				details[k] = float64(val)
+			case []byte:
+				// Convert byte slices to strings to avoid Kubernetes deep copy issues
+				// Note: []uint8 is an alias for []byte, so this case handles both
+				details[k] = string(val)
 			default:
 				details[k] = v
 			}
