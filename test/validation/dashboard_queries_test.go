@@ -63,7 +63,7 @@ func TestDashboardQueriesSyntax(t *testing.T) {
 
 	for _, file := range dashboardFiles {
 		t.Run(filepath.Base(file), func(t *testing.T) {
-			data, err := os.ReadFile(file)
+			data, err := os.ReadFile(file) //nolint:gosec // G304: file is from trusted source (test fixtures)
 			if err != nil {
 				t.Fatalf("Failed to read file %s: %v", file, err)
 			}
@@ -89,7 +89,7 @@ func TestDashboardQueriesExpressions(t *testing.T) {
 
 	for _, file := range dashboardFiles {
 		t.Run(filepath.Base(file), func(t *testing.T) {
-			data, err := os.ReadFile(file)
+			data, err := os.ReadFile(file) //nolint:gosec // G304: file is from trusted source (test fixtures)
 			if err != nil {
 				t.Fatalf("Failed to read file %s: %v", file, err)
 			}
@@ -150,7 +150,7 @@ func TestDashboardVariables(t *testing.T) {
 
 	for _, file := range dashboardFiles {
 		t.Run(filepath.Base(file), func(t *testing.T) {
-			data, err := os.ReadFile(file)
+			data, err := os.ReadFile(file) //nolint:gosec // G304: file is from trusted source (test fixtures)
 			if err != nil {
 				t.Fatalf("Failed to read file %s: %v", file, err)
 			}
@@ -189,7 +189,7 @@ func TestDashboardSeverityFilters(t *testing.T) {
 
 	for _, file := range dashboardFiles {
 		t.Run(filepath.Base(file), func(t *testing.T) {
-			data, err := os.ReadFile(file)
+			data, err := os.ReadFile(file) //nolint:gosec // G304: file is from trusted source (test fixtures)
 			if err != nil {
 				t.Fatalf("Failed to read file %s: %v", file, err)
 			}
