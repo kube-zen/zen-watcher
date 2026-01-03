@@ -150,22 +150,10 @@ networking:
   apiServerPort: ${KIND_API_PORT}
 EOF
         
-        # Create cluster without --wait flag (wait separately)
+        # Create kind cluster (simple - fail if port conflict)
         if kind create cluster --name ${CLUSTER_NAME} --config /tmp/kind-config-${CLUSTER_NAME}.yaml 2>&1 | tee /tmp/kind-create.log; then
             rm -f /tmp/kind-config-${CLUSTER_NAME}.yaml
-            log_info "Cluster created, waiting for it to be ready..."
-            # Wait for cluster to be ready separately
-            for i in {1..60}; do
-                if kubectl cluster-info --context kind-${CLUSTER_NAME} >/dev/null 2>&1; then
-                    log_success "Cluster is ready"
-                    break
-                fi
-                if [ $i -eq 60 ]; then
-                    log_warn "Cluster may not be fully ready, but continuing..."
-                    break
-                fi
-                sleep 2
-            done
+            log_success "Cluster created successfully"
         else
             exit_code=$?
             rm -f /tmp/kind-config-${CLUSTER_NAME}.yaml
