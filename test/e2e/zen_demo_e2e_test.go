@@ -224,7 +224,7 @@ spec:
 	}
 
 	// Cleanup
-	_ = runKubectl("delete", "ingester", "test-e2e-ingester", "-n", testNamespace, "--ignore-not-found=true")
+	_, _ = runKubectl("delete", "ingester", "test-e2e-ingester", "-n", testNamespace, "--ignore-not-found=true")
 }
 
 // TestCanonicalSpecLocations verifies that spec.processing.filter and spec.processing.dedup are respected (W58, W33)
@@ -292,7 +292,7 @@ spec:
 	}
 
 	// Cleanup
-	_ = runKubectl("delete", "ingester", "test-canonical-spec", "-n", testNamespace, "--ignore-not-found=true")
+	_, _ = runKubectl("delete", "ingester", "test-canonical-spec", "-n", testNamespace, "--ignore-not-found=true")
 }
 
 // TestRequiredFieldValidation verifies that required fields (source, ingester, destinations) are validated (W59)
@@ -405,7 +405,7 @@ spec:
 
 			// Cleanup
 			ingesterName := strings.TrimSpace(strings.Split(tt.ingesterYAML, "\n")[4])
-			_ = runKubectl("delete", "ingester", ingesterName, "-n", testNamespace, "--ignore-not-found=true")
+			_, _ = runKubectl("delete", "ingester", ingesterName, "-n", testNamespace, "--ignore-not-found=true")
 		})
 	}
 }
