@@ -30,7 +30,7 @@ import (
 
 func TestConfigMapLoader_ReloadConfig(t *testing.T) {
 	// Create fake client
-	clientSet := fake.NewSimpleClientset()
+	clientSet := fake.NewSimpleClientset() //nolint:staticcheck // SA1019: NewSimpleClientset is deprecated but sufficient for tests
 
 	// Create initial filter
 	initialConfig := &filter.FilterConfig{
@@ -126,7 +126,7 @@ func TestConfigMapLoader_ReloadConfig(t *testing.T) {
 
 func TestConfigMapLoader_InvalidConfigKeepsLastGood(t *testing.T) {
 	// Create fake client
-	clientSet := fake.NewSimpleClientset()
+	clientSet := fake.NewSimpleClientset() //nolint:staticcheck // SA1019: NewSimpleClientset is deprecated but sufficient for tests
 
 	// Create initial filter with good config
 	initialConfig := &filter.FilterConfig{
@@ -201,7 +201,7 @@ func TestConfigMapLoader_InvalidConfigKeepsLastGood(t *testing.T) {
 
 func TestConfigMapLoader_MissingKeyKeepsLastGood(t *testing.T) {
 	// Create fake client
-	clientSet := fake.NewSimpleClientset()
+	clientSet := fake.NewSimpleClientset() //nolint:staticcheck // SA1019: NewSimpleClientset is deprecated but sufficient for tests
 
 	// Create initial filter
 	initialConfig := &filter.FilterConfig{
@@ -254,7 +254,7 @@ func TestConfigMapLoader_MissingKeyKeepsLastGood(t *testing.T) {
 
 func TestConfigMapLoader_Start(t *testing.T) {
 	// Create fake client
-	clientSet := fake.NewSimpleClientset()
+	clientSet := fake.NewSimpleClientset() //nolint:staticcheck // SA1019: NewSimpleClientset is deprecated but sufficient for tests
 
 	// Create initial filter
 	initialConfig := &filter.FilterConfig{
@@ -331,7 +331,7 @@ func TestConfigMapLoader_Start(t *testing.T) {
 
 func TestConfigMapLoader_DeleteFuncHandlesTombstone(t *testing.T) {
 	// Create fake client
-	clientSet := fake.NewSimpleClientset()
+	clientSet := fake.NewSimpleClientset() //nolint:staticcheck // SA1019: NewSimpleClientset is deprecated but sufficient for tests
 
 	// Create initial filter
 	initialConfig := &filter.FilterConfig{
@@ -393,7 +393,7 @@ func TestConfigMapLoader_DeleteFuncHandlesTombstone(t *testing.T) {
 
 func TestConfigMapLoader_EmptySourcesMap(t *testing.T) {
 	// Create fake client
-	clientSet := fake.NewSimpleClientset()
+	clientSet := fake.NewSimpleClientset() //nolint:staticcheck // SA1019: NewSimpleClientset is deprecated but sufficient for tests
 
 	// Create filter with nil Sources
 	filterInstance := filter.NewFilter(&filter.FilterConfig{
@@ -438,7 +438,7 @@ func TestConfigMapLoader_EmptySourcesMap(t *testing.T) {
 
 func TestConfigMapLoader_ContextCancellation(t *testing.T) {
 	// Create fake client
-	clientSet := fake.NewSimpleClientset()
+	clientSet := fake.NewSimpleClientset() //nolint:staticcheck // SA1019: NewSimpleClientset is deprecated but sufficient for tests
 
 	// Create filter
 	filterInstance := filter.NewFilter(&filter.FilterConfig{

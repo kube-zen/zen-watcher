@@ -145,7 +145,7 @@ spec:
   restartPolicy: Never
 `, podName, lg.namespace, string(jsonData), watcherURL)
 
-	cmd := exec.Command("kubectl", "--context="+context, "apply", "-f", "-")
+	cmd := exec.Command("kubectl", "--context="+context, "apply", "-f", "-") //nolint:gosec // G204: kubectl is trusted test tool
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
 	cmd.Stdin = bytes.NewReader([]byte(podYAML))
 	if err := cmd.Run(); err != nil {
@@ -156,7 +156,7 @@ spec:
 	time.Sleep(2 * time.Second)
 
 	// Cleanup
-	if err := exec.Command("kubectl", "--context="+context, "delete", "pod", podName, "-n", lg.namespace, "--ignore-not-found=true").Run(); err != nil {
+	if err := exec.Command("kubectl", "--context="+context, "delete", "pod", podName, "-n", lg.namespace, "--ignore-not-found=true").Run(); err != nil { //nolint:gosec // G204: kubectl is trusted test tool
 		// Log but don't fail - cleanup is best effort
 		fmt.Printf("Warning: failed to cleanup pod %s: %v\n", podName, err)
 	}

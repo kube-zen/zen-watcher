@@ -71,7 +71,7 @@ func getKubectlContext() string {
 // runKubectl runs a kubectl command and returns stdout
 func runKubectl(args ...string) (string, error) {
 	context := getKubectlContext()
-	cmd := exec.Command("kubectl", append([]string{"--context=" + context}, args...)...)
+	cmd := exec.Command("kubectl", append([]string{"--context=" + context}, args...)...) //nolint:gosec // G204: kubectl is trusted test tool
 	// Use KUBECONFIG if set, otherwise let kubectl use default
 	if kubeconfig := os.Getenv("KUBECONFIG"); kubeconfig != "" {
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfig)
