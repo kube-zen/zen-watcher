@@ -134,6 +134,14 @@ case "$PLATFORM" in
             exit 1
         fi
         
+        # Check if API port is available - fail if not (keep it simple)
+        if ! check_port "${KIND_API_PORT}" "kind API" 2>/dev/null; then
+            log_error "Port ${KIND_API_PORT} is already in use"
+            log_info "Please free the port or destroy existing clusters:"
+            log_info "  kind delete clusters"
+            exit 1
+        fi
+        
         # Create kind config
         cat > /tmp/kind-config-${CLUSTER_NAME}.yaml <<EOF
 kind: Cluster
@@ -142,13 +150,26 @@ networking:
   apiServerPort: ${KIND_API_PORT}
 EOF
         
-        if timeout 180 kind create cluster --name ${CLUSTER_NAME} --config /tmp/kind-config-${CLUSTER_NAME}.yaml --wait 2m 2>&1 | tee /tmp/kind-create.log; then
+        # Create cluster without --wait flag (wait separately)
+        if kind create cluster --name ${CLUSTER_NAME} --config /tmp/kind-config-${CLUSTER_NAME}.yaml 2>&1 | tee /tmp/kind-create.log; then
             rm -f /tmp/kind-config-${CLUSTER_NAME}.yaml
-            log_success "Cluster created successfully"
+            log_info "Cluster created, waiting for it to be ready..."
+            # Wait for cluster to be ready separately
+            for i in {1..60}; do
+                if kubectl cluster-info --context kind-${CLUSTER_NAME} >/dev/null 2>&1; then
+                    log_success "Cluster is ready"
+                    break
+                fi
+                if [ $i -eq 60 ]; then
+                    log_warn "Cluster may not be fully ready, but continuing..."
+                    break
+                fi
+                sleep 2
+            done
         else
             exit_code=$?
             rm -f /tmp/kind-config-${CLUSTER_NAME}.yaml
-            log_error "Cluster creation failed or timed out"
+            log_error "Cluster creation failed"
             log_info "Check logs: cat /tmp/kind-create.log"
             exit 1
         fi
