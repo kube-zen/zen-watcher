@@ -169,7 +169,7 @@ func (a *WebhookAdapter) handleWebhook(config *SourceConfig) http.HandlerFunc {
 		select {
 		case a.events <- event:
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "OK")
+			_, _ = fmt.Fprintf(w, "OK")
 		default:
 			// Buffer full - backpressure
 			logger := sdklog.NewLogger("zen-watcher-adapter")
