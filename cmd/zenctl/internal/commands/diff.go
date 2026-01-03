@@ -249,10 +249,10 @@ Exit codes:
        if err := encoder.Encode(jsonReport); err != nil {
 								encoder := json.NewEncoder(os.Stdout)
 								encoder.SetIndent("", "  ")
-
+								encoder.SetIndent("", "  ")
 								encoder := json.NewEncoder(os.Stdout)
 								encoder.SetIndent("", "  ")
-						}
+								encoder.SetIndent("", "  ")
 					}
 					return clierrors.NewExitError(1, fmt.Errorf("label selector matched no resources"))
 				}
@@ -299,6 +299,7 @@ Exit codes:
 					encoder := json.NewEncoder(os.Stdout)
 					encoder.SetIndent("", "  ")
      if err := encoder.Encode(jsonReport); err != nil {
+     	cmd.PrintErrln("ERROR: Failed to encode report:", err)
      }
 					// Human output suppressed when JSON to stdout
 				}
