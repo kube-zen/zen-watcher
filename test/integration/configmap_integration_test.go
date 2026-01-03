@@ -145,7 +145,7 @@ func TestConfigMapLoader_Integration(t *testing.T) {
 
 // TestConfigMapLoader_InvalidConfig tests handling of invalid ConfigMap data
 func TestConfigMapLoader_InvalidConfig(t *testing.T) {
-	clientSet := fake.NewSimpleClientset()
+	clientSet := fake.NewSimpleClientset() //nolint:staticcheck // SA1019: NewClientset requires apply configurations
 
 	initialConfig := &filter.FilterConfig{
 		Sources: make(map[string]filter.SourceFilter),
@@ -196,7 +196,7 @@ func TestConfigMapLoader_InvalidConfig(t *testing.T) {
 
 // TestConfigMapLoader_MissingKey tests handling of missing filter.json key
 func TestConfigMapLoader_MissingKey(t *testing.T) {
-	clientSet := fake.NewSimpleClientset()
+	clientSet := fake.NewSimpleClientset() //nolint:staticcheck // SA1019: NewClientset requires apply configurations
 
 	boolPtr := func(b bool) *bool { return &b }
 	initialConfig := &filter.FilterConfig{
