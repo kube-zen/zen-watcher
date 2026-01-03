@@ -20,7 +20,11 @@ This guide assumes you want to use zen-watcher independently, without any specif
 
 **Quick start**: See [QUICK_START.md](../QUICK_START.md) or run:
 ```bash
+# Lightweight quick demo (recommended for first-time users)
 ./scripts/quick-demo.sh k3d --non-interactive --deploy-mock-data
+
+# Full demo with monitoring stack
+./scripts/demo.sh k3d --non-interactive --deploy-mock-data
 ```
 
 **Note**: This path is optional and intended for quick experimentation. For production deployments, use Path B below.

@@ -7,7 +7,8 @@ This directory contains all scripts for installing, testing, and managing Zen Wa
 ```
 scripts/
 ├── install.sh                    # Main installation orchestrator
-├── quick-demo.sh                 # Quick demo orchestrator (calls modular scripts)
+├── quick-demo.sh                 # Lightweight quick demo (zen-watcher only, no monitoring)
+├── demo.sh                       # Full demo orchestrator (with Grafana/VictoriaMetrics)
 ├── cluster/
 │   ├── create.sh                 # Create cluster (k3d/kind/minikube)
 │   ├── destroy.sh                # Destroy cluster
@@ -58,7 +59,8 @@ scripts/
 
 ### Installation Scripts
 - `install.sh` - Main installation orchestrator
-- `quick-demo.sh` - Complete demo setup (cluster + tools + observability + data)
+- `quick-demo.sh` - Lightweight demo setup (cluster + zen-watcher only, ~2 min)
+- `demo.sh` - Full demo setup (cluster + tools + observability + data, ~4 min)
 
 ### Cluster Management
 - `cluster/create.sh` - Create Kubernetes cluster (k3d/kind/minikube)

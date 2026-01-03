@@ -36,20 +36,35 @@
 git clone https://github.com/kube-zen/zen-watcher
 cd zen-watcher
 
-# Run automated demo (k3d, kind, or minikube)
+# Run lightweight quick demo (zen-watcher only, no monitoring)
 ./scripts/quick-demo.sh k3d --non-interactive --deploy-mock-data
 
 # For minimal resource usage:
 ZEN_DEMO_MINIMAL=1 ./scripts/quick-demo.sh k3d --non-interactive --deploy-mock-data
 
-# The script will:
+# For full demo with Grafana/VictoriaMetrics:
+./scripts/demo.sh k3d --non-interactive --deploy-mock-data
+
+# The quick-demo script will:
 # 1. Create a local Kubernetes cluster
-# 2. Install zen-watcher and monitoring stack
+# 2. Install zen-watcher (lightweight, no monitoring stack)
+# 3. Deploy mock observations
+# 4. Print quick access commands
+
+# The demo script (full-featured) will:
+# 1. Create a local Kubernetes cluster
+# 2. Install zen-watcher and monitoring stack (Grafana/VictoriaMetrics)
 # 3. Deploy mock observations
 # 4. Print Grafana credentials and endpoints
 ```
 
-**What you get:**
+**What you get (quick-demo):**
+- ✅ Lightweight demo environment (zen-watcher only)
+- ✅ Mock observations from all sources
+- ✅ ~2 minutes total setup time
+- ✅ Minimal resource usage
+
+**What you get (demo - full-featured):**
 - ✅ Complete demo environment with monitoring
 - ✅ Mock observations from all sources
 - ✅ Grafana dashboards pre-configured
@@ -63,8 +78,12 @@ export KUBECONFIG=~/.kube/zen-demo-kubeconfig
 # View observations
 kubectl get observations -n zen-system
 
-# Access Grafana (credentials shown at end of quick-demo.sh)
-# URL: http://localhost:8080/grafana
+# Access metrics (quick-demo)
+kubectl port-forward -n zen-system svc/zen-watcher 8080:8080
+curl http://localhost:8080/metrics
+
+# Access Grafana (demo script only)
+# URL: http://localhost:8080/grafana (credentials shown at end of demo.sh)
 ```
 
 **Cleanup:**
@@ -78,7 +97,7 @@ kubectl get observations -n zen-system
 
 > **For production deployments on existing clusters**, see [docs/GETTING_STARTED_GENERIC.md](docs/GETTING_STARTED_GENERIC.md) (Path B) for complete installation instructions.
 
-The quick demo script (`./scripts/quick-demo.sh`) handles installation automatically. For manual installation on existing clusters, refer to the generic installation guide linked above.
+The quick demo script (`./scripts/quick-demo.sh`) handles lightweight installation automatically. For full-featured demo with monitoring, use `./scripts/demo.sh`. For manual installation on existing clusters, refer to the generic installation guide linked above.
 
 ---
 
@@ -115,7 +134,7 @@ curl http://localhost:8080/tools/status
 
 ## Set Up Monitoring (5 minutes)
 
-> **Note**: For a complete automated setup with monitoring, use `./scripts/quick-demo.sh` which includes VictoriaMetrics and Grafana. The steps below are for manual setup.
+> **Note**: For a complete automated setup with monitoring, use `./scripts/demo.sh` which includes VictoriaMetrics and Grafana. For lightweight setup, use `./scripts/quick-demo.sh`. The steps below are for manual setup.
 
 ### 1. Deploy VictoriaMetrics
 

@@ -120,7 +120,7 @@ When updating dashboards:
 
 ## Validation Checklist
 
-After running `./scripts/quick-demo.sh k3d --non-interactive --deploy-mock-data`:
+After running `./scripts/demo.sh k3d --non-interactive --deploy-mock-data` (full demo with monitoring):
 
 - [ ] **Pod running**: `kubectl get pods -n zen-system -l app.kubernetes.io/name=zen-watcher` shows Running
 - [ ] **Metrics endpoint**: `curl http://localhost:8080/metrics | grep "^zen_watcher"` returns metrics
