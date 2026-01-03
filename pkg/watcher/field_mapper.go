@@ -19,8 +19,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
