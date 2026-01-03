@@ -178,4 +178,3 @@ func setupTestEnv(t *testing.T) dynamic.Interface {
 		ingesterGVR:    "IngesterList",
 	})
 }
-

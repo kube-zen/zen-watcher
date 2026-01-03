@@ -271,4 +271,3 @@ func createTestObservation(source, severity string) *unstructured.Unstructured {
 	}
 	return obs
 }
-
