@@ -28,7 +28,8 @@ NC='\033[0m' # No Color
 NAMESPACE="${NAMESPACE:-zen-system}"
 CONTEXT="${CONTEXT:-}"
 DRY_RUN="${DRY_RUN:-true}"
-HELM_CHART_PATH="${HELM_CHART_PATH:-./deployments/helm/zen-watcher}"
+# Default to using helm repository chart
+HELM_CHART_PATH="${HELM_CHART_PATH:-kube-zen/zen-watcher}"
 
 # Functions
 error() {
@@ -70,12 +71,19 @@ check_prerequisites() {
 validate_helm_chart() {
     info "Validating Helm chart..."
     
-    if [ ! -d "$HELM_CHART_PATH" ]; then
+    # Add helm repository if using repo chart
+    if [[ "$HELM_CHART_PATH" == *"/"* ]] && [[ "$HELM_CHART_PATH" != "./"* ]] && [[ "$HELM_CHART_PATH" != "../"* ]]; then
+        info "Adding Helm repository..."
+        helm repo add kube-zen https://kube-zen.github.io/helm-charts 2>/dev/null || true
+        helm repo update || error "Failed to update Helm repository"
+    elif [ ! -d "$HELM_CHART_PATH" ]; then
         error "Helm chart not found at $HELM_CHART_PATH"
     fi
     
-    # Lint chart
-    helm lint "$HELM_CHART_PATH" || error "Helm chart lint failed"
+    # Lint chart (skip for repo charts as they're validated upstream)
+    if [[ "$HELM_CHART_PATH" == "./"* ]] || [[ "$HELM_CHART_PATH" == "../"* ]]; then
+        helm lint "$HELM_CHART_PATH" || error "Helm chart lint failed"
+    fi
     
     # Template and validate
     helm template zen-watcher "$HELM_CHART_PATH" \

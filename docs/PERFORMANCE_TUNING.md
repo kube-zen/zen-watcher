@@ -41,7 +41,7 @@ resources:
 
 Enable automatic cleanup via CronJob:
 ```bash
-helm upgrade zen-watcher ./deployments/helm/zen-watcher \
+helm upgrade zen-watcher kube-zen/zen-watcher \
   --set lifecycle.cleanup.enabled=true \
   --set lifecycle.cleanup.schedule="0 2 * * *" \
   --set lifecycle.cleanup.ttlDays=7
@@ -98,7 +98,7 @@ kubectl get events --all-namespaces --sort-by='.lastTimestamp' | tail -20
 ### Enable Autoscaling
 
 ```bash
-helm upgrade zen-watcher ./deployments/helm/zen-watcher \
+helm upgrade zen-watcher kube-zen/zen-watcher \
   --set autoscaling.enabled=true \
   --set autoscaling.minReplicas=2 \
   --set autoscaling.maxReplicas=10 \
@@ -120,7 +120,7 @@ config:
 ### Enable Resource Quotas
 
 ```bash
-helm upgrade zen-watcher ./deployments/helm/zen-watcher \
+helm upgrade zen-watcher kube-zen/zen-watcher \
   --set resourceQuota.enabled=true \
   --set resourceQuota.observationLimit=10000
 ```
