@@ -86,4 +86,3 @@ Artifacts are collected to a timestamped directory in the current working direct
 
 	return cmd
 }
-
