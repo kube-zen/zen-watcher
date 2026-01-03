@@ -109,6 +109,16 @@ This separation ensures that even if the core is compromised, **no credentials c
 
 > 💡 **For compliance-heavy or highly regulated environments**, this zero blast radius guarantee is the primary differentiator. You can deploy zen-watcher core with confidence, knowing that compromise cannot expose external system credentials.
 
+**Complete Independence:**
+
+zen-watcher is fully decoupled and operates independently:
+- ✅ **No dependencies** on commercial platforms or external services
+- ✅ **No code imports** from proprietary systems
+- ✅ **No runtime coupling** to external APIs or services
+- ✅ **Works standalone** with only Kubernetes and OSS dependencies
+
+This ensures zen-watcher can be deployed, maintained, and evolved independently without any external dependencies or coupling.
+
 ---
 
 ## Component Architecture

@@ -472,45 +472,6 @@ check:
 
 test-race:
 	@go test -v -race -timeout=15m ./...
-## zenctl: Build zenctl-oss CLI (workspace-independent, default)
-zenctl:
-	@echo "$(GREEN)Building zenctl...$(NC)"
-	@GOWORK=off go build -ldflags "$(ZENCTL_LDFLAGS)" -o zenctl ./cmd/zenctl
-	@echo "$(GREEN)✅ zenctl built$(NC)"
-
-## zenctl-workspace: Build zenctl-oss CLI with workspace mode
-zenctl-workspace:
-	@echo "$(GREEN)Building zenctl (workspace mode)...$(NC)"
-	@go build -ldflags "$(ZENCTL_LDFLAGS)" -o zenctl ./cmd/zenctl
-	@echo "$(GREEN)✅ zenctl built$(NC)"
-
-## test-zenctl: Test zenctl-oss (workspace-independent)
-test-zenctl:
-	@echo "$(GREEN)Testing zenctl...$(NC)"
-	@GOWORK=off go test ./cmd/zenctl/internal/...
-	@echo "$(GREEN)✅ zenctl tests passed$(NC)"
-
-# Version and build info for ldflags (zenctl)
-ZENCTL_VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-ZENCTL_GIT_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-ZENCTL_BUILD_TIME ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date -u +"%Y-%m-%dT%H:%M:%SZ")
-ZENCTL_LDFLAGS = -X github.com/kube-zen/zen-watcher/cmd/zenctl/internal/version.Version=$(ZENCTL_VERSION) \
-                 -X github.com/kube-zen/zen-watcher/cmd/zenctl/internal/version.GitCommit=$(ZENCTL_GIT_COMMIT) \
-                 -X github.com/kube-zen/zen-watcher/cmd/zenctl/internal/version.BuildTime=$(ZENCTL_BUILD_TIME)
-
-## release-zenctl: Build zenctl-oss for multiple architectures with checksums
-release-zenctl:
-	@echo "$(GREEN)Building zenctl-oss releases...$(NC)"
-	@mkdir -p dist
-	@GOOS=linux GOARCH=amd64 GOWORK=off go build -ldflags "$(ZENCTL_LDFLAGS)" -o dist/zenctl-linux-amd64 ./cmd/zenctl
-	@GOOS=linux GOARCH=arm64 GOWORK=off go build -ldflags "$(ZENCTL_LDFLAGS)" -o dist/zenctl-linux-arm64 ./cmd/zenctl
-	@GOOS=darwin GOARCH=amd64 GOWORK=off go build -ldflags "$(ZENCTL_LDFLAGS)" -o dist/zenctl-darwin-amd64 ./cmd/zenctl
-	@GOOS=darwin GOARCH=arm64 GOWORK=off go build -ldflags "$(ZENCTL_LDFLAGS)" -o dist/zenctl-darwin-arm64 ./cmd/zenctl
-	@echo "$(GREEN)Generating SHA256SUMS...$(NC)"
-	@cd dist && sha256sum zenctl-* > SHA256SUMS
-	@echo "$(GREEN)✅ zenctl-oss releases built in dist/$(NC)"
-	@echo "   Files:"
-	@ls -lh dist/zenctl-* dist/SHA256SUMS 2>/dev/null | awk '{print "   " $$9 " (" $$5 ")"}'
 
 ## oss-boundary: Run OSS boundary enforcement gate
 oss-boundary:
@@ -524,14 +485,3 @@ oss-boundary-strict:
 	@OSS_BOUNDARY_STRICT=1 bash scripts/test/oss-boundary-gate.sh .
 	@echo "$(GREEN)✅ OSS boundary check passed (strict mode)$(NC)"
 
-## drift-gate: Run drift gate (bounded execution, validates zenctl diff contract)
-drift-gate:
-	@echo "$(GREEN)Running drift gate...$(NC)"
-	@bash scripts/test/drift-gate.sh
-	@echo "$(GREEN)✅ Drift gate passed$(NC)"
-
-## drift-gate-fast: Run fast path tests (no cluster required)
-drift-gate-fast:
-	@echo "$(GREEN)Running drift gate (fast path)...$(NC)"
-	@bash scripts/test/drift-gate-fast.sh
-	@echo "$(GREEN)✅ Drift gate fast path passed$(NC)"
