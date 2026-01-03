@@ -12,6 +12,7 @@
 
 - **kind**: Kubernetes cluster tool (required for quick-demo.sh)
   - Install: `curl -Lo ./kind https://kind.sigs.k8s.io/dl/v0.20.0/kind-linux-amd64 && chmod +x ./kind && sudo mv ./kind /usr/local/bin/kind`
+  - **Important**: Port 6443 must be available. If in use, clean up existing clusters: `kind delete clusters`
   - Note: For platform options (k3d/kind/minikube), use `./scripts/demo.sh` instead
 - **Docker**: Running and accessible (`docker ps` should work)
 - **kubectl**: Kubernetes CLI (`kubectl version --client`)
