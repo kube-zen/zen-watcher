@@ -142,24 +142,35 @@ case "$PLATFORM" in
             exit 1
         fi
         
-        # Create kind config
-        cat > /tmp/kind-config-${CLUSTER_NAME}.yaml <<EOF
+        # Create kind cluster (simple - use default port 6443, no config needed)
+        if [ "${KIND_API_PORT}" = "6443" ]; then
+            # Use default port - no config needed
+            if kind create cluster --name ${CLUSTER_NAME} --wait 2m 2>&1 | tee /tmp/kind-create.log; then
+                log_success "Cluster created successfully"
+            else
+                exit_code=$?
+                log_error "Cluster creation failed"
+                log_info "Check logs: cat /tmp/kind-create.log"
+                exit 1
+            fi
+        else
+            # Custom port - need config
+            cat > /tmp/kind-config-${CLUSTER_NAME}.yaml <<EOF
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 networking:
   apiServerPort: ${KIND_API_PORT}
 EOF
-        
-        # Create kind cluster (simple - fail if port conflict)
-        if kind create cluster --name ${CLUSTER_NAME} --config /tmp/kind-config-${CLUSTER_NAME}.yaml 2>&1 | tee /tmp/kind-create.log; then
-            rm -f /tmp/kind-config-${CLUSTER_NAME}.yaml
-            log_success "Cluster created successfully"
-        else
-            exit_code=$?
-            rm -f /tmp/kind-config-${CLUSTER_NAME}.yaml
-            log_error "Cluster creation failed"
-            log_info "Check logs: cat /tmp/kind-create.log"
-            exit 1
+            if kind create cluster --name ${CLUSTER_NAME} --config /tmp/kind-config-${CLUSTER_NAME}.yaml --wait 2m 2>&1 | tee /tmp/kind-create.log; then
+                rm -f /tmp/kind-config-${CLUSTER_NAME}.yaml
+                log_success "Cluster created successfully"
+            else
+                exit_code=$?
+                rm -f /tmp/kind-config-${CLUSTER_NAME}.yaml
+                log_error "Cluster creation failed"
+                log_info "Check logs: cat /tmp/kind-create.log"
+                exit 1
+            fi
         fi
         ;;
     minikube)
