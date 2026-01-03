@@ -1,8 +1,6 @@
 # golangci-lint configuration for OSS repos
 # Based on Kubernetes and OSS best practices
-# Compatible with golangci-lint v2.7.2 (same format as zen-flow)
-
-version: "2"
+# Compatible with golangci-lint v2.7.2 (no version field, like zen-lead/zen-gc/zen-lock)
 
 run:
   timeout: 5m
@@ -16,6 +14,7 @@ linters:
     - errcheck
     - staticcheck
     - unused
+    - gosimple
     - ineffassign
     - misspell
     - gocyclo
