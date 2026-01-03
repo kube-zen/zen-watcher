@@ -21,8 +21,8 @@ import (
 	"os"
 	"strings"
 
-	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	sdkfilter "github.com/kube-zen/zen-sdk/pkg/filter"
+	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 )

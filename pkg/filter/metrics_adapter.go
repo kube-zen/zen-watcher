@@ -15,8 +15,8 @@
 package filter
 
 import (
-	"github.com/kube-zen/zen-watcher/pkg/metrics"
 	sdkfilter "github.com/kube-zen/zen-sdk/pkg/filter"
+	"github.com/kube-zen/zen-watcher/pkg/metrics"
 )
 
 // MetricsAdapter adapts zen-watcher metrics to zen-sdk FilterMetrics interface
@@ -47,4 +47,3 @@ func (a *MetricsAdapter) RecordEvaluationDuration(source, ruleType string, durat
 	}
 	a.m.FilterRuleEvaluationDuration.WithLabelValues(source, ruleType).Observe(durationSeconds)
 }
-

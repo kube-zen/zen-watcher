@@ -345,7 +345,7 @@ func (ii *IngesterInformer) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to sync Ingester informer cache")
 	}
 
-		configLogger.Info("Ingester informer started and synced",
+	configLogger.Info("Ingester informer started and synced",
 		sdklog.Operation("ingester_informer_synced"))
 
 	return nil
@@ -418,7 +418,7 @@ func (ii *IngesterInformer) onDelete(obj interface{}) {
 	name := u.GetName()
 	ii.store.Delete(namespace, name)
 
-		configLogger.Debug("Deleted Ingester config",
+	configLogger.Debug("Deleted Ingester config",
 		sdklog.Operation("ingester_deleted"),
 		sdklog.String("namespace", namespace),
 		sdklog.String("name", name))
@@ -583,7 +583,7 @@ func (ii *IngesterInformer) convertMultiSourceIngester(u *unstructured.Unstructu
 			Namespace:     namespace,
 			Name:          name,
 			Source:        fmt.Sprintf("%s/%s/%s", namespace, name, sourceName), // Unique source identifier
-			Ingester:      sourceType, // informer, logs, webhook
+			Ingester:      sourceType,                                           // informer, logs, webhook
 			Destinations:  sharedConfig.Destinations,
 			Normalization: sharedConfig.Normalization,
 			Filter:        sharedConfig.Filter,
