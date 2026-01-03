@@ -19,9 +19,9 @@ func TestZenctlOSSRemainsSaaSFree(t *testing.T) {
 
 	// SaaS-only commands that must not exist in OSS
 	forbiddenCommands := []string{
-		"audit",        // SaaS API endpoint
-		"entitlement",  // SaaS entitlement management
-		"tenant",       // SaaS tenant management
+		"audit",       // SaaS API endpoint
+		"entitlement", // SaaS entitlement management
+		"tenant",      // SaaS tenant management
 	}
 
 	for _, forbidden := range forbiddenCommands {
@@ -101,4 +101,3 @@ func newRootCommandForTest() *cobra.Command {
 
 	return rootCmd
 }
-

@@ -14,11 +14,19 @@ import (
 
 // DiffReport represents the JSON report structure for drift detection
 type DiffReport struct {
-	SchemaVersion  string           `json:"schemaVersion"`
-	GeneratedAt    string           `json:"generatedAt"`
-	ClusterContext string           `json:"clusterContext"`
-	Summary        ReportSummary    `json:"summary"`
-	Resources      []ResourceReport `json:"resources"`
+	SchemaVersion   string           `json:"schemaVersion"`
+	GeneratedAt     string           `json:"generatedAt"`
+	ClusterContext  string           `json:"clusterContext"`
+	Summary         ReportSummary    `json:"summary"`
+	Resources       []ResourceReport `json:"resources"`
+	FiltersApplied  *FiltersApplied  `json:"filtersApplied,omitempty"`
+	Warnings        []string         `json:"warnings,omitempty"`
+}
+
+// FiltersApplied contains information about filters applied to the diff
+type FiltersApplied struct {
+	Select        []string `json:"select,omitempty"`
+	LabelSelector string   `json:"labelSelector,omitempty"`
 }
 
 // ReportSummary contains aggregate statistics

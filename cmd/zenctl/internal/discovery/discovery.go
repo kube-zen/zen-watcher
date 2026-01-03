@@ -67,4 +67,3 @@ func (r *ResourceResolver) ResolveAll() (map[string]schema.GroupVersionResource,
 
 	return gvrs, errors
 }
-

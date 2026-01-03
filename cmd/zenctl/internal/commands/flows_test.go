@@ -8,7 +8,7 @@ import (
 func TestFlowsTableColumns(t *testing.T) {
 	// Verify that flows table columns match ACTIVE_TARGET_UX_GUIDE.md
 	// Expected columns: NAMESPACE | NAME | ACTIVE_TARGET | ENTITLEMENT | ENTITLEMENT_REASON | READY | AGE
-	
+
 	expectedColumns := []string{
 		"NAMESPACE",
 		"NAME",
@@ -49,4 +49,3 @@ func TestFlowsCommandExists(t *testing.T) {
 		t.Errorf("Expected command Use='flows', got '%s'", cmd.Use)
 	}
 }
-
