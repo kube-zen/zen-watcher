@@ -24,8 +24,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	sdkdedup "github.com/kube-zen/zen-sdk/pkg/dedup"
+	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/watcher"
 	"k8s.io/apimachinery/pkg/runtime/schema"
