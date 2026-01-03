@@ -26,11 +26,15 @@ When using the installation scripts (`scripts/install.sh` or `scripts/quick-demo
 
 ## Quick Start
 
-### Install from Local Chart
+### Install from Helm Repository (Recommended)
 
 ```bash
+# Add the Helm repository
+helm repo add kube-zen https://kube-zen.github.io/helm-charts
+helm repo update
+
 # Install zen-watcher
-helm install zen-watcher ./deployments/helm/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace
 ```
@@ -57,10 +61,15 @@ The Helm chart includes pre-configured profiles for different environments.
 Minimal resources, single replica, debug logging:
 
 ```bash
-helm install zen-watcher ./deployments/helm/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
-  -f deployments/helm/zen-watcher/values-dev.yaml
+  --set replicaCount=1 \
+  --set resources.requests.cpu=50m \
+  --set resources.requests.memory=64Mi \
+  --set resources.limits.cpu=200m \
+  --set resources.limits.memory=256Mi \
+  --set config.logLevel=DEBUG
 ```
 
 **Profile characteristics:**
@@ -75,10 +84,15 @@ helm install zen-watcher ./deployments/helm/zen-watcher \
 Two replicas, more resources, HA optimization:
 
 ```bash
-helm install zen-watcher ./deployments/helm/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
-  -f deployments/helm/zen-watcher/values-staging.yaml
+  --set replicaCount=2 \
+  --set resources.requests.cpu=100m \
+  --set resources.requests.memory=128Mi \
+  --set resources.limits.cpu=500m \
+  --set resources.limits.memory=512Mi \
+  --set config.logLevel=INFO
 ```
 
 **Profile characteristics:**
@@ -93,10 +107,16 @@ helm install zen-watcher ./deployments/helm/zen-watcher \
 HA deployment with autoscaling and tuned resources:
 
 ```bash
-helm install zen-watcher ./deployments/helm/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
-  -f deployments/helm/zen-watcher/values-prod.yaml
+  --set replicaCount=2 \
+  --set autoscaling.enabled=true \
+  --set resources.requests.cpu=200m \
+  --set resources.requests.memory=256Mi \
+  --set resources.limits.cpu=1000m \
+  --set resources.limits.memory=512Mi \
+  --set config.logLevel=INFO
 ```
 
 **Profile characteristics:**
@@ -111,10 +131,10 @@ helm install zen-watcher ./deployments/helm/zen-watcher \
 
 ### Override Values
 
-You can override any value from `values.yaml`:
+You can override any value from the chart's `values.yaml`:
 
 ```bash
-helm install zen-watcher ./deployments/helm/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --set replicaCount=3 \
@@ -126,7 +146,7 @@ helm install zen-watcher ./deployments/helm/zen-watcher \
 
 **Watch specific namespaces:**
 ```bash
-helm install zen-watcher ./deployments/helm/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --set config.watchNamespace="prod,staging"
@@ -134,7 +154,7 @@ helm install zen-watcher ./deployments/helm/zen-watcher \
 
 **Disable CRD installation (if already installed):**
 ```bash
-helm install zen-watcher ./deployments/helm/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --set crds.install=false
@@ -142,7 +162,7 @@ helm install zen-watcher ./deployments/helm/zen-watcher \
 
 **Custom image:**
 ```bash
-helm install zen-watcher ./deployments/helm/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --set image.repository=my-registry/zen-watcher \
@@ -190,11 +210,14 @@ helm package vm/victoria-metrics-operator-crds
 
 ### Manual Installation (No Scripts)
 
-For complete offline control, install zen-watcher directly from the local chart:
+For complete offline control, you can download and use the chart locally:
 
 ```bash
-# Install zen-watcher (no external dependencies)
-helm install zen-watcher ./deployments/helm/zen-watcher \
+# Download the chart
+helm pull kube-zen/zen-watcher --untar
+
+# Install from local chart
+helm install zen-watcher ./zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --set image.repository=your-registry/zen-watcher \
@@ -206,14 +229,18 @@ helm install zen-watcher ./deployments/helm/zen-watcher \
 ## Upgrading
 
 ```bash
+# Update the repository to get latest version
+helm repo update
+
 # Upgrade to new version
-helm upgrade zen-watcher ./deployments/helm/zen-watcher \
+helm upgrade zen-watcher kube-zen/zen-watcher \
   --namespace zen-system
 
-# Upgrade with new values
-helm upgrade zen-watcher ./deployments/helm/zen-watcher \
+# Upgrade with custom values
+helm upgrade zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
-  -f deployments/helm/zen-watcher/values-prod.yaml
+  --set replicaCount=2 \
+  --set resources.requests.cpu=200m
 ```
 
 ## Uninstalling

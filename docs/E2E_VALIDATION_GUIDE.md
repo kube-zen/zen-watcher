@@ -54,7 +54,7 @@ This validates:
 
 ```bash
 # Install via Helm
-helm install zen-watcher ./deployments/helm/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace "$NAMESPACE" \
   --create-namespace \
   --kube-context "$CONTEXT" \

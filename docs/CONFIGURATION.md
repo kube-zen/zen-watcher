@@ -180,7 +180,7 @@ Configuration is applied in the following order (highest to lowest priority):
 ```bash
 # Deploy with custom API group
 export ZEN_API_GROUP="observations.k8s.io"
-helm install zen-watcher ./deployments/helm/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --set env.ZEN_API_GROUP=observations.k8s.io

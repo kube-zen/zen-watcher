@@ -43,7 +43,7 @@
 ### Issue: Stress test fails with "too many observations"
 **Solution**: Enable automatic cleanup via CronJob:
 ```bash
-helm upgrade zen-watcher ./deployments/helm/zen-watcher \
+helm upgrade zen-watcher kube-zen/zen-watcher \
   --set lifecycle.cleanup.enabled=true \
   --set lifecycle.cleanup.ttlDays=1
 ```
@@ -70,7 +70,7 @@ wait_for_grafana_api grafana
 ### Issue: Pod OOM (Out of Memory) kills
 **Solution**: Increase resource limits:
 ```bash
-helm upgrade zen-watcher ./deployments/helm/zen-watcher \
+helm upgrade zen-watcher kube-zen/zen-watcher \
   --set resources.limits.memory=1Gi \
   --set resources.requests.memory=512Mi
 ```
@@ -78,7 +78,7 @@ helm upgrade zen-watcher ./deployments/helm/zen-watcher \
 ### Issue: Too many observations consuming etcd storage
 **Solution**: Enable resource quotas and lifecycle cleanup:
 ```bash
-helm upgrade zen-watcher ./deployments/helm/zen-watcher \
+helm upgrade zen-watcher kube-zen/zen-watcher \
   --set resourceQuota.enabled=true \
   --set resourceQuota.observationLimit=5000 \
   --set lifecycle.cleanup.enabled=true
@@ -100,7 +100,7 @@ kubectl logs -n zen-system -l app=zen-watcher --tail=100 | grep -i "slow\|error\
 ### Issue: High CPU usage
 **Solution**: Scale horizontally or increase resources:
 ```bash
-helm upgrade zen-watcher ./deployments/helm/zen-watcher \
+helm upgrade zen-watcher kube-zen/zen-watcher \
   --set autoscaling.enabled=true \
   --set autoscaling.minReplicas=2 \
   --set autoscaling.maxReplicas=5
@@ -111,7 +111,7 @@ helm upgrade zen-watcher ./deployments/helm/zen-watcher \
 ### Error: "observation CRD not found"
 **Solution**: Install CRDs first:
 ```bash
-kubectl apply -f deployments/helm/zen-watcher/crds/
+kubectl apply -f deployments/crds/
 ```
 
 ### Error: "permission denied" when creating observations

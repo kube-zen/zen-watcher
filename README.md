@@ -27,8 +27,12 @@ For air-gapped environments, use `--offline` flag (see [DEPLOYMENT_HELM.md](docs
 ### Install via Helm
 
 ```bash
+# Add the Helm repository
+helm repo add kube-zen https://kube-zen.github.io/helm-charts
+helm repo update
+
 # Install zen-watcher
-helm install zen-watcher ./deployments/helm/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace
 

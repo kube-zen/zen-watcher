@@ -280,8 +280,11 @@ helm-validate:
 		echo "$(YELLOW)ℹ️  Helm not installed, skipping validation$(NC)"; \
 		exit 0; \
 	fi
-	@helm lint deployments/helm/zen-watcher
-	@helm template zen-watcher deployments/helm/zen-watcher > /tmp/zen-watcher-manifests.yaml
+	@echo "$(YELLOW)ℹ️  Helm chart validation skipped (chart is in helm-charts repository)$(NC)"
+	@echo "$(YELLOW)   To validate: helm repo add kube-zen https://kube-zen.github.io/helm-charts && helm lint kube-zen/zen-watcher$(NC)"
+	@helm repo add kube-zen https://kube-zen.github.io/helm-charts 2>/dev/null || true
+	@helm repo update 2>/dev/null || true
+	@helm template zen-watcher kube-zen/zen-watcher > /tmp/zen-watcher-manifests.yaml
 	@if command -v kubectl &> /dev/null; then \
 		echo "$(GREEN)Running kubectl dry-run validation...$(NC)"; \
 		kubectl apply --dry-run=client -f /tmp/zen-watcher-manifests.yaml > /dev/null 2>&1 || \
@@ -394,7 +397,9 @@ zen-demo-deploy-watcher:
 	 ./scripts/install.sh k3d --skip-monitoring --use-existing-cluster || \
 		(echo "$(YELLOW)⚠️  Install script failed, trying direct Helm install...$(NC)"; \
 		 KUBECONFIG=$${HOME}/.config/k3d/kubeconfig-$$CLUSTER_NAME.yaml; \
-		 helm --kubeconfig=$$KUBECONFIG --kube-context=k3d-$$CLUSTER_NAME upgrade --install zen-watcher deployments/helm/zen-watcher \
+		 helm repo add kube-zen https://kube-zen.github.io/helm-charts 2>/dev/null || true; \
+		 helm repo update 2>/dev/null || true; \
+		 helm --kubeconfig=$$KUBECONFIG --kube-context=k3d-$$CLUSTER_NAME upgrade --install zen-watcher kube-zen/zen-watcher \
 		   --namespace $$NAMESPACE --create-namespace \
 		   --set image.repository=kubezen/zen-watcher \
 		   --set image.tag=zen-demo-$$IMAGE_TAG \
