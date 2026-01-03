@@ -159,7 +159,7 @@ type diffClients struct {
 }
 
 // initializeDiffClients creates the necessary clients for diff operations
-func initializeDiffClients(opts *Options) (*diffClients, error) {
+func initializeDiffClients(opts Options) (*diffClients, error) {
 	dynClient, config, err := client.NewDynamicClient(opts.Kubeconfig, opts.Context)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create client: %w", err)
