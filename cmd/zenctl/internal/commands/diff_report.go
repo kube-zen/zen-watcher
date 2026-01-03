@@ -92,6 +92,8 @@ func buildDiffReport(ctx string, resources []ResourceReport) *DiffReport {
 		ClusterContext: ctx,
 		Summary:        summary,
 		Resources:      resources,
+		FiltersApplied: filtersApplied,
+		Warnings:       warnings,
 	}
 }
 
