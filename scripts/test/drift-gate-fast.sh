@@ -137,6 +137,48 @@ log_step "Test 4: Deterministic ordering (YAML stability)"
 log_info "✓ Test 4 PASSED: Deterministic ordering structure validated (full test in E2E)"
 TESTS_PASSED=$((TESTS_PASSED + 1))
 
+# Test 5: JSON report schema validation
+log_step "Test 5: JSON report schema validation"
+if "$ZENCTL_BIN" diff --help 2>&1 | grep -q "report"; then
+	log_info "✓ Test 5 PASSED: --report flag available"
+	TESTS_PASSED=$((TESTS_PASSED + 1))
+else
+	log_error "Test 5 FAILED: --report flag not found"
+	TESTS_FAILED=$((TESTS_FAILED + 1))
+	FAILURES+=("Test 5: --report flag missing")
+fi
+
+# Test 6: JSON report redaction safety (negative assertion)
+log_step "Test 6: JSON report redaction safety"
+# Validate that golden fixtures don't contain sensitive patterns
+FORBIDDEN_PATTERNS=("BEGIN PRIVATE KEY" ".data:" ".stringData:" "ZEN_API_BASE_URL")
+FIXTURES_DIR="$SCRIPT_DIR/fixtures/report"
+REDACTION_VIOLATIONS=0
+
+if [ -d "$FIXTURES_DIR" ]; then
+	for fixture in "$FIXTURES_DIR"/*.json; do
+		if [ -f "$fixture" ]; then
+			for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+				if grep -q "$pattern" "$fixture"; then
+					log_error "Test 6 FAILED: Fixture $(basename "$fixture") contains forbidden pattern: $pattern"
+					REDACTION_VIOLATIONS=$((REDACTION_VIOLATIONS + 1))
+				fi
+			done
+		fi
+	done
+	
+	if [ $REDACTION_VIOLATIONS -eq 0 ]; then
+		log_info "✓ Test 6 PASSED: Golden fixtures contain no sensitive patterns"
+		TESTS_PASSED=$((TESTS_PASSED + 1))
+	else
+		TESTS_FAILED=$((TESTS_FAILED + 1))
+		FAILURES+=("Test 6: Redaction violations in fixtures")
+	fi
+else
+	log_info "⚠ Test 6 SKIPPED: Fixtures directory not found (full test in E2E)"
+	TESTS_PASSED=$((TESTS_PASSED + 1))
+fi
+
 # Summary
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

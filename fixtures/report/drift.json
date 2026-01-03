@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "<NORMALIZED>",
+  "clusterContext": "default",
+  "summary": {
+    "total": 3,
+    "drifted": 2,
+    "noDrift": 1,
+    "errors": 0,
+    "specDrift": 1,
+    "metadataDrift": 1
+  },
+  "resources": [
+    {
+      "group": "",
+      "version": "v1",
+      "kind": "ConfigMap",
+      "namespace": "default",
+      "name": "test-cm",
+      "status": "drift",
+      "driftType": "spec",
+      "diffStats": {
+        "added": 2,
+        "removed": 1,
+        "changed": 1
+      },
+      "redacted": false
+    },
+    {
+      "group": "apps",
+      "version": "v1",
+      "kind": "Deployment",
+      "namespace": "default",
+      "name": "test-app",
+      "status": "drift",
+      "driftType": "metadata",
+      "diffStats": {
+        "added": 1,
+        "removed": 0,
+        "changed": 0
+      },
+      "redacted": false
+    },
+    {
+      "group": "",
+      "version": "v1",
+      "kind": "Service",
+      "namespace": "default",
+      "name": "test-svc",
+      "status": "no_drift",
+      "driftType": "none",
+      "redacted": false
+    }
+  ]
+}
+

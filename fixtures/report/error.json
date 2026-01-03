@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1.0",
+  "generatedAt": "<NORMALIZED>",
+  "clusterContext": "default",
+  "summary": {
+    "total": 3,
+    "drifted": 1,
+    "noDrift": 1,
+    "errors": 1,
+    "specDrift": 1,
+    "metadataDrift": 0
+  },
+  "resources": [
+    {
+      "group": "",
+      "version": "v1",
+      "kind": "ConfigMap",
+      "namespace": "default",
+      "name": "test-cm",
+      "status": "drift",
+      "driftType": "spec",
+      "diffStats": {
+        "added": 1,
+        "removed": 0,
+        "changed": 0
+      },
+      "redacted": false
+    },
+    {
+      "group": "custom.io",
+      "version": "v1alpha1",
+      "kind": "CustomResource",
+      "namespace": "default",
+      "name": "missing-crd",
+      "status": "error",
+      "driftType": "unknown",
+      "error": "CRD not found: no matches for kind \"CustomResource\" in version \"custom.io/v1alpha1\"",
+      "redacted": false
+    },
+    {
+      "group": "",
+      "version": "v1",
+      "kind": "Service",
+      "namespace": "default",
+      "name": "test-svc",
+      "status": "no_drift",
+      "driftType": "none",
+      "redacted": false
+    }
+  ]
+}
+
