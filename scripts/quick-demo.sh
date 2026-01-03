@@ -143,11 +143,92 @@ fi
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Step 1: Install (cluster + components)
-log_step "Installing Zen Watcher..."
-"${SCRIPT_DIR}/install.sh" "$PLATFORM" "${INSTALL_ARGS[@]}" || {
-    log_error "Installation failed"
-    exit 1
+# Step 1: Create cluster (if needed)
+if ! cluster_exists "$PLATFORM" "$CLUSTER_NAME"; then
+    log_step "Creating cluster..."
+    CREATE_ARGS=()
+    if [ "$USE_EXISTING_CLUSTER" = true ]; then
+        CREATE_ARGS+=("--use-existing")
+    fi
+    "${SCRIPT_DIR}/cluster/create.sh" "$PLATFORM" "$CLUSTER_NAME" "${CREATE_ARGS[@]}" || {
+        log_error "Failed to create cluster"
+        exit 1
+    }
+else
+    log_info "Using existing cluster: $CLUSTER_NAME"
+fi
+
+# Setup kubeconfig
+KUBECONFIG_FILE=$(get_kubeconfig_path "kind" "$CLUSTER_NAME" 2>/dev/null || echo "${HOME}/.kube/kind-${CLUSTER_NAME}-config")
+if [ -f "$KUBECONFIG_FILE" ]; then
+    export KUBECONFIG="$KUBECONFIG_FILE"
+else
+    # For kind, kubeconfig is usually in default location
+    export KUBECONFIG="${HOME}/.kube/config"
+    # Set context if needed
+    if kubectl config get-contexts "kind-${CLUSTER_NAME}" >/dev/null 2>&1; then
+        kubectl config use-context "kind-${CLUSTER_NAME}" >/dev/null 2>&1 || true
+    fi
+fi
+
+# Wait for cluster to be ready
+log_step "Waiting for cluster to be ready..."
+for i in {1..60}; do
+    if kubectl cluster-info >/dev/null 2>&1; then
+        log_success "Cluster is ready"
+        break
+    fi
+    if [ $i -eq 60 ]; then
+        log_error "Cluster did not become ready in time"
+        exit 1
+    fi
+    sleep 2
+done
+
+# Step 2: Install zen-watcher directly with Helm (no helmfile required)
+log_step "Installing Zen Watcher with Helm..."
+
+# Add Helm repository
+log_info "Adding Helm repository..."
+helm repo add kube-zen https://kube-zen.github.io/helm-charts 2>&1 | grep -v "already exists" > /dev/null || true
+helm repo update > /dev/null 2>&1 || {
+    log_warn "Helm repo update failed (non-fatal, continuing with cached charts)"
+}
+
+# Create namespace
+kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f - > /dev/null 2>&1 || true
+
+# Install zen-watcher
+log_info "Installing zen-watcher chart..."
+HELM_ARGS=(
+    "--namespace" "$NAMESPACE"
+    "--create-namespace"
+    "--set" "crds.install=true"
+)
+
+# Add image settings if provided
+if [ -n "${ZEN_WATCHER_IMAGE:-}" ]; then
+    IMAGE_REPO=$(echo "$ZEN_WATCHER_IMAGE" | cut -d: -f1)
+    IMAGE_TAG=$(echo "$ZEN_WATCHER_IMAGE" | cut -d: -f2)
+    HELM_ARGS+=("--set" "image.repository=$IMAGE_REPO")
+    HELM_ARGS+=("--set" "image.tag=$IMAGE_TAG")
+fi
+
+if helm upgrade --install zen-watcher kube-zen/zen-watcher "${HELM_ARGS[@]}" --wait --timeout=5m > /dev/null 2>&1; then
+    log_success "Zen Watcher installed successfully"
+else
+    log_error "Failed to install zen-watcher"
+    log_info "Trying without --wait flag..."
+    helm upgrade --install zen-watcher kube-zen/zen-watcher "${HELM_ARGS[@]}" || {
+        log_error "Installation failed"
+        exit 1
+    }
+fi
+
+# Wait for zen-watcher pod to be ready
+log_info "Waiting for zen-watcher pod to be ready..."
+kubectl wait --for=condition=ready pod -n "$NAMESPACE" -l app.kubernetes.io/name=zen-watcher --timeout=120s > /dev/null 2>&1 || {
+    log_warn "Pod may not be ready yet, continuing..."
 }
 
 # Get kubeconfig (kind-specific)
