@@ -21,4 +21,3 @@ func main() {
 	// via init() functions and compiled into the main zen-watcher binary.
 	// This main() function exists only to satisfy Go's package main requirement.
 }
-
