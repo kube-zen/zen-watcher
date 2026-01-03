@@ -78,7 +78,7 @@ func generateIngesterDoc(outputDir string) error {
 	md := generateMarkdown("Ingester", v1Schema)
 
 	// Write to file
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0755); err != nil { //nolint:gosec // G301: 0755 is standard for documentation output
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
@@ -120,7 +120,7 @@ func generateObservationDoc(outputDir string) error {
 	md := generateMarkdown("Observation", v1Schema)
 
 	// Write to file
-	if err := os.MkdirAll(outputDir, 0755); err != nil {
+	if err := os.MkdirAll(outputDir, 0755); err != nil { //nolint:gosec // G301: 0755 is standard for documentation output
 		return fmt.Errorf("failed to create output directory: %w", err)
 	}
 
