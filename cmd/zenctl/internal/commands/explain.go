@@ -184,4 +184,3 @@ func printFlowDetails(obj *unstructured.Unstructured) error {
 
 	return nil
 }
-
