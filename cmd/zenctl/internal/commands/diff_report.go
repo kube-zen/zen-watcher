@@ -104,20 +104,20 @@ func writeReportFile(report *DiffReport, filePath string) error {
 	encoder := json.NewEncoder(tmpFile)
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(report); err != nil {
-		tmpFile.Close()
-		os.Remove(tmpPath)
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("failed to encode report: %w", err)
 	}
 	
 	// Sync to disk
 	if err := tmpFile.Sync(); err != nil {
-		tmpFile.Close()
-		os.Remove(tmpPath)
+		_ = tmpFile.Close()
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("failed to sync report: %w", err)
 	}
 	
 	if err := tmpFile.Close(); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("failed to close temp file: %w", err)
 	}
 	
