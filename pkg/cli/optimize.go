@@ -129,10 +129,10 @@ func (cli *OptimizeCLI) History(ctx context.Context, source string) error {
 	_, _ = fmt.Fprintf(w, "Optimizations Applied\t%d\n", impact.OptimizationsApplied)
 	_, _ = fmt.Fprintf(w, "Observations Reduced\t%d\n", impact.ObservationsReduced)
 	_, _ = fmt.Fprintf(w, "Reduction Percentage\t%.1f%%\n", impact.ReductionPercent*100)
-	fmt.Fprintf(w, "CPU Savings (minutes)\t%.1f\n", impact.CPUSavingsMinutes)
-	fmt.Fprintf(w, "Most Effective\t%s\n", impact.MostEffective)
+	_, _ = fmt.Fprintf(w, "CPU Savings (minutes)\t%.1f\n", impact.CPUSavingsMinutes)
+	_, _ = fmt.Fprintf(w, "Most Effective\t%s\n", impact.MostEffective)
 	if !impact.LastOptimizedAt.IsZero() {
-		fmt.Fprintf(w, "Last Optimized\t%s\n", impact.LastOptimizedAt.Format("2006-01-02 15:04:05"))
+		_, _ = fmt.Fprintf(w, "Last Optimized\t%s\n", impact.LastOptimizedAt.Format("2006-01-02 15:04:05"))
 	}
 	_ = w.Flush()
 
