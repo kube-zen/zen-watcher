@@ -64,7 +64,7 @@ func (fsp *FileStatePersistence) Save(source string, state *OptimizationState) e
 func (fsp *FileStatePersistence) Load(source string) (*OptimizationState, error) {
 	filename := filepath.Join(fsp.baseDir, fmt.Sprintf("%s.json", source))
 
-	data, err := os.ReadFile(filename)
+	data, err := os.ReadFile(filename) //nolint:gosec // G304: filename is from trusted source (internal state file)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil // File doesn't exist yet, not an error

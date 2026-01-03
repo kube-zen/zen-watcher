@@ -181,7 +181,7 @@ func (s *Server) registerHandlers(mux *http.ServeMux) {
 	// Legacy /health endpoint (kept for backward compatibility)
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, "healthy")
+		_, _ = fmt.Fprintf(w, "healthy")
 	})
 
 	// Readiness probe endpoint (Kubernetes standard: /readyz)
@@ -223,10 +223,10 @@ func (s *Server) registerHandlers(mux *http.ServeMux) {
 
 		if ready {
 			w.WriteHeader(http.StatusOK)
-			fmt.Fprintf(w, "ready")
+			_, _ = fmt.Fprintf(w, "ready")
 		} else {
 			w.WriteHeader(http.StatusServiceUnavailable)
-			fmt.Fprintf(w, "not ready")
+			_, _ = fmt.Fprintf(w, "not ready")
 		}
 	})
 
