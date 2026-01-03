@@ -231,6 +231,45 @@ spec:
 }
 
 // validateManifest uses kubectl apply --dry-run=client to validate a manifest
+// isCRDNotAvailableError checks if the error output indicates CRD is not available
+func isCRDNotAvailableError(outputStr string) bool {
+	return strings.Contains(outputStr, "no matches for kind") ||
+		strings.Contains(outputStr, "the server could not find the requested resource") ||
+		strings.Contains(outputStr, "resource mapping not found") ||
+		strings.Contains(outputStr, "ensure CRDs are installed") ||
+		strings.Contains(outputStr, "NotFound") ||
+		(strings.Contains(outputStr, "error:") && (strings.Contains(outputStr, "not found") || strings.Contains(outputStr, "does not exist"))) ||
+		(strings.Contains(outputStr, "context") && (strings.Contains(outputStr, "not found") || strings.Contains(outputStr, "does not exist")))
+}
+
+// isValidationError checks if the error output indicates a validation failure
+func isValidationError(outputStr string) bool {
+	return strings.Contains(outputStr, "validation") ||
+		strings.Contains(outputStr, "invalid") ||
+		strings.Contains(outputStr, "required") ||
+		strings.Contains(outputStr, "must be") ||
+		strings.Contains(outputStr, "field is immutable")
+}
+
+// tryClientSideValidation attempts client-side validation as a fallback
+func tryClientSideValidation(t *testing.T, tmpFile string) error {
+	cmd := exec.Command("kubectl", "apply", "--dry-run=client", "-f", tmpFile) //nolint:gosec // G204: kubectl is trusted test tool
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		outputStr := string(output)
+		if isCRDNotAvailableError(outputStr) {
+			t.Skipf("CRD not available for validation (expected in unit tests): %s", outputStr)
+			return nil
+		}
+		if isValidationError(outputStr) {
+			return err
+		}
+		t.Skipf("kubectl validation not available: %s", outputStr)
+		return nil
+	}
+	return nil
+}
+
 func validateManifest(t *testing.T, manifest string, crdType string) error {
 	// Write manifest to temp file
 	tmpFile := filepath.Join(t.TempDir(), "manifest.yaml")
@@ -239,61 +278,22 @@ func validateManifest(t *testing.T, manifest string, crdType string) error {
 		return err
 	}
 
-	// Run kubectl apply --dry-run=client
+	// Run kubectl apply --dry-run=server
 	// Use server-side validation if available, otherwise client-side
 	cmd := exec.Command("kubectl", "apply", "--dry-run=server", "-f", tmpFile) //nolint:gosec // G204: kubectl is trusted test tool
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		outputStr := string(output)
-		// If CRD doesn't exist or server-side validation not available, try client-side
-		if strings.Contains(outputStr, "no matches for kind") ||
-			strings.Contains(outputStr, "the server could not find the requested resource") ||
-			strings.Contains(outputStr, "resource mapping not found") ||
-			strings.Contains(outputStr, "ensure CRDs are installed") ||
-			strings.Contains(outputStr, "NotFound") ||
-			(strings.Contains(outputStr, "error:") && (strings.Contains(outputStr, "not found") || strings.Contains(outputStr, "does not exist"))) ||
-			strings.Contains(outputStr, "context") && (strings.Contains(outputStr, "not found") || strings.Contains(outputStr, "does not exist")) {
+		if isCRDNotAvailableError(outputStr) {
 			// Fall back to client-side validation
-			cmd = exec.Command("kubectl", "apply", "--dry-run=client", "-f", tmpFile) //nolint:gosec // G204: kubectl is trusted test tool
-			output, err = cmd.CombinedOutput()
-			if err != nil {
-				outputStr = string(output)
-				// If CRD doesn't exist in client cache either, skip validation
-				if strings.Contains(outputStr, "no matches for kind") ||
-					strings.Contains(outputStr, "NotFound") ||
-					strings.Contains(outputStr, "resource mapping not found") ||
-					strings.Contains(outputStr, "ensure CRDs are installed") ||
-					strings.Contains(outputStr, "the server could not find the requested resource") ||
-					(strings.Contains(outputStr, "error:") && (strings.Contains(outputStr, "not found") || strings.Contains(outputStr, "does not exist"))) ||
-					(strings.Contains(outputStr, "context") && (strings.Contains(outputStr, "not found") || strings.Contains(outputStr, "does not exist"))) {
-					t.Skipf("CRD not available for validation (expected in unit tests): %s", outputStr)
-					return nil
-				}
-				// Check if error is validation-related
-				if strings.Contains(outputStr, "validation") ||
-					strings.Contains(outputStr, "invalid") ||
-					strings.Contains(outputStr, "required") ||
-					strings.Contains(outputStr, "must be") {
-					return err
-				}
-				// Other errors (like missing kubectl, context issues) - skip test
-				t.Skipf("kubectl validation not available: %s", outputStr)
-				return nil
-			}
-		} else {
-			// Check if error is validation-related (only return error for actual validation failures)
-			if strings.Contains(outputStr, "validation") ||
-				strings.Contains(outputStr, "invalid") ||
-				strings.Contains(outputStr, "required") ||
-				strings.Contains(outputStr, "must be") ||
-				strings.Contains(outputStr, "field is immutable") {
-				return err
-			}
-			// For any other error (CRD not found, context issues, connection problems, etc.) - skip test
-			// This is expected in unit test environments where CRDs may not be installed
-			t.Skipf("kubectl validation not available (CRD may not be installed): %s", outputStr)
-			return nil
+			return tryClientSideValidation(t, tmpFile)
 		}
+		if isValidationError(outputStr) {
+			return err
+		}
+		// For any other error (CRD not found, context issues, connection problems, etc.) - skip test
+		t.Skipf("kubectl validation not available (CRD may not be installed): %s", outputStr)
+		return nil
 	}
 
 	return nil
