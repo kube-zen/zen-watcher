@@ -81,7 +81,7 @@ helm install zen-watcher kube-zen/zen-watcher \
 
 ### Staging Profile
 
-Two replicas, more resources, HA optimization:
+Two replicas, more resources, HA deployment:
 
 ```bash
 helm install zen-watcher kube-zen/zen-watcher \
@@ -96,11 +96,14 @@ helm install zen-watcher kube-zen/zen-watcher \
 ```
 
 **Profile characteristics:**
-- 2 replicas
+- 2 replicas (default - provides HA for webhook traffic)
 - 100m CPU / 128Mi memory requests
 - 500m CPU / 512Mi memory limits
 - INFO log level
-- HA optimization enabled
+- Leader election mandatory (always enabled)
+- HA for webhook sources, single point of failure for informer sources
+
+**See [HIGH_AVAILABILITY.md](../docs/HIGH_AVAILABILITY.md) for HA model details.**
 
 ### Production Profile
 
@@ -120,12 +123,17 @@ helm install zen-watcher kube-zen/zen-watcher \
 ```
 
 **Profile characteristics:**
-- 2+ replicas (autoscaling enabled)
+- 2+ replicas (autoscaling enabled - scales webhook processing)
 - 200m CPU / 256Mi memory requests
 - 1000m CPU / 512Mi memory limits
 - INFO log level
-- HA optimization enabled
+- Leader election mandatory (always enabled)
+- HA for webhook sources, single point of failure for informer sources
 - Pod Disruption Budget enabled
+
+**Note:** HPA scales webhook processing horizontally. Informer sources remain single leader only.
+
+**See [HIGH_AVAILABILITY.md](../docs/HIGH_AVAILABILITY.md) for HA model details.**
 
 ## Custom Configuration
 

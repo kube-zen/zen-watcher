@@ -341,7 +341,7 @@ resources:
 
 **Very Large Cluster (>50,000 events/day)**:
 - Consider namespace sharding
-- Or use multi-replica with HA optimization
+- Or use multiple replicas with leader election (HA for webhook traffic)
 - Per-replica: 500m CPU, 512Mi memory
 
 ---
@@ -491,14 +491,20 @@ zen_watcher_dedup_decisions_total{strategy="event-stream",decision="drop"}
 - Lower resource overhead
 - Use when: Single replica can handle your event volume
 
-**Multi-Replica Deployment (With HA Optimization)**
-- Suitable for clusters with >10,000 events/day
-- Requires `haOptimization.enabled: true` in Helm values
+**Multi-Replica Deployment (With Leader Election)**
+- Suitable for production workloads
+- Default: 2 replicas (provides HA for webhook traffic)
+- Leader election is mandatory and always enabled
 - Provides:
-  - Dynamic deduplication window adjustment
-  - Adaptive cache sizing
-  - Load balancing across replicas
-- Use when: Single replica cannot keep up with event volume
+  - High availability for webhook sources (all pods serve, load-balanced)
+  - Automatic leader failover (10-15 seconds)
+  - HPA support for webhook scaling
+- Limitations:
+  - Informer sources remain single point of failure (only leader processes)
+  - Processing gaps for informers during leader transitions
+- Use when: Need HA for webhook traffic or high webhook volume
+
+**See [HIGH_AVAILABILITY.md](HIGH_AVAILABILITY.md) for complete HA model.**
 
 **Namespace Sharding (For Very Large Clusters)**
 - Deploy multiple zen-watcher instances, each watching specific namespaces
@@ -746,8 +752,11 @@ See [OBSERVABILITY.md](OBSERVABILITY.md) for recommended alerting rules.
 - Very aggressive filtering
 - Short TTL: `OBSERVATION_TTL_SECONDS=86400` (1 day)
 - Large dedup cache: `DEDUP_MAX_SIZE=50000`
-- For HA deployments, enable HA optimization features (see HA configuration in Helm values)
-- Single replica sufficient for standard deployments. HA optimization available for multi-replica deployments.
+- For HA deployments, use multiple replicas (default: 2) - provides HA for webhook traffic
+- Single replica sufficient for development/testing only (no HA guarantees)
+- Leader election is mandatory and always enabled
+
+**See [HIGH_AVAILABILITY.md](HIGH_AVAILABILITY.md) for complete HA model.**
 - Resource requests: 500m CPU, 512MB memory
 - Resource limits: 1000m CPU, 1GB memory
 
