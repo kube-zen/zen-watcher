@@ -57,6 +57,14 @@ type Metrics struct {
 	DestinationQueueDepth      *prometheus.GaugeVec     // Queue depth by source and destination type
 	DestinationRetriesTotal    *prometheus.CounterVec   // Retry attempts by source and destination type
 
+	// Ingester-specific metrics for KEDA autoscaling
+	IngesterQueueDepth *prometheus.GaugeVec // Queue depth for zen-ingester component
+	IngesterEventsTotal *prometheus.CounterVec // Total events processed by zen-ingester
+
+	// Egress-specific metrics for KEDA autoscaling
+	EgressQueueDepth *prometheus.GaugeVec // Queue depth for zen-egress component
+	EgressEventsTotal *prometheus.CounterVec // Total events dispatched by zen-egress
+
 	// ConfigManager metrics (NEW - High Priority)
 	ConfigMapLoadTotal              *prometheus.CounterVec   // ConfigMap loads by name and result
 	ConfigMapReloadDuration         *prometheus.HistogramVec // Reload duration by ConfigMap name
@@ -408,6 +416,40 @@ func NewMetrics() *Metrics {
 		[]string{"source", "destination_type"},
 	)
 
+	// Ingester-specific metrics for KEDA autoscaling
+	ingesterQueueDepth := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "ingester_queue_depth",
+			Help: "Current depth of observation queue for zen-ingester",
+		},
+		[]string{"component"}, // component: zen-ingester
+	)
+
+	ingesterEventsTotal := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ingester_events_total",
+			Help: "Total events processed by zen-ingester",
+		},
+		[]string{"component", "status"}, // component: zen-ingester, status: success, error
+	)
+
+	// Egress-specific metrics for KEDA autoscaling
+	egressQueueDepth := prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "egress_queue_depth",
+			Help: "Current depth of dispatch queue for zen-egress",
+		},
+		[]string{"component"}, // component: zen-egress
+	)
+
+	egressEventsTotal := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "egress_events_total",
+			Help: "Total events dispatched by zen-egress",
+		},
+		[]string{"component", "status"}, // component: zen-egress, status: success, error
+	)
+
 	// NEW: ConfigManager metrics (High Priority)
 	configMapLoadTotal := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
@@ -543,6 +585,14 @@ func NewMetrics() *Metrics {
 	prometheus.MustRegister(destinationDeliveryLatency)
 	prometheus.MustRegister(destinationQueueDepth)
 	prometheus.MustRegister(destinationRetriesTotal)
+
+	// Register Ingester-specific metrics for KEDA
+	prometheus.MustRegister(ingesterQueueDepth)
+	prometheus.MustRegister(ingesterEventsTotal)
+
+	// Register Egress-specific metrics for KEDA
+	prometheus.MustRegister(egressQueueDepth)
+	prometheus.MustRegister(egressEventsTotal)
 	// Register ConfigManager metrics
 	prometheus.MustRegister(configMapLoadTotal)
 	prometheus.MustRegister(configMapReloadDuration)
@@ -807,6 +857,14 @@ func NewMetrics() *Metrics {
 		DestinationDeliveryLatency: destinationDeliveryLatency,
 		DestinationQueueDepth:      destinationQueueDepth,
 		DestinationRetriesTotal:    destinationRetriesTotal,
+
+		// Ingester-specific metrics for KEDA autoscaling
+		IngesterQueueDepth: ingesterQueueDepth,
+		IngesterEventsTotal: ingesterEventsTotal,
+
+		// Egress-specific metrics for KEDA autoscaling
+		EgressQueueDepth: egressQueueDepth,
+		EgressEventsTotal: egressEventsTotal,
 
 		// ConfigManager metrics (NEW - High Priority)
 		ConfigMapLoadTotal:              configMapLoadTotal,
