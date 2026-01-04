@@ -120,7 +120,7 @@ func (cm *ConfigManager) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to sync config informers")
 	}
 
-	logger.Info("ConfigManager started",
+	configLogger.Info("ConfigManager started",
 		sdklog.Operation("start"),
 		sdklog.String("namespace", cm.namespace),
 		sdklog.String("base_config", cm.baseConfigName),

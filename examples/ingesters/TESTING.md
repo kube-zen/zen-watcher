@@ -351,6 +351,6 @@ After validating examples:
 
 - `README.md` - Overview of examples
 - `zen-watcher/docs/INGESTER_API.md` - Complete Ingester API documentation
-- `zen-admin/docs/INGESTER_V1_FINAL_SHAPE.md` - v1 spec design
+- `zen-watcher/docs/ARCHITECTURE.md` - Architecture and design principles
 - `zen-watcher/docs/INTELLIGENT_EVENT_PIPELINE.md` - Pipeline architecture
 

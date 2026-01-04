@@ -54,7 +54,7 @@ func resolveDestinationGVR(destMap map[string]interface{}, destValue string, log
 
 		if version != "" && resource != "" {
 			if err := ValidateGVRConfig(group, version, resource); err != nil {
-				logger.Warn("Invalid GVR in destination configuration",
+				configLogger.Warn("Invalid GVR in destination configuration",
 					sdklog.Operation("ingester_convert"),
 					sdklog.String("group", group),
 					sdklog.String("version", version),
@@ -70,7 +70,7 @@ func resolveDestinationGVR(destMap map[string]interface{}, destValue string, log
 		} else if destValue != "" {
 			gvr = ResolveDestinationGVR(destValue)
 		} else {
-			logger.Warn("Destination has neither gvr nor value",
+			configLogger.Warn("Destination has neither gvr nor value",
 				sdklog.Operation("ingester_convert"))
 		}
 	} else if destValue != "" {

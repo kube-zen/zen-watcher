@@ -362,10 +362,10 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 	}
 
 	// STEP 2: UPDATE METRICS ONLY AFTER SUCCESSFUL CREATION
-	oc.updateMetricsAfterCreation(observation, source, category, severity, eventType, namespace, createdObservation, logger)
+	oc.updateMetricsAfterCreation(observation, source, category, severity, eventType, namespace, createdObservation, observationLogger)
 
 	// STEP 3: LOG SUCCESS
-	logger.Debug("Observation created successfully",
+	observationLogger.Debug("Observation created successfully",
 		sdklog.Operation("observation_create"),
 		sdklog.String("source", source),
 		sdklog.String("namespace", namespace),
@@ -391,7 +391,7 @@ func (oc *ObservationCreator) extractMetricsFields(observation *unstructured.Uns
 			category = fmt.Sprintf("%v", categoryVal)
 		}
 	} else if !categoryFound {
-		logger.Debug("Category not found in spec",
+		observationLogger.Debug("Category not found in spec",
 			sdklog.Operation("observation_create"),
 			sdklog.String("source", source))
 	}
@@ -405,7 +405,7 @@ func (oc *ObservationCreator) extractMetricsFields(observation *unstructured.Uns
 			severity = fmt.Sprintf("%v", severityVal)
 		}
 	} else if !severityFound {
-		logger.Debug("Severity not found in spec",
+		observationLogger.Debug("Severity not found in spec",
 			sdklog.Operation("observation_create"),
 			sdklog.String("source", source))
 	}
@@ -419,7 +419,7 @@ func (oc *ObservationCreator) extractMetricsFields(observation *unstructured.Uns
 			eventType = fmt.Sprintf("%v", eventTypeVal)
 		}
 	} else if !eventTypeFound {
-		logger.Debug("EventType not found in spec",
+		observationLogger.Debug("EventType not found in spec",
 			sdklog.Operation("observation_create"),
 			sdklog.String("source", source))
 	}
@@ -649,7 +649,7 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 		if ttlSeconds, err := strconv.ParseInt(ttlSecondsStr, 10, 64); err == nil && ttlSeconds > 0 {
 			defaultTTLSeconds = ttlSeconds
 		} else {
-			logger.Warn("Failed to parse OBSERVATION_TTL_SECONDS, using default",
+			observationLogger.Warn("Failed to parse OBSERVATION_TTL_SECONDS, using default",
 				sdklog.Operation("ttl_parsing"),
 				sdklog.String("value", ttlSecondsStr),
 				sdklog.Error(err))
