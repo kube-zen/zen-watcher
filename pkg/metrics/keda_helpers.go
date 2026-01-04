@@ -29,4 +29,3 @@ func (m *Metrics) IncrementEgressEvents(status string) {
 		m.EgressEventsTotal.WithLabelValues("zen-egress", status).Inc()
 	}
 }
-
