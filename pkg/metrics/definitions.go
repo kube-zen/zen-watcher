@@ -58,11 +58,11 @@ type Metrics struct {
 	DestinationRetriesTotal    *prometheus.CounterVec   // Retry attempts by source and destination type
 
 	// Ingester-specific metrics for KEDA autoscaling
-	IngesterQueueDepth *prometheus.GaugeVec // Queue depth for zen-ingester component
+	IngesterQueueDepth  *prometheus.GaugeVec   // Queue depth for zen-ingester component
 	IngesterEventsTotal *prometheus.CounterVec // Total events processed by zen-ingester
 
 	// Egress-specific metrics for KEDA autoscaling
-	EgressQueueDepth *prometheus.GaugeVec // Queue depth for zen-egress component
+	EgressQueueDepth  *prometheus.GaugeVec   // Queue depth for zen-egress component
 	EgressEventsTotal *prometheus.CounterVec // Total events dispatched by zen-egress
 
 	// ConfigManager metrics (NEW - High Priority)
@@ -859,11 +859,11 @@ func NewMetrics() *Metrics {
 		DestinationRetriesTotal:    destinationRetriesTotal,
 
 		// Ingester-specific metrics for KEDA autoscaling
-		IngesterQueueDepth: ingesterQueueDepth,
+		IngesterQueueDepth:  ingesterQueueDepth,
 		IngesterEventsTotal: ingesterEventsTotal,
 
 		// Egress-specific metrics for KEDA autoscaling
-		EgressQueueDepth: egressQueueDepth,
+		EgressQueueDepth:  egressQueueDepth,
 		EgressEventsTotal: egressEventsTotal,
 
 		// ConfigManager metrics (NEW - High Priority)

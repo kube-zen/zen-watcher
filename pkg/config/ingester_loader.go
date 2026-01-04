@@ -93,7 +93,6 @@ type LogPattern struct {
 	Priority float64
 }
 
-
 // NormalizationConfig holds normalization rules
 type NormalizationConfig struct {
 	Domain       string
