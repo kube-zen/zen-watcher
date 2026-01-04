@@ -31,9 +31,9 @@ When cutting a new release of zen-watcher:
 
 ### 3. Update Helm Chart Repository
 
-- [ ] Clone helm-charts repository: `git clone https://github.com/kube-zen/helm-charts`
+- [ ] Clone helm-charts repository (separate repo): `git clone https://github.com/kube-zen/helm-charts`
 - [ ] Navigate to chart: `cd helm-charts/charts/zen-watcher`
-- [ ] **Sync CRD** (if CRD was changed): `cd ../zen-watcher && make sync-crd-to-chart`
+- [ ] **Sync CRD** (if CRD was changed): From zen-watcher repo, run `make sync-crd-to-chart`
 - [ ] Update `Chart.yaml`:
   - [ ] Set `version: "1.0.X"` (chart version)
   - [ ] Set `appVersion: "1.0.X"` (application version)

@@ -11,7 +11,7 @@ Zen-watcher uses semantic versioning with synchronized releases across component
 | Component | Version | Location |
 |-----------|---------|----------|
 | Docker Image | 1.0.0-alpha | `kubezen/zen-watcher:1.0.0-alpha` |
-| Helm Chart | 1.1.0 | `kube-zen/helm-charts/charts/zen-watcher` |
+| Helm Chart | 1.1.0 | `kube-zen/zen-watcher` (ArtifactHub) |
 | Git Tag | v1.1.0 | `github.com:kube-zen/zen-watcher` |
 
 ## Semantic Versioning
@@ -61,12 +61,13 @@ VERSION=1.1.0
 git push origin main
 git push origin v${VERSION}
 
-# 5. Update helm-charts repo
+# 5. Update helm-charts repo (separate repository)
 # Clone if needed: git clone https://github.com/kube-zen/helm-charts.git
 cd helm-charts
 # Update charts/zen-watcher/Chart.yaml version to ${VERSION}
 git commit -am "chore: zen-watcher ${VERSION}"
 git push origin main
+# Chart will be available via: helm install zen-watcher kube-zen/zen-watcher
 
 # 6. Create GitHub Release from tag
 # 7. Update ArtifactHub (if published)

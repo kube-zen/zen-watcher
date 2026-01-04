@@ -15,8 +15,9 @@ The `Observation` CRD is the core data model for zen-watcher. It stores all secu
 
 The CRD is automatically synced to the Helm charts repository:
 
-- **Helm charts location**: `helm-charts/charts/zen-watcher/templates/observation_crd.yaml`
+- **Helm charts location**: `charts/zen-watcher/templates/observation_crd.yaml` (in the separate helm-charts repository)
 - **This file is a copy** - do not edit it directly in the helm-charts repo
+- Helm charts are published to ArtifactHub and available via `helm install zen-watcher kube-zen/zen-watcher`
 
 ### Sync Process
 

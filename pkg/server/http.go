@@ -105,7 +105,7 @@ func NewServerWithIngester(
 			maxRequests = parsed
 		}
 	}
-	rateLimiter := NewPerKeyRateLimiter(maxRequests, 1*time.Minute)
+	rateLimiter := NewPerKeyRateLimiter(maxRequests, 1*time.Minute, auth.GetTrustedProxyCIDRs())
 
 	// Load HA configuration
 	haConfig := config.LoadHAConfig()

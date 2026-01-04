@@ -187,7 +187,7 @@ The CRD is synced to the Helm charts repository:
 make sync-crd-to-chart
 ```
 
-This copies the canonical CRD to `helm-charts/charts/zen-watcher/templates/observation_crd.yaml`.
+This copies the canonical CRD to the helm-charts repository at `charts/zen-watcher/templates/observation_crd.yaml`.
 
 ### Checking for Drift
 

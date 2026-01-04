@@ -141,24 +141,53 @@ spec:
   ingester: webhook
   webhook:
     path: "/ingest/trivy"
-    methods: ["POST"]
     auth:
-      type: hmac
-      secretRef: "trivy-webhook-secret"
-    tls:
-      enabled: true
-      certSecretRef: "trivy-tls-cert"
-    rateLimit:
-      requestsPerSecond: 1000
-      burst: 2000
+      type: bearer
+      secretName: "trivy-webhook-secret"
   destinations:
     - type: crd
       value: observations
-    - type: webhook
-      url: "https://backup-sink.example.com/events"
 ```
 
-**Note**: Webhook-type ingest requires zen-bridge (platform component) to provision the HTTP endpoints. zen-watcher (OSS) handles informer-based ingestion.
+**Authentication:**
+
+Webhook authentication is **per-ingester** and configured via Kubernetes Secrets. Supported authentication types:
+
+- **`bearer`**: Bearer token authentication
+  - Secret must contain `token` key with the bearer token value
+  - Client sends `Authorization: Bearer <token>` header
+- **`basic`**: HTTP Basic authentication
+  - Secret must contain `username` and `password` keys
+  - Password can be plain text (v0 compatibility) or bcrypt-hashed (recommended)
+  - Client sends HTTP Basic Auth headers
+
+**Creating Authentication Secrets:**
+
+```bash
+# Bearer token
+kubectl create secret generic trivy-webhook-secret \
+  --from-literal=token=$(openssl rand -hex 32) \
+  -n zen-system
+
+# Basic auth (plain text - for v0)
+kubectl create secret generic trivy-webhook-secret \
+  --from-literal=username=webhook-user \
+  --from-literal=password=secure-password \
+  -n zen-system
+
+# Basic auth (bcrypt - recommended)
+# Generate hash: echo -n "password" | htpasswd -nBCi 10 webhook-user
+kubectl create secret generic trivy-webhook-secret \
+  --from-literal=username=webhook-user \
+  --from-literal=password='$2a$10$...' \
+  -n zen-system
+```
+
+**Security:**
+- Secrets are cached (5-minute TTL) to reduce Kubernetes API load
+- Bearer tokens use constant-time comparison
+- Basic auth supports bcrypt password hashing
+- Each ingester requires its own secret (per-ingester authentication)
 
 ### `logs`
 

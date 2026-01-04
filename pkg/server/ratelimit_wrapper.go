@@ -15,6 +15,7 @@
 package server
 
 import (
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -23,19 +24,28 @@ import (
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 )
 
+// limiterEntry holds a rate limiter and its last-seen timestamp
+type limiterEntry struct {
+	limiter  *ratelimiter.RateLimiter
+	lastSeen time.Time
+}
+
 // PerKeyRateLimiter wraps zen-sdk rate limiter to provide per-key (per-IP) rate limiting.
 // This maintains backward compatibility with zen-watcher's per-IP rate limiting semantics.
 type PerKeyRateLimiter struct {
-	mu          sync.Mutex
-	limiters    map[string]*ratelimiter.RateLimiter
-	maxPerSec   int
-	cleanupTick *time.Ticker
+	mu                sync.Mutex
+	limiters          map[string]*limiterEntry
+	maxPerSec         int
+	cleanupTick       *time.Ticker
+	trustedProxyCIDRs []*net.IPNet
+	cleanupInterval   time.Duration // Interval between cleanup runs
+	entryTTL          time.Duration // Time-to-live for inactive entries
 }
 
 // NewPerKeyRateLimiter creates a new per-key rate limiter.
 // maxTokens is the maximum tokens per key, refillInterval is the refill interval.
 // This converts refillInterval-based semantics to per-second rate limiting.
-func NewPerKeyRateLimiter(maxTokens int, refillInterval time.Duration) *PerKeyRateLimiter {
+func NewPerKeyRateLimiter(maxTokens int, refillInterval time.Duration, trustedProxyCIDRs []*net.IPNet) *PerKeyRateLimiter {
 	// Convert refillInterval to per-second rate
 	// e.g., 100 tokens per minute = 100/60 = ~1.67 per second
 	// Round up to ensure we don't exceed the intended rate
@@ -45,12 +55,15 @@ func NewPerKeyRateLimiter(maxTokens int, refillInterval time.Duration) *PerKeyRa
 	}
 
 	rl := &PerKeyRateLimiter{
-		limiters:  make(map[string]*ratelimiter.RateLimiter),
-		maxPerSec: maxPerSec,
+		limiters:          make(map[string]*limiterEntry),
+		maxPerSec:         maxPerSec,
+		trustedProxyCIDRs: trustedProxyCIDRs,
+		cleanupInterval:   1 * time.Hour, // Run cleanup every hour
+		entryTTL:          1 * time.Hour, // Remove entries inactive for 1 hour
 	}
 
-	// Cleanup old entries periodically
-	rl.cleanupTick = time.NewTicker(1 * time.Hour)
+	// Start periodic cleanup
+	rl.cleanupTick = time.NewTicker(rl.cleanupInterval)
 	go rl.cleanup()
 
 	return rl
@@ -61,32 +74,59 @@ func (rl *PerKeyRateLimiter) Allow(key string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	limiter, exists := rl.limiters[key]
+	entry, exists := rl.limiters[key]
 	if !exists {
 		// Create new rate limiter for this key
-		limiter = ratelimiter.NewRateLimiter(rl.maxPerSec)
-		rl.limiters[key] = limiter
+		entry = &limiterEntry{
+			limiter:  ratelimiter.NewRateLimiter(rl.maxPerSec),
+			lastSeen: time.Now(),
+		}
+		rl.limiters[key] = entry
+	} else {
+		// Update last-seen timestamp
+		entry.lastSeen = time.Now()
 	}
 
-	return limiter.Allow()
+	return entry.limiter.Allow()
 }
 
-// cleanup removes old entries to prevent memory leaks.
+// cleanup removes old entries that haven't been accessed within the TTL period.
 func (rl *PerKeyRateLimiter) cleanup() {
 	for range rl.cleanupTick.C {
-		// Note: zen-sdk rate limiter doesn't track last access time,
-		// so we can't implement automatic cleanup based on inactivity.
-		// For now, we keep all limiters. In production, consider adding
-		// a last-access-time tracking mechanism if memory becomes an issue.
-		// No cleanup logic currently implemented, so no lock needed.
-		_ = rl // Keep reference to avoid unused receiver warning
+		rl.mu.Lock()
+		now := time.Now()
+		removed := 0
+		for key, entry := range rl.limiters {
+			// Remove entries that haven't been accessed within the TTL period
+			if now.Sub(entry.lastSeen) > rl.entryTTL {
+				delete(rl.limiters, key)
+				removed++
+			}
+		}
+		remaining := len(rl.limiters)
+		rl.mu.Unlock()
+
+		if removed > 0 {
+			logger := sdklog.NewLogger("zen-watcher-server")
+			logger.Debug("Rate limiter cleanup completed",
+				sdklog.Operation("rate_limit_cleanup"),
+				sdklog.Int("removed", removed),
+				sdklog.Int("remaining", remaining))
+		}
+	}
+}
+
+// Stop stops the cleanup ticker (for graceful shutdown)
+func (rl *PerKeyRateLimiter) Stop() {
+	if rl.cleanupTick != nil {
+		rl.cleanupTick.Stop()
 	}
 }
 
 // RateLimitMiddleware wraps a handler with rate limiting.
 func (rl *PerKeyRateLimiter) RateLimitMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		key := getClientIP(r)
+		key := getClientIP(r, rl.trustedProxyCIDRs)
 		if !rl.Allow(key) {
 			logger := sdklog.NewLogger("zen-watcher-server")
 			logger.Warn("Rate limit exceeded",

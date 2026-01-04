@@ -32,13 +32,6 @@ zen-watcher/
 │   ├── Dockerfile                # Multi-stage Dockerfile
 │   └── .dockerignore             # Docker ignore rules
 │
-├── charts/                       # Helm charts
-│   └── zen-watcher/              # Main Helm chart
-│       ├── Chart.yaml            # Chart metadata
-│       ├── values.yaml           # Default values
-│       ├── templates/            # K8s templates
-│       └── README.md             # Chart documentation
-│
 ├── config/                       # Configuration files
 │   ├── dashboards/               # Grafana dashboards
 │   ├── monitoring/               # Monitoring configs
@@ -135,12 +128,11 @@ zen-watcher/
 - Build configs
 - CI/CD files
 
-### `/charts`
-**Purpose**: Helm charts
+### Helm Charts
+**Note**: Helm charts are maintained in the separate [helm-charts](https://github.com/kube-zen/helm-charts) repository and published to ArtifactHub.
 
-- Standard Helm chart structure
-- Production-ready defaults
-- Comprehensive configuration
+- Install via Helm repository: `helm install zen-watcher kube-zen/zen-watcher`
+- Charts are not stored in this repository
 
 ### `/config`
 **Purpose**: Configuration files
@@ -192,7 +184,7 @@ zen-watcher/
 | CRD YAML | `deployments/crds/zen_event_crd.yaml` |
 | Business logic | `pkg/*/` subdirectories |
 | Dockerfile | `build/Dockerfile` |
-| Helm chart | `charts/zen-watcher/` |
+| Helm chart | `kube-zen/zen-watcher` (from ArtifactHub) |
 | K8s manifests | `deployments/` |
 | Monitoring | `config/monitoring/` |
 | Dashboard | `config/dashboards/` |
@@ -215,7 +207,9 @@ docker build -f build/Dockerfile -t zen-watcher:1.0.0 .
 
 ### Helm Install
 ```bash
-helm install zen-watcher ./charts/zen-watcher
+helm repo add kube-zen https://kube-zen.github.io/helm-charts
+helm repo update
+helm install zen-watcher kube-zen/zen-watcher --namespace zen-system --create-namespace
 ```
 
 ### kubectl Deploy

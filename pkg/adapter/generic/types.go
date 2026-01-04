@@ -29,8 +29,9 @@ type RawEvent struct {
 
 // SourceConfig represents the adapter configuration from Ingester CRD
 type SourceConfig struct {
-	Source   string
-	Ingester string // informer, webhook, logs
+	Source    string
+	Ingester  string // informer, webhook, logs
+	Namespace string // Namespace of the Ingester CRD (for loading secrets, etc.)
 
 	// Adapter-specific configs (only one should be set based on ingester)
 	Informer *InformerConfig

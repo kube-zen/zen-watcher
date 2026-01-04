@@ -419,7 +419,9 @@ cosign attest --predicate sbom.json --type spdx \
 cosign verify --key cosign.pub zubezen/zen-watcher:1.0.0
 
 # 8. Deploy
-helm install zen-watcher ./charts/zen-watcher \
+helm install zen-watcher kube-zen/zen-watcher \
+  --namespace zen-system \
+  --create-namespace \
   --set image.verifySignature=true \
   --set-file image.cosignPublicKey=cosign.pub
 ```

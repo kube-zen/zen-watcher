@@ -49,7 +49,10 @@ func (f *Factory) NewAdapter(ingester string) (GenericAdapter, error) {
 		}
 		return NewInformerAdapterWithManager(f.informerManager), nil
 	case "webhook":
-		return NewWebhookAdapter(), nil
+		if f.clientSet == nil {
+			return nil, fmt.Errorf("kubernetes client required for webhook adapter")
+		}
+		return NewWebhookAdapter(f.clientSet), nil
 	case "logs":
 		if f.clientSet == nil {
 			return nil, fmt.Errorf("kubernetes client required for logs adapter")

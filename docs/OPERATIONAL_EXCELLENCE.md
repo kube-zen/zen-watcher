@@ -350,7 +350,10 @@ helm get values zen-watcher -n zen-system > backup-values.yaml
 
 # 4. Restore
 kubectl apply -f backup-crd.yaml
-helm install zen-watcher ./charts/zen-watcher -f backup-values.yaml
+helm install zen-watcher kube-zen/zen-watcher \
+  --namespace zen-system \
+  --create-namespace \
+  -f backup-values.yaml
 kubectl apply -f backup-events.yaml
 ```
 
@@ -616,7 +619,8 @@ spec:
 
 ```bash
 # Update image
-helm upgrade zen-watcher ./charts/zen-watcher \
+helm upgrade zen-watcher kube-zen/zen-watcher \
+  --namespace zen-system \
   --reuse-values \
   --set image.tag=1.1.0 \
   --wait
@@ -678,7 +682,10 @@ tar -czf $BACKUP_DIR.tar.gz $BACKUP_DIR
 kubectl apply -f backup/crd.yaml
 
 # 2. Reinstall application
-helm install zen-watcher ./charts/zen-watcher -f backup/values.yaml
+helm install zen-watcher kube-zen/zen-watcher \
+  --namespace zen-system \
+  --create-namespace \
+  -f backup/values.yaml
 
 # 3. Wait for ready
 kubectl wait --for=condition=ready pod -l app=zen-watcher -n zen-system --timeout=300s
@@ -744,7 +751,7 @@ trivy image zubezen/zen-watcher:${IMAGE_TAG}
 cosign verify --key cosign.pub zubezen/zen-watcher:${IMAGE_TAG}
 
 # 3. Deploy
-helm upgrade --install zen-watcher ./charts/zen-watcher \
+helm upgrade --install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --set image.tag=${IMAGE_TAG} \
@@ -854,7 +861,8 @@ kubectl get zenevents -n zen-system --no-headers | wc -l
 
 ```bash
 # 1. Enable ServiceMonitor
-helm upgrade zen-watcher ./charts/zen-watcher \
+helm upgrade zen-watcher kube-zen/zen-watcher \
+  --namespace zen-system \
   --reuse-values \
   --set serviceMonitor.enabled=true
 

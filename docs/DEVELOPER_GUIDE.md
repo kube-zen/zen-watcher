@@ -1075,7 +1075,9 @@ kubectl apply -f deployments/crds/
 kubectl apply -f deployments/base/
 
 # Helm deployment
-helm install zen-watcher ./charts/zen-watcher \
+helm repo add kube-zen https://kube-zen.github.io/helm-charts
+helm repo update
+helm install zen-watcher kube-zen/zen-watcher \
     --namespace zen-system \
     --create-namespace
 
@@ -1404,13 +1406,19 @@ docker push kubezen/zen-watcher:latest
 
 ### 5. Update Helm Charts
 
+Helm charts are maintained in the separate [helm-charts](https://github.com/kube-zen/helm-charts) repository. To update charts:
+
 ```bash
-# Update helm chart values.yaml
-vim helm-charts/charts/zen-watcher/values.yaml
+# Clone the helm-charts repository
+git clone https://github.com/kube-zen/helm-charts.git
+cd helm-charts/charts/zen-watcher
+
+# Update values.yaml
+vim values.yaml
 # Change: tag: "1.0.20"
 
 # Commit and push
-git add helm-charts/charts/zen-watcher/values.yaml
+git add values.yaml
 git commit -m "zen-watcher v1.0.20"
 git push
 ```

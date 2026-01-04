@@ -16,6 +16,7 @@ package server
 
 import (
 	"crypto/subtle"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -32,6 +33,9 @@ type WebhookAuth struct {
 	// IP allowlist
 	ipAllowlistEnabled bool
 	allowedIPs         []string
+
+	// Trusted proxy CIDRs (for X-Forwarded-For/X-Real-IP header validation)
+	trustedProxyCIDRs []*net.IPNet
 
 	// mTLS (future)
 	// nolint:unused // Kept for future use
@@ -64,7 +68,40 @@ func NewWebhookAuth() *WebhookAuth {
 			sdklog.Strings("allowed_ips", auth.allowedIPs))
 	}
 
+	// Trusted proxy CIDRs
+	if trustedCIDRsStr := os.Getenv("SERVER_TRUSTED_PROXY_CIDRS"); trustedCIDRsStr != "" {
+		cidrs := strings.Split(trustedCIDRsStr, ",")
+		auth.trustedProxyCIDRs = make([]*net.IPNet, 0, len(cidrs))
+		for _, cidrStr := range cidrs {
+			cidrStr = strings.TrimSpace(cidrStr)
+			if cidrStr == "" {
+				continue
+			}
+			_, ipNet, err := net.ParseCIDR(cidrStr)
+			if err != nil {
+				logger := sdklog.NewLogger("zen-watcher-server")
+				logger.Warn("Invalid CIDR in SERVER_TRUSTED_PROXY_CIDRS, ignoring",
+					sdklog.Operation("auth_init"),
+					sdklog.String("cidr", cidrStr),
+					sdklog.Error(err))
+				continue
+			}
+			auth.trustedProxyCIDRs = append(auth.trustedProxyCIDRs, ipNet)
+		}
+		if len(auth.trustedProxyCIDRs) > 0 {
+			logger := sdklog.NewLogger("zen-watcher-server")
+			logger.Info("Trusted proxy CIDRs configured",
+				sdklog.Operation("auth_init"),
+				sdklog.Int("count", len(auth.trustedProxyCIDRs)))
+		}
+	}
+
 	return auth
+}
+
+// GetTrustedProxyCIDRs returns the trusted proxy CIDRs
+func (a *WebhookAuth) GetTrustedProxyCIDRs() []*net.IPNet {
+	return a.trustedProxyCIDRs
 }
 
 // Authenticate validates the request
@@ -99,7 +136,7 @@ func (a *WebhookAuth) Authenticate(r *http.Request) bool {
 
 	// IP allowlist
 	if a.ipAllowlistEnabled {
-		clientIP := getClientIP(r)
+		clientIP := getClientIP(r, a.trustedProxyCIDRs)
 		allowed := false
 		for _, allowedIP := range a.allowedIPs {
 			if clientIP == allowedIP || strings.HasPrefix(clientIP, allowedIP+":") {
@@ -123,26 +160,61 @@ func (a *WebhookAuth) Authenticate(r *http.Request) bool {
 }
 
 // getClientIP extracts the client IP from the request
-func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header (for proxies/load balancers)
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		ips := strings.Split(xff, ",")
-		if len(ips) > 0 {
-			return strings.TrimSpace(ips[0])
+// Only trusts X-Forwarded-For/X-Real-IP headers when RemoteAddr is from a trusted proxy CIDR
+func getClientIP(r *http.Request, trustedProxyCIDRs []*net.IPNet) string {
+	// Extract IP from RemoteAddr
+	remoteAddr := r.RemoteAddr
+	var remoteIP net.IP
+	if host, _, err := net.SplitHostPort(remoteAddr); err == nil {
+		remoteIP = net.ParseIP(host)
+	} else {
+		// Try parsing as IP without port
+		remoteIP = net.ParseIP(remoteAddr)
+	}
+
+	// Check if RemoteAddr is from a trusted proxy
+	isTrustedProxy := false
+	if remoteIP != nil {
+		for _, cidr := range trustedProxyCIDRs {
+			if cidr.Contains(remoteIP) {
+				isTrustedProxy = true
+				break
+			}
 		}
 	}
 
-	// Check X-Real-IP header
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return strings.TrimSpace(xri)
+	// Only trust proxy headers if RemoteAddr is from a trusted proxy
+	if isTrustedProxy {
+		// Check X-Forwarded-For header (for proxies/load balancers)
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			ips := strings.Split(xff, ",")
+			if len(ips) > 0 {
+				// Take the first (original client) IP
+				clientIP := strings.TrimSpace(ips[0])
+				if clientIP != "" {
+					return clientIP
+				}
+			}
+		}
+
+		// Check X-Real-IP header
+		if xri := r.Header.Get("X-Real-IP"); xri != "" {
+			clientIP := strings.TrimSpace(xri)
+			if clientIP != "" {
+				return clientIP
+			}
+		}
 	}
 
-	// Fall back to RemoteAddr
-	ip := r.RemoteAddr
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
+	// Fall back to RemoteAddr (untrusted proxy or no proxy headers)
+	if remoteIP != nil {
+		return remoteIP.String()
 	}
-	return ip
+	// Fallback: return RemoteAddr as-is if parsing failed
+	if idx := strings.LastIndex(remoteAddr, ":"); idx != -1 {
+		return remoteAddr[:idx]
+	}
+	return remoteAddr
 }
 
 // RequireAuth middleware function
