@@ -201,4 +201,3 @@ type LogPattern struct {
 	Type     string  `json:"type,omitempty" yaml:"type,omitempty"`
 	Priority float64 `json:"priority,omitempty" yaml:"priority,omitempty"`
 }
-
