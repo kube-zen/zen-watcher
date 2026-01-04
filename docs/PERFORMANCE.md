@@ -1,8 +1,6 @@
-# Performance Benchmarks and Profiling
+# Performance Guide
 
-This document provides performance benchmarks, profiling data, and scalability test results for zen-watcher. These numbers are critical for SIG review and demonstrate that zen-watcher does not cause excessive load on Kubernetes clusters.
-
----
+This guide provides comprehensive performance information for zen-watcher, including benchmarks, profiling data, sizing recommendations, and tuning guidance.
 
 ## Table of Contents
 
@@ -11,7 +9,10 @@ This document provides performance benchmarks, profiling data, and scalability t
 - [Resource Usage](#resource-usage)
 - [Informer CPU Cost](#informer-cpu-cost)
 - [Scale Testing](#scale-testing)
+- [Resource Allocation](#resource-allocation)
+- [Performance Tuning](#performance-tuning)
 - [Profiling Instructions](#profiling-instructions)
+- [Monitoring Performance](#monitoring-performance)
 
 ---
 
@@ -65,6 +66,45 @@ See `scripts/benchmark/` for benchmark scripts:
 - Deduplication adds ~5ms overhead per observation
 - Filtering adds ~3ms overhead per observation
 - Latency measured end-to-end (event received → CRD created)
+
+### Benchmark Scenarios
+
+#### High-Volume Events with Different Severity Mixes
+
+**Scenario 1: High LOW Severity (85% LOW, 15% HIGH)**
+- Simulates Trivy-like traffic with many low-priority findings
+- Expected strategy: `filter_first` (filter out noise early)
+- Throughput: ~150-170 events/sec
+- Memory: ~65MB average
+
+**Scenario 2: Balanced Severity (40% LOW, 30% MEDIUM, 30% HIGH)**
+- Mixed severity distribution
+- Expected strategy: `dedup_first` or `filter_first` depending on dedup effectiveness
+- Throughput: ~180-200 events/sec
+- Memory: ~55MB average
+
+**Scenario 3: High Deduplication Rate (60% duplicates)**
+- Simulates cert-manager-like traffic with retry patterns
+- Expected strategy: `dedup_first` (remove duplicates early)
+- Throughput: ~170-190 events/sec
+- Memory: ~60MB average
+
+#### Different Duplication Rates
+
+**Low Duplication (10%)**
+- Most events are unique
+- Dedup overhead minimal
+- Throughput: ~180-200 events/sec
+
+**Medium Duplication (40%)**
+- Moderate duplicate rate
+- Dedup provides value
+- Throughput: ~170-190 events/sec
+
+**High Duplication (70%)**
+- High duplicate rate
+- Dedup highly effective
+- Throughput: ~160-180 events/sec (dedup reduces work downstream)
 
 ### Sustained Throughput
 
@@ -226,6 +266,304 @@ kubectl get observations --chunk-size=500
 
 ---
 
+## Resource Allocation
+
+### Small Clusters (<5 nodes)
+
+```yaml
+resources:
+  limits:
+    cpu: 100m
+    memory: 256Mi
+  requests:
+    cpu: 50m
+    memory: 128Mi
+```
+
+### Medium Clusters (5-20 nodes)
+
+```yaml
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+```
+
+### Large Clusters (20+ nodes)
+
+```yaml
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+```
+
+### Resource Limits by Traffic Volume
+
+**Small Cluster (<1,000 events/day)**:
+```yaml
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+```
+
+**Medium Cluster (1,000-10,000 events/day)**:
+```yaml
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+```
+
+**Large Cluster (10,000-50,000 events/day)**:
+```yaml
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 1000m
+    memory: 512Mi
+```
+
+**Very Large Cluster (>50,000 events/day)**:
+- Consider namespace sharding
+- Or use multi-replica with HA optimization
+- Per-replica: 500m CPU, 512Mi memory
+
+---
+
+## Performance Tuning
+
+### Observation Lifecycle Management
+
+#### Automatic Cleanup
+
+Enable automatic cleanup via CronJob:
+```bash
+helm upgrade zen-watcher kube-zen/zen-watcher \
+  --set lifecycle.cleanup.enabled=true \
+  --set lifecycle.cleanup.schedule="0 2 * * *" \
+  --set lifecycle.cleanup.ttlDays=7
+```
+
+#### TTL Configuration by Use Case
+
+- **Dev/test**: 24 hours
+  ```yaml
+  lifecycle:
+    cleanup:
+      ttlDays: 1
+  ```
+
+- **Production**: 7 days
+  ```yaml
+  lifecycle:
+    cleanup:
+      ttlDays: 7
+  ```
+
+- **Compliance**: 90 days
+  ```yaml
+  lifecycle:
+    cleanup:
+      ttlDays: 90
+  ```
+
+### Deduplication Strategy Selection
+
+zen-watcher supports multiple deduplication strategies, each optimized for different event patterns:
+
+#### Available Strategies
+
+1. **`fingerprint` (default)**
+   - Content-based fingerprinting using source, category, severity, eventType, resource, and critical details
+   - Best for: General-purpose deduplication, most event sources
+   - Window: Configurable (default: 60s)
+   - Use when: You need accurate deduplication based on event content
+
+2. **`event-stream`**
+   - Strict window-based deduplication optimized for high-volume, noisy event streams
+   - Best for: Kubernetes events, log-based sources with repetitive patterns
+   - Window: Shorter effective window (5 minutes or configurable)
+   - Use when: You have high-volume sources with many duplicate events in short time windows
+
+3. **`key`**
+   - Field-based deduplication using explicit fields
+   - Best for: Custom deduplication logic based on specific resource fields
+   - Window: Configurable
+   - Use when: You need fine-grained control over which fields determine duplicates
+
+#### Strategy Selection Guidelines
+
+**Choose `fingerprint` (default) when:**
+- You want accurate content-based deduplication
+- Events have varying content but may be semantically similar
+- You need to deduplicate based on vulnerability IDs, rule names, or other critical details
+- Most use cases fall into this category
+
+**Choose `event-stream` when:**
+- You have high-volume sources (e.g., kubernetes-events via informer, log streams)
+- Events are highly repetitive within short time windows
+- You want stricter deduplication with shorter windows
+- You observe high dedup effectiveness (>60%) with the default strategy
+
+**Choose `key` when:**
+- You need custom deduplication logic based on specific resource fields
+- You want to deduplicate based on a subset of fields (e.g., only source + kind + name)
+- You have specific requirements that don't fit fingerprint or event-stream patterns
+
+#### Example Configurations
+
+**Fingerprint (default):**
+```yaml
+spec:
+  processing:
+    dedup:
+      enabled: true
+      strategy: "fingerprint"  # or omit for default
+      window: "60s"
+```
+
+**Event-stream for noisy sources:**
+```yaml
+spec:
+  processing:
+    dedup:
+      enabled: true
+      strategy: "event-stream"
+      window: "5m"
+      maxEventsPerWindow: 10
+```
+
+**Key-based for custom logic:**
+```yaml
+spec:
+  processing:
+    dedup:
+      enabled: true
+      strategy: "key"
+      window: "60s"
+      fields:
+        - "source"
+        - "kind"
+        - "name"
+```
+
+#### Monitoring Strategy Effectiveness
+
+Use the following metrics to evaluate strategy performance:
+
+```promql
+# Effectiveness per strategy
+zen_watcher_dedup_effectiveness_per_strategy{strategy="fingerprint",source="trivy"}
+
+# Compare strategies
+zen_watcher_dedup_effectiveness_per_strategy
+
+# Decision breakdown
+zen_watcher_dedup_decisions_total{strategy="event-stream",decision="drop"}
+```
+
+**When to switch strategies:**
+- If `fingerprint` effectiveness is <30% for a source, consider `event-stream`
+- If `event-stream` is dropping too many unique events, switch back to `fingerprint`
+- Monitor `zen_watcher_dedup_decisions_total` to understand drop vs create patterns
+
+### Horizontal Scaling Patterns
+
+**Single-Replica Deployment (Recommended for Most Cases)**
+- Suitable for clusters with <10,000 events/day
+- Simpler operation (no HA coordination)
+- Lower resource overhead
+- Use when: Single replica can handle your event volume
+
+**Multi-Replica Deployment (With HA Optimization)**
+- Suitable for clusters with >10,000 events/day
+- Requires `haOptimization.enabled: true` in Helm values
+- Provides:
+  - Dynamic deduplication window adjustment
+  - Adaptive cache sizing
+  - Load balancing across replicas
+- Use when: Single replica cannot keep up with event volume
+
+**Namespace Sharding (For Very Large Clusters)**
+- Deploy multiple zen-watcher instances, each watching specific namespaces
+- Each instance operates independently
+- Use when: Single cluster has >50,000 events/day
+
+### When to Tune Optimization Thresholds
+
+**Default thresholds work well for most cases**. Consider tuning if:
+
+1. **High LOW severity but filter_first not activating**
+   - Current threshold: 70%
+   - If you have 65% LOW severity and want filter_first, lower threshold
+   - Location: `pkg/optimization/config.go` (FilterFirstThresholdLowSeverity)
+
+2. **High dedup effectiveness but dedup_first not activating**
+   - Current threshold: 50%
+   - If you have 45% dedup effectiveness and want dedup_first, lower threshold
+   - Location: `pkg/optimization/config.go` (DedupFirstThresholdEffectiveness)
+
+3. **Frequent strategy oscillation**
+   - Indicates thresholds are too close to actual metrics
+   - Consider adding hysteresis (cooldown period)
+   - Already implemented: 5-minute cooldown between strategy changes
+
+**How to Tune**:
+1. Monitor `zen_watcher_optimization_strategy_changes_total` for oscillation
+2. Monitor `zen_watcher_low_severity_percent` and `zen_watcher_optimization_deduplication_rate_ratio`
+3. Adjust thresholds in optimization config if needed
+4. Rebuild and redeploy
+
+### Stress Testing Guidelines
+
+#### Max Observations per Test
+
+- **Small clusters**: 1000 observations
+- **Medium clusters**: 5000 observations
+- **Large clusters**: 10000 observations
+
+#### Batch Cleanup for Large Tests
+
+For stress tests with >1000 observations, use batch cleanup:
+```bash
+./scripts/cleanup/fast-observation-cleanup.sh zen-system stress-test=true 50 10
+```
+
+#### Monitor etcd Storage During Tests
+
+```bash
+# Check etcd storage usage
+kubectl top nodes
+kubectl get events --all-namespaces --sort-by='.lastTimestamp' | tail -20
+```
+
+### Optimization Tips
+
+1. **Enable filtering** to reduce unnecessary observations
+2. **Configure deduplication** to prevent duplicate events
+3. **Use resource quotas** to prevent resource exhaustion
+4. **Enable automatic cleanup** to manage observation lifecycle
+5. **Monitor etcd storage** during high-load periods
+6. **Scale horizontally** for high-throughput scenarios
+
+---
+
 ## Profiling Instructions
 
 ### CPU Profiling
@@ -318,9 +656,22 @@ spec:
 
 ---
 
-## Benchmark Scripts
+## Monitoring Performance
 
-### Quick Benchmark
+### Key Metrics to Monitor
+
+1. **Throughput**: `rate(zen_watcher_optimization_source_events_processed_total[5m])`
+2. **Latency**: `histogram_quantile(0.95, zen_watcher_optimization_source_processing_latency_seconds_bucket)`
+3. **Error Rate**: `rate(zen_watcher_pipeline_errors_total[5m])`
+4. **Resource Usage**: CPU and memory from Kubernetes metrics
+
+### Performance Alerts
+
+See [OBSERVABILITY.md](OBSERVABILITY.md) for recommended alerting rules.
+
+### Benchmark Scripts
+
+#### Quick Benchmark
 
 ```bash
 # Run quick benchmark (100 observations)
@@ -334,7 +685,7 @@ spec:
 # Memory: 50MB
 ```
 
-### Load Test
+#### Load Test
 
 ```bash
 # Run load test (1000 observations over 1 minute)
@@ -349,7 +700,7 @@ spec:
 # Memory avg: 55MB, peak: 75MB
 ```
 
-### Scale Test
+#### Scale Test
 
 ```bash
 # Create 20,000 observations
@@ -413,9 +764,17 @@ spec:
 
 ---
 
+## Related Documentation
+
+- [OBSERVABILITY.md](OBSERVABILITY.md) - Metrics and monitoring
+- [SCALING.md](SCALING.md) - Scaling strategies
+- [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Operations best practices
+- [OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md) - Optimization usage guide
+
+---
+
 ## References
 
 - [Kubernetes Performance Best Practices](https://kubernetes.io/docs/concepts/cluster-administration/manage-deployment/)
 - [etcd Performance Tuning](https://etcd.io/docs/v3.5/tuning/)
 - [Go Profiling Guide](https://go.dev/doc/diagnostics)
-

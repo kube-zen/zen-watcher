@@ -13,7 +13,7 @@ This document describes the validation guarantees provided by zen-watcher CRD sc
   - Example: `trivy`, `falco`, `kyverno`
 
 - **`spec.ingester`** (required, enum)
-  - Valid values: `informer`, `webhook`, `logs`, `k8s-events`
+  - Valid values: `informer`, `webhook`, `logs`
   - Rejected: any other value
 
 - **`spec.destinations`** (required, array, minItems: 1)

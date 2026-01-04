@@ -173,45 +173,6 @@ func NewKubeBenchIngester(namespace, name string) *Ingester {
 	}
 }
 
-// NewK8sEventsIngester creates a canonical Kubernetes Events Ingester example
-func NewK8sEventsIngester(namespace, name string) *Ingester {
-	enabled := true
-	return &Ingester{
-		APIVersion: "zen.kube-zen.io/v1",
-		Kind:       "Ingester",
-		Metadata: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Spec: IngesterSpec{
-			Source:   "k8s-events",
-			Ingester: "k8s-events",
-			Destinations: []Destination{
-				{
-					Type:  "crd",
-					Value: "observations",
-					Mapping: &NormalizationMapping{
-						Domain: "operations",
-						Type:   "kubernetes_event",
-					},
-				},
-			},
-			K8sEvents: &K8sEventsConfig{
-				InvolvedObjectKinds: []string{"Pod", "Deployment", "Service"},
-			},
-			Deduplication: &DeduplicationConfig{
-				Enabled:  &enabled,
-				Strategy: "fingerprint",
-				Window:   "5m",
-			},
-			Filters: &FilterConfig{
-				MinSeverity:       "MEDIUM",
-				ExcludeNamespaces: []string{"kube-system", "kube-public"},
-			},
-		},
-	}
-}
-
 func floatPtr(f float64) *float64 {
 	return &f
 }

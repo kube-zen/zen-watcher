@@ -1,0 +1,91 @@
+# Example: Multi-Destination Ingester
+# Demonstrates writing to multiple destinations simultaneously
+# This shows the power and extensibility of zen-watcher
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: trivy-multi-destination
+  namespace: zen-system
+spec:
+  source: trivy
+  ingester: informer
+  informer:
+    gvr:
+      group: aquasecurity.github.io
+      version: v1alpha1
+      resource: vulnerabilityreports
+    namespace: ""
+    resyncPeriod: "30m"
+  normalization:
+    domain: security
+    type: vulnerability
+    priority:
+      CRITICAL: 0.9
+      HIGH: 0.7
+      MEDIUM: 0.5
+      LOW: 0.3
+    fieldMapping:
+      - from: vulnerabilityID
+        to: cve_id
+      - from: resource.kind
+        to: resource_kind
+      - from: resource.name
+        to: resource_name
+  filter:
+    minPriority: 0.3
+    excludeNamespaces:
+      - kube-system
+      - kube-public
+  dedup:
+    window: "1h"
+    strategy: fingerprint
+  # Multiple destinations: write to both Observations CRD and ConfigMaps
+  destinations:
+    # Destination 1: Write to Observations CRD (standard, queryable)
+    - type: crd
+      name: observations
+      value: observations
+      mapping:
+        domain: security
+        type: vulnerability
+    
+    # Destination 2: Write to ConfigMaps (for integration with other tools)
+    # Useful for tools that read from ConfigMaps or for backup/archival
+    - type: crd
+      name: configmap-archive
+      gvr:
+        group: ""
+        version: "v1"
+        resource: "configmaps"
+      mapping:
+        domain: security
+        type: vulnerability_archive
+        fieldMapping:
+          - from: cve_id
+            to: cve-id
+          - from: resource_kind
+            to: resource-kind
+          - from: resource_name
+            to: resource-name
+
+---
+# Use Case Examples:
+#
+# 1. Dual Storage Strategy:
+#    - Observations: For real-time querying, dashboards, and alerts
+#    - ConfigMaps: For archival, compliance reporting, or tool integration
+#
+# 2. Multi-Tool Integration:
+#    - Observations: Consumed by zen-watcher dashboards and controllers
+#    - ConfigMaps: Consumed by external tools (e.g., compliance scanners)
+#
+# 3. Backup and Redundancy:
+#    - Observations: Primary storage with full CRD features
+#    - ConfigMaps: Backup storage in case CRD access is restricted
+#
+# Benefits:
+# - Single source of truth (Trivy) → multiple destinations
+# - No duplication of collection logic
+# - Each destination can have different normalization/mapping
+# - Flexible: add/remove destinations without changing source config
+

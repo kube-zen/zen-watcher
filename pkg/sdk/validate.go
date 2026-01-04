@@ -21,14 +21,23 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/config"
 )
 
-// ValidationError represents a validation error
+// ValidationError represents a validation error with actionable suggestions
 type ValidationError struct {
-	Field   string
-	Message string
+	Field      string
+	Message    string
+	Suggestion string // Optional suggestion for fixing the error
+	Example    string // Optional example of correct value
 }
 
 func (e *ValidationError) Error() string {
-	return fmt.Sprintf("validation error in field '%s': %s", e.Field, e.Message)
+	msg := fmt.Sprintf("validation error in field '%s': %s", e.Field, e.Message)
+	if e.Suggestion != "" {
+		msg += fmt.Sprintf(" (suggestion: %s)", e.Suggestion)
+	}
+	if e.Example != "" {
+		msg += fmt.Sprintf(" (example: %s)", e.Example)
+	}
+	return msg
 }
 
 // ValidateIngester validates an Ingester spec
@@ -61,21 +70,30 @@ func ValidateIngester(ingester *Ingester) error {
 	}
 
 	if spec.Ingester == "" {
-		return &ValidationError{Field: "spec.ingester", Message: "is required"}
+		return &ValidationError{
+			Field:      "spec.ingester",
+			Message:    "is required",
+			Suggestion: "Specify one of: informer, webhook, or logs",
+			Example:    "spec:\n  ingester: informer",
+		}
 	}
 
 	validIngesterTypes := map[string]bool{
-		"informer":   true,
-		"webhook":    true,
-		"logs":       true,
-		"k8s-events": true,
+		"informer": true,
+		"webhook":  true,
+		"logs":     true,
 	}
 	if !validIngesterTypes[spec.Ingester] {
-		return &ValidationError{Field: "spec.ingester", Message: fmt.Sprintf("must be one of: informer, webhook, logs, k8s-events (got: %s)", spec.Ingester)}
+		return &ValidationError{Field: "spec.ingester", Message: fmt.Sprintf("must be one of: informer, webhook, logs (got: %s)", spec.Ingester)}
 	}
 
 	if len(spec.Destinations) == 0 {
-		return &ValidationError{Field: "spec.destinations", Message: "must have at least one destination"}
+		return &ValidationError{
+			Field:      "spec.destinations",
+			Message:    "must have at least one destination",
+			Suggestion: "Add at least one destination (e.g., 'observations' CRD)",
+			Example:    "spec:\n  destinations:\n    - type: crd\n      value: observations",
+		}
 	}
 
 	// Validate destinations
@@ -108,7 +126,12 @@ func validateDestinations(destinations []Destination) error {
 		}
 
 		if dest.Value == "" {
-			return &ValidationError{Field: fmt.Sprintf("spec.destinations[%d].value", i), Message: "is required for type 'crd'"}
+			return &ValidationError{
+				Field:      fmt.Sprintf("spec.destinations[%d].value", i),
+				Message:    "is required for type 'crd'",
+				Suggestion: "Specify the CRD resource name (e.g., 'observations', 'configmaps')",
+				Example:    "spec:\n  destinations:\n    - type: crd\n      value: observations",
+			}
 		}
 
 		if !matchesPattern(dest.Value, `^[a-z0-9-]+$`) {

@@ -177,6 +177,6 @@ This validation harness:
 ## Related Documentation
 
 - [Helm Deployment Guide](DEPLOYMENT_HELM.md) - Complete Helm installation guide
-- [obsctl CLI Guide](OBSCTL_CLI_GUIDE.md) - Querying Observations
+- [TOOLING_GUIDE.md](TOOLING_GUIDE.md#obsctl) - Querying Observations with obsctl
 - [Troubleshooting](TROUBLESHOOTING.md) - Common issues and solutions
 

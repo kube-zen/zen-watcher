@@ -81,6 +81,86 @@ chmod +x query-examples.sh
 # Run individual commands from the script
 ```
 
+### 5. **multi-destination-ingester.yaml**
+Advanced example demonstrating zen-watcher's extensibility: writing to multiple destinations simultaneously.
+
+**Features**:
+- Single source (Trivy) → multiple destinations
+- Observations CRD (primary, queryable)
+- ConfigMaps (secondary, for archival/integration)
+- Different normalization/mapping per destination
+
+**Use Cases**:
+- Dual storage strategy (real-time + archival)
+- Multi-tool integration (different tools consume different destinations)
+- Backup and redundancy
+
+**Usage**:
+```bash
+# Apply the multi-destination ingester
+kubectl apply -f multi-destination-ingester.yaml
+
+# Check Observations CRD
+kubectl get observations -n zen-system -l source=trivy
+
+# Check ConfigMap archive
+kubectl get configmaps -n zen-system -l source=trivy
+```
+
+**Benefits**:
+- No duplication of collection logic
+- Flexible: add/remove destinations without changing source config
+- Each destination can have different field mappings
+
+### 6. **Non-Security Examples** (Generic Event Processing)
+
+zen-watcher is a **generic Kubernetes event processing engine**, not just for security. These examples demonstrate its versatility:
+
+#### Performance Monitoring
+- **performance-pod-crashloop.yaml**: Detects pods in CrashLoopBackOff state
+  - Use case: Application reliability monitoring
+  - Features: Aggressive filtering, deduplication to prevent alert fatigue
+  
+- **performance-latency-spike.yaml**: Receives latency alerts from monitoring tools
+  - Use case: Performance engineering, SLO monitoring
+  - Features: Webhook ingestion, priority-based filtering
+
+#### Cost Optimization
+- **cost-resource-waste.yaml**: Detects resource inefficiency in deployments
+  - Use case: Cloud cost management, FinOps
+  - Features: Long deduplication window, cost-focused filtering
+
+#### Operations Monitoring
+- **operations-deployment-failures.yaml**: Monitors deployment status for failures
+  - Use case: CI/CD pipeline monitoring, DevOps
+  - Features: Real-time failure detection, filtering healthy deployments
+
+- **application-error-logs.yaml**: Monitors application logs for errors
+  - Use case: Application observability, error tracking
+  - Features: Log pattern matching, error aggregation
+
+- **infrastructure-node-conditions.yaml**: Monitors node health conditions
+  - Use case: Infrastructure reliability, cluster health
+  - Features: Node condition monitoring, infrastructure alerts
+
+**Usage**:
+```bash
+# Apply performance monitoring
+kubectl apply -f performance-pod-crashloop.yaml
+
+# Apply cost optimization
+kubectl apply -f cost-resource-waste.yaml
+
+# Apply operations monitoring
+kubectl apply -f operations-deployment-failures.yaml
+```
+
+**Key Benefits**:
+- **Generic**: Works with any Kubernetes resource or event source
+- **Filtering**: Reduce noise by filtering low-priority events
+- **Deduplication**: Aggregate repeated events to prevent spam
+- **Extensible**: Add any source type (informer, webhook, logs)
+
 ---
 
 ## 🎯 Quick Start Examples

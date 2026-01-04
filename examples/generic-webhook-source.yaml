@@ -39,3 +39,6 @@ spec:
       - "message"
   processing:
     order: auto
+  destinations:
+    - type: crd
+      value: observations

@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 #### Added
 
 **Core Features:**
-- **Ingester v1**: Complete Ingester CRD with informer/webhook/logs/k8s-events support
+- **Ingester v1**: Complete Ingester CRD with informer/webhook/logs support
 - **Canonical Pipeline**: Enforced pipeline order `source → (filter | dedup) → normalize → destinations[]`
 - **Configurable Processing Order**: Manual selection of filter_first or dedup_first strategies per source
 - **Filter Expressions (v1.1)**: Expression-based filtering with AND/OR/NOT, comparisons, macros

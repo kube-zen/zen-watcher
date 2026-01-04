@@ -9,7 +9,7 @@ This document provides a clear reference for all configuration types used in zen
 **Scope**: Complete ingester configuration including all source types  
 **Fields**:
 - Namespace, Name, Source, Ingester
-- Informer, Webhook, Logs, K8sEvents configs
+- Informer, Webhook, Logs configs
 - Normalization, Filter, Dedup, Processing, Optimization configs
 - Destinations
 

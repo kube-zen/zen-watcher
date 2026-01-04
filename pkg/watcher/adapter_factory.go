@@ -31,8 +31,7 @@ type WorkerPoolInterface interface {
 }
 
 // AdapterFactory creates SourceAdapter instances for all configured sources
-// Only creates the K8sEventsAdapter (exception). All other sources are configured
-// via Ingester CRDs and handled by the GenericOrchestrator.
+// All sources are configured via Ingester CRDs and handled by the GenericOrchestrator.
 type AdapterFactory struct {
 	clientSet kubernetes.Interface
 }
@@ -47,19 +46,11 @@ func NewAdapterFactory(
 }
 
 // CreateAdapters creates all enabled source adapters
-// Only creates K8sEventsAdapter. All other sources are configured via
-// Ingester CRDs and handled by GenericOrchestrator.
+// All sources are configured via Ingester CRDs and handled by GenericOrchestrator.
 func (af *AdapterFactory) CreateAdapters() []SourceAdapter {
-	var adapters []SourceAdapter
-
-	// Only create K8sEventsAdapter (exception - watching native Kubernetes Events API)
-	// All other sources are configured via Ingester CRDs and handled by GenericOrchestrator
+	// All sources are now configured via Ingester CRDs and handled by GenericOrchestrator
 	// which creates generic adapters (informer, webhook, logs) based on YAML config.
-	if af.clientSet != nil {
-		adapters = append(adapters, NewK8sEventsAdapter(af.clientSet))
-	}
-
-	return adapters
+	return []SourceAdapter{}
 }
 
 // AdapterLauncher manages running all source adapters

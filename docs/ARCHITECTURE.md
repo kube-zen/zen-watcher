@@ -21,7 +21,7 @@ Zen Watcher is a Kubernetes-native security event aggregator that consolidates e
 - **Standalone**: Works completely independently, no external services required
 - **Pure & Secure**: Zero egress traffic, zero secrets, zero external dependencies
 - **Kubernetes-native**: Stores data as CRDs in etcd, no external database
-- **Modular**: 9 first-class source adapters + 1 generic CRD adapter for extensibility
+- **Modular**: Generic Source Adapters (informer, webhook, logs) for all sources, configured via Ingester CRD
 - **Efficient**: <100m CPU, <50MB RAM under normal load (tested with 9 sources)
 - **Observable**: 20+ Prometheus metrics, structured logging, health endpoints
 - **Infrastructure-Blind**: Avoids cluster-unique identifiers (AWS account ID, GKE project name) while preserving Kubernetes-native context (namespace, name, kind) for RBAC, auditing, and multi-tenancy
@@ -41,11 +41,12 @@ Zen Watcher is a Kubernetes-native security event aggregator that consolidates e
 - kubectl-compatible
 
 ### 3. **Extensible & Modular**
-- **Formal SourceAdapter interface** for standardizing new source integrations
-- **Informer-based processors** for CRD sources (real-time)
-- **Webhook processors** for push-based tools (real-time)
-- **ConfigMap processors** for batch tools (periodic)
-- Easy to add new watchers by implementing the SourceAdapter interface
+- **Ingester CRD** - User-facing API for configuring event collection
+- **Source Adapter interface** - Implementation components that transform events
+- **Informer-based adapters** for CRD sources (real-time)
+- **Webhook adapters** for push-based tools (real-time)
+- **Log adapters** for log-based sources (real-time)
+- Easy to add new sources via Ingester CRD (YAML) or by implementing SourceAdapter interface
 - Normalized Event model for consistent processing
 - Tool-specific data kept in `details.*` namespace (generic Observation spec)
 - Follows Kubernetes controller best practices
@@ -201,7 +202,7 @@ Each event source type has a dedicated processor that **normalizes events** and 
   - Creates Observation structure
   - Calls `ObservationCreator.CreateObservation()` (centralized flow)
 
-- **InformerAdapter**: Handles any Kubernetes resource (CRDs, ConfigMaps, Pods, etc.)
+- **InformerAdapter** (Source Adapter): Handles any Kubernetes resource (CRDs, ConfigMaps, Pods, etc.)
   - Watches resources via Kubernetes informers
   - Extracts data from resource events
   - Calls `ObservationCreator.CreateObservation()` (centralized flow)
@@ -473,7 +474,7 @@ Parse JSON, extract failed_checks[]
 Create Observation with category=security
 ```
 
-**Note**: ConfigMaps are not a separate source type. They're watched using the `informer` adapter with `gvr: {group: "", version: "v1", resource: "configmaps"}`.
+**Note**: ConfigMaps are not a separate source type. They're watched using the `informer` Source Adapter (configured via Ingester CRD with `gvr: {group: "", version: "v1", resource: "configmaps"}`).
 
 #### C. Webhook-Based Sources (Push Model)
 **Falco:**
@@ -500,7 +501,7 @@ Create Observation with category=compliance
 
 ### 2. Event Processing Pipeline
 
-All events from any source (informer, webhook, logs, k8s-events) flow through the same centralized processing pipeline:
+All events from any source (informer, webhook, logs) flow through the same centralized processing pipeline:
 
 ```mermaid
 graph LR
@@ -529,7 +530,7 @@ graph LR
 
 2. **NORMALIZE** - Map to standard format
    - Severity: Normalize to uppercase (CRITICAL, HIGH, MEDIUM, LOW)
-   - Category: Assign standard category (security, compliance, performance)
+   - Category: Assign standard category (security, compliance, performance, operations, cost)
    - EventType: Map to standard event types
    - Resource: Normalize Kubernetes resource references
 

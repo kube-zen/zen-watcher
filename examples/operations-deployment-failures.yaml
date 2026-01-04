@@ -1,0 +1,60 @@
+# Example: Operations Monitoring - Deployment Failure Detection
+# Monitors Deployment status for failures using informer
+# Demonstrates: Operations monitoring, filtering, and real-time alerts
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: deployment-failure-monitor
+  namespace: zen-system
+spec:
+  source: deployment-watcher
+  ingester: informer
+  informer:
+    gvr:
+      group: "apps"
+      version: "v1"
+      resource: "deployments"
+    namespace: ""
+    resyncPeriod: "5m"
+  normalization:
+    domain: operations
+    type: deployment_failure
+    priority:
+      # Failed deployments are critical
+      ReplicaFailure: 0.9
+      ProgressDeadlineExceeded: 0.9
+      Available: 0.1  # Healthy deployments are low priority
+    fieldMapping:
+      - from: status.conditions[?(@.type=='Available')].status
+        to: available_status
+      - from: status.conditions[?(@.type=='Progressing')].reason
+        to: failure_reason
+      - from: status.replicas
+        to: desired_replicas
+      - from: status.availableReplicas
+        to: available_replicas
+  filter:
+    enabled: true
+    minPriority: 0.7  # Only failures, not healthy deployments
+    includeEventTypes:
+      - deployment_failure
+    excludeNamespaces:
+      - kube-system
+  dedup:
+    enabled: true
+    window: "10m"  # Dedupe repeated failures
+    strategy: fingerprint
+  destinations:
+    - type: crd
+      value: observations
+      mapping:
+        domain: operations
+        type: deployment_failure
+
+---
+# Use Case: CI/CD and Deployment Monitoring
+# - Detects failed deployments in real-time
+# - Filters out healthy deployments to reduce noise
+# - Useful for DevOps teams monitoring deployment pipelines
+# - Can trigger alerts for failed rollouts
+

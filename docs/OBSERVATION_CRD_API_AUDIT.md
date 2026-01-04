@@ -40,7 +40,7 @@ This audit evaluates the current Observation CRD (and related configuration CRDs
 ```yaml
 spec:
   source: string          # Tool identifier (trivy, falco, kyverno, etc.)
-  category: string        # Event category (security, compliance, performance)
+  category: string        # Event category (security, compliance, performance, operations, cost)
   severity: string        # Severity level (critical, high, medium, low, info)
   eventType: string       # Type of event (vulnerability, runtime-threat, policy-violation)
 ```
@@ -384,7 +384,6 @@ status:
 
 - **Current CRD**: `deployments/crds/observation_crd.yaml`
 - **CRD Documentation**: `docs/CRD.md`
-- **KEP Draft**: `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md`
 - **Versioning Plan**: `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` (execution path for improvements)
 - **Quality Standards**: `CONTRIBUTING.md` (Quality Bar & API Stability section)
 - **Roadmap**: `the project roadmap`

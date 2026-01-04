@@ -40,4 +40,7 @@ spec:
   rateLimit:
     observationsPerMinute: 10000
     burst: 100
+  destinations:
+    - type: crd
+      value: observations
 

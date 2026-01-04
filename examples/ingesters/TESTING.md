@@ -220,7 +220,7 @@ kubectl get observation <name> -n default -o jsonpath='{.spec.category}'  # Shou
 ### Apply Ingester
 
 ```bash
-kubectl apply -f high-rate-k8s-events.yaml
+kubectl apply -f high-rate-kubernetes-events.yaml
 ```
 
 ### Generate Test Events
@@ -243,7 +243,7 @@ kubectl delete pod test-event-generator
 
 ```bash
 # Should see multiple Observations created
-kubectl get observations -n default -l source=k8s-events --sort-by=.metadata.creationTimestamp
+kubectl get observations -n default -l source=kubernetes-events --sort-by=.metadata.creationTimestamp
 ```
 
 ### Validate Observation Fields
@@ -253,7 +253,7 @@ kubectl get observation <name> -n default -o jsonpath='{.spec.category}'  # Shou
 ```
 
 **Expected**:
-- `spec.source`: "k8s-events" (or configured source name)
+- `spec.source`: "kubernetes-events" (or configured source name)
 - `spec.category`: "operations"
 - Multiple Observations created for the event burst
 

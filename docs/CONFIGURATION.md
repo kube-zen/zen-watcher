@@ -2,6 +2,8 @@
 
 This document describes all configuration options for zen-watcher, including environment variables, ConfigMap settings, and Ingester CRD configuration.
 
+---
+
 ## Environment Variables
 
 ### API Group Configuration
@@ -150,6 +152,170 @@ export LOG_LEVEL=DEBUG  # Enable debug logging
 export WATCH_NAMESPACE=zen-system  # Only watch zen-system namespace
 ```
 
+---
+
+## ConfigMap Configuration
+
+zen-watcher supports ConfigMap-based configuration for runtime feature management. This approach:
+
+- ✅ **Leverages Existing Infrastructure**: Uses the existing informer system
+- ✅ **Runtime Updates**: Change configuration without pod restarts
+- ✅ **Hierarchical Configuration**: Base + environment-specific overrides
+- ✅ **GitOps Friendly**: Configuration as code in version control
+
+### Configuration Structure
+
+#### Base Configuration
+
+The base configuration (`zen-watcher-base-config`) contains default settings for all features:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zen-watcher-base-config
+  namespace: zen-system
+data:
+  features.yaml: |
+    worker_pool:
+      enabled: false
+      size: 5
+      queue_size: 1000
+    
+    event_batching:
+      enabled: false
+      batch_size: 50
+      batch_age: 10s
+      flush_interval: 30s
+    
+    namespace_filtering:
+      enabled: true
+      included_namespaces: []
+      excluded_namespaces: ["kube-system", "kube-public", "kube-node-lease"]
+```
+
+#### Environment-Specific Overrides
+
+Environment-specific ConfigMaps (e.g., `zen-watcher-prod-config`) can override base settings:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zen-watcher-prod-config
+  namespace: zen-system
+data:
+  features.yaml: |
+    worker_pool:
+      enabled: true
+      size: 20
+      queue_size: 5000
+    
+    event_batching:
+      enabled: true
+      batch_size: 200
+      batch_age: 5s
+```
+
+### Feature Configuration
+
+#### Worker Pool
+
+Controls async event processing:
+
+```yaml
+worker_pool:
+  enabled: true      # Enable/disable worker pool
+  size: 20          # Number of worker goroutines
+  queue_size: 5000  # Maximum queue depth
+```
+
+**Environment Variables** (fallback if ConfigMap not available):
+- `WORKER_POOL_ENABLED=true`
+- `WORKER_POOL_SIZE=20`
+
+#### Event Batching
+
+Batches observations for high-volume destinations:
+
+```yaml
+event_batching:
+  enabled: true         # Enable/disable batching
+  batch_size: 200      # Maximum events per batch
+  batch_age: 5s        # Maximum age before flush
+  flush_interval: 30s  # Periodic flush interval
+```
+
+**Environment Variables** (fallback):
+- `EVENT_BATCHING_ENABLED=true`
+- `EVENT_BATCH_SIZE=200`
+- `EVENT_BATCH_AGE=5s`
+
+#### Namespace Filtering
+
+Filters informer resources by namespace:
+
+```yaml
+namespace_filtering:
+  enabled: true
+  included_namespaces: ["production", "staging"]  # Only watch these namespaces
+  excluded_namespaces: ["kube-system"]            # Exclude these namespaces
+```
+
+### ConfigMap Deployment
+
+#### 1. Create ConfigMaps
+
+```bash
+# Apply base configuration
+kubectl apply -f deployments/configmaps/zen-watcher-base-config.yaml
+
+# Apply environment-specific configuration (optional)
+kubectl apply -f deployments/configmaps/zen-watcher-prod-config.yaml
+```
+
+#### 2. Configure Environment Variables
+
+Set these environment variables in your deployment:
+
+```yaml
+env:
+- name: CONFIG_NAMESPACE
+  value: "zen-system"
+- name: BASE_CONFIG_NAME
+  value: "zen-watcher-base-config"
+- name: ENV_CONFIG_NAME
+  value: "zen-watcher-prod-config"  # Optional
+```
+
+#### 3. Verify Configuration
+
+Check logs for configuration updates:
+
+```bash
+kubectl logs -n zen-system deployment/zen-watcher | grep "config_update"
+```
+
+### Runtime Updates
+
+Configuration changes are applied immediately without pod restarts:
+
+```bash
+# Update worker pool size
+kubectl patch configmap zen-watcher-base-config -n zen-system --type merge -p '
+data:
+  features.yaml: |
+    worker_pool:
+      enabled: true
+      size: 30
+      queue_size: 10000
+'
+```
+
+Changes are detected within seconds and applied automatically.
+
+---
+
 ## Configuration Precedence
 
 Configuration is applied in the following order (highest to lowest priority):
@@ -163,15 +329,20 @@ Configuration is applied in the following order (highest to lowest priority):
 2. **ConfigMap** (if configured)
    - Global defaults
    - Shared normalization rules
+   - Feature flags (worker pool, event batching, namespace filtering)
+   - Environment-specific overrides
 
 3. **Environment Variables**
    - Default TTL
    - GC settings
    - API group override
+   - Feature flags (fallback if ConfigMap not available)
 
 4. **Built-in Defaults** (lowest priority)
    - Hardcoded defaults in code
    - See `pkg/config/constants.go`
+
+---
 
 ## Examples
 
@@ -206,9 +377,86 @@ export OBSERVATION_TTL_SECONDS=3600  # 1 hour for testing
 export GC_INTERVAL=5m
 ```
 
+### Production ConfigMap Configuration
+
+```yaml
+# Base ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zen-watcher-base-config
+  namespace: zen-system
+data:
+  features.yaml: |
+    worker_pool:
+      enabled: true
+      size: 20
+      queue_size: 5000
+    event_batching:
+      enabled: true
+      batch_size: 200
+      batch_age: 5s
+    namespace_filtering:
+      enabled: true
+      excluded_namespaces: ["kube-system", "kube-public"]
+```
+
+---
+
+## Best Practices
+
+1. **Use Base + Environment Pattern**: Keep defaults in base ConfigMap, overrides in environment ConfigMaps
+2. **Version Control**: Store ConfigMaps in Git for auditability
+3. **Gradual Rollout**: Test configuration changes in staging before production
+4. **Monitor Metrics**: Watch Prometheus metrics after configuration changes
+5. **Documentation**: Document environment-specific configurations
+6. **Precedence Awareness**: Understand configuration precedence to avoid conflicts
+
+---
+
+## Troubleshooting
+
+### Configuration Not Applied
+
+1. Check ConfigMap exists:
+   ```bash
+   kubectl get configmap zen-watcher-base-config -n zen-system
+   ```
+
+2. Verify YAML syntax:
+   ```bash
+   kubectl get configmap zen-watcher-base-config -n zen-system -o yaml | grep -A 20 features.yaml
+   ```
+
+3. Check logs for errors:
+   ```bash
+   kubectl logs -n zen-system deployment/zen-watcher | grep -i config
+   ```
+
+### Configuration Conflicts
+
+If both base and environment ConfigMaps exist, environment settings take precedence. To debug:
+
+```bash
+# Check current merged configuration
+kubectl logs -n zen-system deployment/zen-watcher | grep "config_update"
+```
+
+### Environment Variable Override
+
+If ConfigMap is not available, environment variables are used as fallback. Check environment variables:
+
+```bash
+kubectl get deployment zen-watcher -n zen-system -o yaml | grep -A 20 env:
+```
+
+---
+
 ## Related Documentation
 
 - [Ingester API](INGESTER_API.md) - Ingester CRD configuration
+- [Config Type Reference](CONFIG_TYPE_REFERENCE.md) - Internal configuration type reference
 - [Deployment Guide](DEPLOYMENT_HELM.md) - Helm deployment configuration
 - [Troubleshooting](TROUBLESHOOTING.md) - Common configuration issues
-
+- [Performance Tuning](PERFORMANCE.md) - Performance optimization guide
+- [Scaling Guide](SCALING.md) - Horizontal scaling patterns

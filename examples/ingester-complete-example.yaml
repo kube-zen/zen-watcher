@@ -1,5 +1,7 @@
 # Complete Ingester Example - Demonstrating All Ingester Types
 # This example shows how to configure different ingester types in Zen Watcher
+#
+# For multi-destination examples, see: multi-destination-ingester.yaml
 
 ---
 # Example 1: Informer Ingester (for CRD-based tools like Trivy, Kyverno)
@@ -38,6 +40,9 @@ spec:
   dedup:
     window: "1h"
     strategy: fingerprint
+  destinations:
+    - type: crd
+      value: observations
 
 ---
 # Example 2: Webhook Ingester (for push-based tools like Falco, Audit)
@@ -64,6 +69,9 @@ spec:
   dedup:
     window: "5m"
     strategy: fingerprint
+  destinations:
+    - type: crd
+      value: observations
 
 ---
 # Example 3: Logs Ingester (for log-based monitoring)
@@ -92,9 +100,13 @@ spec:
     type: log_error
   filter:
     minPriority: 0.4
+  destinations:
+    - type: crd
+      value: observations
 
 ---
 # Example 4: ConfigMap Ingester (for batch tools like Checkov, Kube-Bench)
+# Uses informer with GVR to watch ConfigMaps
 apiVersion: zen.kube-zen.io/v1alpha1
 kind: Ingester
 metadata:
@@ -102,12 +114,15 @@ metadata:
   namespace: zen-system
 spec:
   source: checkov
-  ingester: informer  # NOTE: ConfigMap ingester type removed. Use informer with GVR.
-  configmap:
+  ingester: informer
+  informer:
+    gvr:
+      group: ""
+      version: "v1"
+      resource: "configmaps"
     namespace: ""
     labelSelector: app=checkov
-    pollInterval: "30m"
-    jsonPath: ""
+    resyncPeriod: "30m"
   normalization:
     domain: security
     type: iac_vulnerability
@@ -121,11 +136,18 @@ spec:
   dedup:
     window: "2h"
     strategy: fingerprint
+  destinations:
+    - type: crd
+      gvr:
+        group: ""
+        version: "v1"
+        resource: "configmaps"
+      mapping:
+        domain: security
+        type: iac_vulnerability
 
 ---
-# Example 5: K8s Events Ingester (native Kubernetes Events API)
-# Note: k8s-events ingester is handled by K8sEventsAdapter which is built-in
-# This example shows how it would be configured (if supported via CRD)
+# Example 5: Kubernetes Events Ingester (using informer)
 apiVersion: zen.kube-zen.io/v1alpha1
 kind: Ingester
 metadata:
@@ -133,8 +155,14 @@ metadata:
   namespace: zen-system
 spec:
   source: kubernetes-events
-  ingester: k8s-events
-  # k8s-events doesn't require additional config as it uses native K8s Events API
+  ingester: informer
+  informer:
+    gvr:
+      group: ""
+      version: "v1"
+      resource: "events"
+    namespace: ""
+    resyncPeriod: "0"
   normalization:
     domain: operations
     type: kubernetes_event
@@ -153,4 +181,7 @@ spec:
   dedup:
     window: "10m"
     strategy: fingerprint
+  destinations:
+    - type: crd
+      value: observations
 

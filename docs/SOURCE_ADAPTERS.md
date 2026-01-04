@@ -1,6 +1,12 @@
 # Writing a New Source Adapter
 
-This guide explains how to add support for new event sources to Zen Watcher. The Source Adapter interface makes it easy to integrate any tool that emits security, compliance, or infrastructure events.
+This guide explains how to add support for new event sources to Zen Watcher. 
+
+**Terminology:**
+- **Ingester** - The user-facing Kubernetes CRD that defines how events are collected and processed
+- **Source Adapter** - The implementation component that transforms tool-specific events into normalized format
+
+The Ingester CRD uses Source Adapters internally to handle event transformation. Most users configure Ingesters via YAML without needing to understand Source Adapters.
 
 ## 🎯 Adding a New Source: Just YAML!
 
@@ -36,44 +42,23 @@ That's it! No code changes, no recompilation—just apply the YAML and zen-watch
 
 See [Generic Source Configuration](#generic-source-configuration-via-yaml) below for complete examples of all input methods.
 
-## Two-Tier Adapter Approach
+## Architecture: Ingester CRD and Source Adapters
 
-Zen Watcher uses a **two-tier adapter strategy** that balances reliability with extensibility:
+The Ingester CRD is the user-facing API. Internally, zen-watcher uses generic Source Adapters to transform events. All sources use the same three generic adapter types:
 
-### Tier 1: First-Class Adapters (The "Big Nine")
+### Generic Source Adapters
 
-**Official adapters** implemented in Go code for core security tools:
-- ✅ **TrivyAdapter** - Vulnerability scanning
-- ✅ **KyvernoAdapter** - Policy violations
-- ✅ **FalcoAdapter** - Runtime security threats
-- ✅ **AuditAdapter** - Kubernetes audit events
-- ✅ **KubeBenchAdapter** - CIS benchmark compliance
-- ✅ **CheckovAdapter** - Infrastructure-as-code security
-- ✅ **CertManagerAdapter** - Certificate lifecycle monitoring
-- ✅ **SealedSecretsAdapter** - Sealed secret decryption failures
-- ✅ **K8sEventsAdapter** - Native Kubernetes Events (security-focused filtering)
+All event sources are handled by generic Source Adapters configured via Ingester CRD:
 
-**Why first-class adapters?**
-- ✅ **Strong semantics** - Hand-tested mappings ensure Observations are well-formed
-- ✅ **Resilience** - Can handle version-specific differences in upstream tools
-- ✅ **Confidence** - Battle-tested adapters that "just work" out of the box
-- ✅ **Clean story** - Users know these integrations are production-ready
+- **InformerAdapter** - Watches Kubernetes resources (CRDs, ConfigMaps, Pods, Events, etc.)
+- **WebhookAdapter** - Receives HTTP webhooks from external tools
+- **LogsAdapter** - Monitors pod logs with regex pattern matching
 
-
-**Why generic adapter?**
-- ✅ **Extensibility** - Add new tools via YAML configuration
+**Benefits:**
+- ✅ **Extensibility** - Add new tools via YAML configuration (Ingester CRD)
 - ✅ **Low friction** - No code changes needed for new integrations
-- ✅ **Vendor-friendly** - Tools can provide their own mappings
-
-**When to use each:**
-
-| Scenario | Use First-Class | Use Generic |
-|----------|----------------|-------------|
-| Core security tool (Falco, Trivy, etc.) | ✅ | ❌ |
-| New tool integration | ❌ | ✅ |
-| Prototyping integration | ❌ | ✅ |
-| Internal/company-specific CRD | ❌ | ✅ |
-| Vendor-provided mapping | ❌ | ✅ |
+- ✅ **Consistency** - All sources use the same processing pipeline
+- ✅ **Vendor-friendly** - Tools can provide their own Ingester CRD configurations
 
 See [Generic Source Configuration](#generic-source-configuration-via-yaml) section below for complete examples of all input methods.
 
@@ -220,7 +205,7 @@ Watch native Kubernetes Events:
 apiVersion: zen.kube-zen.io/v1alpha1
 kind: Ingester
 metadata:
-  name: k8s-events-source
+  name: kubernetes-events-source
   namespace: zen-system
 spec:
   source: kubernetes-events
@@ -563,20 +548,24 @@ See the examples above for processing order configuration.
 
 ## Overview
 
-Zen Watcher uses a **Source Adapter** pattern that provides a clean, consistent interface for integrating new event sources. All adapters:
+**For Users:** Configure Ingesters via YAML. The Ingester CRD handles everything.
+
+**For Developers:** zen-watcher uses a **Source Adapter** pattern internally. Source Adapters:
 
 1. **Normalize** tool-specific events into a standard `Event` format
 2. **Output** to a channel for centralized processing
 3. **Leverage** shared infrastructure (filtering, deduplication, metrics)
+
+When you create an Ingester CRD, zen-watcher automatically creates the appropriate Source Adapter to handle event transformation.
 
 **Key Principle:**
 > Tool-specific data goes in `details`. Only core fields (source, category, severity, eventType, resource) are in the Observation spec.
 
 ---
 
-## Source Adapter Interface
+## Source Adapter Interface (Implementation Detail)
 
-All source adapters implement the `SourceAdapter` interface:
+Source Adapters are implementation components used internally by Ingesters. All source adapters implement the `SourceAdapter` interface:
 
 ```go
 type SourceAdapter interface {
@@ -593,7 +582,7 @@ The `Event` struct represents the normalized internal event model:
 ```go
 type Event struct {
     Source    string                      // Tool name (required)
-    Category  string                      // security, compliance, performance (required)
+    Category  string                      // security, compliance, performance, operations, cost (required)
     Severity  string                      // CRITICAL, HIGH, MEDIUM, LOW (required)
     EventType string                      // vulnerability, runtime-threat, etc. (required)
     Resource  *ResourceRef                // Affected K8s resource (optional)
@@ -862,11 +851,11 @@ Use consistent, lowercase source names:
 ### 4. Category Values
 
 Standard categories:
-- `security` - Security-related events
-- `compliance` - Compliance violations
-- `performance` - Performance issues
-- `cost` - Cost-related events
-- `reliability` - Reliability/availability issues
+- `security` - Security-related events (vulnerabilities, threats, policy violations)
+- `compliance` - Compliance violations (audit findings, policy checks)
+- `performance` - Performance issues (latency spikes, resource exhaustion)
+- `operations` - Operations-related events (deployment failures, pod crashes, infrastructure health)
+- `cost` - Cost-related events (resource waste, unused resources)
 
 ### 5. EventType Values
 

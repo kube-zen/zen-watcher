@@ -183,7 +183,7 @@ kubectl get observation test-ttl -n zen-system  # Should be deleted
 
 ## Related Documentation
 
-- [Performance Tuning Guide](PERFORMANCE_TUNING.md) - Resource allocation and TTL configuration
+- [Performance Guide](PERFORMANCE.md) - Resource allocation and TTL configuration
 - [Troubleshooting Guide](TROUBLESHOOTING.md) - Common issues and solutions
 - [Observation CRD API](OBSERVATION_API_PUBLIC_GUIDE.md) - CRD schema reference
 

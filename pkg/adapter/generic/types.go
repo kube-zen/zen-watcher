@@ -30,7 +30,7 @@ type RawEvent struct {
 // SourceConfig represents the adapter configuration from Ingester CRD
 type SourceConfig struct {
 	Source   string
-	Ingester string // informer, webhook, logs, k8s-events (cm/configmap is NOT supported)
+	Ingester string // informer, webhook, logs
 
 	// Adapter-specific configs (only one should be set based on ingester)
 	Informer *InformerConfig

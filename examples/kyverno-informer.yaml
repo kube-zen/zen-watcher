@@ -32,4 +32,7 @@ spec:
     observationsPerMinute:
       warning: 50
       critical: 100
+  destinations:
+    - type: crd
+      value: observations
 

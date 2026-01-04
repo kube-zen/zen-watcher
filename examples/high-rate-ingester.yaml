@@ -5,13 +5,14 @@ metadata:
   namespace: zen-system
 spec:
   source: kubernetes-events
-  ingester: k8s-events
-  
-  k8sEvents:
-    involvedObjectKinds:
-      - Pod
-      - Deployment
-      - Service
+  ingester: informer
+  informer:
+    gvr:
+      group: ""
+      version: "v1"
+      resource: "events"
+    namespace: ""
+    resyncPeriod: "0"
   
   rateLimit:
     enabled: true

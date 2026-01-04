@@ -51,14 +51,12 @@
 
 **Requirements**:
 - Must link to `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md`
-- Must link to KEP draft if relevant: `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md`
 - Must include migration instructions if breaking
 
 **Example**:
 - **Observation CRD v1alpha2**: Added enum validation for `severity` and `category` fields
   - **Impact**: Non-breaking (existing valid values match enums)
   - **Reference**: `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` (v1alpha2 section)
-  - **KEP**: `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md` (Design Details)
 
 ---
 
@@ -105,7 +103,6 @@
 ## References
 
 - **Versioning Plan**: `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md`
-- **KEP Draft**: `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md`
 - **API Audit**: `docs/OBSERVATION_CRD_API_AUDIT.md`
 - **Roadmap**: `the project roadmap`
 - **OSS Release Checklist**: `` - For OSS releases, see this checklist

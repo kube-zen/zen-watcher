@@ -1,0 +1,65 @@
+# Example: Performance Monitoring - Latency Spike Detection via Webhook
+# Receives latency metrics from monitoring tools (Prometheus, Datadog, etc.)
+# Demonstrates: Webhook ingestion, performance monitoring, and filtering
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: latency-spike-detector
+  namespace: zen-system
+spec:
+  source: prometheus-alerts
+  ingester: webhook
+  webhook:
+    path: "/ingest/latency"
+    port: 8080
+    auth:
+      type: bearer
+      secretRef: prometheus-webhook-token
+    rateLimit:
+      requestsPerMinute: 1000
+  normalization:
+    domain: performance
+    type: latency_spike
+    priority:
+      # Higher latency = higher priority
+      p99_high: 0.9
+      p95_high: 0.7
+      p50_high: 0.5
+    fieldMapping:
+      - from: $.metric.p50
+        to: p50_latency
+      - from: $.metric.p95
+        to: p95_latency
+      - from: $.metric.p99
+        to: p99_latency
+      - from: $.metric.service
+        to: service_name
+      - from: $.metric.deployment
+        to: deployment_name
+  filter:
+    enabled: true
+    minPriority: 0.6  # Only significant latency spikes
+    excludeNamespaces:
+      - kube-system
+  # Short deduplication: latency spikes can be transient
+  dedup:
+    enabled: true
+    window: "1m"  # Dedupe same latency spike within 1 minute
+    strategy: fingerprint
+    fields:
+      - "spec.resource.name"
+      - "spec.eventType"
+  destinations:
+    - type: crd
+      value: observations
+      mapping:
+        domain: performance
+        type: latency_spike
+
+---
+# Use Case: Performance Engineering
+# - Receives latency alerts from monitoring tools
+# - Aggregates and filters to focus on significant spikes
+# - Useful for performance teams optimizing application response times
+# - Can trigger auto-scaling or performance investigations
+

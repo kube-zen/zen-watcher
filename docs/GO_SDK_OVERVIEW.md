@@ -101,8 +101,18 @@ kyvernoIngester := sdk.NewKyvernoIngester("default", "kyverno-informer")
 // Kube-bench
 kubeBenchIngester := sdk.NewKubeBenchIngester("default", "kube-bench-informer")
 
-// Kubernetes Events
-k8sEventsIngester := sdk.NewK8sEventsIngester("default", "k8s-events-informer")
+// Kubernetes Events (use informer with events resource)
+k8sEventsIngester := sdk.NewIngester("default", "kubernetes-events-informer", sdk.IngesterSpec{
+	Source:   "kubernetes-events",
+	Ingester: "informer",
+	Informer: &sdk.InformerConfig{
+		GVR: &sdk.GVRConfig{
+			Group:    "",
+			Version:  "v1",
+			Resource: "events",
+		},
+	},
+})
 ```
 
 ## Use Cases
@@ -149,7 +159,7 @@ The SDK provides offline validation that matches CRD schema validation:
 
 - **Required fields**: Validates all required fields are present
 - **Patterns**: Validates field patterns (e.g., `source` must match `^[a-z0-9-]+$`)
-- **Enums**: Validates enum values (e.g., `ingester` must be one of: informer, webhook, logs, k8s-events)
+- **Enums**: Validates enum values (e.g., `ingester` must be one of: informer, webhook, logs)
 - **Ranges**: Validates numeric ranges (e.g., `minPriority` must be 0.0-1.0)
 
 ## Type Alignment
@@ -164,5 +174,5 @@ All SDK types are aligned with CRD schemas:
 
 - [INGESTER_API.md](INGESTER_API.md) - Complete Ingester CRD API reference
 - [INGESTER_MIGRATION_GUIDE.md](INGESTER_MIGRATION_GUIDE.md) - Migration from v1alpha1 to v1
-- [INGESTER_TOOLING.md](INGESTER_TOOLING.md) - Command-line tools for Ingesters
+- [TOOLING_GUIDE.md](TOOLING_GUIDE.md) - Command-line tools for Ingesters and Observations
 

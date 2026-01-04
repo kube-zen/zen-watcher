@@ -97,8 +97,7 @@ func (cm *ConfigManager) setupInformers() {
 		UpdateFunc: cm.handleConfigMapUpdate,
 		DeleteFunc: cm.handleConfigMapDelete,
 	}); err != nil {
-		logger := sdklog.NewLogger("zen-watcher-config")
-		logger.Error(err, "Failed to add event handlers",
+		configLogger.Error(err, "Failed to add event handlers",
 			sdklog.Operation("setup_informers"))
 		// Note: This is called during initialization, so we log but don't return error
 	}
@@ -107,9 +106,8 @@ func (cm *ConfigManager) setupInformers() {
 // Start starts the configuration manager
 func (cm *ConfigManager) Start(ctx context.Context) error {
 	// Load initial configuration
-	logger := sdklog.NewLogger("zen-watcher-config")
 	if err := cm.loadInitialConfig(); err != nil {
-		logger.Warn("Failed to load initial config, using defaults",
+		configLogger.Warn("Failed to load initial config, using defaults",
 			sdklog.Operation("initial_load"),
 			sdklog.Error(err))
 	}
@@ -146,8 +144,7 @@ func (cm *ConfigManager) loadInitialConfig() error {
 			if cm.metrics != nil {
 				cm.metrics.ConfigMapLoadTotal.WithLabelValues(cm.baseConfigName, "not_found").Inc()
 			}
-			logger := sdklog.NewLogger("zen-watcher-config")
-			logger.Debug("Base ConfigMap not found, using defaults",
+			configLogger.Debug("Base ConfigMap not found, using defaults",
 				sdklog.Operation("load_base"),
 				sdklog.String("configmap", cm.baseConfigName))
 			return nil
@@ -179,8 +176,7 @@ func (cm *ConfigManager) loadInitialConfig() error {
 				if cm.metrics != nil {
 					cm.metrics.ConfigMapLoadTotal.WithLabelValues(cm.envConfigName, "not_found").Inc()
 				}
-				logger := sdklog.NewLogger("zen-watcher-config")
-				logger.Debug("Environment ConfigMap not found, using base config only",
+				configLogger.Debug("Environment ConfigMap not found, using base config only",
 					sdklog.Operation("load_env"),
 					sdklog.String("configmap", cm.envConfigName))
 				return nil
@@ -243,14 +239,12 @@ func (cm *ConfigManager) handleConfigMapDelete(obj interface{}) {
 	switch cmConfig.Name {
 	case cm.baseConfigName:
 		cm.baseConfig = make(map[string]interface{})
-		logger := sdklog.NewLogger("zen-watcher-config")
-		logger.Info("Base ConfigMap deleted, using defaults",
+		configLogger.Info("Base ConfigMap deleted, using defaults",
 			sdklog.Operation("configmap_deleted"),
 			sdklog.String("configmap", cmConfig.Name))
 	case cm.envConfigName:
 		cm.envConfig = make(map[string]interface{})
-		logger := sdklog.NewLogger("zen-watcher-config")
-		logger.Info("Environment ConfigMap deleted, using base config only",
+		configLogger.Info("Environment ConfigMap deleted, using base config only",
 			sdklog.Operation("configmap_deleted"),
 			sdklog.String("configmap", cmConfig.Name))
 	}
@@ -274,8 +268,7 @@ func (cm *ConfigManager) processConfigMap(cmConfig *corev1.ConfigMap) {
 		if cm.metrics != nil {
 			cm.metrics.ConfigMapValidationErrors.WithLabelValues(cmConfig.Name, "missing_features_yaml").Inc()
 		}
-		logger := sdklog.NewLogger("zen-watcher-config")
-		logger.Debug("ConfigMap missing features.yaml, skipping",
+		configLogger.Debug("ConfigMap missing features.yaml, skipping",
 			sdklog.Operation("process_configmap"),
 			sdklog.String("configmap", cmConfig.Name))
 		return
@@ -286,8 +279,7 @@ func (cm *ConfigManager) processConfigMap(cmConfig *corev1.ConfigMap) {
 		if cm.metrics != nil {
 			cm.metrics.ConfigMapValidationErrors.WithLabelValues(cmConfig.Name, "parse_error").Inc()
 		}
-		logger := sdklog.NewLogger("zen-watcher-config")
-		logger.Warn("Failed to parse config from ConfigMap",
+		configLogger.Warn("Failed to parse config from ConfigMap",
 			sdklog.Operation("parse_config"),
 			sdklog.String("configmap", cmConfig.Name),
 			sdklog.Error(err))
@@ -301,14 +293,12 @@ func (cm *ConfigManager) processConfigMap(cmConfig *corev1.ConfigMap) {
 	switch cmConfig.Name {
 	case cm.baseConfigName:
 		cm.baseConfig = parsedConfig
-		logger := sdklog.NewLogger("zen-watcher-config")
-		logger.Debug("Base configuration updated",
+		configLogger.Debug("Base configuration updated",
 			sdklog.Operation("base_config_updated"),
 			sdklog.String("configmap", cmConfig.Name))
 	case cm.envConfigName:
 		cm.envConfig = parsedConfig
-		logger := sdklog.NewLogger("zen-watcher-config")
-		logger.Debug("Environment configuration updated",
+		configLogger.Debug("Environment configuration updated",
 			sdklog.Operation("env_config_updated"),
 			sdklog.String("configmap", cmConfig.Name))
 	}

@@ -355,7 +355,7 @@ Before deploying to production:
 ## References
 
 - **Metrics Documentation**: `docs/OBSERVABILITY.md`
-- **Alert Rules Review**: `docs/ALERT_RULES_REVIEW.md`
+- **Alert Rules Guide**: `docs/ALERT_RULES.md`
 - **Dashboard Documentation**: `config/dashboards/README.md`
 - **Metrics Inventory**: `../../METRICS_INVENTORY.md`
 - **Metrics Definitions**: `pkg/metrics/definitions.go`

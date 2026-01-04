@@ -395,7 +395,7 @@ Choose the order that best fits your workload patterns based on metrics.
 - [DEDUPLICATION.md](DEDUPLICATION.md) - Detailed deduplication documentation
 - [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Processing order configuration guide
 - [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture overview
-- [OPERATIONS.md](OPERATIONS.md) - Operational guidance and monitoring
+- [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Operational guidance and monitoring
 
 ---
 

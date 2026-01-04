@@ -117,6 +117,6 @@ If fuzzing causes OOM:
 ## Related Documentation
 
 - [Go Fuzzing Documentation](https://go.dev/doc/fuzz/)
-- [PERFORMANCE_GUIDE.md](PERFORMANCE_GUIDE.md) - Performance characteristics and sizing
+- [PERFORMANCE.md](PERFORMANCE.md) - Performance characteristics and sizing
 - [CRD_CONFORMANCE.md](CRD_CONFORMANCE.md) - CRD validation and conformance
 

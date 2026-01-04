@@ -55,11 +55,7 @@ func (f *Factory) NewAdapter(ingester string) (GenericAdapter, error) {
 			return nil, fmt.Errorf("kubernetes client required for logs adapter")
 		}
 		return NewLogsAdapter(f.clientSet), nil
-	case "k8s-events":
-		// k8s-events is handled by K8sEventsAdapter which is created separately
-		// This factory only handles generic adapters
-		return nil, fmt.Errorf("k8s-events ingester is handled by K8sEventsAdapter, not generic factory")
 	default:
-		return nil, fmt.Errorf("unknown ingester type: %s", ingester)
+		return nil, fmt.Errorf("unsupported ingester type: %s (must be one of: informer, webhook, logs)", ingester)
 	}
 }
