@@ -114,7 +114,7 @@ resources:
   - Process webhook events
 
 **Implications:**
-- ✅ HPA/KEDA becomes meaningful for webhook traffic
+- ✅ HPA becomes meaningful for webhook traffic
 - ✅ Webhook traffic load-balances across pods
 - ✅ Only leader processes informer-driven sources
 - ✅ Dedup remains per-pod for webhooks (acceptable as "best-effort")
@@ -288,7 +288,7 @@ env:
 
 ### Q: Why not support HPA out of the box?
 
-**A:** HPA without leader election creates duplicate processing. With leader election now implemented (mandatory), HPA/KEDA is supported for webhook traffic. See [LEADER_ELECTION.md](LEADER_ELECTION.md) for details.
+**A:** HPA without leader election creates duplicate processing. With leader election now implemented (mandatory), HPA is supported for webhook traffic. See [LEADER_ELECTION.md](LEADER_ELECTION.md) for details.
 
 ### Q: Can I run multiple replicas for high availability?
 
@@ -307,7 +307,7 @@ env:
 
 ### Q: Will leader election be added?
 
-**A:** ✅ **Already implemented!** Leader election is mandatory and always enabled. It enables HPA/KEDA for webhook traffic while keeping informers + GC as singleton. See [LEADER_ELECTION.md](LEADER_ELECTION.md) for details.
+**A:** ✅ **Already implemented!** Leader election is mandatory and always enabled. It enables HPA for webhook traffic while keeping informers + GC as singleton. See [LEADER_ELECTION.md](LEADER_ELECTION.md) for details.
 
 ---
 
@@ -320,7 +320,7 @@ env:
 
 **Current (v1.0.0-alpha):**
 - ✅ Leader election (mandatory, always enabled)
-- ✅ HPA/KEDA support for webhook traffic
+- ✅ HPA support for webhook traffic
 - ✅ Clear leader-bound vs. stateless separation
 
 **Key Principle:** Keep it simple. We don't need to solve "global perfect dedup across replicas" to be successful or KEP-worthy. Best-effort dedup plus clear semantics is enough.
