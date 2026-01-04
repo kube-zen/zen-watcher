@@ -200,7 +200,7 @@ func (a *WebhookAdapter) handleWebhook(config *SourceConfig) http.HandlerFunc {
 			}
 		}
 		limitedBody := http.MaxBytesReader(w, r.Body, maxRequestBytes)
-		defer limitedBody.Close()
+		defer func() { _ = limitedBody.Close() }()
 
 		// Parse request body
 		var data map[string]interface{}
