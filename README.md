@@ -64,6 +64,41 @@ kubectl get observations
 
 ---
 
+## 🔒 Security Defaults
+
+**What is enabled by default on `helm install`:**
+
+✅ **Enabled (Secure by default):**
+- **CRDs**: Observation and Ingester CRDs are installed automatically (`crds.enabled=true`)
+- **NetworkPolicy**: Network traffic restrictions enabled (`networkPolicy.enabled=true`)
+  - Ingress: Metrics scraping from Prometheus namespaces only
+  - Egress: DNS (port 53) and Kubernetes API (port 443) only
+- **RBAC**: ClusterRole/ClusterRoleBinding created with least-privilege permissions
+- **Container Security**: Non-root, read-only filesystem, dropped capabilities, seccomp profile
+- **ServiceAccount**: Token automount enabled (required for Kubernetes API access)
+- **Request Body Size Limit**: 1MiB maximum (prevents DoS)
+- **Rate Limiting**: 100 requests/minute per IP with TTL-based cleanup
+
+❌ **Disabled (Requires opt-in):**
+- **Webhook Authentication**: No authentication on webhook endpoints by default
+  - **Production**: Enable per-ingester authentication via `Ingester` CRD `spec.webhook.auth`
+  - See [SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md#authentication-configuration)
+- **Default Ingester**: No Ingester created automatically (`ingester.createDefaultK8sEvents=false`)
+  - Create an Ingester resource to start collecting events
+  - Quick start: `helm install ... --set ingester.createDefaultK8sEvents=true`
+- **Trusted Proxy CIDRs**: Empty by default (proxy headers not trusted)
+  - Configure `server.trustedProxyCIDRs` if behind trusted proxies/load balancers
+- **IP Allowlists**: Not enabled by default
+
+**Trust posture:**
+- ✅ **Secure by default** for container, network, and RBAC security
+- ⚠️ **Webhook endpoints are unauthenticated by default** - enable authentication for production
+- ⚠️ **No default event collection** - create an Ingester to start collecting events
+
+See [SECURITY.md](docs/SECURITY.md) for complete security documentation.
+
+---
+
 ## 🔒 Zero Blast Radius Security
 
 **Zen Watcher's core architecture delivers zero blast radius in the event of compromise.**
