@@ -812,10 +812,6 @@ func NewMetrics() *Metrics {
 		DestinationQueueDepth:      destinationQueueDepth,
 		DestinationRetriesTotal:    destinationRetriesTotal,
 
-		// zen-watcher KEDA autoscaling metrics
-		WatcherQueueDepth:  watcherQueueDepth,
-		WatcherEventsTotal: watcherEventsTotal,
-
 		// ConfigManager metrics (NEW - High Priority)
 		ConfigMapLoadTotal:              configMapLoadTotal,
 		ConfigMapReloadDuration:         configMapReloadDuration,
