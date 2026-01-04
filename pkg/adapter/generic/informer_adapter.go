@@ -33,7 +33,7 @@ import (
 type InformerAdapter struct {
 	manager *informers.Manager
 	stopCh  chan struct{}
-	events  chan RawEvent // Event channel - must be closed in Stop() to prevent goroutine leaks
+	events  chan RawEvent                                   // Event channel - must be closed in Stop() to prevent goroutine leaks
 	queue   workqueue.TypedRateLimitingInterface[*RawEvent] // Internal queue for backpressure (future use)
 	mu      sync.Mutex
 }
