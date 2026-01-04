@@ -192,6 +192,12 @@ resources:
 - Automatic removal of stale entries prevents unbounded growth
 - Cleanup runs hourly, removing entries not accessed in the last hour
 
+#### Request Body Size Limit
+- Maximum request body size: 1MiB (1048576 bytes) by default
+- Configurable via `SERVER_MAX_REQUEST_BYTES` environment variable or `server.maxRequestBytes` Helm value
+- Prevents DoS attacks via large request bodies
+- Requests exceeding the limit receive HTTP 413 (Request Entity Too Large)
+
 #### Webhook Channels
 - Bounded capacity (100 Falco, 200 Audit)
 - Backpressure via HTTP 503 (not crash)
@@ -301,7 +307,7 @@ Uses Kubernetes Secrets for:
 
 **1. Enable Webhook Authentication (Generic Webhook Adapter)**
 
-For Ingester-based webhook sources, configure per-ingester authentication:
+For Ingester-based webhook sources, configure per-ingester authentication. For detailed configuration examples and secret creation instructions, see [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md#authentication-configuration).
 
 ```yaml
 apiVersion: zen.kube-zen.io/v1alpha1
@@ -318,20 +324,6 @@ spec:
       secretName: webhook-auth-secret
 ```
 
-Create authentication secrets:
-```bash
-# Bearer token
-kubectl create secret generic webhook-auth-secret \
-  --from-literal=token=$(openssl rand -hex 32) \
-  -n zen-system
-
-# Basic auth (bcrypt recommended for production)
-kubectl create secret generic webhook-auth-secret \
-  --from-literal=username=webhook-user \
-  --from-literal=password='$2a$10$...' \
-  -n zen-system
-```
-
 **2. Configure Trusted Proxy CIDRs (Helm)**
 ```yaml
 server:
@@ -342,7 +334,15 @@ server:
 
 **Note:** Empty list (default) = proxy headers never trusted (secure by default). This prevents IP spoofing attacks in rate limiting and IP allowlists.
 
-**3. Apply NetworkPolicy**
+**3. Configure Request Body Size Limit (Helm)**
+```yaml
+server:
+  maxRequestBytes: 2097152  # 2MiB (default: 1MiB)
+```
+
+**Note:** Default is 1MiB (1048576 bytes). This prevents DoS attacks via large request bodies. Webhooks exceeding this limit receive HTTP 413 (Request Entity Too Large).
+
+**4. Apply NetworkPolicy**
 ```yaml
 networkPolicy:
   enabled: true

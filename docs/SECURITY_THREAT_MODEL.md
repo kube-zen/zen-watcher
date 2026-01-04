@@ -116,10 +116,21 @@ spec:
 
 **Mitigations:**
 - ✅ Rate limiting (100 req/min per IP)
+- ✅ Request body size limit (1MiB default, configurable)
 - ✅ Request timeouts (15s read/write)
 - ✅ Channel buffering with drop-on-full
 - ✅ Resource limits on pods
 - ✅ GC prevents unbounded growth
+
+#### Request Body Size Limit
+
+**Threat:** Large request bodies could exhaust memory via DoS attacks.
+
+**Mitigation:**
+- Maximum request body size: 1MiB (1048576 bytes) by default
+- Configurable via `SERVER_MAX_REQUEST_BYTES` environment variable or `server.maxRequestBytes` Helm value
+- Requests exceeding the limit receive HTTP 413 (Request Entity Too Large)
+- Applied to all webhook endpoints (Falco, Audit, generic webhook adapter)
 
 ## Security Boundaries
 
@@ -216,19 +227,7 @@ spec:
          secretName: webhook-auth-secret
    ```
    
-   Create authentication secrets:
-   ```bash
-   # Bearer token
-   kubectl create secret generic webhook-auth-secret \
-     --from-literal=token=$(openssl rand -hex 32) \
-     -n zen-system
-   
-   # Basic auth (bcrypt recommended)
-   kubectl create secret generic webhook-auth-secret \
-     --from-literal=username=webhook-user \
-     --from-literal=password='$2a$10$...' \
-     -n zen-system
-   ```
+   For detailed authentication configuration and secret creation examples, see [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md#authentication-configuration).
 
 2. **Configure Trusted Proxy CIDRs (Helm):**
    ```yaml

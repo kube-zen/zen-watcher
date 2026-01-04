@@ -19,12 +19,16 @@ import (
 	"crypto/subtle"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -34,13 +38,15 @@ import (
 
 // WebhookAdapter handles ALL webhook-based sources
 type WebhookAdapter struct {
-	server     *http.Server
-	events     chan RawEvent
-	mu         sync.RWMutex
-	configs    map[string]*SourceConfig // path -> config
-	clientSet  kubernetes.Interface
-	secretCache map[string]*secretCacheEntry // namespace/secretName -> cached secret
-	secretMu   sync.RWMutex
+	server         *http.Server
+	events         chan RawEvent
+	mu             sync.RWMutex
+	configs        map[string]*SourceConfig // path -> config
+	clientSet      kubernetes.Interface
+	secretCache    map[string]*secretCacheEntry // namespace/secretName -> cached secret
+	secretMu       sync.RWMutex
+	webhookMetrics *prometheus.CounterVec // Metrics for webhook requests (optional)
+	webhookDropped *prometheus.CounterVec // Metrics for webhook events dropped (optional)
 }
 
 type secretCacheEntry struct {
@@ -50,11 +56,18 @@ type secretCacheEntry struct {
 
 // NewWebhookAdapter creates a new generic webhook adapter
 func NewWebhookAdapter(clientSet kubernetes.Interface) *WebhookAdapter {
+	return NewWebhookAdapterWithMetrics(clientSet, nil, nil)
+}
+
+// NewWebhookAdapterWithMetrics creates a new generic webhook adapter with metrics support
+func NewWebhookAdapterWithMetrics(clientSet kubernetes.Interface, webhookMetrics *prometheus.CounterVec, webhookDropped *prometheus.CounterVec) *WebhookAdapter {
 	return &WebhookAdapter{
-		events:      make(chan RawEvent, 100),
-		configs:     make(map[string]*SourceConfig),
-		clientSet:   clientSet,
-		secretCache: make(map[string]*secretCacheEntry),
+		events:         make(chan RawEvent, 100),
+		configs:        make(map[string]*SourceConfig),
+		clientSet:      clientSet,
+		secretCache:    make(map[string]*secretCacheEntry),
+		webhookMetrics: webhookMetrics,
+		webhookDropped: webhookDropped,
 	}
 }
 
@@ -164,17 +177,46 @@ func (a *WebhookAdapter) Start(ctx context.Context, config *SourceConfig) (<-cha
 // handleWebhook handles incoming webhook requests
 func (a *WebhookAdapter) handleWebhook(config *SourceConfig) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Use source name as endpoint label for metrics
+		endpoint := config.Source
+
 		// Handle authentication if configured
 		if config.Webhook.Auth != nil && config.Webhook.Auth.Type != "none" {
 			if !a.authenticate(r, config) {
+				// Track authentication failure in metrics
+				if a.webhookMetrics != nil {
+					a.webhookMetrics.WithLabelValues(endpoint, "401").Inc()
+				}
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
 		}
 
+		// Limit request body size to prevent DoS attacks (default: 1MiB)
+		maxRequestBytes := int64(1048576) // 1MiB default
+		if maxBytesStr := os.Getenv("SERVER_MAX_REQUEST_BYTES"); maxBytesStr != "" {
+			if parsed, err := strconv.ParseInt(maxBytesStr, 10, 64); err == nil && parsed > 0 {
+				maxRequestBytes = parsed
+			}
+		}
+		limitedBody := http.MaxBytesReader(w, r.Body, maxRequestBytes)
+		defer limitedBody.Close()
+
 		// Parse request body
 		var data map[string]interface{}
-		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+		if err := json.NewDecoder(limitedBody).Decode(&data); err != nil {
+			if err == io.EOF {
+				// Track request body too large in metrics
+				if a.webhookMetrics != nil {
+					a.webhookMetrics.WithLabelValues(endpoint, "413").Inc()
+				}
+				http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+				return
+			}
+			// Track parse error in metrics
+			if a.webhookMetrics != nil {
+				a.webhookMetrics.WithLabelValues(endpoint, "400").Inc()
+			}
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
 			return
 		}
@@ -194,6 +236,10 @@ func (a *WebhookAdapter) handleWebhook(config *SourceConfig) http.HandlerFunc {
 		// Send event (non-blocking with buffer)
 		select {
 		case a.events <- event:
+			// Track successful request in metrics
+			if a.webhookMetrics != nil {
+				a.webhookMetrics.WithLabelValues(endpoint, "200").Inc()
+			}
 			w.WriteHeader(http.StatusOK)
 			_, _ = fmt.Fprintf(w, "OK")
 		default:
@@ -202,6 +248,13 @@ func (a *WebhookAdapter) handleWebhook(config *SourceConfig) http.HandlerFunc {
 			logger.Warn("Webhook event buffer full, dropping event",
 				sdklog.Operation("webhook_backpressure"),
 				sdklog.String("source", config.Source))
+			// Track service unavailable in metrics
+			if a.webhookMetrics != nil {
+				a.webhookMetrics.WithLabelValues(endpoint, "503").Inc()
+			}
+			if a.webhookDropped != nil {
+				a.webhookDropped.WithLabelValues(endpoint).Inc()
+			}
 			http.Error(w, "Buffer full", http.StatusServiceUnavailable)
 		}
 	}
