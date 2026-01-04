@@ -87,7 +87,7 @@ Add support for forwarding Observation events to external systems via optional, 
 **Current (v1.0.0-alpha):**
 - ✅ **Leader Election** - Mandatory leader election for singleton responsibilities:
   - Leader handles: Informer-based watchers (Kyverno, Trivy) + Garbage collection
-  - All pods handle: Webhook endpoints (Falco, audit) - enables HPA/KEDA for webhook traffic
+  - All pods handle: Webhook endpoints (Falco, audit) - enables HPA for webhook traffic
   - Keeps CRD semantics intact while allowing horizontal scaling
   - See [docs/LEADER_ELECTION.md](docs/LEADER_ELECTION.md) for details
 
@@ -101,7 +101,7 @@ Add support for forwarding Observation events to external systems via optional, 
 - Keep it simple and predictable
 - Single-replica default with clear scaling envelope
 - Sharding by namespace for scale-out (alternative to multi-replica)
-- Leader election mandatory (enables HPA/KEDA for webhook traffic)
+- Leader election mandatory (enables HPA for webhook traffic)
 
 See [docs/SCALING.md](docs/SCALING.md) for complete scaling strategy and recommendations.
 
