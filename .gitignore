@@ -8,10 +8,15 @@ zen-watcher
 
 # Test binary
 *.test
+*_test
 
 # Output of the go coverage tool
 *.out
 coverage.out
+
+# Binaries
+zenctl
+zen-watcher
 
 # Go workspace file
 go.work
