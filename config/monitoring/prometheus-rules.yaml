@@ -106,6 +106,26 @@ spec:
         summary: "Webhook endpoint {{$labels.endpoint}} failing"
         description: "{{$value | humanizePercentage}} of requests to {{$labels.endpoint}} are failing (status: {{$labels.status}})"
 
+    - alert: ZenWatcherHighAuthFailures
+      expr: sum(rate(zen_watcher_webhook_requests_total{status="401"}[5m])) by (endpoint) > 1
+      for: 5m
+      labels:
+        severity: warning
+        component: security
+      annotations:
+        summary: "High rate of webhook authentication failures on {{$labels.endpoint}}"
+        description: "Rate of 401 Unauthorized responses is {{$value}}/sec on {{$labels.endpoint}} - possible attack or misconfiguration"
+
+    - alert: ZenWatcherHighRateLimitRejections
+      expr: sum(rate(zen_watcher_webhook_requests_total{status="429"}[5m])) by (endpoint) > 10
+      for: 5m
+      labels:
+        severity: warning
+        component: security
+      annotations:
+        summary: "High rate of webhook rate limit rejections on {{$labels.endpoint}}"
+        description: "Rate of 429 Too Many Requests responses is {{$value}}/sec on {{$labels.endpoint}} - possible DoS attempt or misconfigured upstream"
+
     - alert: ZenWatcherGCErrors
       expr: rate(zen_watcher_gc_errors_total[5m]) > 0.1
       for: 5m

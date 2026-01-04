@@ -125,7 +125,7 @@ spec:
 
 See [docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md) for complete examples.
 
-### Intelligent Noise Reduction
+### Advanced Noise Reduction
 
 - **SHA-256 content fingerprinting**: Accurate duplicate detection
 - **Per-source token bucket rate limiting**: Prevents one noisy tool from overwhelming the system
@@ -134,7 +134,6 @@ See [docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md) for complete examples.
 
 **Result**: <100ms CPU spikes and minimal etcd churn—even under firehose conditions
 
-See [docs/INTELLIGENT_EVENT_PIPELINE.md](docs/INTELLIGENT_EVENT_PIPELINE.md) for details.
 
 ### Comprehensive Observability
 
@@ -193,10 +192,9 @@ kubectl get observations -n zen-system -o json | \
 
 - [Installation Guide](docs/DEPLOYMENT_HELM.md) - Complete deployment instructions
 - [Source Adapters](docs/SOURCE_ADAPTERS.md) - How to add new sources
-- [Manual Webhook Adapter](docs/manual-webhook-adapter.md) - Configure webhooks for Falco, Audit, and other tools
-- [Observation API](docs/OBSERVATION_API_PUBLIC_GUIDE.md) - API reference
+- [Manual Webhook Adapter](docs/MANUAL_WEBHOOK_ADAPTER.md) - Configure webhooks for Falco, Audit, and other tools
+- [Observation API](docs/CRD.md) - API reference
 - [Integrations](docs/INTEGRATIONS.md) - How to consume Observations
-- [Intelligent Pipeline](docs/INTELLIGENT_EVENT_PIPELINE.md) - Noise reduction and optimization
 - [Deduplication](docs/DEDUPLICATION.md) - Deduplication strategies
 - [CRD Documentation](docs/CRD.md) - Detailed CRD documentation
 

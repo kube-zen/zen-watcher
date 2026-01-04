@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // WebhookAuth handles authentication for webhook endpoints
@@ -40,11 +41,21 @@ type WebhookAuth struct {
 	// mTLS (future)
 	// nolint:unused // Kept for future use
 	mtlsEnabled bool
+
+	// Metrics for tracking authentication failures
+	webhookMetrics *prometheus.CounterVec
 }
 
 // NewWebhookAuth creates a new webhook authenticator from environment variables
 func NewWebhookAuth() *WebhookAuth {
-	auth := &WebhookAuth{}
+	return NewWebhookAuthWithMetrics(nil)
+}
+
+// NewWebhookAuthWithMetrics creates a new webhook authenticator with metrics support
+func NewWebhookAuthWithMetrics(webhookMetrics *prometheus.CounterVec) *WebhookAuth {
+	auth := &WebhookAuth{
+		webhookMetrics: webhookMetrics,
+	}
 
 	// Token authentication
 	if token := os.Getenv("WEBHOOK_AUTH_TOKEN"); token != "" {
@@ -227,6 +238,13 @@ func (a *WebhookAuth) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 				sdklog.String("reason", "authentication_failed"),
 				sdklog.String("path", r.URL.Path),
 				sdklog.String("remote_addr", r.RemoteAddr))
+			
+			// Track authentication failure in metrics
+			if a.webhookMetrics != nil {
+				endpoint := getEndpointFromPath(r.URL.Path)
+				a.webhookMetrics.WithLabelValues(endpoint, "401").Inc()
+			}
+			
 			w.WriteHeader(http.StatusUnauthorized)
 			if _, err := w.Write([]byte(`{"error":"unauthorized"}`)); err != nil {
 				logger.Warn("Failed to write authentication error response",
@@ -242,4 +260,17 @@ func (a *WebhookAuth) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 			sdklog.String("remote_addr", r.RemoteAddr))
 		next(w, r)
 	}
+}
+
+// getEndpointFromPath extracts the endpoint name from the URL path
+// Examples: /falco/webhook -> "falco", /audit/webhook -> "audit"
+func getEndpointFromPath(path string) string {
+	// Remove leading slash
+	path = strings.TrimPrefix(path, "/")
+	// Split by "/" and take first segment
+	parts := strings.Split(path, "/")
+	if len(parts) > 0 {
+		return parts[0]
+	}
+	return "unknown"
 }

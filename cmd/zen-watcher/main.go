@@ -299,8 +299,13 @@ func initializeAdapters(clients *kubernetes.Clients, proc *processor.Processor, 
 		DefaultResync: 0, // Watch-only, no periodic resync
 	})
 
-	// Create generic adapter factory
-	genericAdapterFactory := generic.NewFactory(informerManager, clients.Standard)
+	// Create generic adapter factory with metrics support for webhook adapters
+	genericAdapterFactory := generic.NewFactoryWithMetrics(
+		informerManager,
+		clients.Standard,
+		m.WebhookRequests,
+		m.WebhookDropped,
+	)
 
 	// Create GenericOrchestrator with metrics
 	genericOrchestrator := orchestrator.NewGenericOrchestratorWithMetrics(

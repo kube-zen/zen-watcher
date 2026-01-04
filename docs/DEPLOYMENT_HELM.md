@@ -157,7 +157,7 @@ helm install zen-watcher kube-zen/zen-watcher \
 helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
-  --set crds.install=false
+  --set crds.enabled=false
 ```
 
 **Custom image:**

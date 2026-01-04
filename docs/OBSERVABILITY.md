@@ -102,6 +102,30 @@ kubectl exec -n zen-system zen-watcher-0 -- curl -s http://localhost:8080/metric
   - Type: Gauge
   - Labels: `source`
 
+### Webhook Metrics
+
+#### Webhook Requests
+- **`zen_watcher_webhook_requests_total{endpoint="<endpoint>",status="<status>"}`**
+  - Total number of webhook requests received by endpoint and HTTP status code
+  - Type: Counter
+  - Labels: `endpoint` (e.g., "falco", "audit"), `status` (HTTP status code as string)
+  - Status codes tracked:
+    - `200` - Success
+    - `400` - Bad Request (invalid JSON, parse errors)
+    - `401` - Unauthorized (authentication failures)
+    - `405` - Method Not Allowed (invalid HTTP method)
+    - `413` - Request Entity Too Large (request body exceeds size limit)
+    - `429` - Too Many Requests (rate limit exceeded)
+    - `503` - Service Unavailable (channel buffer full, backpressure)
+  - Example: `zen_watcher_webhook_requests_total{endpoint="falco",status="401"}`
+
+#### Webhook Events Dropped
+- **`zen_watcher_webhook_events_dropped_total{endpoint="<endpoint>"}`**
+  - Total number of webhook events dropped due to channel buffer full (backpressure)
+  - Type: Counter
+  - Labels: `endpoint`
+  - Example: `zen_watcher_webhook_events_dropped_total{endpoint="falco"}`
+
 ### Pipeline Errors
 
 #### Errors by Stage
@@ -287,6 +311,26 @@ zen_watcher_optimization_current_strategy
     summary: "Low confidence in optimization decisions"
 ```
 
+### High Webhook Authentication Failures
+```yaml
+- alert: ZenWatcherHighAuthFailures
+  expr: rate(zen_watcher_webhook_requests_total{status="401"}[5m]) > 1
+  for: 5m
+  annotations:
+    summary: "High rate of webhook authentication failures"
+    description: "Rate of 401 Unauthorized responses is above threshold - possible attack or misconfiguration"
+```
+
+### High Webhook Rate Limit Rejections
+```yaml
+- alert: ZenWatcherHighRateLimitRejections
+  expr: rate(zen_watcher_webhook_requests_total{status="429"}[5m]) > 10
+  for: 5m
+  annotations:
+    summary: "High rate of webhook rate limit rejections"
+    description: "Rate of 429 Too Many Requests responses is above threshold - possible DoS attempt or misconfigured upstream"
+```
+
 ## CLI Tools
 
 **Query Observations**: Use `obsctl` CLI for querying Observations without external tools. See [TOOLING_GUIDE.md](TOOLING_GUIDE.md#obsctl) for details.
@@ -356,5 +400,4 @@ See the "Future Improvements" section above for detailed metric specifications a
 
 - [PERFORMANCE.md](PERFORMANCE.md) - Performance characteristics, benchmarks, and tuning
 - [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Operations best practices
-- [INTELLIGENT_EVENT_PIPELINE.md](INTELLIGENT_EVENT_PIPELINE.md) - Pipeline architecture
 

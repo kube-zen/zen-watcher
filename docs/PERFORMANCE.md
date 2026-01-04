@@ -571,14 +571,15 @@ kubectl get events --all-namespaces --sort-by='.lastTimestamp' | tail -20
 **Collect CPU Profile:**
 ```bash
 # First, enable pprof by setting ENABLE_PPROF=true in the deployment
-# Then port-forward the HTTP endpoint
-kubectl port-forward -n zen-system deployment/zen-watcher 8080:8080
+# pprof endpoints are bound to 127.0.0.1 only (localhost) for security
+# Port-forward the pprof port (default: 6060, configurable via PPROF_PORT)
+kubectl port-forward -n zen-system deployment/zen-watcher 6060:6060
 
 # Collect 30-second CPU profile
-go tool pprof http://localhost:8080/debug/pprof/profile?seconds=30
+go tool pprof http://localhost:6060/debug/pprof/profile?seconds=30
 
 # Or using curl
-curl http://localhost:8080/debug/pprof/profile?seconds=30 > cpu.prof
+curl http://localhost:6060/debug/pprof/profile?seconds=30 > cpu.prof
 go tool pprof cpu.prof
 ```
 
@@ -598,15 +599,16 @@ Showing nodes accounting for 80% of total CPU time
 **Collect Memory Profile:**
 ```bash
 # First, enable pprof by setting ENABLE_PPROF=true in the deployment
-# Then port-forward the HTTP endpoint
-kubectl port-forward -n zen-system deployment/zen-watcher 8080:8080
+# pprof endpoints are bound to 127.0.0.1 only (localhost) for security
+# Port-forward the pprof port (default: 6060, configurable via PPROF_PORT)
+kubectl port-forward -n zen-system deployment/zen-watcher 6060:6060
 
 # Get heap snapshot
-curl http://localhost:8080/debug/pprof/heap > heap.prof
+curl http://localhost:6060/debug/pprof/heap > heap.prof
 go tool pprof heap.prof
 
 # Get allocation profile
-curl http://localhost:8080/debug/pprof/allocs > allocs.prof
+curl http://localhost:6060/debug/pprof/allocs > allocs.prof
 go tool pprof allocs.prof
 ```
 
@@ -640,7 +642,8 @@ spec:
         ports:
         - containerPort: 8080
           name: http
-        # pprof endpoints available on same port when ENABLE_PPROF=true
+        # pprof endpoints available on localhost-only port when ENABLE_PPROF=true
+        # Default port: 6060 (configurable via PPROF_PORT environment variable)
         # /debug/pprof/profile - CPU profile
         # /debug/pprof/heap - Memory profile
         # /debug/pprof/allocs - Allocation profile
@@ -649,10 +652,12 @@ spec:
         # /debug/pprof/mutex - Mutex profile
 ```
 
-**Security Note**: 
+**Security**: 
 - pprof endpoints are **disabled by default** (set `ENABLE_PPROF=true` to enable)
-- Consider restricting `/debug/pprof` access via NetworkPolicy or authentication in production
-- For production profiling, use a separate port or restrict access via NetworkPolicy
+- When enabled, pprof endpoints are bound to **127.0.0.1 only** (localhost) for security
+- Access requires `kubectl port-forward` from the pod (not accessible from outside the pod)
+- Default pprof port: `6060` (configurable via `PPROF_PORT` environment variable)
+- This prevents unauthorized access to profiling endpoints in production
 
 ---
 
@@ -769,7 +774,7 @@ See [OBSERVABILITY.md](OBSERVABILITY.md) for recommended alerting rules.
 - [OBSERVABILITY.md](OBSERVABILITY.md) - Metrics and monitoring
 - [SCALING.md](SCALING.md) - Scaling strategies
 - [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Operations best practices
-- [OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md) - Optimization usage guide
+- [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Optimization usage guide
 
 ---
 

@@ -69,7 +69,7 @@ AlertManager integrates with:
 For detailed documentation, see:
 - [Alerting Integration Guide](../../docs/alerting/alerting-integration-guide.md)
 - [Silence Management](../../docs/alerting/silence-management.md)
-- [Security Incident Response](../../docs/alerting/SECURITY_INCIDENT_RESPONSE.md)
+- [Security Incident Response](../../docs/alerting/SECURITY_ALERTING_OVERVIEW.md)
 
 ## Testing
 

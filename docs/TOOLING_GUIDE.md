@@ -311,7 +311,7 @@ obsctl list --namespace zen-system --context my-cluster
 
 ## Related Documentation
 
-- [TOOLING_OVERVIEW.md](TOOLING_OVERVIEW.md) - Quick reference and tool selection guide
+- [TOOLING_GUIDE.md](TOOLING_GUIDE.md) - Quick reference and tool selection guide
 - [INGESTER_API.md](INGESTER_API.md) - Complete Ingester CRD API reference
 - [INGESTER_MIGRATION_GUIDE.md](INGESTER_MIGRATION_GUIDE.md) - Migration from v1alpha1 to v1
 - [GO_SDK_OVERVIEW.md](GO_SDK_OVERVIEW.md) - Go SDK for programmatic Ingester creation
@@ -319,4 +319,100 @@ obsctl list --namespace zen-system --context my-cluster
 - [OBSERVABILITY.md](OBSERVABILITY.md) - Metrics and observability guide
 - [TROUBLESHOOTING.md](TROUBLESHOOTING.md) - Troubleshooting guide
 - [OBSERVATION_API_PUBLIC_GUIDE.md](OBSERVATION_API_PUBLIC_GUIDE.md) - Complete Observation CRD API reference
+
+
+---
+
+# Tooling Overview
+
+zen-watcher provides a suite of CLI tools for operators and developers.
+
+## Tools
+
+### ingester-migrate
+
+**Purpose**: Migrate Ingester specs from v1alpha1 to v1
+
+**See**: [TOOLING_GUIDE.md](TOOLING_GUIDE.md#ingester-tools) and [INGESTER_MIGRATION_GUIDE.md](INGESTER_MIGRATION_GUIDE.md)
+
+### ingester-lint
+
+**Purpose**: Validate Ingester specs for safety and correctness
+
+**See**: [TOOLING_GUIDE.md](TOOLING_GUIDE.md#ingester-lint) for complete documentation
+
+### obsctl
+
+**Purpose**: Query Observations from the cluster
+
+**See**: [TOOLING_GUIDE.md](TOOLING_GUIDE.md#obsctl) for complete documentation
+
+### schema-doc-gen
+
+**Purpose**: Generate schema documentation from CRDs
+
+**See**: [TOOLING_GUIDE.md](TOOLING_GUIDE.md#schema-doc-gen) and [CONTRIBUTING.md](../CONTRIBUTING.md)
+
+## When to Use Which Tool
+
+| Task | Tool | When |
+|------|------|------|
+| Migrate Ingester specs | `ingester-migrate` | Upgrading from v1alpha1 to v1 |
+| Validate Ingester config | `ingester-lint` | Before applying Ingesters, in CI/CD |
+| Query Observations | `obsctl` | Debugging, monitoring, validation |
+| Generate docs | `schema-doc-gen` | After modifying CRDs or types |
+
+## Recommended Pipeline
+
+For authoring and deploying Ingesters:
+
+```bash
+# 1. Author spec
+vim my-ingester.yaml
+
+# 2. Lint for safety
+ingester-lint my-ingester.yaml
+
+# 3. Migrate if needed (v1alpha1 → v1)
+ingester-migrate -input my-ingester.yaml -output my-ingester-v1.yaml
+
+# 4. Apply via GitOps or kubectl
+kubectl apply -f my-ingester-v1.yaml --namespace zen-system --context my-cluster
+
+# 5. Verify Observations
+obsctl list --namespace zen-system --context my-cluster
+```
+
+## CI/CD Integration
+
+### Pre-commit Hook
+
+```bash
+#!/bin/bash
+# .githooks/pre-commit
+
+# Lint all Ingester YAMLs
+find . -name "*.yaml" -path "*/ingesters/*" | xargs ingester-lint
+```
+
+### CI Pipeline
+
+```yaml
+# Example GitHub Actions
+- name: Lint Ingesters
+  run: |
+    make install-tools
+    ingester-lint -dir ./examples/ingesters
+
+- name: Validate schema docs
+  run: |
+    go run ./cmd/schema-doc-gen
+    git diff --exit-code docs/generated/
+```
+
+## Related Documentation
+
+- [TOOLING_GUIDE.md](TOOLING_GUIDE.md) - Complete tooling documentation with detailed usage
+- [Ingester API](INGESTER_API.md) - Complete Ingester CRD reference
+- [Ingester Migration Guide](INGESTER_MIGRATION_GUIDE.md) - v1alpha1 → v1 migration
 

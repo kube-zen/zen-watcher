@@ -18,6 +18,7 @@ import (
 	"fmt"
 
 	"github.com/kube-zen/zen-watcher/internal/informers"
+	"github.com/prometheus/client_golang/prometheus"
 	"k8s.io/client-go/kubernetes"
 )
 
@@ -26,6 +27,8 @@ type Factory struct {
 	informerManager *informers.Manager
 	clientSet       kubernetes.Interface
 	webhookPorts    map[string]int // Track used ports
+	webhookMetrics  *prometheus.CounterVec // Metrics for webhook requests (optional)
+	webhookDropped  *prometheus.CounterVec // Metrics for webhook events dropped (optional)
 }
 
 // NewFactory creates a new adapter factory using InformerManager
@@ -33,10 +36,22 @@ func NewFactory(
 	informerManager *informers.Manager,
 	clientSet kubernetes.Interface,
 ) *Factory {
+	return NewFactoryWithMetrics(informerManager, clientSet, nil, nil)
+}
+
+// NewFactoryWithMetrics creates a new adapter factory with metrics support
+func NewFactoryWithMetrics(
+	informerManager *informers.Manager,
+	clientSet kubernetes.Interface,
+	webhookMetrics *prometheus.CounterVec,
+	webhookDropped *prometheus.CounterVec,
+) *Factory {
 	return &Factory{
 		informerManager: informerManager,
 		clientSet:       clientSet,
 		webhookPorts:    make(map[string]int),
+		webhookMetrics:  webhookMetrics,
+		webhookDropped:  webhookDropped,
 	}
 }
 
@@ -52,7 +67,7 @@ func (f *Factory) NewAdapter(ingester string) (GenericAdapter, error) {
 		if f.clientSet == nil {
 			return nil, fmt.Errorf("kubernetes client required for webhook adapter")
 		}
-		return NewWebhookAdapter(f.clientSet), nil
+		return NewWebhookAdapterWithMetrics(f.clientSet, f.webhookMetrics, f.webhookDropped), nil
 	case "logs":
 		if f.clientSet == nil {
 			return nil, fmt.Errorf("kubernetes client required for logs adapter")

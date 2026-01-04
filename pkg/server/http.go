@@ -18,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -37,6 +38,7 @@ import (
 // Server wraps the HTTP server and handlers
 type Server struct {
 	server          *http.Server
+	pprofServer     *http.Server // Separate server for pprof (localhost only)
 	ready           bool
 	readyMu         sync.RWMutex
 	falcoAlertsChan chan map[string]interface{}
@@ -48,6 +50,7 @@ type Server struct {
 	haConfig        *config.HAConfig
 	haStatus        *HAStatus
 	haStatusMu      sync.RWMutex
+	maxRequestBytes int64 // Maximum request body size (default: 1MiB)
 }
 
 // HAStatus holds current HA status information
@@ -84,7 +87,7 @@ func NewServerWithIngester(
 	}
 
 	mux := http.NewServeMux()
-	auth := NewWebhookAuth()
+	auth := NewWebhookAuthWithMetrics(webhookMetrics)
 
 	// Initialize HTTP metrics using zen-sdk/pkg/metrics
 	httpMetrics, err := sdkmetrics.NewHTTPMetrics(sdkmetrics.HTTPMetricsConfig{
@@ -105,13 +108,27 @@ func NewServerWithIngester(
 			maxRequests = parsed
 		}
 	}
-	rateLimiter := NewPerKeyRateLimiter(maxRequests, 1*time.Minute, auth.GetTrustedProxyCIDRs())
+	rateLimiter := NewPerKeyRateLimiterWithMetrics(maxRequests, 1*time.Minute, auth.GetTrustedProxyCIDRs(), webhookMetrics)
 
 	// Load HA configuration
 	haConfig := config.LoadHAConfig()
 	replicaID := os.Getenv("HOSTNAME")
 	if replicaID == "" {
 		replicaID = fmt.Sprintf("replica-%d", time.Now().UnixNano())
+	}
+
+	// Load max request body size (default: 1MiB = 1048576 bytes)
+	maxRequestBytes := int64(1048576) // 1MiB default
+	if maxBytesStr := os.Getenv("SERVER_MAX_REQUEST_BYTES"); maxBytesStr != "" {
+		if parsed, err := strconv.ParseInt(maxBytesStr, 10, 64); err == nil && parsed > 0 {
+			maxRequestBytes = parsed
+		} else {
+			logger := sdklog.NewLogger("zen-watcher-server")
+			logger.Warn("Invalid SERVER_MAX_REQUEST_BYTES, using default",
+				sdklog.Operation("server_init"),
+				sdklog.String("invalid_value", maxBytesStr),
+				sdklog.Int64("default", maxRequestBytes))
+		}
 	}
 
 	s := &Server{
@@ -135,6 +152,7 @@ func NewServerWithIngester(
 			Healthy:    true,
 			LastUpdate: time.Now().Format(time.RFC3339),
 		},
+		maxRequestBytes: maxRequestBytes,
 	}
 
 	// Register all handlers first
@@ -143,6 +161,11 @@ func NewServerWithIngester(
 	// Wrap mux with HTTP metrics middleware if available (after handlers are registered)
 	if httpMetrics != nil {
 		s.server.Handler = httpMetrics.Middleware("zen-watcher")(mux)
+	}
+
+	// Initialize pprof server if enabled (localhost only for security)
+	if s.isPprofEnabled() {
+		s.initPprofServer()
 	}
 
 	return s
@@ -158,6 +181,36 @@ func parseEnvInt(s string) (int, error) {
 func (s *Server) isPprofEnabled() bool {
 	enablePprof := os.Getenv("ENABLE_PPROF")
 	return enablePprof == "true" || enablePprof == "1"
+}
+
+// initPprofServer initializes a separate HTTP server for pprof endpoints bound to localhost only
+func (s *Server) initPprofServer() {
+	pprofPort := os.Getenv("PPROF_PORT")
+	if pprofPort == "" {
+		pprofPort = "6060" // Default pprof port
+	}
+
+	pprofMux := http.NewServeMux()
+	// Register all pprof endpoints
+	pprofMux.HandleFunc("/debug/pprof/", pprof.Index)
+	pprofMux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+	pprofMux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+	pprofMux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+	pprofMux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	// Additional pprof endpoints
+	pprofMux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
+	pprofMux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
+	pprofMux.Handle("/debug/pprof/allocs", pprof.Handler("allocs"))
+	pprofMux.Handle("/debug/pprof/block", pprof.Handler("block"))
+	pprofMux.Handle("/debug/pprof/mutex", pprof.Handler("mutex"))
+
+	s.pprofServer = &http.Server{
+		Addr:         "127.0.0.1:" + pprofPort, // Bind to localhost only for security
+		Handler:      pprofMux,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 30 * time.Second, // Longer timeout for CPU profiling
+		IdleTimeout:  60 * time.Second,
+	}
 }
 
 // registerHandlers registers all HTTP handlers
@@ -233,21 +286,7 @@ func (s *Server) registerHandlers(mux *http.ServeMux) {
 	// Prometheus metrics endpoint
 	mux.Handle("/metrics", promhttp.Handler())
 
-	// pprof endpoints (for performance profiling)
-	// Security: Consider restricting /debug/pprof access via NetworkPolicy or authentication in production
-	if s.isPprofEnabled() {
-		mux.HandleFunc("/debug/pprof/", pprof.Index)
-		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-		// Additional pprof endpoints
-		mux.Handle("/debug/pprof/goroutine", pprof.Handler("goroutine"))
-		mux.Handle("/debug/pprof/heap", pprof.Handler("heap"))
-		mux.Handle("/debug/pprof/allocs", pprof.Handler("allocs"))
-		mux.Handle("/debug/pprof/block", pprof.Handler("block"))
-		mux.Handle("/debug/pprof/mutex", pprof.Handler("mutex"))
-	}
+	// pprof endpoints are registered on a separate localhost-only server (see startPprofServer)
 
 	// HA-aware endpoints (only if HA is enabled)
 	if s.haConfig != nil && s.haConfig.IsHAEnabled() {
@@ -293,9 +332,23 @@ func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit request body size to prevent DoS attacks
+	limitedBody := http.MaxBytesReader(w, r.Body, s.maxRequestBytes)
+	defer limitedBody.Close()
+
 	var alert map[string]interface{}
-	if err := json.NewDecoder(r.Body).Decode(&alert); err != nil {
+	if err := json.NewDecoder(limitedBody).Decode(&alert); err != nil {
 		logger := sdklog.NewLogger("zen-watcher-server")
+		if err == io.EOF {
+			logger.Warn("Falco webhook rejected: request body too large",
+				sdklog.Operation("falco_webhook"),
+				sdklog.String("source", "falco"),
+				sdklog.String("reason", "request_body_too_large"),
+				sdklog.Int64("max_bytes", s.maxRequestBytes))
+			s.webhookMetrics.WithLabelValues("falco", "413").Inc()
+			w.WriteHeader(http.StatusRequestEntityTooLarge)
+			return
+		}
 		logger.Warn("Failed to parse Falco alert",
 			sdklog.Operation("falco_webhook"),
 			sdklog.String("source", "falco"),
@@ -365,9 +418,23 @@ func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit request body size to prevent DoS attacks
+	limitedBody := http.MaxBytesReader(w, r.Body, s.maxRequestBytes)
+	defer limitedBody.Close()
+
 	var auditEvent map[string]interface{}
-	if err := json.NewDecoder(r.Body).Decode(&auditEvent); err != nil {
+	if err := json.NewDecoder(limitedBody).Decode(&auditEvent); err != nil {
 		logger := sdklog.NewLogger("zen-watcher-server")
+		if err == io.EOF {
+			logger.Warn("Audit webhook rejected: request body too large",
+				sdklog.Operation("audit_webhook"),
+				sdklog.String("source", "audit"),
+				sdklog.String("reason", "request_body_too_large"),
+				sdklog.Int64("max_bytes", s.maxRequestBytes))
+			s.webhookMetrics.WithLabelValues("audit", "413").Inc()
+			w.WriteHeader(http.StatusRequestEntityTooLarge)
+			return
+		}
 		logger.Warn("Failed to parse audit event",
 			sdklog.Operation("audit_webhook"),
 			sdklog.String("source", "audit"),
@@ -432,14 +499,6 @@ func (s *Server) Start(ctx context.Context, wg *sync.WaitGroup) {
 			"/falco/webhook",
 			"/audit/webhook",
 		}
-		if s.isPprofEnabled() {
-			endpoints = append(endpoints,
-				"/debug/pprof/",
-				"/debug/pprof/profile",
-				"/debug/pprof/heap",
-				"/debug/pprof/allocs",
-			)
-		}
 
 		logger := sdklog.NewLogger("zen-watcher-server")
 		logger.Info("HTTP server starting",
@@ -448,12 +507,31 @@ func (s *Server) Start(ctx context.Context, wg *sync.WaitGroup) {
 			sdklog.Strings("endpoints", endpoints),
 			sdklog.Bool("pprof", s.isPprofEnabled()))
 
+		if s.isPprofEnabled() && s.pprofServer != nil {
+			logger.Info("pprof server starting (localhost only)",
+				sdklog.Operation("pprof_start"),
+				sdklog.String("address", s.pprofServer.Addr))
+		}
+
 		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			logger := sdklog.NewLogger("zen-watcher-server")
 			logger.Error(err, "HTTP server error",
 				sdklog.Operation("http_serve"))
 		}
 	}()
+
+	// Start pprof server if enabled (separate goroutine, localhost only)
+	if s.isPprofEnabled() && s.pprofServer != nil {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := s.pprofServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				logger := sdklog.NewLogger("zen-watcher-server")
+				logger.Error(err, "pprof server error",
+					sdklog.Operation("pprof_serve"))
+			}
+		}()
+	}
 
 	// Graceful shutdown handler
 	go func() {
@@ -477,6 +555,15 @@ func (s *Server) Start(ctx context.Context, wg *sync.WaitGroup) {
 			logger := sdklog.NewLogger("zen-watcher-server")
 			logger.Error(err, "HTTP server shutdown error",
 				sdklog.Operation("http_shutdown"))
+		}
+
+		// Shutdown pprof server if enabled
+		if s.pprofServer != nil {
+			if err := sdklifecycle.ShutdownHTTPServer(ctx, s.pprofServer, "pprof-server", shutdownTimeout); err != nil {
+				logger := sdklog.NewLogger("zen-watcher-server")
+				logger.Error(err, "pprof server shutdown error",
+					sdklog.Operation("pprof_shutdown"))
+			}
 		}
 	}()
 }

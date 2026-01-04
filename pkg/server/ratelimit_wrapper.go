@@ -22,6 +22,7 @@ import (
 
 	"github.com/kube-zen/zen-sdk/pkg/gc/ratelimiter"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 // limiterEntry holds a rate limiter and its last-seen timestamp
@@ -40,12 +41,18 @@ type PerKeyRateLimiter struct {
 	trustedProxyCIDRs []*net.IPNet
 	cleanupInterval   time.Duration // Interval between cleanup runs
 	entryTTL          time.Duration // Time-to-live for inactive entries
+	webhookMetrics    *prometheus.CounterVec // Metrics for tracking rate limit rejections
 }
 
 // NewPerKeyRateLimiter creates a new per-key rate limiter.
 // maxTokens is the maximum tokens per key, refillInterval is the refill interval.
 // This converts refillInterval-based semantics to per-second rate limiting.
 func NewPerKeyRateLimiter(maxTokens int, refillInterval time.Duration, trustedProxyCIDRs []*net.IPNet) *PerKeyRateLimiter {
+	return NewPerKeyRateLimiterWithMetrics(maxTokens, refillInterval, trustedProxyCIDRs, nil)
+}
+
+// NewPerKeyRateLimiterWithMetrics creates a new per-key rate limiter with metrics support
+func NewPerKeyRateLimiterWithMetrics(maxTokens int, refillInterval time.Duration, trustedProxyCIDRs []*net.IPNet, webhookMetrics *prometheus.CounterVec) *PerKeyRateLimiter {
 	// Convert refillInterval to per-second rate
 	// e.g., 100 tokens per minute = 100/60 = ~1.67 per second
 	// Round up to ensure we don't exceed the intended rate
@@ -60,6 +67,7 @@ func NewPerKeyRateLimiter(maxTokens int, refillInterval time.Duration, trustedPr
 		trustedProxyCIDRs: trustedProxyCIDRs,
 		cleanupInterval:   1 * time.Hour, // Run cleanup every hour
 		entryTTL:          1 * time.Hour, // Remove entries inactive for 1 hour
+		webhookMetrics:    webhookMetrics,
 	}
 
 	// Start periodic cleanup
@@ -133,6 +141,13 @@ func (rl *PerKeyRateLimiter) RateLimitMiddleware(next http.HandlerFunc) http.Han
 				sdklog.Operation("rate_limit"),
 				sdklog.String("reason", "rate_limit_exceeded"),
 				sdklog.String("client_ip", key))
+			
+			// Track rate limit rejection in metrics
+			if rl.webhookMetrics != nil {
+				endpoint := getEndpointFromPath(r.URL.Path)
+				rl.webhookMetrics.WithLabelValues(endpoint, "429").Inc()
+			}
+			
 			w.WriteHeader(http.StatusTooManyRequests)
 			if _, err := w.Write([]byte(`{"error":"rate limit exceeded"}`)); err != nil {
 				logger.Warn("Failed to write rate limit response",

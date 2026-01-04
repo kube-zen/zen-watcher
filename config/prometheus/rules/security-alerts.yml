@@ -27,7 +27,7 @@ spec:
       annotations:
         summary: "Critical runtime security threat detected by Falco"
         description: "Falco detected {{$value}} critical security events/min. Namespace: {{$labels.namespace}}, Kind: {{$labels.kind}}"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#falco-runtime-threats"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#falco-runtime-threats"
         escalation_policy: "critical-immediate"
         action_required: "Investigate Falco events in namespace {{$labels.namespace}}"
         
@@ -44,7 +44,7 @@ spec:
       annotations:
         summary: "Critical vulnerability detected"
         description: "Trivy found {{$value}} critical vulnerabilities/min. EventType: {{$labels.eventType}}, Resource: {{$labels.kind}}/{{$labels.namespace}}"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#critical-vulnerabilities"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#critical-vulnerabilities"
         escalation_policy: "critical-4h"
         action_required: "Patch or mitigate critical vulnerabilities in {{$labels.kind}} resources"
         
@@ -61,7 +61,7 @@ spec:
       annotations:
         summary: "Critical CIS benchmark compliance failure"
         description: "Kube-Bench detected {{$value}} critical/high compliance failures/min. EventType: {{$labels.eventType}}"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#cis-benchmark-failures"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#cis-benchmark-failures"
         escalation_policy: "critical-24h"
         action_required: "Fix CIS benchmark compliance issues"
         
@@ -78,7 +78,7 @@ spec:
       annotations:
         summary: "Critical Infrastructure as Code security issue"
         description: "Checkov found {{$value}} critical IaC issues/min. EventType: {{$labels.eventType}}"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#iac-critical-issues"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#iac-critical-issues"
         escalation_policy: "critical-24h"
         action_required: "Fix IaC security issues"
         
@@ -95,7 +95,7 @@ spec:
       annotations:
         summary: "Suspicious audit activity detected"
         description: "Unusual audit activity: {{$value}} critical/high events/min. Namespace: {{$labels.namespace}}, EventType: {{$labels.eventType}}"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#suspicious-audit-activity"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#suspicious-audit-activity"
         escalation_policy: "critical-immediate"
         action_required: "Investigate suspicious activity in namespace {{$labels.namespace}}"
         
@@ -112,7 +112,7 @@ spec:
       annotations:
         summary: "Critical policy violation detected"
         description: "Kyverno policy violation detected. EventType: {{$labels.eventType}}, Resource: {{$labels.kind}}/{{$labels.namespace}}"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#policy-violations"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#policy-violations"
         escalation_policy: "critical-immediate"
         action_required: "Review and remediate policy violations"
         
@@ -129,7 +129,7 @@ spec:
       annotations:
         summary: "Multiple security tools are offline"
         description: "{{$value}} security tools are offline for more than 5 minutes"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#security-tool-outages"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#security-tool-outages"
         escalation_policy: "critical-immediate"
         action_required: "Restore security tool functionality - check deployments and health"
 
@@ -150,7 +150,7 @@ spec:
       annotations:
         summary: "High severity vulnerability detected"
         description: "Trivy found {{$value}} high severity vulnerabilities/min. EventType: {{$labels.eventType}}"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#high-vulnerabilities"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#high-vulnerabilities"
         escalation_policy: "high-24h"
         action_required: "Plan response for high severity vulnerabilities"
         
@@ -167,7 +167,7 @@ spec:
       annotations:
         summary: "High priority runtime security event"
         description: "Falco detected {{$value}} high severity events/min. EventType: {{$labels.eventType}}"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#falco-warning-events"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#falco-warning-events"
         escalation_policy: "high-4h"
         action_required: "Review Falco events for potential security concerns"
         
@@ -184,7 +184,7 @@ spec:
       annotations:
         summary: "CIS benchmark compliance warning"
         description: "Kube-Bench detected {{$value}} medium severity compliance warnings/min"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#cis-benchmark-warnings"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#cis-benchmark-warnings"
         escalation_policy: "high-48h"
         action_required: "Review and address compliance warnings"
         
@@ -201,7 +201,7 @@ spec:
       annotations:
         summary: "High severity Infrastructure as Code issue"
         description: "Checkov found {{$value}} high severity IaC issues/min. EventType: {{$labels.eventType}}"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#iac-high-issues"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#iac-high-issues"
         escalation_policy: "high-48h"
         action_required: "Review and fix IaC security issues"
         
@@ -218,7 +218,7 @@ spec:
       annotations:
         summary: "Potential unauthorized access attempt"
         description: "High rate of unauthorized/forbidden operations: {{$value}} operations/min. Namespace: {{$labels.namespace}}"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#unauthorized-access"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#unauthorized-access"
         escalation_policy: "high-2h"
         action_required: "Review access patterns - potential unauthorized activity"
         
@@ -235,7 +235,7 @@ spec:
       annotations:
         summary: "Policy violation warning"
         description: "Kyverno policy violation warning. EventType: {{$labels.eventType}}, Namespace: {{$labels.namespace}}"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#policy-warnings"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#policy-warnings"
         escalation_policy: "high-8h"
         action_required: "Review policy configuration"
 
@@ -256,7 +256,7 @@ spec:
       annotations:
         summary: "Medium severity vulnerability trend"
         description: "Trivy found {{$value}} medium severity vulnerabilities/min. EventType: {{$labels.eventType}}"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#medium-vulnerabilities"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#medium-vulnerabilities"
         escalation_policy: "medium-1w"
         action_required: "Plan response for multiple medium severity vulnerabilities"
         
@@ -273,7 +273,7 @@ spec:
       annotations:
         summary: "Security tool {{$labels.tool}} is offline"
         description: "Tool {{$labels.tool}} has been offline for more than 10 minutes"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#single-tool-offline"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#single-tool-offline"
         escalation_policy: "medium-4h"
         action_required: "Check status and restore {{$labels.tool}} service"
         
@@ -290,7 +290,7 @@ spec:
       annotations:
         summary: "Unusual audit activity volume"
         description: "Audit event rate is {{$value}} events/min - higher than normal baseline"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#audit-spikes"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#audit-spikes"
         escalation_policy: "medium-2h"
         action_required: "Review audit log volume increase - investigate if legitimate"
 
@@ -316,7 +316,7 @@ spec:
       annotations:
         summary: "Anomalous security event pattern detected"
         description: "Security event rate is 3x higher than baseline. Current: {{$value}} events/min"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#security-anomalies"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#security-anomalies"
         escalation_policy: "high-1h"
         action_required: "Investigate unusual security event pattern - possible security incident"
         
@@ -338,7 +338,7 @@ spec:
       annotations:
         summary: "Unusual namespace activity pattern detected"
         description: "Namespace {{$labels.namespace}} activity is 5x higher than baseline. {{$value}} operations/min"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#namespace-anomalies"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#namespace-anomalies"
         escalation_policy: "high-2h"
         action_required: "Review activity pattern for namespace {{$labels.namespace}} - potential security issue"
 
@@ -363,7 +363,7 @@ spec:
       annotations:
         summary: "Compliance score below threshold"
         description: "Compliance score is {{$value | humanizePercentage}} - below 80% threshold"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#compliance-scores"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#compliance-scores"
         escalation_policy: "high-24h"
         action_required: "Review and address compliance failures to restore score above 80%"
         
@@ -384,7 +384,7 @@ spec:
       annotations:
         summary: "Infrastructure as Code security drift detected"
         description: "{{$value | humanizePercentage}} of IaC scans show high/critical issues - possible configuration drift"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#iac-drift"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#iac-drift"
         escalation_policy: "medium-1w"
         action_required: "Review IaC configurations for security drift and misalignment"
 
@@ -411,7 +411,7 @@ spec:
       annotations:
         summary: "Correlated security events across multiple sources"
         description: "Namespace {{$labels.namespace}} has security events from multiple sources"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#correlated-events"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#correlated-events"
         escalation_policy: "critical-30m"
         action_required: "Investigate correlated security events in namespace {{$labels.namespace}} - possible coordinated attack"
         
@@ -434,7 +434,7 @@ spec:
       annotations:
         summary: "Runtime threat detected on vulnerable workload"
         description: "Runtime threats detected in namespace {{$labels.namespace}} that also has known vulnerabilities"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#vuln-runtime-correlation"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#vuln-runtime-correlation"
         escalation_policy: "critical-immediate"
         action_required: "Immediate investigation required - vulnerable namespace showing runtime threats"
 
@@ -458,7 +458,7 @@ spec:
       annotations:
         summary: "Falco event processing latency high"
         description: "95th percentile processing latency for Falco events is {{$value}}s"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#falco-performance"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#falco-performance"
         escalation_policy: "medium-4h"
         action_required: "Investigate Falco processing performance issues"
         
@@ -479,7 +479,7 @@ spec:
       annotations:
         summary: "High false positive rate detected"
         description: "{{$value | humanizePercentage}} of events are suspicious/unauthorized alerts - possible rule tuning needed"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#false-positives"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#false-positives"
         escalation_policy: "medium-1w"
         action_required: "Review and tune security rules to reduce false positive rate"
 
@@ -500,7 +500,7 @@ spec:
       annotations:
         summary: "New security tool discovered"
         description: "Tool {{$labels.tool}} is now active and being monitored"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#tool-discovery"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#tool-discovery"
         escalation_policy: "info"
         action_required: "Review new security tool integration and configuration"
         
@@ -521,7 +521,7 @@ spec:
       annotations:
         summary: "Security event rate significantly increased"
         description: "Current security event rate is 2x higher than 7-day average"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#event-trends"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#event-trends"
         escalation_policy: "medium-4h"
         action_required: "Review security event trend increase - investigate root cause"
         
@@ -539,6 +539,6 @@ spec:
       annotations:
         summary: "Weekly security event summary"
         description: "Week summary: {{$value}} {{$labels.severity}} security events processed"
-        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_INCIDENT_RESPONSE.md#weekly-summary"
+        runbook_url: "https://github.com/kube-zen/zen-watcher/blob/main/docs/SECURITY_ALERTING_OVERVIEW.md#weekly-summary"
         escalation_policy: "info"
         action_required: "Review weekly security event summary for trends and patterns"

@@ -117,5 +117,4 @@ func TestMyHook(t *testing.T) {
 ## Related Documentation
 
 - [Observation API Public Guide](OBSERVATION_API_PUBLIC_GUIDE.md) - Complete Observation CRD API reference
-- [Pipeline Architecture](INTELLIGENT_EVENT_PIPELINE.md) - Pipeline architecture and flow
 

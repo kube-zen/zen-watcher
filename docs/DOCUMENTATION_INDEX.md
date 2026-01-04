@@ -93,18 +93,12 @@ Complete guide to all Zen Watcher documentation files.
 
 ### Alerting & Incident Response
 
-13. **[alerting/SECURITY_ALERTING_OVERVIEW.md](alerting/SECURITY_ALERTING_OVERVIEW.md)** - Security alerting system overview ⭐ **NEW**
+13. **[alerting/SECURITY_ALERTING_OVERVIEW.md](alerting/SECURITY_ALERTING_OVERVIEW.md)** - Security alerting system and incident response ⭐ **NEW**
     - Alert categories and severity levels
     - Response time SLAs
     - Key metrics and thresholds
     - Alert configuration
-
-14. **[alerting/SECURITY_INCIDENT_RESPONSE.md](alerting/SECURITY_INCIDENT_RESPONSE.md)** - Security incident response runbooks ⭐ **NEW**
-    - Falco runtime threat response
-    - Critical vulnerability handling
-    - CIS benchmark compliance failures
-    - IaC security issue investigation
-    - Suspicious audit activity investigation
+    - Incident response runbooks and procedures
 
 15. **[alerting/alerting-integration-guide.md](alerting/alerting-integration-guide.md)** - Alerting integration guide ⭐ **NEW**
     - AlertManager configuration
@@ -186,6 +180,10 @@ Complete guide to all Zen Watcher documentation files.
     - Future considerations
 
 23. **[CRD.md](CRD.md)** - Custom Resource Definitions
+    - CRD schema and definition
+    - Conformance and validation
+    - Public API guide
+    - API audit and future improvements
     - Observation CRD schema
     - Ingester CRD
     - Schema reference
@@ -203,7 +201,7 @@ Complete guide to all Zen Watcher documentation files.
     - Schema sync guidance
     - Controller examples
 
-27. **[TESTING_FALCO_AUDIT.md](TESTING_FALCO_AUDIT.md)** - Falco and audit testing
+27. **[E2E_VALIDATION_GUIDE.md](E2E_VALIDATION_GUIDE.md)** - Falco and audit testing
     - Testing procedures
     - Example configurations
     - Troubleshooting
@@ -250,7 +248,7 @@ Complete guide to all Zen Watcher documentation files.
     - Code organization
     - File naming conventions
 
-35. **[TOOLING_OVERVIEW.md](TOOLING_OVERVIEW.md)** - Tooling overview
+35. **[TOOLING_GUIDE.md](TOOLING_GUIDE.md)** - Tooling overview
     - Quick reference for all CLI tools
     - When to use which tool
     - Recommended pipeline
@@ -363,7 +361,7 @@ Complete guide to all Zen Watcher documentation files.
 
 **Monitoring?**
 1. [config/monitoring/README.md](../config/monitoring/README.md) - Prometheus metrics
-2. [OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md) - Optimization metrics
+2. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Optimization metrics
 3. [DASHBOARD.md](DASHBOARD.md) - Dashboard guide and optimization updates
 
 ### For Developers
@@ -396,13 +394,12 @@ Complete guide to all Zen Watcher documentation files.
 ### Processing Order
 
 - **[SOURCE_ADAPTERS.md#processing-order-configuration](SOURCE_ADAPTERS.md)** - Processing order configuration guide
-- **[INTELLIGENT_EVENT_PIPELINE.md](INTELLIGENT_EVENT_PIPELINE.md)** - Event pipeline architecture
 
 ### Thresholds & Warnings
 
 - **[SOURCE_ADAPTERS.md#thresholds-and-warnings](SOURCE_ADAPTERS.md)** - Complete threshold documentation ⭐
 - **[README.md#advanced-configuration](../README.md)** - Quick overview
-- **[OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md)** - Alert configuration
+- **[SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md)** - Alert configuration
 
 ### Ingester CRD
 
@@ -453,7 +450,7 @@ Complete guide to all Zen Watcher documentation files.
 
 - [config/monitoring/README.md](../config/monitoring/README.md) - Prometheus metrics
 - [config/dashboards/DASHBOARD_GUIDE.md](../config/dashboards/DASHBOARD_GUIDE.md) - Dashboard guide
-- [OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md) - Optimization metrics
+- [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Optimization metrics
 - [README.md#observability](../README.md#observability) - Quick reference
 
 ### Troubleshooting

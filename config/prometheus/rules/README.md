@@ -66,7 +66,7 @@ These alerting rules integrate with:
 For detailed documentation, see:
 - [Security Alerting Overview](../../docs/alerting/SECURITY_ALERTING_OVERVIEW.md)
 - [Alerting Integration Guide](../../docs/alerting/alerting-integration-guide.md)
-- [Security Incident Response](../../docs/alerting/SECURITY_INCIDENT_RESPONSE.md)
+- [Security Incident Response](../../docs/alerting/SECURITY_ALERTING_OVERVIEW.md)
 
 ## Testing
 
