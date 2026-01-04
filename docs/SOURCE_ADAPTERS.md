@@ -142,7 +142,70 @@ spec:
 - Exposes HTTP endpoint at `:8080/webhook/my-tool`
 - Receives POST requests from external tools
 - Buffers events for processing
-- Supports bearer token or basic auth (optional)
+- Supports bearer token or basic auth (per-ingester, configured via Kubernetes Secrets)
+
+#### Authentication Configuration
+
+Webhook authentication is **per-ingester** - each ingester can have its own authentication secret. Authentication is configured via the `auth.secretName` field, which references a Kubernetes Secret in the same namespace as the Ingester.
+
+**Bearer Token Authentication:**
+
+```yaml
+spec:
+  webhook:
+    auth:
+      type: bearer
+      secretName: webhook-auth-secret
+```
+
+Create the secret with a bearer token:
+```bash
+kubectl create secret generic webhook-auth-secret \
+  --from-literal=token=$(openssl rand -hex 32) \
+  -n zen-system
+```
+
+**Secret Format (Bearer):**
+- Key: `token` - Contains the bearer token value
+- Usage: Client sends `Authorization: Bearer <token>` header
+
+**Basic Authentication:**
+
+```yaml
+spec:
+  webhook:
+    auth:
+      type: basic
+      secretName: webhook-auth-secret
+```
+
+Create the secret with username and password:
+```bash
+# Option 1: Plain text password (for v0 compatibility)
+kubectl create secret generic webhook-auth-secret \
+  --from-literal=username=webhook-user \
+  --from-literal=password=secure-password \
+  -n zen-system
+
+# Option 2: Bcrypt-hashed password (recommended for production)
+# Generate bcrypt hash: echo -n "password" | htpasswd -nBCi 10 webhook-user
+kubectl create secret generic webhook-auth-secret \
+  --from-literal=username=webhook-user \
+  --from-literal=password='$2a$10$...' \
+  -n zen-system
+```
+
+**Secret Format (Basic):**
+- Key: `username` - Contains the expected username
+- Key: `password` - Contains the password (plain text or bcrypt hash starting with `$2a$`, `$2b$`, or `$2y$`)
+- Usage: Client sends HTTP Basic Auth headers
+
+**Security Notes:**
+- Secrets are loaded from Kubernetes and cached (5-minute TTL)
+- Bearer tokens use constant-time comparison to prevent timing attacks
+- Basic auth supports bcrypt password hashing (recommended for production)
+- Each ingester can have its own secret (per-ingester authentication)
+- Authentication is required when `auth.type` is set (not "none")
 
 ### Method 3: CRD/Informer Adapter
 

@@ -187,6 +187,11 @@ resources:
 - Fixed max size (default 5000)
 - LRU eviction prevents unbounded growth
 
+#### Rate Limiter Cache
+- TTL-based cleanup (1 hour inactivity)
+- Automatic removal of stale entries prevents unbounded growth
+- Cleanup runs hourly, removing entries not accessed in the last hour
+
 #### Webhook Channels
 - Bounded capacity (100 Falco, 200 Audit)
 - Backpressure via HTTP 503 (not crash)
@@ -294,15 +299,50 @@ Uses Kubernetes Secrets for:
 
 ### For Production Deployments
 
-**1. Enable Webhook Authentication**
+**1. Enable Webhook Authentication (Generic Webhook Adapter)**
+
+For Ingester-based webhook sources, configure per-ingester authentication:
+
 ```yaml
-webhookSecurity:
-  authToken:
-    enabled: true
-    secretName: zen-watcher-webhook-token
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: my-webhook-source
+  namespace: zen-system
+spec:
+  source: my-tool
+  ingester: webhook
+  webhook:
+    auth:
+      type: bearer
+      secretName: webhook-auth-secret
 ```
 
-**2. Apply NetworkPolicy**
+Create authentication secrets:
+```bash
+# Bearer token
+kubectl create secret generic webhook-auth-secret \
+  --from-literal=token=$(openssl rand -hex 32) \
+  -n zen-system
+
+# Basic auth (bcrypt recommended for production)
+kubectl create secret generic webhook-auth-secret \
+  --from-literal=username=webhook-user \
+  --from-literal=password='$2a$10$...' \
+  -n zen-system
+```
+
+**2. Configure Trusted Proxy CIDRs (Helm)**
+```yaml
+server:
+  trustedProxyCIDRs:
+    - "10.0.0.0/8"      # Private network proxies
+    - "172.16.0.0/12"   # Private network proxies
+```
+
+**Note:** Empty list (default) = proxy headers never trusted (secure by default). This prevents IP spoofing attacks in rate limiting and IP allowlists.
+
+**3. Apply NetworkPolicy**
 ```yaml
 networkPolicy:
   enabled: true
@@ -327,7 +367,7 @@ image:
     -----END PUBLIC KEY-----
 ```
 
-**4. Set Resource Quotas**
+**5. Set Resource Quotas**
 ```yaml
 resources:
   limits:
@@ -335,7 +375,7 @@ resources:
     cpu: 500m
 ```
 
-**5. Enable Pod Security Standards**
+**6. Enable Pod Security Standards**
 ```yaml
 namespace:
   podSecurity:
@@ -355,7 +395,9 @@ namespace:
 
 1. **Enable All Security Features**
    ```bash
-   helm install zen-watcher ./charts/zen-watcher \
+   helm install zen-watcher kube-zen/zen-watcher \
+     --namespace zen-system \
+     --create-namespace \
      --set networkPolicy.enabled=true \
      --set podSecurityStandards.enabled=true \
      --set image.verifySignature=true

@@ -272,7 +272,8 @@ interval: 10 * time.Minute  // Default: 5 minutes
 
 **With Multiple Replicas:**
 ```bash
-helm upgrade zen-watcher charts/zen-watcher \
+helm upgrade zen-watcher kube-zen/zen-watcher \
+  --namespace zen-system \
   --reuse-values \
   --set image.tag=1.0.20
 ```

@@ -16,9 +16,10 @@ This document describes the threat model for `zen-watcher`, including potential 
 - Injecting malicious data into Observation CRDs
 
 **Mitigations:**
-- ✅ Token-based authentication (`WEBHOOK_AUTH_TOKEN`)
+- ✅ Per-ingester authentication (bearer token or basic auth via Kubernetes Secrets)
 - ✅ IP allowlist (`WEBHOOK_ALLOWED_IPS`)
-- ✅ Rate limiting (100 requests/minute per IP, configurable)
+- ✅ IP spoofing protection (trusted proxy CIDRs - proxy headers only trusted from trusted proxies)
+- ✅ Rate limiting (100 requests/minute per IP, configurable, with TTL-based cleanup)
 - ✅ NetworkPolicy restrictions (only allow from Falco/Audit namespaces)
 - 🔄 mTLS support (planned)
 
@@ -179,26 +180,75 @@ spec:
 - **Webhook Rate Limit:** 100 requests/minute per IP (configurable)
 - **Channel Buffers:** 100 (Falco), 200 (Audit)
 - **Drop Policy:** Drop on full (prevents blocking)
+- **Cache Management:** TTL-based cleanup (1 hour inactivity) prevents unbounded memory growth
+- **IP Spoofing Protection:** Proxy headers (`X-Forwarded-For`, `X-Real-IP`) only trusted when `RemoteAddr` is from a trusted proxy CIDR (default: trust none)
+
+### IP Spoofing Protection
+
+**Threat:** Attackers could spoof IP addresses via `X-Forwarded-For` or `X-Real-IP` headers to bypass rate limiting or IP allowlists.
+
+**Mitigation:**
+- Proxy headers are only trusted when `RemoteAddr` matches a trusted proxy CIDR
+- Default behavior: Empty trusted proxy list = proxy headers never trusted (secure by default)
+- Configured via `server.trustedProxyCIDRs` in Helm values
+- Prevents IP spoofing attacks in both rate limiting and IP allowlist checks
 
 ## Security Recommendations
 
 ### Production Deployment
 
-1. **Enable Webhook Authentication:**
+1. **Enable Webhook Authentication (Generic Webhook Adapter):**
+   
+   For Ingester-based webhook sources, configure per-ingester authentication:
+   
+   ```yaml
+   apiVersion: zen.kube-zen.io/v1alpha1
+   kind: Ingester
+   metadata:
+     name: my-webhook-source
+     namespace: zen-system
+   spec:
+     source: my-tool
+     ingester: webhook
+     webhook:
+       auth:
+         type: bearer
+         secretName: webhook-auth-secret
+   ```
+   
+   Create authentication secrets:
    ```bash
-   # Create secret with token
-   kubectl create secret generic zen-watcher-webhook-token \
+   # Bearer token
+   kubectl create secret generic webhook-auth-secret \
      --from-literal=token=$(openssl rand -hex 32) \
+     -n zen-system
+   
+   # Basic auth (bcrypt recommended)
+   kubectl create secret generic webhook-auth-secret \
+     --from-literal=username=webhook-user \
+     --from-literal=password='$2a$10$...' \
      -n zen-system
    ```
 
-2. **Configure IP Allowlist:**
+2. **Configure Trusted Proxy CIDRs (Helm):**
+   ```yaml
+   server:
+     trustedProxyCIDRs:
+       - "10.0.0.0/8"      # Private network proxies
+       - "172.16.0.0/12"   # Private network proxies
+   ```
+   
+   **Note:** Empty list (default) = proxy headers never trusted (secure by default)
+
+3. **Configure IP Allowlist:**
    ```yaml
    webhookSecurity:
      ipAllowlist:
        enabled: true
        allowedIPs: ["10.0.0.0/8", "172.16.0.0/12"]
    ```
+   
+   **Note:** IP allowlist also respects trusted proxy CIDRs (proxy headers only trusted from trusted proxies)
 
 3. **Set Resource Quotas:**
    ```yaml

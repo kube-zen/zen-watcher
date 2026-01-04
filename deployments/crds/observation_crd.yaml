@@ -146,7 +146,9 @@ spec:
                 && has(self.detectedAt)) || (has(self.category) && has(self.severity) && has(self.eventType))
               message: Either provide full new-style fields (domain, type, priority, title, description, detectedAt) OR full
                 legacy-style fields (category, severity, eventType)
-          status: {}
+          status:
+            type: object
+            x-kubernetes-preserve-unknown-fields: true
     subresources:
       status: {}
     additionalPrinterColumns:

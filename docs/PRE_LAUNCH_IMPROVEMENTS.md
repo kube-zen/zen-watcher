@@ -256,7 +256,7 @@ return &ValidationError{
 **Final Checks Needed**:
 
 ### 6.1 Security Hardening Verification
-- [x] ✅ Verify all security contexts are applied - **Verified in `helm-charts/charts/zen-watcher/templates/deployment.yaml`**
+- [x] ✅ Verify all security contexts are applied - **Verified in the helm-charts repository at `charts/zen-watcher/templates/deployment.yaml`**
   - `runAsNonRoot: true`, `runAsUser: 65534`
   - `readOnlyRootFilesystem: true`
   - `allowPrivilegeEscalation: false`

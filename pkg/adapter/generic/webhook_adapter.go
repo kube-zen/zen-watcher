@@ -16,28 +16,45 @@ package generic
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+	"golang.org/x/crypto/bcrypt"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 )
 
 // WebhookAdapter handles ALL webhook-based sources
 type WebhookAdapter struct {
-	server  *http.Server
-	events  chan RawEvent
-	mu      sync.RWMutex
-	configs map[string]*SourceConfig // path -> config
+	server     *http.Server
+	events     chan RawEvent
+	mu         sync.RWMutex
+	configs    map[string]*SourceConfig // path -> config
+	clientSet  kubernetes.Interface
+	secretCache map[string]*secretCacheEntry // namespace/secretName -> cached secret
+	secretMu   sync.RWMutex
+}
+
+type secretCacheEntry struct {
+	secret    *corev1.Secret
+	timestamp time.Time
 }
 
 // NewWebhookAdapter creates a new generic webhook adapter
-func NewWebhookAdapter() *WebhookAdapter {
+func NewWebhookAdapter(clientSet kubernetes.Interface) *WebhookAdapter {
 	return &WebhookAdapter{
-		events:  make(chan RawEvent, 100),
-		configs: make(map[string]*SourceConfig),
+		events:      make(chan RawEvent, 100),
+		configs:     make(map[string]*SourceConfig),
+		clientSet:   clientSet,
+		secretCache: make(map[string]*secretCacheEntry),
 	}
 }
 
@@ -56,6 +73,15 @@ func (a *WebhookAdapter) Validate(config *SourceConfig) error {
 	}
 	if config.Webhook.Port < 1 || config.Webhook.Port > 65535 {
 		return fmt.Errorf("webhook.port must be between 1 and 65535")
+	}
+	// Require SecretName when auth is enabled and not "none"
+	if config.Webhook.Auth != nil && config.Webhook.Auth.Type != "none" {
+		if config.Webhook.Auth.SecretName == "" {
+			return fmt.Errorf("webhook.auth.secretName is required when auth.type is %s", config.Webhook.Auth.Type)
+		}
+		if config.Namespace == "" {
+			return fmt.Errorf("namespace is required when webhook auth is enabled")
+		}
 	}
 	return nil
 }
@@ -181,28 +207,163 @@ func (a *WebhookAdapter) handleWebhook(config *SourceConfig) http.HandlerFunc {
 	}
 }
 
+// loadSecret loads a secret from Kubernetes, with caching (5 minute TTL)
+func (a *WebhookAdapter) loadSecret(ctx context.Context, namespace, secretName string) (*corev1.Secret, error) {
+	cacheKey := fmt.Sprintf("%s/%s", namespace, secretName)
+
+	// Check cache first
+	a.secretMu.RLock()
+	if entry, found := a.secretCache[cacheKey]; found {
+		// Cache is valid for 5 minutes
+		if time.Since(entry.timestamp) < 5*time.Minute {
+			a.secretMu.RUnlock()
+			return entry.secret, nil
+		}
+	}
+	a.secretMu.RUnlock()
+
+	// Load from Kubernetes
+	secret, err := a.clientSet.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to load secret %s/%s: %w", namespace, secretName, err)
+	}
+
+	// Update cache
+	a.secretMu.Lock()
+	a.secretCache[cacheKey] = &secretCacheEntry{
+		secret:    secret,
+		timestamp: time.Now(),
+	}
+	a.secretMu.Unlock()
+
+	return secret, nil
+}
+
 // authenticate handles webhook authentication
 func (a *WebhookAdapter) authenticate(r *http.Request, config *SourceConfig) bool {
 	if config.Webhook.Auth == nil {
 		return true
 	}
 
+	// Load secret if needed
+	if config.Webhook.Auth.SecretName == "" {
+		logger := sdklog.NewLogger("zen-watcher-adapter")
+		logger.Warn("Webhook auth enabled but secretName not configured",
+			sdklog.Operation("auth_validate"),
+			sdklog.String("source", config.Source),
+			sdklog.String("path", config.Webhook.Path))
+		return false
+	}
+
+	secret, err := a.loadSecret(r.Context(), config.Namespace, config.Webhook.Auth.SecretName)
+	if err != nil {
+		logger := sdklog.NewLogger("zen-watcher-adapter")
+		if errors.IsNotFound(err) {
+			logger.Warn("Secret not found for webhook auth",
+				sdklog.Operation("auth_secret_load"),
+				sdklog.String("source", config.Source),
+				sdklog.String("namespace", config.Namespace),
+				sdklog.String("secret", config.Webhook.Auth.SecretName))
+		} else {
+			logger.Warn("Failed to load secret for webhook auth",
+				sdklog.Operation("auth_secret_load"),
+				sdklog.String("source", config.Source),
+				sdklog.String("namespace", config.Namespace),
+				sdklog.String("secret", config.Webhook.Auth.SecretName),
+				sdklog.Error(err))
+		}
+		return false
+	}
+
 	switch config.Webhook.Auth.Type {
 	case "bearer":
-		// Extract token from Authorization header
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			return false
-		}
-		// Validate token (would load from secret in production)
-		return true // Simplified
+		return a.authenticateBearer(r, secret)
 	case "basic":
-		// Basic auth validation
-		_, _, ok := r.BasicAuth()
-		return ok
+		return a.authenticateBasic(r, secret)
 	default:
-		return true
+		logger := sdklog.NewLogger("zen-watcher-adapter")
+		logger.Warn("Unsupported auth type",
+			sdklog.Operation("auth_validate"),
+			sdklog.String("source", config.Source),
+			sdklog.String("type", config.Webhook.Auth.Type))
+		return false
 	}
+}
+
+// authenticateBearer validates bearer token authentication
+func (a *WebhookAdapter) authenticateBearer(r *http.Request, secret *corev1.Secret) bool {
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		return false
+	}
+
+	// Extract token (support "Bearer <token>" or just "<token>")
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return false
+	}
+
+	// Get expected token from secret
+	// Secret format: key "token" contains the expected bearer token
+	expectedTokenBytes, found := secret.Data["token"]
+	if !found {
+		logger := sdklog.NewLogger("zen-watcher-adapter")
+		logger.Warn("Secret missing 'token' key for bearer auth",
+			sdklog.Operation("auth_bearer_validate"),
+			sdklog.String("namespace", secret.Namespace),
+			sdklog.String("secret", secret.Name))
+		return false
+	}
+
+	expectedToken := string(expectedTokenBytes)
+
+	// Constant-time comparison
+	return subtle.ConstantTimeCompare([]byte(token), []byte(expectedToken)) == 1
+}
+
+// authenticateBasic validates basic authentication
+func (a *WebhookAdapter) authenticateBasic(r *http.Request, secret *corev1.Secret) bool {
+	username, password, ok := r.BasicAuth()
+	if !ok {
+		return false
+	}
+
+	// Get expected credentials from secret
+	// Secret format:
+	// - key "username" contains the expected username
+	// - key "password" contains the bcrypt-hashed password (or plain text for v0)
+	expectedUsernameBytes, usernameFound := secret.Data["username"]
+	expectedPasswordBytes, passwordFound := secret.Data["password"]
+
+	if !usernameFound || !passwordFound {
+		logger := sdklog.NewLogger("zen-watcher-adapter")
+		logger.Warn("Secret missing 'username' or 'password' key for basic auth",
+			sdklog.Operation("auth_basic_validate"),
+			sdklog.String("namespace", secret.Namespace),
+			sdklog.String("secret", secret.Name))
+		return false
+	}
+
+	expectedUsername := string(expectedUsernameBytes)
+	expectedPasswordHash := string(expectedPasswordBytes)
+
+	// Constant-time username comparison
+	if subtle.ConstantTimeCompare([]byte(username), []byte(expectedUsername)) != 1 {
+		return false
+	}
+
+	// Check if password is bcrypt-hashed (starts with $2a$, $2b$, or $2y$)
+	if strings.HasPrefix(expectedPasswordHash, "$2a$") ||
+		strings.HasPrefix(expectedPasswordHash, "$2b$") ||
+		strings.HasPrefix(expectedPasswordHash, "$2y$") {
+		// Use bcrypt comparison
+		err := bcrypt.CompareHashAndPassword([]byte(expectedPasswordHash), []byte(password))
+		return err == nil
+	}
+
+	// Plain text password (for v0 compatibility) - constant-time comparison
+	return subtle.ConstantTimeCompare([]byte(password), []byte(expectedPasswordHash)) == 1
 }
 
 // Stop stops the webhook adapter

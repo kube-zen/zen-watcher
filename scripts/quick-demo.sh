@@ -203,7 +203,7 @@ log_info "Installing zen-watcher chart..."
 HELM_ARGS=(
     "--namespace" "$NAMESPACE"
     "--create-namespace"
-    "--set" "crds.install=true"
+    "--set" "crds.enabled=true"
 )
 
 # Add image settings if provided

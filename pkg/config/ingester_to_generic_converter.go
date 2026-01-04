@@ -25,8 +25,9 @@ func ConvertIngesterConfigToGeneric(ingesterConfig *IngesterConfig) *generic.Sou
 	}
 
 	config := &generic.SourceConfig{
-		Source:   ingesterConfig.Source,
-		Ingester: ingesterConfig.Ingester,
+		Source:    ingesterConfig.Source,
+		Ingester:  ingesterConfig.Ingester,
+		Namespace: ingesterConfig.Namespace,
 	}
 
 	// Convert informer config
