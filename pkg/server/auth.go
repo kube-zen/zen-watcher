@@ -238,13 +238,13 @@ func (a *WebhookAuth) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 				sdklog.String("reason", "authentication_failed"),
 				sdklog.String("path", r.URL.Path),
 				sdklog.String("remote_addr", r.RemoteAddr))
-			
+
 			// Track authentication failure in metrics
 			if a.webhookMetrics != nil {
 				endpoint := getEndpointFromPath(r.URL.Path)
 				a.webhookMetrics.WithLabelValues(endpoint, "401").Inc()
 			}
-			
+
 			w.WriteHeader(http.StatusUnauthorized)
 			if _, err := w.Write([]byte(`{"error":"unauthorized"}`)); err != nil {
 				logger.Warn("Failed to write authentication error response",

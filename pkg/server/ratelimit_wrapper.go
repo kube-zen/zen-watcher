@@ -39,8 +39,8 @@ type PerKeyRateLimiter struct {
 	maxPerSec         int
 	cleanupTick       *time.Ticker
 	trustedProxyCIDRs []*net.IPNet
-	cleanupInterval   time.Duration // Interval between cleanup runs
-	entryTTL          time.Duration // Time-to-live for inactive entries
+	cleanupInterval   time.Duration          // Interval between cleanup runs
+	entryTTL          time.Duration          // Time-to-live for inactive entries
 	webhookMetrics    *prometheus.CounterVec // Metrics for tracking rate limit rejections
 }
 
@@ -141,13 +141,13 @@ func (rl *PerKeyRateLimiter) RateLimitMiddleware(next http.HandlerFunc) http.Han
 				sdklog.Operation("rate_limit"),
 				sdklog.String("reason", "rate_limit_exceeded"),
 				sdklog.String("client_ip", key))
-			
+
 			// Track rate limit rejection in metrics
 			if rl.webhookMetrics != nil {
 				endpoint := getEndpointFromPath(r.URL.Path)
 				rl.webhookMetrics.WithLabelValues(endpoint, "429").Inc()
 			}
-			
+
 			w.WriteHeader(http.StatusTooManyRequests)
 			if _, err := w.Write([]byte(`{"error":"rate limit exceeded"}`)); err != nil {
 				logger.Warn("Failed to write rate limit response",
