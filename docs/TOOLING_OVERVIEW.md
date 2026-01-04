@@ -8,65 +8,25 @@ zen-watcher provides a suite of CLI tools for operators and developers.
 
 **Purpose**: Migrate Ingester specs from v1alpha1 to v1
 
-**Usage**:
-```bash
-# Migrate a single file
-ingester-migrate -input ingester.yaml -output ingester-v1.yaml
-
-# Migrate directory
-ingester-migrate -input-dir ./ingesters -output-dir ./ingesters-v1
-```
-
-**See**: [INGESTER_MIGRATION_GUIDE.md](INGESTER_MIGRATION_GUIDE.md)
+**See**: [TOOLING_GUIDE.md](TOOLING_GUIDE.md#ingester-tools) and [INGESTER_MIGRATION_GUIDE.md](INGESTER_MIGRATION_GUIDE.md)
 
 ### ingester-lint
 
 **Purpose**: Validate Ingester specs for safety and correctness
 
-**Usage**:
-```bash
-# Lint a single file
-ingester-lint ingester.yaml
-
-# Lint directory
-ingester-lint -dir ./ingesters
-
-# Exit code indicates severity (0=pass, 1=warnings, 2=errors)
-```
-
-**See**: [INGESTER_TOOLING.md](INGESTER_TOOLING.md)
+**See**: [TOOLING_GUIDE.md](TOOLING_GUIDE.md#ingester-lint) for complete documentation
 
 ### obsctl
 
 **Purpose**: Query Observations from the cluster
 
-**Usage**:
-```bash
-# List Observations
-obsctl list --namespace zen-system --context my-cluster
-
-# Show statistics
-obsctl stats --group-by 'source,severity' --namespace zen-system
-
-# Get specific Observation
-obsctl get observation-name --namespace zen-system
-```
-
-**See**: [OBSCTL_CLI_GUIDE.md](OBSCTL_CLI_GUIDE.md)
+**See**: [TOOLING_GUIDE.md](TOOLING_GUIDE.md#obsctl) for complete documentation
 
 ### schema-doc-gen
 
 **Purpose**: Generate schema documentation from CRDs
 
-**Usage**:
-```bash
-# Generate documentation
-go run ./cmd/schema-doc-gen
-
-# Outputs to docs/generated/
-```
-
-**See**: [CONTRIBUTING.md](../CONTRIBUTING.md) - Run after modifying CRDs
+**See**: [TOOLING_GUIDE.md](TOOLING_GUIDE.md#schema-doc-gen) and [CONTRIBUTING.md](../CONTRIBUTING.md)
 
 ## When to Use Which Tool
 
@@ -127,8 +87,7 @@ find . -name "*.yaml" -path "*/ingesters/*" | xargs ingester-lint
 
 ## Related Documentation
 
+- [TOOLING_GUIDE.md](TOOLING_GUIDE.md) - Complete tooling documentation with detailed usage
 - [Ingester API](INGESTER_API.md) - Complete Ingester CRD reference
 - [Ingester Migration Guide](INGESTER_MIGRATION_GUIDE.md) - v1alpha1 → v1 migration
-- [Ingester Tooling](INGESTER_TOOLING.md) - Linter and tooling details
-- [obsctl CLI Guide](OBSCTL_CLI_GUIDE.md) - Querying Observations
 

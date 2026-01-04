@@ -1,0 +1,70 @@
+# Example: Application Monitoring - Error Log Detection
+# Monitors application logs for errors using logs ingester
+# Demonstrates: Log parsing, pattern matching, and error aggregation
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: application-error-monitor
+  namespace: zen-system
+spec:
+  source: app-logs
+  ingester: logs
+  logs:
+    podSelector: app=my-application
+    container: ""  # All containers
+    patterns:
+      # High-priority: Application errors
+      - regex: 'ERROR.*(?P<message>.*)'
+        type: application_error
+        priority: 0.8
+      # Medium-priority: Warnings
+      - regex: 'WARN.*(?P<message>.*)'
+        type: application_warning
+        priority: 0.5
+      # Critical: Fatal errors
+      - regex: 'FATAL.*(?P<message>.*)'
+        type: fatal_error
+        priority: 0.9
+      # Database connection errors
+      - regex: 'database.*connection.*failed.*(?P<message>.*)'
+        type: database_error
+        priority: 0.7
+      # Slow requests
+      - regex: 'request.*took.*(?P<duration>\d+\.\d+)s.*exceeded.*threshold'
+        type: slow_request
+        priority: 0.6
+    sinceSeconds: 300  # Look back 5 minutes
+    pollInterval: "10s"
+  normalization:
+    domain: operations
+    type: application_error
+    fieldMapping:
+      - from: matches.message
+        to: error_message
+      - from: matches.duration
+        to: request_duration
+  filter:
+    enabled: true
+    minPriority: 0.5  # Only warnings and above
+    excludeNamespaces:
+      - kube-system
+  # Aggressive deduplication: same error repeated many times
+  dedup:
+    enabled: true
+    window: "2m"  # Dedupe same error within 2 minutes
+    strategy: event-stream  # Use event-stream for high-volume logs
+    maxEventsPerWindow: 10  # Max 10 same errors per window
+  destinations:
+    - type: crd
+      value: observations
+      mapping:
+        domain: operations
+        type: application_error
+
+---
+# Use Case: Application Observability
+# - Monitors application logs for errors and warnings
+# - Aggregates repeated errors to prevent alert spam
+# - Detects slow requests and database issues
+# - Useful for application teams monitoring service health
+

@@ -44,3 +44,6 @@ spec:
       - "vuln-id"
   processing:
     order: filter_first
+  destinations:
+    - type: crd
+      value: observations

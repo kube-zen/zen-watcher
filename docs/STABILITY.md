@@ -324,5 +324,4 @@ Before deploying to production:
 - [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Adapter architecture
 - [SECURITY.md](SECURITY.md) - Security model and threat analysis
 - [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Best practices
-- [KEP](../keps/sig-foo/0000-zen-watcher/README.md) - Design proposal
 

@@ -310,7 +310,6 @@ func (oc *ObservationCreator) getSourceMetrics(source string) *SourceMetrics {
 
 // createObservation creates the observation (extracted from original CreateObservation)
 func (oc *ObservationCreator) createObservation(ctx context.Context, observation *unstructured.Unstructured, source string) error {
-	logger := sdklog.NewLogger("zen-watcher")
 
 	// Extract namespace from observation (optimized)
 	namespace, found := oc.fieldExtractor.ExtractString(observation.Object, "metadata", "namespace")
@@ -330,7 +329,7 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 	}
 
 	// Extract category, severity, and eventType from spec for metrics BEFORE creation (optimized)
-	category, severity, eventType := oc.extractMetricsFields(observation, logger, source)
+	category, severity, eventType := oc.extractMetricsFields(observation, observationLogger, source)
 
 	// Set TTL in spec if not already set (Kubernetes native style)
 	oc.setTTLIfNotSet(observation)
@@ -472,8 +471,7 @@ func (oc *ObservationCreator) updateMetricsAfterCreation(observation *unstructur
 // updateEventsTotalMetric updates the eventsTotal metric
 func (oc *ObservationCreator) updateEventsTotalMetric(observation *unstructured.Unstructured, source, category, severity, eventType, namespace string, createdObservation *unstructured.Unstructured, logger *sdklog.Logger) {
 	if oc.metrics == nil || oc.metrics.EventsTotal == nil {
-		logger := sdklog.NewLogger("zen-watcher")
-		logger.Error(fmt.Errorf("eventsTotal metric is nil"), "eventsTotal metric is nil, metrics will not be incremented",
+		observationLogger.Error(fmt.Errorf("eventsTotal metric is nil"), "eventsTotal metric is nil, metrics will not be incremented",
 			sdklog.Operation("observation_create"),
 			sdklog.String("source", source))
 		return
@@ -638,8 +636,6 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 		return
 	}
 
-	logger := sdklog.NewLogger("zen-watcher")
-
 	// Get default TTL from environment variable (in seconds)
 	// Convert from days (OBSERVATION_TTL_DAYS) or use OBSERVATION_TTL_SECONDS if set
 	var defaultTTLSeconds int64 = 7 * 24 * 60 * 60 // Default: 7 days in seconds
@@ -663,8 +659,7 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 		if ttlDays, err := strconv.Atoi(ttlDaysStr); err == nil && ttlDays > 0 {
 			defaultTTLSeconds = int64(ttlDays) * 24 * 60 * 60
 		} else {
-			logger := sdklog.NewLogger("zen-watcher")
-			logger.Warn("Failed to parse OBSERVATION_TTL_DAYS, using default",
+			observationLogger.Warn("Failed to parse OBSERVATION_TTL_DAYS, using default",
 				sdklog.Operation("ttl_parsing"),
 				sdklog.String("value", ttlDaysStr),
 				sdklog.Error(err))
@@ -673,16 +668,14 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 
 	// Validate TTL bounds
 	if defaultTTLSeconds < MinTTLSeconds {
-		logger := sdklog.NewLogger("zen-watcher")
-		logger.Warn("TTL value too small, using minimum",
+		observationLogger.Warn("TTL value too small, using minimum",
 			sdklog.Operation("ttl_validation"),
 			sdklog.Int64("requested_ttl", defaultTTLSeconds),
 			sdklog.Int64("minimum_ttl", MinTTLSeconds),
 			sdklog.Int64("applied_ttl", MinTTLSeconds))
 		defaultTTLSeconds = MinTTLSeconds
 	} else if defaultTTLSeconds > MaxTTLSeconds {
-		logger := sdklog.NewLogger("zen-watcher")
-		logger.Warn("TTL value too large, using maximum",
+		observationLogger.Warn("TTL value too large, using maximum",
 			sdklog.Operation("ttl_validation"),
 			sdklog.Int64("requested_ttl", defaultTTLSeconds),
 			sdklog.Int64("maximum_ttl", MaxTTLSeconds),
@@ -695,8 +688,7 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 	if spec == nil {
 		spec = make(map[string]interface{})
 		if err := unstructured.SetNestedMap(observation.Object, spec, "spec"); err != nil {
-			logger := sdklog.NewLogger("zen-watcher-observation-creator")
-			logger.Warn("Failed to set spec",
+			observationLogger.Warn("Failed to set spec",
 				sdklog.Operation("set_ttl"),
 				sdklog.Error(err))
 			return
@@ -706,8 +698,7 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 	// Set TTL in spec (only if not already set)
 	spec["ttlSecondsAfterCreation"] = defaultTTLSeconds
 	if err := unstructured.SetNestedMap(observation.Object, spec, "spec"); err != nil {
-		logger := sdklog.NewLogger("zen-watcher-observation-creator")
-		logger.Warn("Failed to set spec with TTL",
+		observationLogger.Warn("Failed to set spec with TTL",
 			sdklog.Operation("set_ttl"),
 			sdklog.Error(err))
 	}

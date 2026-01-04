@@ -33,7 +33,7 @@ All events are normalized to the standard `Event` struct:
 ```go
 type Event struct {
     Source    string                      // Tool name (required)
-    Category  string                      // security, compliance, performance (required)
+    Category  string                      // security, compliance, performance, operations, cost (required)
     Severity  string                      // CRITICAL, HIGH, MEDIUM, LOW (required)
     EventType string                      // vulnerability, runtime-threat, etc. (required)
     Resource  *ResourceRef                // Affected K8s resource (optional)
@@ -92,8 +92,9 @@ Events are categorized based on their nature:
 **Standard Categories:**
 - `security` - Security-related events (vulnerabilities, threats, policy violations)
 - `compliance` - Compliance-related events (audit logs, CIS benchmarks)
-- `performance` - Performance-related events (resource usage, latency)
-- Custom categories are supported but not recommended
+- `performance` - Performance-related events (latency spikes, resource exhaustion, crashes)
+- `operations` - Operations-related events (deployment failures, pod crashes, infrastructure health)
+- `cost` - Cost/efficiency-related events (resource waste, unused resources)
 
 **Tool-Specific Category Mapping:**
 
@@ -215,7 +216,7 @@ This ensures accurate duplicate detection across different tool formats.
 When creating custom adapters, follow normalization rules:
 
 1. **Map Severity**: Use `normalizeSeverity()` function or equivalent logic
-2. **Assign Category**: Choose appropriate category (`security`, `compliance`, `performance`)
+2. **Assign Category**: Choose appropriate category (`security`, `compliance`, `performance`, `operations`, `cost`)
 3. **Set EventType**: Use descriptive event type or create custom one
 4. **Normalize Resource**: Extract and normalize Kubernetes resource references
 5. **Preserve Details**: Keep tool-specific data in `details` field

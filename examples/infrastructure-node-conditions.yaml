@@ -1,0 +1,65 @@
+# Example: Infrastructure Monitoring - Node Health Conditions
+# Monitors Node conditions for infrastructure health issues
+# Demonstrates: Infrastructure monitoring, filtering, and aggregation
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: node-health-monitor
+  namespace: zen-system
+spec:
+  source: node-monitor
+  ingester: informer
+  informer:
+    gvr:
+      group: ""
+      version: "v1"
+      resource: "nodes"
+    namespace: ""  # Nodes are cluster-scoped
+    resyncPeriod: "5m"
+  normalization:
+    domain: operations
+    type: node_condition
+    priority:
+      # Critical node conditions
+      MemoryPressure: 0.9
+      DiskPressure: 0.9
+      PIDPressure: 0.8
+      NetworkUnavailable: 0.9
+      # Less critical
+      Ready: 0.1
+    fieldMapping:
+      - from: status.conditions[?(@.type=='MemoryPressure')].status
+        to: memory_pressure
+      - from: status.conditions[?(@.type=='DiskPressure')].status
+        to: disk_pressure
+      - from: status.conditions[?(@.type=='Ready')].status
+        to: node_ready
+      - from: metadata.name
+        to: node_name
+  filter:
+    enabled: true
+    minPriority: 0.7  # Only pressure conditions, not healthy nodes
+    includeEventTypes:
+      - node_condition
+  # Long deduplication: node conditions don't change rapidly
+  dedup:
+    enabled: true
+    window: "15m"  # Dedupe same node condition for 15 minutes
+    strategy: fingerprint
+    fields:
+      - "spec.resource.name"
+      - "spec.eventType"
+  destinations:
+    - type: crd
+      value: observations
+      mapping:
+        domain: operations
+        type: node_condition
+
+---
+# Use Case: Infrastructure Reliability
+# - Monitors node health conditions (memory, disk, network pressure)
+# - Detects infrastructure issues before they impact workloads
+# - Useful for platform/SRE teams managing cluster health
+# - Can trigger node remediation actions
+

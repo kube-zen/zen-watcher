@@ -75,8 +75,7 @@ func NewConfigMapLoader(
 
 // Start starts watching the ConfigMap for changes
 func (cml *ConfigMapLoader) Start(ctx context.Context) error {
-	logger := sdklog.NewLogger("zen-watcher-config")
-	logger.Info("Starting ConfigMap watcher for filter config",
+	configLogger.Info("Starting ConfigMap watcher for filter config",
 		sdklog.Operation("configmap_watcher_start"),
 		sdklog.String("namespace", cml.configMapNamespace),
 		sdklog.String("configmap_name", cml.configMapName))
@@ -92,7 +91,7 @@ func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 	} else {
 		cml.updateFilter(initialConfig)
 		cml.setLastGoodConfig(initialConfig)
-		logger.Info("Loaded initial filter configuration from ConfigMap",
+		configLogger.Info("Loaded initial filter configuration from ConfigMap",
 			sdklog.Operation("configmap_load_initial"),
 			sdklog.String("namespace", cml.configMapNamespace),
 			sdklog.String("configmap_name", cml.configMapName))
@@ -115,8 +114,7 @@ func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 			if !ok || cm.Name != cml.configMapName {
 				return
 			}
-			logger := sdklog.NewLogger("zen-watcher-config")
-			logger.Info("ConfigMap added",
+			configLogger.Info("ConfigMap added",
 				sdklog.Operation("configmap_added"),
 				sdklog.String("namespace", cm.Namespace),
 				sdklog.String("configmap_name", cm.Name))
@@ -127,8 +125,7 @@ func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 			if !ok || cm.Name != cml.configMapName {
 				return
 			}
-			logger := sdklog.NewLogger("zen-watcher-config")
-			logger.Info("ConfigMap updated",
+			configLogger.Info("ConfigMap updated",
 				sdklog.Operation("configmap_updated"),
 				sdklog.String("namespace", cm.Namespace),
 				sdklog.String("configmap_name", cm.Name))
@@ -151,8 +148,7 @@ func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 			if cm.Name != cml.configMapName {
 				return
 			}
-			logger := sdklog.NewLogger("zen-watcher-config")
-			logger.Info("ConfigMap deleted, keeping last good config",
+			configLogger.Info("ConfigMap deleted, keeping last good config",
 				sdklog.Operation("configmap_deleted"),
 				sdklog.String("namespace", cm.Namespace),
 				sdklog.String("configmap_name", cm.Name))
@@ -170,7 +166,7 @@ func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 		return fmt.Errorf("failed to sync ConfigMap informer cache")
 	}
 
-	logger.Info("ConfigMap watcher started and synced",
+	configLogger.Info("ConfigMap watcher started and synced",
 		sdklog.Operation("configmap_watcher_synced"),
 		sdklog.String("namespace", cml.configMapNamespace),
 		sdklog.String("configmap_name", cml.configMapName))
@@ -185,8 +181,7 @@ func (cml *ConfigMapLoader) handleConfigMapChange(cm *corev1.ConfigMap) {
 	// Extract filter.json from ConfigMap
 	filterJSON, found := cm.Data[cml.configMapKey]
 	if !found {
-		logger := sdklog.NewLogger("zen-watcher-config")
-		logger.Warn("Filter key not found in ConfigMap, keeping last good config",
+		configLogger.Warn("Filter key not found in ConfigMap, keeping last good config",
 			sdklog.Operation("configmap_reload"),
 			sdklog.String("namespace", cm.Namespace),
 			sdklog.String("reason", "key_not_found"),
@@ -198,8 +193,7 @@ func (cml *ConfigMapLoader) handleConfigMapChange(cm *corev1.ConfigMap) {
 	// Parse JSON
 	var config filter.FilterConfig
 	if err := json.Unmarshal([]byte(filterJSON), &config); err != nil {
-		logger := sdklog.NewLogger("zen-watcher-config")
-		logger.Error(err, "Failed to parse filter config from ConfigMap, keeping last good config",
+		configLogger.Error(err, "Failed to parse filter config from ConfigMap, keeping last good config",
 			sdklog.Operation("configmap_reload"),
 			sdklog.String("namespace", cm.Namespace),
 			sdklog.String("configmap_name", cm.Name))
@@ -217,8 +211,7 @@ func (cml *ConfigMapLoader) handleConfigMapChange(cm *corev1.ConfigMap) {
 	// Update filter with new config
 	// ConfigMap configs are loaded directly
 	cml.updateFilter(&config)
-	logger := sdklog.NewLogger("zen-watcher-config")
-	logger.Info("Reloaded filter configuration from ConfigMap",
+	configLogger.Info("Reloaded filter configuration from ConfigMap",
 		sdklog.Operation("configmap_reload"),
 		sdklog.String("namespace", cm.Namespace),
 		sdklog.String("configmap_name", cm.Name))

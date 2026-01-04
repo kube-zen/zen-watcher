@@ -118,10 +118,11 @@ spec:
                         specified)
                       properties:
                         domain:
-                          description: 'Domain: security, operations, cost, compliance, custom'
+                          description: 'Domain: security, operations, performance, cost, compliance, custom'
                           enum:
                           - security
                           - operations
+                          - performance
                           - cost
                           - compliance
                           - custom
@@ -354,12 +355,11 @@ spec:
                     type: string
                 type: object
               ingester:
-                description: 'Ingester type: informer, webhook, logs, or k8s-events'
+                description: 'Ingester type: informer, webhook, or logs'
                 enum:
                 - informer
                 - webhook
                 - logs
-                - k8s-events
                 type: string
               logs:
                 description: Logs adapter configuration

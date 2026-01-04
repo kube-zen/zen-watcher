@@ -1,0 +1,33 @@
+# Project Classification: zen-watcher
+CLASS: oss
+SCOPE: standalone-oss-component
+BOUNDARIES:
+  - TYPE: open-source
+  - DECOUPLED: true
+  - NO_PRIVATE_IMPORTS: true
+
+FORBIDDEN:
+  - zen-platform/* imports
+  - zen-admin/* imports
+  - zen-saas/* references
+  - zen-bridge/* references
+  - Private API endpoints
+  - PM/admin documentation
+  - Completion reports
+  - Build verification docs
+
+ALLOWED:
+  - Standard library
+  - k8s.io/client-go/*
+  - k8s.io/apimachinery/*
+  - zen-sdk (OSS SDK only)
+  - User-facing documentation
+  - API documentation
+  - Contributing guides
+
+DOCUMENTATION_RULES:
+  - User-facing docs only (README, CONTRIBUTING, API docs)
+  - NO PM/admin docs
+  - NO completion reports
+  - NO references to private features
+

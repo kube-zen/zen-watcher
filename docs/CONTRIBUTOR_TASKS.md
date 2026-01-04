@@ -158,19 +158,6 @@ Work that requires deep understanding of CRDs, informers, or KEP-driven architec
     - **Blockers**: Requires coordination with maintainers
     - **Difficulty**: High
 
-### KEP-Driven Work
-
-20. **Prepare KEP submission materials**
-    - **Description**: Finalize `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md` for Kubernetes SIG submission
-    - **Design Doc**: `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md`
-    - **Blockers**: Requires maintainer approval, community feedback
-    - **Difficulty**: High
-
-21. **Implement API stability guarantees**
-    - **Description**: Add deprecation policies and compatibility guarantees per KEP requirements
-    - **Design Doc**: `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md`, `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md`
-    - **Blockers**: Requires KEP approval
-    - **Difficulty**: High
 
 ---
 
@@ -179,7 +166,6 @@ Work that requires deep understanding of CRDs, informers, or KEP-driven architec
 All tasks are sourced from:
 - `the project roadmap` - Near-term and mid-term backlog
 - `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` - Versioning and API evolution
-- `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md` - KEP-driven work
 
 **Note**: Tasks are not invented off-roadmap. All work aligns with documented priorities.
 

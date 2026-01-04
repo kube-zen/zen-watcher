@@ -40,3 +40,12 @@ spec:
       - "test_id"
   processing:
     order: auto
+  destinations:
+    - type: crd
+      gvr:
+        group: ""
+        version: "v1"
+        resource: "configmaps"
+      mapping:
+        domain: compliance
+        type: cis_benchmark_finding

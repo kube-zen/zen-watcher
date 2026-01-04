@@ -200,7 +200,14 @@ metadata:
   namespace: default
 spec:
   source: kubernetes-events
-  ingester: k8s-events
+  ingester: informer
+  informer:
+    gvr:
+      group: ""
+      version: "v1"
+      resource: "events"
+    namespace: ""
+    resyncPeriod: "0"
   processing:
     filter:
       enabled: true
@@ -262,7 +269,14 @@ metadata:
   namespace: default
 spec:
   source: test-canonical
-  ingester: k8s-events
+  ingester: informer
+  informer:
+    gvr:
+      group: ""
+      version: "v1"
+      resource: "events"
+    namespace: ""
+    resyncPeriod: "0"
   processing:
     filter:
       enabled: true
@@ -344,7 +358,14 @@ metadata:
   name: test-missing-source
   namespace: default
 spec:
-  ingester: k8s-events
+  ingester: informer
+  informer:
+    gvr:
+      group: ""
+      version: "v1"
+      resource: "events"
+    namespace: ""
+    resyncPeriod: "0"
   destinations:
     - type: crd
       value: observations
@@ -377,7 +398,14 @@ metadata:
   namespace: default
 spec:
   source: test-source
-  ingester: k8s-events
+  ingester: informer
+  informer:
+    gvr:
+      group: ""
+      version: "v1"
+      resource: "events"
+    namespace: ""
+    resyncPeriod: "0"
 `,
 			shouldFail: true,
 		},
@@ -391,7 +419,14 @@ metadata:
   namespace: default
 spec:
   source: test-source
-  ingester: k8s-events
+  ingester: informer
+  informer:
+    gvr:
+      group: ""
+      version: "v1"
+      resource: "events"
+    namespace: ""
+    resyncPeriod: "0"
   destinations:
     - type: crd
       value: observations
@@ -496,7 +531,14 @@ metadata:
   namespace: default
 spec:
   source: test-metrics
-  ingester: k8s-events
+  ingester: informer
+  informer:
+    gvr:
+      group: ""
+      version: "v1"
+      resource: "events"
+    namespace: ""
+    resyncPeriod: "0"
   processing:
     filter:
       enabled: true

@@ -57,7 +57,7 @@ The Observation CRD defines:
 #### Required Fields
 
 - `spec.source` - Tool that detected the event (trivy, falco, kyverno, etc.)
-- `spec.category` - Event category (security, compliance, performance)
+- `spec.category` - Event category (security, compliance, performance, operations, cost)
 - `spec.severity` - Severity level (critical, high, medium, low, info)
 - `spec.eventType` - Type of event (vulnerability, runtime-threat, policy-violation)
 

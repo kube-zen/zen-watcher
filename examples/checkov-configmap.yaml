@@ -37,3 +37,12 @@ spec:
     strategy: fingerprint
   processing:
     order: auto
+  destinations:
+    - type: crd
+      gvr:
+        group: ""
+        version: "v1"
+        resource: "configmaps"
+      mapping:
+        domain: security
+        type: iac_vulnerability

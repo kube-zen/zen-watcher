@@ -1,8 +1,10 @@
-# Security Policy and Best Practices
+# Security Policy and Model
 
 > **Note:** For detailed security documentation, see:
 > - [RBAC Security Documentation](./SECURITY_RBAC.md) - Detailed RBAC permissions and rationale
-> - [Threat Model](./SECURITY_THREAT_MODEL.md) - Threat vectors, mitigations, and security boundaries
+> - [Threat Model](./SECURITY_THREAT_MODEL.md) - Comprehensive threat analysis and mitigations
+
+---
 
 ## Quick Security Checklist
 
@@ -15,28 +17,7 @@
 - ✅ Garbage collection (prevents CRD bloat)
 - ✅ Resource quotas (recommended)
 
-## Webhook Security
-
-Zen Watcher exposes webhook endpoints for Falco and Audit events. **In production, enable authentication:**
-
-```yaml
-webhookSecurity:
-  authToken:
-    enabled: true
-    secretName: "zen-watcher-webhook-token"
-  ipAllowlist:
-    enabled: true
-    allowedIPs: ["10.0.0.0/8"]
-  rateLimit:
-    enabled: true
-    requestsPerMinute: 100
-```
-
-See [Threat Model](./SECURITY_THREAT_MODEL.md) for details.
-
 ---
-
-# Security Policy and Best Practices
 
 ## Security Commitment
 
@@ -57,9 +38,61 @@ We will respond within 24 hours and work with you to understand and address the 
 - Potential impact
 - Suggested fix (if any)
 
-## Security Features
+---
 
-### 1. Container Security
+## Security Principles
+
+1. **Zero Trust** - No external dependencies, no egress traffic, no credentials
+2. **Least Privilege** - Minimum RBAC permissions required
+3. **Defense in Depth** - Multiple layers of security controls
+4. **Transparency** - Open source, auditable, documented
+5. **Kubernetes-Native** - Leverage platform security primitives
+
+---
+
+## Trust Boundaries
+
+### What Zen-Watcher Trusts
+
+✅ **Kubernetes API Server**
+- Source of truth for all data
+- RBAC enforcement
+- Admission webhooks (if configured)
+
+✅ **Source Security Tools**
+- Trivy Operator: Trusted vulnerability data
+- Kyverno: Trusted policy enforcement
+- Falco: Trusted runtime detection
+- Checkov, KubeBench, Audit: Trusted scan results
+
+✅ **Kubernetes Informer Pattern**
+- Watch API resilient to disconnections
+- Automatic resync on failures
+
+### What Zen-Watcher Does NOT Trust
+
+❌ **Webhook Payloads** (Falco, Audit)
+- Validated and sanitized
+- Optional token authentication
+- Optional IP allowlist
+- Rate limiting per endpoint
+- Bounded channel capacity (backpressure)
+
+❌ **ConfigMap Contents** (Checkov, KubeBench)
+- JSON parsing with error handling
+- Invalid data skipped, not crashed
+- No code execution from ConfigMap data
+
+❌ **Ingester CRDs**
+- Validated before application
+- Invalid filters fall back to last-good-config
+- No filter can execute arbitrary code
+
+---
+
+## Security Layers
+
+### Layer 1: Container Security
 
 #### Non-Privileged Execution
 ```yaml
@@ -91,13 +124,13 @@ securityContext:
     type: RuntimeDefault
 ```
 
-### 2. Network Security
+### Layer 2: Network Security
 
 #### NetworkPolicy
 Zen Watcher implements strict network policies:
 
-**Ingress**: Only from monitoring namespace (Prometheus)
-**Egress**: Only to Kubernetes API and DNS
+**Ingress**: Only from webhook sources (Falco, Audit) and Prometheus (metrics scraping)  
+**Egress**: Only to Kubernetes API (443) and CoreDNS (53)
 
 ```yaml
 networkPolicy:
@@ -107,10 +140,15 @@ networkPolicy:
     - Egress
 ```
 
+#### No External Dependencies
+- Zero outbound traffic to internet
+- No external databases or services
+- Pure Kubernetes primitives only
+
 #### Service Mesh Compatibility
 Compatible with Istio, Linkerd, and other service meshes.
 
-### 3. RBAC
+### Layer 3: RBAC
 
 #### Least Privilege
 Zen Watcher uses minimal RBAC permissions:
@@ -121,6 +159,84 @@ Zen Watcher uses minimal RBAC permissions:
 
 #### ServiceAccount
 Dedicated ServiceAccount with limited permissions.
+
+See [SECURITY_RBAC.md](SECURITY_RBAC.md) for detailed permission rationale.
+
+### Layer 4: Data Sanitization
+
+#### Input Validation
+- Webhook payloads: JSON schema validation
+- ConfigMap data: Safe JSON parsing
+- CRD fields: Kubernetes validation via OpenAPI schema
+
+#### Output Sanitization
+- No sensitive data in logs (passwords, tokens filtered)
+- Observation CRDs: Structured, validated fields only
+- Metrics: No PII or sensitive metadata
+
+### Layer 5: Resource Limits
+
+#### Memory Protection
+```yaml
+resources:
+  limits:
+    memory: 512Mi  # OOMKill before consuming cluster resources
+```
+
+#### Dedup Cache
+- Fixed max size (default 5000)
+- LRU eviction prevents unbounded growth
+
+#### Webhook Channels
+- Bounded capacity (100 Falco, 200 Audit)
+- Backpressure via HTTP 503 (not crash)
+
+#### Observation TTL
+- Default 7 days
+- Automatic GC prevents etcd exhaustion
+
+---
+
+## Webhook Security
+
+Zen Watcher exposes webhook endpoints for Falco and Audit events. **In production, enable authentication:**
+
+```yaml
+webhookSecurity:
+  authToken:
+    enabled: true
+    secretName: "zen-watcher-webhook-token"
+  ipAllowlist:
+    enabled: true
+    allowedIPs: ["10.0.0.0/8"]
+  rateLimit:
+    enabled: true
+    requestsPerMinute: 100
+```
+
+See [SECURITY_THREAT_MODEL.md](SECURITY_THREAT_MODEL.md) for details.
+
+---
+
+## Security Features
+
+### 1. Container Security
+
+All container security features are enabled by default:
+- Non-privileged execution
+- Read-only root filesystem
+- Dropped capabilities
+- Seccomp profile
+
+### 2. Network Security
+
+NetworkPolicy is enabled by default and restricts:
+- Ingress to webhook sources and Prometheus
+- Egress to Kubernetes API and DNS only
+
+### 3. RBAC
+
+Least-privilege RBAC with read-only access to source CRDs and write access only to Observation CRDs.
 
 ### 4. Pod Security Standards
 
@@ -140,7 +256,7 @@ All official images are signed with Cosign:
 
 ```bash
 # Verify image signature
-cosign verify --key cosign.pub zubezen/zen-watcher:1.0.0
+cosign verify --key cosign.pub kubezen/zen-watcher:1.0.0
 ```
 
 #### SBOM (Software Bill of Materials)
@@ -148,7 +264,7 @@ Every release includes an SBOM:
 
 ```bash
 # Generate SBOM
-syft zubezen/zen-watcher:1.0.0 -o spdx-json > sbom.json
+syft kubezen/zen-watcher:1.0.0 -o spdx-json > sbom.json
 
 # Scan SBOM for vulnerabilities
 grype sbom:sbom.json
@@ -172,7 +288,68 @@ Uses Kubernetes Secrets for:
 - Image pull secrets
 - API keys (if needed)
 
+---
+
 ## Security Best Practices
+
+### For Production Deployments
+
+**1. Enable Webhook Authentication**
+```yaml
+webhookSecurity:
+  authToken:
+    enabled: true
+    secretName: zen-watcher-webhook-token
+```
+
+**2. Apply NetworkPolicy**
+```yaml
+networkPolicy:
+  enabled: true
+  ingressRules:
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: falco
+    - from:
+      - namespaceSelector:
+          matchLabels:
+            name: monitoring
+```
+
+**3. Enable Image Signature Verification**
+```yaml
+image:
+  verifySignature: true
+  cosignPublicKey: |
+    -----BEGIN PUBLIC KEY-----
+    ...
+    -----END PUBLIC KEY-----
+```
+
+**4. Set Resource Quotas**
+```yaml
+resources:
+  limits:
+    memory: 512Mi
+    cpu: 500m
+```
+
+**5. Enable Pod Security Standards**
+```yaml
+namespace:
+  podSecurity:
+    enforce: restricted
+    audit: restricted
+    warn: restricted
+```
+
+**6. Regular Security Audits**
+- Review RBAC permissions quarterly
+- Scan zen-watcher image with Trivy
+- Check for CVEs in dependencies
+- Audit Observation CRDs for sensitive data
+- Review NetworkPolicy rules
 
 ### Deployment
 
@@ -217,7 +394,7 @@ Uses Kubernetes Secrets for:
 
 2. **Watch for Security Events**
    ```bash
-   kubectl get zenevents -n zen-system --watch
+   kubectl get observations -n zen-system --watch
    ```
 
 3. **Monitor Logs**
@@ -235,11 +412,37 @@ Uses Kubernetes Secrets for:
 2. **Verify Updates**
    ```bash
    # Verify new image signature
-   cosign verify --key cosign.pub zubezen/zen-watcher:1.1.0
+   cosign verify --key cosign.pub kubezen/zen-watcher:1.1.0
    
    # Check for vulnerabilities
-   trivy image zubezen/zen-watcher:1.1.0
+   trivy image kubezen/zen-watcher:1.1.0
    ```
+
+---
+
+## Security Monitoring
+
+### Metrics to Alert On
+
+```promql
+# Unauthorized webhook attempts (if auth enabled)
+rate(zen_watcher_webhook_requests_total{outcome="unauthorized"}[5m]) > 0
+
+# RBAC denials (indicates misconfiguration)
+# Check logs: kubectl logs | grep forbidden
+
+# High observation creation errors
+rate(zen_watcher_observations_create_errors_total[5m]) > 1
+```
+
+### Security Logs to Monitor
+
+```bash
+# Check for security-related errors
+kubectl logs -n zen-system deployment/zen-watcher | jq 'select(.level=="error" or .level=="warn") | select(.operation | test("auth|rbac|webhook"))'
+```
+
+---
 
 ## Security Scanning
 
@@ -247,13 +450,13 @@ Uses Kubernetes Secrets for:
 
 ```bash
 # Trivy
-trivy image zubezen/zen-watcher:1.0.0
+trivy image kubezen/zen-watcher:1.0.0
 
 # Grype
-grype zubezen/zen-watcher:1.0.0
+grype kubezen/zen-watcher:1.0.0
 
 # Snyk (if you have access)
-snyk container test zubezen/zen-watcher:1.0.0
+snyk container test kubezen/zen-watcher:1.0.0
 ```
 
 ### Scan the Deployment
@@ -268,6 +471,8 @@ kube-bench run --targets node,policies
 # Falco (runtime monitoring)
 kubectl logs -n falco -l app=falco
 ```
+
+---
 
 ## Compliance
 
@@ -289,6 +494,8 @@ Follows NIST 800-190 Application Container Security Guide.
 ### PCI-DSS
 Suitable for PCI-DSS environments with proper configuration.
 
+---
+
 ## Security Checklist
 
 Before deploying to production:
@@ -304,6 +511,8 @@ Before deploying to production:
 - [ ] Monitoring enabled
 - [ ] Logs centralized
 - [ ] Backup strategy in place
+
+---
 
 ## Incident Response
 
@@ -340,7 +549,7 @@ Before deploying to production:
    kubectl get events -n zen-system
    
    # Check Observations
-   kubectl get zenevents -n zen-system
+   kubectl get observations -n zen-system
    ```
 
 3. **Remediate**
@@ -354,6 +563,8 @@ Before deploying to production:
    - Document timeline
    - Share findings
 
+---
+
 ## Security Roadmap
 
 Future security enhancements:
@@ -364,6 +575,17 @@ Future security enhancements:
 - [ ] FIPS 140-2 compliance
 - [ ] Air-gapped deployment support
 
+---
+
+## Related Documentation
+
+- [SECURITY_RBAC.md](SECURITY_RBAC.md) - Detailed RBAC permissions
+- [SECURITY_THREAT_MODEL.md](SECURITY_THREAT_MODEL.md) - Comprehensive threat analysis
+- [STABILITY.md](STABILITY.md) - Production operations
+- [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Operational excellence guide
+
+---
+
 ## Resources
 
 - [Kubernetes Security Best Practices](https://kubernetes.io/docs/concepts/security/overview/)
@@ -371,10 +593,14 @@ Future security enhancements:
 - [CIS Kubernetes Benchmark](https://www.cisecurity.org/benchmark/kubernetes)
 - [NSA/CISA Kubernetes Hardening Guide](https://media.defense.gov/2022/Aug/29/2003066362/-1/-1/0/CTR_KUBERNETES_HARDENING_GUIDANCE_1.2_20220829.PDF)
 
+---
+
 ## Contact
 
-- Security Issues: security@kube-zen.com
-- General Questions: support@kube-zen.com
-- GitHub: https://github.com/your-org/zen-watcher/security
+- **Security Issues**: security@kube-zen.com
+- **General Questions**: support@kube-zen.com
+- **GitHub**: https://github.com/kube-zen/zen-watcher/security
 
+**DO NOT** open public GitHub issues for vulnerabilities.
 
+We will respond within 24 hours.

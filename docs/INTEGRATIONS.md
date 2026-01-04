@@ -650,11 +650,267 @@ func watchObservations(ctx context.Context, c client.Client) {
 
 ---
 
+---
+
+## Ecosystem Integration Patterns
+
+zen-watcher Observations can be consumed by various ecosystem tools. This section provides an overview of integration patterns.
+
+### Direct CRD Watch
+
+Tools can watch Observation CRDs directly via Kubernetes informers:
+
+- **Kubewatch**: Route Observations to Slack, Teams, etc.
+- **Robusta**: Trigger playbooks based on Observations
+- **Custom Controllers**: Build your own controller to process Observations
+
+### Export via Agent
+
+Deploy an agent that watches Observations and exports to external systems:
+
+- **Prometheus Exporter**: Convert Observations to Prometheus metrics
+- **Log Forwarder**: Forward Observations to SIEM/log stacks
+
+### Integration Playbooks
+
+Detailed playbooks for integrating zen-watcher Observations with common ecosystem tools:
+
+- [Kubewatch Integration](playbooks/PLAYBOOK_KUBEWATCH.md) - Route Observations to Slack, Teams, etc.
+- [Robusta Integration](playbooks/PLAYBOOK_ROBUSTA.md) - Trigger Robusta playbooks based on Observations
+- [Prometheus/Alertmanager Integration](playbooks/PLAYBOOK_PROM_ALERTS.md) - Export Observations as Prometheus metrics and alerts
+- [SIEM/Log Export](playbooks/PLAYBOOK_SIEM_EXPORT.md) - Forward Observations to SIEM/log stacks
+
+**Note**: zen-watcher does not ship these integrations. These are patterns for operators to implement.
+
+---
+
+## External Aggregator Example
+
+This section shows how to build an external aggregator that reads Observations from multiple clusters without requiring changes to zen-watcher core.
+
+### Overview
+
+The external aggregator is a separate component that:
+- Reads Observations from multiple clusters via Kubernetes API
+- Aggregates data across clusters
+- Writes to external stores (Elasticsearch, Postgres, etc.)
+
+**Important**: This is not part of zen-watcher. It's an example pattern for operators.
+
+### Stub Implementation
+
+A minimal stub implementation is provided in `examples/aggregator/`.
+
+#### Building
+
+```bash
+cd zen-watcher/examples/aggregator
+go build -o observation-aggregator
+```
+
+#### Usage
+
+```bash
+# Aggregate from multiple clusters
+./observation-aggregator \
+  --kubeconfigs=/path/to/cluster1/config,/path/to/cluster2/config \
+  --namespace=default \
+  --interval=1m
+```
+
+### Extending the Stub
+
+#### Add External Sink
+
+```go
+type Sink interface {
+    Write(ctx context.Context, obs []unstructured.Unstructured) error
+}
+
+type ElasticsearchSink struct {
+    endpoint string
+    index    string
+}
+
+func (s *ElasticsearchSink) Write(ctx context.Context, obs []unstructured.Unstructured) error {
+    // Write to Elasticsearch
+    return nil
+}
+```
+
+#### Add Filtering
+
+```go
+func filterObservations(obs []unstructured.Unstructured, filters map[string]string) []unstructured.Unstructured {
+    filtered := make([]unstructured.Unstructured, 0)
+    for _, o := range obs {
+        if matchesFilters(o, filters) {
+            filtered = append(filtered, o)
+        }
+    }
+    return filtered
+}
+```
+
+#### Add Aggregation Logic
+
+```go
+type Aggregation struct {
+    Source   string
+    Severity string
+    Count    int
+    Clusters []string
+}
+
+func aggregateObservations(obs []unstructured.Unstructured) []Aggregation {
+    // Aggregate by source and severity
+    // Track which clusters contributed
+    return aggregations
+}
+```
+
+### Use Cases
+
+#### Centralized SIEM
+
+Aggregate Observations from multiple clusters to a central SIEM:
+
+```go
+sink := &ElasticsearchSink{
+    endpoint: "https://siem.example.com:9200",
+    index:    "observations",
+}
+
+for _, cluster := range clusters {
+    obs := readObservations(cluster)
+    sink.Write(ctx, obs)
+}
+```
+
+#### Cross-Cluster Analytics
+
+Analyze Observations across clusters for trends:
+
+```go
+aggregations := aggregateObservations(allObservations)
+for _, agg := range aggregations {
+    fmt.Printf("%s/%s: %d observations across %d clusters\n",
+        agg.Source, agg.Severity, agg.Count, len(agg.Clusters))
+}
+```
+
+#### Compliance Reporting
+
+Aggregate compliance Observations for reporting:
+
+```go
+complianceObs := filterObservations(allObservations, map[string]string{
+    "zen.io/category": "compliance",
+})
+
+generateReport(complianceObs)
+```
+
+---
+
+## GitOps Example: Multi-Ingester Deployment with ArgoCD
+
+This example demonstrates deploying multiple Ingesters via ArgoCD, showing both the happy path and entitlement gating behavior.
+
+### Prerequisites
+
+- ArgoCD installed and configured
+- zen-watcher CRDs installed (`crds.enabled=true` or managed separately)
+
+### Example: Multiple Ingesters via ArgoCD
+
+#### ArgoCD Application
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: zen-watcher-ingesters
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/your-org/zen-gitops
+    targetRevision: main
+    path: ingesters
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: zen-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+```
+
+#### Ingester Configurations
+
+**File: `ingesters/01-pod-events.yaml`**
+```yaml
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: pod-events
+  namespace: zen-system
+spec:
+  source: informer
+  informer:
+    gvr:
+      group: ""
+      version: v1
+      resource: pods
+    namespace: default
+  destinations:
+    - type: crd
+      value: observations
+```
+
+**File: `ingesters/02-security-scans.yaml`**
+```yaml
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: security-scans
+  namespace: zen-system
+spec:
+  source: webhook
+  webhook:
+    path: /webhook/trivy
+  destinations:
+    - type: crd
+      value: observations
+```
+
+### Verifying Status
+
+```bash
+# Check Ingester status
+kubectl get ingesters -n zen-system
+kubectl describe ingester pod-events -n zen-system
+```
+
+### Key Points
+
+1. **GitOps-friendly**: All CRs apply cleanly and can be managed via ArgoCD
+2. **Version controlled**: All Ingester configurations are in Git
+3. **Automated sync**: ArgoCD automatically syncs changes
+4. **Self-healing**: ArgoCD ensures desired state is maintained
+
+---
+
 ## See Also
 
 - [CRD Documentation](CRD.md) - Complete CRD schema reference
 - [Developer Guide](DEVELOPER_GUIDE.md) - Building custom watchers
 - [Architecture](ARCHITECTURE.md) - System architecture overview
+- [Observation API Public Guide](OBSERVATION_API_PUBLIC_GUIDE.md) - Complete Observation CRD API reference
+- [Go SDK Overview](GO_SDK_OVERVIEW.md) - Go SDK for programmatic Observation handling
 - [kubewatch Documentation](https://github.com/robusta-dev/kubewatch) - Official kubewatch docs
 - [Robusta Documentation](https://home.robusta.dev/) - Robusta platform docs
 

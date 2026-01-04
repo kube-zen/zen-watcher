@@ -25,11 +25,10 @@ type IngesterConfig struct {
 	Namespace     string
 	Name          string
 	Source        string
-	Ingester      string // informer, webhook, logs, k8s-events
+	Ingester      string // informer, webhook, logs
 	Informer      *InformerConfig
 	Webhook       *WebhookConfig
 	Logs          *LogsConfig
-	K8sEvents     *K8sEventsConfig
 	Normalization *NormalizationConfig
 	Filter        *FilterConfig
 	Dedup         *DedupConfig
@@ -94,10 +93,6 @@ type LogPattern struct {
 	Priority float64
 }
 
-// K8sEventsConfig holds Kubernetes events configuration
-type K8sEventsConfig struct {
-	InvolvedObjectKinds []string
-}
 
 // NormalizationConfig holds normalization rules
 type NormalizationConfig struct {
@@ -222,7 +217,7 @@ func (s *IngesterStore) ListAll() []*IngesterConfig {
 	return configs
 }
 
-// ListByType returns all IngesterConfigs of a specific type (informer, webhook, logs, k8s-events)
+// ListByType returns all IngesterConfigs of a specific type (informer, webhook, logs)
 func (s *IngesterStore) ListByType(ingesterType string) []*IngesterConfig {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -379,10 +374,9 @@ func (ii *IngesterInformer) onAdd(obj interface{}) {
 
 // onUpdate handles Ingester CRD update events
 func (ii *IngesterInformer) onUpdate(oldObj, newObj interface{}) {
-	logger := sdklog.NewLogger("zen-watcher-config")
 	u, ok := newObj.(*unstructured.Unstructured)
 	if !ok {
-		logger.Warn("Failed to convert Ingester CRD to unstructured",
+		configLogger.Warn("Failed to convert Ingester CRD to unstructured",
 			sdklog.Operation("ingester_update_convert"))
 		return
 	}
@@ -390,7 +384,7 @@ func (ii *IngesterInformer) onUpdate(oldObj, newObj interface{}) {
 	config := ii.ConvertToIngesterConfig(u)
 	if config != nil {
 		ii.store.AddOrUpdate(config)
-		logger.Debug("Updated Ingester config",
+		configLogger.Debug("Updated Ingester config",
 			sdklog.Operation("ingester_updated"),
 			sdklog.String("namespace", config.Namespace),
 			sdklog.String("name", config.Name),

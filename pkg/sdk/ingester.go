@@ -81,7 +81,6 @@ type IngesterSpec struct {
 	Informer      *InformerConfig      `json:"informer,omitempty" yaml:"informer,omitempty"`
 	Webhook       *WebhookConfig       `json:"webhook,omitempty" yaml:"webhook,omitempty"`
 	Logs          *LogsConfig          `json:"logs,omitempty" yaml:"logs,omitempty"`
-	K8sEvents     *K8sEventsConfig     `json:"k8sEvents,omitempty" yaml:"k8sEvents,omitempty"`
 }
 
 // Destination represents a destination configuration
@@ -203,7 +202,3 @@ type LogPattern struct {
 	Priority float64 `json:"priority,omitempty" yaml:"priority,omitempty"`
 }
 
-// K8sEventsConfig represents Kubernetes events configuration
-type K8sEventsConfig struct {
-	InvolvedObjectKinds []string `json:"involvedObjectKinds,omitempty" yaml:"involvedObjectKinds,omitempty"`
-}

@@ -55,7 +55,7 @@ kubectl exec -n zen-system zen-watcher-0 -- curl -s http://localhost:8080/metric
   - Type: Counter
   - Labels: `strategy`, `source`, `decision`
   - Decision values: `create`, `drop`
-  - Example: `zen_watcher_dedup_decisions_total{strategy="event-stream",source="k8s-events",decision="drop"}`
+  - Example: `zen_watcher_dedup_decisions_total{strategy="event-stream",source="kubernetes-events",decision="drop"}`
 
 ### Processing Order Metrics
 
@@ -289,11 +289,72 @@ zen_watcher_optimization_current_strategy
 
 ## CLI Tools
 
-**Query Observations**: Use `obsctl` CLI for querying Observations without external tools. See [OBSCTL_CLI_GUIDE.md](OBSCTL_CLI_GUIDE.md) for details.
+**Query Observations**: Use `obsctl` CLI for querying Observations without external tools. See [TOOLING_GUIDE.md](TOOLING_GUIDE.md#obsctl) for details.
+
+## Future Improvements
+
+This section outlines recommended metrics enhancements for better observability. Current metrics are production-ready; these are enhancements for future releases.
+
+### Missing Critical Metrics
+
+1. **Ingester-Specific Metrics**
+   - Ingester CRD count (active/inactive)
+   - Ingester type distribution (informer/webhook/logs)
+   - Per-ingester event throughput
+   - Per-ingester error rates
+   - Ingester configuration validation failures
+   - Ingester destination delivery metrics (per destination type)
+
+2. **Filter Enhancement Metrics**
+   - Filter rule evaluation time (histogram)
+   - Filter rule effectiveness (ratio of events filtered per rule)
+   - Filter chain depth (how many rules evaluated)
+   - Filter cache hit/miss (if caching is implemented)
+   - Global namespace filter impact
+
+3. **Dedup Enhancement Metrics**
+   - Dedup window size per source (gauge)
+   - Dedup cache size per source (gauge)
+   - Dedup cache hit/miss ratio
+   - Dedup fingerprint generation latency
+   - Dedup strategy performance comparison
+
+4. **Mapping/Normalization Metrics**
+   - Field mapping transformation success/failure rates
+   - Normalization rule match rates
+   - Priority mapping accuracy
+   - Field extraction success rates
+   - Mapping rule evaluation latency
+
+5. **Destination Metrics**
+   - Destination delivery success/failure rates
+   - Destination delivery latency
+   - Destination queue depth
+   - Destination retry counts
+   - Destination rate limiting hits
+
+### Implementation Priority
+
+**High Priority (Critical for Operations)**
+1. Ingester Status & Health Metrics
+2. Destination Delivery Metrics
+3. ConfigManager Metrics
+
+**Medium Priority (Important for Optimization)**
+1. Filter Rule Metrics
+2. Dedup Cache Details
+3. Mapping/Normalization Metrics
+
+**Low Priority (Nice to Have)**
+1. Worker Pool Metrics (only if enabled)
+2. Event Batching Metrics (only if enabled)
+3. Optimization Quality Scores
+
+See the "Future Improvements" section above for detailed metric specifications and implementation guidance.
 
 ## Related Documentation
 
-- [PERFORMANCE_GUIDE.md](PERFORMANCE_GUIDE.md) - Performance characteristics and tuning
+- [PERFORMANCE.md](PERFORMANCE.md) - Performance characteristics, benchmarks, and tuning
 - [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Operations best practices
 - [INTELLIGENT_EVENT_PIPELINE.md](INTELLIGENT_EVENT_PIPELINE.md) - Pipeline architecture
 

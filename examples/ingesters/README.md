@@ -32,11 +32,11 @@ Kube-bench compliance reports using informer adapter to watch ConfigMaps.
 - 24h deduplication window
 - Processing order: filter_first
 
-### high-rate-k8s-events.yaml
-High-rate Kubernetes events using k8s-events adapter.
+### high-rate-kubernetes-events.yaml
+High-rate Kubernetes events using informer adapter.
 
 **Key features:**
-- k8s-events ingester type
+- informer ingester type (watching events resource)
 - High-rate optimization (5m analysis interval)
 - Rate limiting enabled (1000 req/s)
 - 30s deduplication window for high-frequency events
@@ -119,7 +119,7 @@ kubectl apply -f kyverno-informer.yaml
 kubectl apply -f kube-bench-informer.yaml
 
 # Apply high-rate K8s events ingester
-kubectl apply -f high-rate-k8s-events.yaml
+kubectl apply -f high-rate-kubernetes-events.yaml
 ```
 
 Verify the ingester is running:
@@ -133,7 +133,7 @@ kubectl describe ingester <name> -n <namespace>
 To validate optimization engine effectiveness:
 
 1. Deploy an ingester with `spec.optimization.order: auto`
-2. Generate load (e.g., high-rate k8s-events)
+2. Generate load (e.g., high-rate kubernetes-events)
 3. Monitor metrics:
    - `zen_watcher_optimization_source_events_processed_total`
    - `zen_watcher_optimization_source_processing_latency_seconds`
@@ -144,7 +144,7 @@ To validate optimization engine effectiveness:
 
 ```bash
 # Apply high-rate ingester
-kubectl apply -f high-rate-k8s-events.yaml
+kubectl apply -f high-rate-kubernetes-events.yaml
 
 # Generate Kubernetes events (example script)
 for i in {1..100}; do
@@ -177,6 +177,5 @@ Monitor `zen_watcher_optimization_strategy_changes_total` to see when the engine
 ## References
 
 - `zen-watcher/docs/INGESTER_API.md` - Ingester API documentation
-- `zen-admin/docs/CRD_INGESTER_DESTINATION_DESIGN.md` - CRD design principles
-- `zen-admin/docs/INGESTER_V1_FINAL_SHAPE.md` - v1 spec design
+- `zen-watcher/docs/ARCHITECTURE.md` - Architecture and design principles
 

@@ -789,7 +789,6 @@ When preparing a release:
 1. **Use the template**: Follow `docs/RELEASE_NOTES_TEMPLATE.md` for structure
 2. **Document CRD/API changes**: All CRD/API changes must link to:
    - `docs/OBSERVATION_VERSIONING_AND_RELEASE_PLAN.md` (versioning plan)
-   - `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md` (if relevant to KEP)
 3. **Create release notes**: Add to `docs/releases/` directory
 4. **Update version**: Update version in code and documentation
 

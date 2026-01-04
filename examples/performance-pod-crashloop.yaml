@@ -1,0 +1,66 @@
+# Example: Performance Monitoring - Pod CrashLoop Detection
+# Monitors Kubernetes Pods for crashloop conditions using informer
+# Demonstrates: Filtering, deduplication, and aggregation of operational events
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: pod-crashloop-monitor
+  namespace: zen-system
+spec:
+  source: pod-monitor
+  ingester: informer
+  informer:
+    gvr:
+      group: ""
+      version: "v1"
+      resource: "pods"
+    namespace: ""  # Watch all namespaces
+    fieldSelector: status.phase!=Running,status.phase!=Succeeded
+    resyncPeriod: "1m"
+  normalization:
+    domain: performance  # Performance monitoring: pod crashes affect application performance
+    type: pod_crashloop
+    priority:
+      CrashLoopBackOff: 0.9
+      Error: 0.8
+      Pending: 0.3
+      Unknown: 0.5
+    fieldMapping:
+      - from: status.containerStatuses[0].restartCount
+        to: restart_count
+      - from: status.containerStatuses[0].lastState.terminated.exitCode
+        to: exit_code
+      - from: status.containerStatuses[0].lastState.terminated.reason
+        to: failure_reason
+  # Aggressive filtering: only care about crashloops
+  filter:
+    enabled: true
+    minPriority: 0.7  # Only high-priority events (crashloops)
+    includeEventTypes:
+      - pod_crashloop
+    excludeNamespaces:
+      - kube-system
+      - kube-public
+  # Deduplication: prevent spam from same pod crashing repeatedly
+  dedup:
+    enabled: true
+    window: "5m"  # Dedupe same pod crashes within 5 minutes
+    strategy: fingerprint
+    fields:
+      - "spec.resource.name"
+      - "spec.resource.namespace"
+      - "spec.eventType"
+  destinations:
+    - type: crd
+      value: observations
+      mapping:
+        domain: performance
+        type: pod_crashloop
+
+---
+# Use Case: Application Reliability Monitoring
+# - Detects pods in CrashLoopBackOff state
+# - Aggregates repeated crashes to prevent alert fatigue
+# - Filters out low-priority pod states (Pending, etc.)
+# - Useful for SRE teams monitoring application health
+

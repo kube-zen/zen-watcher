@@ -356,7 +356,7 @@ func lintNormalizationHints(destinations []interface{}) []Issue {
 }
 
 func isHighRateSource(source, ingesterType string) bool {
-	highRateSources := []string{"k8s-events", "audit", "kubernetes-events"}
+	highRateSources := []string{"audit", "kubernetes-events"}
 	for _, s := range highRateSources {
 		if source == s || ingesterType == s {
 			return true

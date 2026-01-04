@@ -1,0 +1,60 @@
+# Example: Cost Optimization - Resource Waste Detection
+# Monitors Deployments for resource inefficiency using informer
+# Demonstrates: Cost optimization, aggregation, and filtering
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: resource-waste-detector
+  namespace: zen-system
+spec:
+  source: cost-optimizer
+  ingester: informer
+  informer:
+    gvr:
+      group: "apps"
+      version: "v1"
+      resource: "deployments"
+    namespace: ""
+    resyncPeriod: "1h"  # Check hourly for cost optimization
+  normalization:
+    domain: cost
+    type: resource_waste
+    priority:
+      # High waste = high priority (opportunity to save money)
+      waste_ratio_high: 0.8
+      waste_ratio_medium: 0.5
+      waste_ratio_low: 0.3
+    fieldMapping:
+      - from: spec.template.spec.containers[0].resources.requests.cpu
+        to: requested_cpu
+      - from: spec.template.spec.containers[0].resources.requests.memory
+        to: requested_memory
+  filter:
+    enabled: true
+    minPriority: 0.4  # Include medium and high waste
+    excludeNamespaces:
+      - kube-system
+      - kube-public
+  # Long deduplication window: cost issues don't change quickly
+  dedup:
+    enabled: true
+    window: "24h"  # Don't spam about same waste for 24h
+    strategy: fingerprint
+    fields:
+      - "spec.resource.name"
+      - "spec.resource.namespace"
+      - "spec.eventType"
+  destinations:
+    - type: crd
+      value: observations
+      mapping:
+        domain: cost
+        type: resource_waste
+
+---
+# Use Case: Cloud Cost Management
+# - Identifies deployments with low resource utilization
+# - Helps FinOps teams optimize cloud spending
+# - Aggregates findings to prevent noise
+# - Can integrate with cost management tools (Kubecost, etc.)
+

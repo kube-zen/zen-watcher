@@ -437,8 +437,7 @@ kubectl get observations -A -o json | \
 **Integration**:
 - `examples/observations/` - Canonical Observation examples
 
-**KEP & Roadmap**:
-- `docs/KEP_DRAFT_ZEN_WATCHER_OBSERVATIONS.md` - KEP pre-draft (design details)
+**Roadmap**:
 - `the project roadmap` - Roadmap and priorities
 
 **CRD Definition**:

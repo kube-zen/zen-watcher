@@ -102,4 +102,4 @@ After removing timezone data, verify:
 ## Related Documentation
 
 - [Dockerfile](../build/Dockerfile) - Current build configuration
-- [Performance Guide](PERFORMANCE_GUIDE.md) - Resource usage benchmarks
+- [Performance Guide](PERFORMANCE.md) - Resource usage benchmarks

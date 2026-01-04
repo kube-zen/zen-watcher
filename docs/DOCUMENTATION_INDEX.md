@@ -30,14 +30,7 @@ Complete guide to all Zen Watcher documentation files.
 
 ### Core Operations
 
-3. **[OPERATIONS.md](OPERATIONS.md)** - Day-to-day operations guide
-   - Health checks
-   - Common operations
-   - Troubleshooting runbooks
-   - Monitoring & alerting
-   - Backup & recovery
-
-4. **[OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md)** - Ops best practices
+3. **[OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md)** - Operational excellence guide
    - Monitoring setup
    - Logging
    - Performance tuning
@@ -152,7 +145,7 @@ Complete guide to all Zen Watcher documentation files.
     - Compliance
     - Incident response
 
-21. **[SECURITY_MODEL.md](SECURITY_MODEL.md)** - Security model & threat analysis
+21. **[SECURITY.md](SECURITY.md)** - Security policy, model & best practices
     - Trust boundaries
     - Threat model
     - Security layers
@@ -257,24 +250,35 @@ Complete guide to all Zen Watcher documentation files.
     - Code organization
     - File naming conventions
 
-35. **[CONTRIBUTING.md](../CONTRIBUTING.md)** - Contribution guide
+35. **[TOOLING_OVERVIEW.md](TOOLING_OVERVIEW.md)** - Tooling overview
+    - Quick reference for all CLI tools
+    - When to use which tool
+    - Recommended pipeline
+
+36. **[TOOLING_GUIDE.md](TOOLING_GUIDE.md)** - Complete tooling guide
+    - Ingester tools (ingester-lint, ingester-migrate)
+    - Observation tools (obsctl)
+    - Schema tools (schema-doc-gen)
+    - Detailed usage and examples
+
+37. **[CONTRIBUTING.md](../CONTRIBUTING.md)** - Contribution guide
     - How to contribute
     - Development setup
     - Code standards
     - PR workflow
     - Review process
 
-36. **[CHANGELOG.md](../CHANGELOG.md)** - Version history
+38. **[CHANGELOG.md](../CHANGELOG.md)** - Version history
     - Release notes
     - Features added
     - Bug fixes
 
-37. **[VERSIONING.md](VERSIONING.md)** - Versioning strategy
+39. **[VERSIONING.md](VERSIONING.md)** - Versioning strategy
     - Semantic versioning
     - Image and chart sync
     - Release process
 
-38. **[RELEASE.md](RELEASE.md)** - Release process
+40. **[RELEASE.md](RELEASE.md)** - Release process
     - Release checklist
     - Version tagging
     - Changelog generation
@@ -360,7 +364,7 @@ Complete guide to all Zen Watcher documentation files.
 **Monitoring?**
 1. [config/monitoring/README.md](../config/monitoring/README.md) - Prometheus metrics
 2. [OPTIMIZATION_USAGE.md](OPTIMIZATION_USAGE.md) - Optimization metrics
-3. [DASHBOARD_OPTIMIZATION_UPDATES.md](DASHBOARD_OPTIMIZATION_UPDATES.md) - Dashboard setup
+3. [DASHBOARD.md](DASHBOARD.md) - Dashboard guide and optimization updates
 
 ### For Developers
 
@@ -441,7 +445,7 @@ Complete guide to all Zen Watcher documentation files.
 - [SECURITY.md](SECURITY.md) - Security policy
 - [SBOM.md](SBOM.md) - Software Bill of Materials
 - [COSIGN.md](COSIGN.md) - Image signing
-- [SECURITY_MODEL.md](SECURITY_MODEL.md) - Security model
+- [SECURITY.md](SECURITY.md) - Security policy and model
 - [SECURITY_RBAC.md](SECURITY_RBAC.md) - RBAC permissions
 - [Helm Charts Repository - Security](https://github.com/kube-zen/helm-charts) - Chart security settings
 
@@ -455,8 +459,7 @@ Complete guide to all Zen Watcher documentation files.
 ### Troubleshooting
 
 - [QUICK_START.md#common-issues](../QUICK_START.md#common-issues) - Common issues
-- [OPERATIONS.md](OPERATIONS.md) - Troubleshooting runbooks
-- [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Operational guide
+- [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Operational guide and troubleshooting
 - [README.md#troubleshooting](../README.md#troubleshooting) - Quick troubleshooting
 
 ---

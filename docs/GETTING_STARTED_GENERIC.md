@@ -126,7 +126,7 @@ Create a simple source configuration to start collecting observations. This exam
 apiVersion: zen.kube-zen.io/v1alpha1
 kind: Ingester
 metadata:
-  name: k8s-events-example
+  name: kubernetes-events-example
   namespace: zen-system
 spec:
   source: kubernetes-events
@@ -140,7 +140,7 @@ kubectl apply -f - <<EOF
 apiVersion: zen.kube-zen.io/v1alpha1
 kind: Ingester
 metadata:
-  name: k8s-events-example
+  name: kubernetes-events-example
   namespace: zen-system
 spec:
   source: kubernetes-events

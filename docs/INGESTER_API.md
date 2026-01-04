@@ -2,11 +2,13 @@
 
 ## What is an Ingester?
 
-An **Ingester** defines how events enter the system and where they go. It's a single CRD that consolidates:
+An **Ingester** is a Kubernetes CRD that defines how events enter the system and where they go. It's a single resource that consolidates:
 
-- **How to collect events** (informer, webhook, logs, or k8s-events)
+- **How to collect events** (informer, webhook, or logs)
 - **How to process events** (normalization, filter, dedup, optimization)
 - **Where events go** (destinations: crd, webhook, saas, queue)
+
+**Implementation Note:** Internally, zen-watcher uses Source Adapters to transform events. You configure Ingesters via YAML; Source Adapters are created automatically.
 
 ## Core Concept
 
@@ -160,31 +162,7 @@ spec:
 
 ### `logs`
 
-Use for log-based ingestion (placeholder for future implementation).
-
-### `k8s-events` (Legacy)
-
-**Note**: The `k8s-events` ingester type is still supported for backward compatibility, but it's recommended to use the `informer` adapter instead (see Example 2 above). The informer adapter provides the same functionality with more flexibility.
-
-**When to use:**
-- Legacy configurations that already use `k8s-events`
-- When you need the built-in security filtering provided by `K8sEventsAdapter`
-
-**Example:**
-```yaml
-spec:
-  source: k8s-warnings
-  ingester: k8s-events
-  k8sEvents:
-    involvedObjectKinds:
-      - Pod
-      - Deployment
-  destinations:
-    - type: crd
-      value: observations
-```
-
-**Recommended**: Use `ingester: informer` with `gvr: {resource: "events"}` instead (see Example 2 in the `informer` section above).
+Use for log-based ingestion (monitoring pod logs with regex patterns).
 
 ## Processing Pipeline
 
@@ -275,6 +253,34 @@ If `spec.processing.dedup.strategy` is not set, the default `fingerprint` strate
 - Single normalization function
 - Always runs after filter/dedup block and before any destination
 - No destination sees un-normalized payloads
+
+**Normalization Configuration:**
+
+Normalization can be configured via `spec.normalization` or `spec.destinations[].mapping`:
+
+```yaml
+spec:
+  normalization:
+    domain: security  # Domain classification (see enum below)
+    type: vulnerability
+    priority:
+      critical: 0.9
+      high: 0.7
+  destinations:
+    - type: crd
+      value: observations
+      mapping:
+        domain: security  # Override normalization.domain for this destination
+        type: vulnerability
+```
+
+**Domain Enum Values** (for `normalization.domain` and `destinations[].mapping.domain`):
+- `security` - Security-related events (vulnerabilities, threats, policy violations)
+- `operations` - Operations-related events (deployment failures, pod crashes, infrastructure health)
+- `performance` - Performance-related events (latency spikes, resource exhaustion, crashes)
+- `cost` - Cost/efficiency-related events (resource waste, unused resources)
+- `compliance` - Compliance-related events (audit findings, policy checks)
+- `custom` - Custom domains for user-defined classifications
 
 **Stage 3: Destinations**
 - Fan-out to destinations[] from the normalized event

@@ -205,5 +205,5 @@ Deduplication is integrated into the centralized `ObservationCreator`:
 - [NORMALIZATION.md](NORMALIZATION.md) - How events are normalized before deduplication
 - [Architecture](ARCHITECTURE.md) - System architecture overview
 - [Performance](PERFORMANCE.md) - Performance characteristics and tuning
-- [Operations](OPERATIONS.md) - Operational guidance and monitoring
+- [Operations](OPERATIONAL_EXCELLENCE.md) - Operational guidance and monitoring
 
