@@ -21,7 +21,7 @@ spec:
   
   # Processing pipeline configuration (canonical format)
   # Canonical pipeline: source → (filter | dedup) → normalize → destinations[]
-  # Conforms to common Ingester semantics (see zen-admin/docs/common/COMMON_INGESTER_CRD_AND_PIPELINE_SEMANTICS_V1.md)
+  # See zen-watcher/docs/INGESTER_API.md for complete API documentation
   processing:
     filter:
       enabled: true

@@ -83,7 +83,7 @@ func (cml *ConfigMapLoader) Start(ctx context.Context) error {
 	// Load initial config (use context to respect cancellation)
 	initialConfig, err := cml.loadConfigWithContext(ctx)
 	if err != nil {
-		logger.Warn("Failed to load initial filter config, will retry on ConfigMap creation",
+		configLogger.Warn("Failed to load initial filter config, will retry on ConfigMap creation",
 			sdklog.Operation("configmap_load_initial"),
 			sdklog.String("namespace", cml.configMapNamespace),
 			sdklog.Error(err))
