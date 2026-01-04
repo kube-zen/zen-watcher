@@ -33,6 +33,7 @@ import (
 type InformerAdapter struct {
 	manager *informers.Manager
 	stopCh  chan struct{}
+	events  chan RawEvent // Event channel - must be closed in Stop() to prevent goroutine leaks
 	queue   workqueue.TypedRateLimitingInterface[*RawEvent] // Internal queue for backpressure (future use)
 	mu      sync.Mutex
 }
@@ -68,7 +69,11 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 	}
 
 	// Bounded output channel (smaller than queue to provide backpressure signal)
-	events := make(chan RawEvent, 100)
+	// Store in struct so we can close it in Stop() to prevent goroutine leaks
+	a.mu.Lock()
+	a.events = make(chan RawEvent, 100)
+	events := a.events
+	a.mu.Unlock()
 
 	// Parse GVR
 	gvr := schema.GroupVersionResource{
@@ -238,6 +243,13 @@ func (a *InformerAdapter) Stop() {
 	default:
 		close(a.stopCh)
 	}
+
+	// Close events channel to unblock processEvents goroutine and prevent leak
+	if a.events != nil {
+		close(a.events)
+		a.events = nil
+	}
+
 	if a.queue != nil {
 		a.queue.ShutDown()
 	}
