@@ -408,23 +408,6 @@ func NewMetrics() *Metrics {
 		[]string{"source", "destination_type"},
 	)
 
-	// zen-watcher KEDA autoscaling metrics
-	watcherQueueDepth := prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "zen_watcher_queue_depth",
-			Help: "Current depth of observation queue for zen-watcher",
-		},
-		[]string{"component"}, // component: zen-watcher
-	)
-
-	watcherEventsTotal := prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "zen_watcher_events_total",
-			Help: "Total events processed by zen-watcher",
-		},
-		[]string{"component", "status"}, // component: zen-watcher, status: success, error
-	)
-
 	// NEW: ConfigManager metrics (High Priority)
 	configMapLoadTotal := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
