@@ -293,19 +293,34 @@ func (a *WebhookAdapter) loadSecret(ctx context.Context, namespace, secretName s
 }
 
 // authenticate handles webhook authentication
+// Security: If Auth is configured (non-nil) and Type is not "none", authentication is REQUIRED.
+// Returns false (rejects request) if:
+// - Auth is configured but SecretName is missing
+// - Secret cannot be loaded
+// - Authentication fails
+// Returns true only if:
+// - Auth is nil (no auth required) OR
+// - Auth.Type == "none" (explicitly no auth) OR
+// - Auth is properly configured AND validation succeeds
 func (a *WebhookAdapter) authenticate(r *http.Request, config *SourceConfig) bool {
 	if config.Webhook.Auth == nil {
+		return true // No auth required
+	}
+
+	// If auth type is explicitly "none", allow
+	if config.Webhook.Auth.Type == "none" {
 		return true
 	}
 
-	// Load secret if needed
+	// Auth is required - ensure SecretName is configured
 	if config.Webhook.Auth.SecretName == "" {
 		logger := sdklog.NewLogger("zen-watcher-adapter")
-		logger.Warn("Webhook auth enabled but secretName not configured",
+		logger.Warn("Webhook auth enabled but secretName not configured - rejecting request",
 			sdklog.Operation("auth_validate"),
 			sdklog.String("source", config.Source),
-			sdklog.String("path", config.Webhook.Path))
-		return false
+			sdklog.String("path", config.Webhook.Path),
+			sdklog.String("auth_type", config.Webhook.Auth.Type))
+		return false // Hard-fail: auth required but not properly configured
 	}
 
 	secret, err := a.loadSecret(r.Context(), config.Namespace, config.Webhook.Auth.SecretName)
