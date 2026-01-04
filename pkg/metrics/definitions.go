@@ -544,9 +544,6 @@ func NewMetrics() *Metrics {
 	prometheus.MustRegister(destinationQueueDepth)
 	prometheus.MustRegister(destinationRetriesTotal)
 
-	// Register zen-watcher KEDA autoscaling metrics
-	prometheus.MustRegister(watcherQueueDepth)
-	prometheus.MustRegister(watcherEventsTotal)
 	// Register ConfigManager metrics
 	prometheus.MustRegister(configMapLoadTotal)
 	prometheus.MustRegister(configMapReloadDuration)
