@@ -428,11 +428,18 @@ resources:
    - Deploy multiple instances, each scoped to different namespaces
    - See [SCALING.md](SCALING.md) for details
 
-3. **Leader Election** (Future):
-   - Planned for v1.1.x+
-   - Will enable HPA for webhook traffic
+3. **Leader Election** (✅ Implemented):
+   - ✅ Mandatory and always enabled (via zen-sdk/pkg/leader)
+   - ✅ Enables HPA for webhook traffic
+   - ⚠️ Informer sources remain single leader only (single point of failure)
 
-**✅ HA Support:** HPA is enabled by default. With HA optimization enabled, proper deduplication and load balancing are maintained across replicas.
+**✅ HA Support:** Leader election is mandatory and always enabled. Multiple replicas provide:
+- ✅ High availability for webhook sources (all pods serve, load-balanced)
+- ⚠️ Single point of failure for informer sources (only leader processes)
+- ✅ Automatic leader failover (10-15 seconds)
+- ⚠️ Processing gaps for informers during leader transitions
+
+**See [HIGH_AVAILABILITY.md](HIGH_AVAILABILITY.md) for complete HA model documentation.**
 
 See [docs/SCALING.md](SCALING.md) for complete scaling strategy.
 

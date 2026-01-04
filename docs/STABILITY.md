@@ -8,10 +8,18 @@ Zen-watcher is designed for production use with high availability, reliability, 
 
 ### 1. High Availability & Resilience
 
-**Multiple Replicas Supported:**
-- Stateless design allows horizontal scaling
-- Leader election not required (each replica processes independently)
-- Deduplication prevents duplicate Observations across replicas
+**Leader Election (Mandatory, Always Enabled):**
+- ✅ Uses `zen-sdk/pkg/leader` (controller-runtime Manager)
+- ✅ Only leader pod processes informer-based sources (Trivy, Kyverno, ConfigMaps)
+- ✅ All pods serve webhook endpoints (load-balanced)
+
+**High Availability Characteristics:**
+- ✅ **Webhook sources (Falco, Audit, generic)**: High availability - all pods serve, can scale horizontally
+- ⚠️ **Informer sources (Trivy, Kyverno)**: Single point of failure - only leader processes, cannot scale horizontally without sharding
+- ✅ Automatic leader failover (10-15 seconds)
+- ⚠️ Processing gaps for informer sources during leader transitions
+
+**For complete HA model documentation, see [HIGH_AVAILABILITY.md](HIGH_AVAILABILITY.md).**
 
 **Graceful Degradation:**
 - Filter config errors fall back to last-good-config
@@ -120,26 +128,41 @@ resources:
 **Cons:** No HA during pod restart  
 **Use case:** Dev/test, small clusters (<50 nodes)
 
-### Pattern 2: Multi-Replica (Production)
+### Pattern 2: Multi-Replica (Production) ✅ Recommended Default
+
 ```yaml
-replicas: 2-3
+replicas: 2-3  # Default: 2
 resources:
   requests:
-    memory: 256Mi
-    cpu: 200m
+    memory: 128Mi
+    cpu: 100m
   limits:
-    memory: 1Gi
-    cpu: 1000m
+    memory: 512Mi
+    cpu: 500m
 
 # Recommended:
 podDisruptionBudget:
   minAvailable: 1
 ```
 
-**Pros:** High availability, zero downtime during updates  
-**Cons:** Higher resource usage  
-**Use case:** Production clusters, critical workloads  
-**Note:** Deduplication prevents duplicate Observations across replicas
+**Pros:** 
+- ✅ High availability for webhook traffic (all pods serve, load-balanced)
+- ✅ Zero downtime during leader failover for webhooks
+- ✅ Can use HPA to scale webhook processing
+
+**Cons:** 
+- ⚠️ Single point of failure for informer sources (only leader processes)
+- ⚠️ Processing gaps for informers during leader transitions (10-15 seconds)
+- ⚠️ Higher resource usage
+
+**Use case:** Production workloads where webhook sources (Falco, Audit) are primary
+
+**Note:** 
+- Webhook sources: High availability (all pods serve)
+- Informer sources: Single leader only (processing gaps during failover)
+- For HA of informer sources, use namespace sharding (Pattern 3)
+
+**See [HIGH_AVAILABILITY.md](HIGH_AVAILABILITY.md) for complete HA model.**
 
 ### Pattern 3: Namespace-Scoped (Multi-Tenant)
 Deploy separate zen-watcher instances per namespace with namespace-scoped RBAC:

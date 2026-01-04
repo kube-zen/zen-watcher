@@ -37,16 +37,23 @@ Complete guide to all Zen Watcher documentation files.
    - Security hardening
 
 5. **[STABILITY.md](STABILITY.md)** - Production readiness guide
-   - HA configuration
+   - HA configuration (see [HIGH_AVAILABILITY.md](HIGH_AVAILABILITY.md) for details)
    - Capacity planning
    - Failure modes
    - Recovery procedures
 
 6. **[SCALING.md](SCALING.md)** - Scaling strategy and recommendations
-   - Single-replica deployment (recommended)
-   - Namespace sharding for scale-out
-   - Leader election roadmap
+   - Multiple replicas with leader election (default, recommended for production)
+   - Single-replica (development/testing only)
+   - Namespace sharding for informer source HA
    - Performance tuning
+
+7. **[HIGH_AVAILABILITY.md](HIGH_AVAILABILITY.md)** - High availability model ⭐ **NEW**
+   - Leader election architecture
+   - HA guarantees and limitations
+   - Deployment recommendations
+   - Failure scenarios
+   - Operational considerations
 
 ### Source Management
 

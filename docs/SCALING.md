@@ -1,31 +1,31 @@
 # Scaling Strategy
 
-## 🛡️ Official Scaling Strategy for v1.x: Namespace Sharding
-
 ## Overview
 
-Zen Watcher is designed to be **simple, decoupled, and easy to extend**. Our scaling strategy prioritizes predictability and operational simplicity over complex distributed coordination.
+Zen Watcher uses **leader election** (mandatory, always enabled) to coordinate processing across multiple replicas. The scaling model has **different characteristics for webhook vs informer-based sources**.
+
+**Key Points:**
+- ✅ **Webhook sources (Falco, Audit, generic)**: Can scale horizontally with multiple replicas
+- ⚠️ **Informer sources (Trivy, Kyverno, ConfigMaps)**: Single leader only (cannot scale horizontally without sharding)
+- ✅ **Default**: 2 replicas for HA (webhook traffic only)
+
+See [HIGH_AVAILABILITY.md](HIGH_AVAILABILITY.md) for complete HA model documentation.
 
 ---
 
-## Current Behavior (v1.0.0-alpha)
+## Component Distribution (Leader Election)
 
-### Single-Replica Deployment (Recommended)
+### Leader Pod Responsibilities
+- ✅ Informer-based watchers (Trivy VulnerabilityReports, Kyverno PolicyReports)
+- ✅ GenericOrchestrator (manages informer-based adapters)
+- ✅ IngesterInformer (watches Ingester CRDs)
+- ✅ Garbage collection
+- ✅ Webhook endpoints (also served by followers)
 
-**Official Stance:** `replicas: 1` is the recommended deployment model.
-
-**Why?**
-- **Predictable semantics**: Deduplication and filtering work exactly as designed
-- **Simple operations**: No coordination complexity
-- **Consistent behavior**: All events processed by the same instance
-- **Resource efficient**: Minimal overhead
-
-**Current Components Per Pod:**
-- ✅ **Informers** - Watch CRD sources (Kyverno, Trivy) in every pod
-- ✅ **Dedup cache** - In-memory per pod
-- ✅ **Filters** - In-memory per pod
-- ✅ **GC (Garbage Collection)** - Runs in every pod
-- ✅ **Webhook handlers** - Serve HTTP endpoints
+### All Pods (Leader + Followers)
+- ✅ Webhook endpoints (load-balanced across all pods)
+- ✅ Webhook event processing
+- ✅ Filtering and deduplication (per-pod, best-effort for webhooks)
 
 ### Scaling Envelope
 
@@ -38,32 +38,23 @@ See [PERFORMANCE.md](PERFORMANCE.md) for detailed performance benchmarks.
 
 ---
 
-## Why Not HPA Yet?
+## HPA Support
 
-**If you enable HPA blindly, you get:**
+**HPA is supported for webhook traffic** (Falco, Audit, generic webhooks) because:
+- ✅ All pods serve webhook endpoints (load-balanced)
+- ✅ Webhook processing is stateless (no coordination needed)
+- ✅ Leader election prevents duplicate processing from informers
 
-1. **Duplicated Processing from Informers**
-   - Multiple pods watching the same CRDs (PolicyReports, VulnerabilityReports)
-   - Same events processed multiple times
-   - Duplicate Observations created
-
-2. **Best-Effort Deduplication Only**
-   - Dedup cache is per-pod (in-memory)
-   - No coordination between pods
-   - Same event can pass dedup in different pods
-
-3. **GC Runs N Times Instead of Once**
-   - Each pod runs garbage collection independently
-   - Duplicate scans, wasted resources
-   - No coordination
-
-**Result:** HPA without proper coordination creates operational overhead and unpredictable behavior.
+**HPA limitations:**
+- ⚠️ **Only scales webhook processing** - informer sources remain single leader only
+- ⚠️ Multiple replicas don't increase throughput for Trivy/Kyverno
+- ⚠️ For informer source scaling, use namespace sharding instead
 
 ---
 
 ## Scaling Options
 
-### Option A: Single-Replica + Vertical Scaling (Recommended)
+### Option A: Single-Replica (Development/Testing Only)
 
 **Deployment:**
 ```yaml
@@ -81,62 +72,82 @@ resources:
 1. **Vertical scaling first**: Increase CPU/memory limits
 2. **Check metrics**: Use `zen_watcher_observations_created_total` to measure throughput
 3. **Optimize filters**: Reduce noise with source-level filtering
-4. **Consider sharding**: See Option C below
+4. **Move to multiple replicas**: For HA, use Option B
 
 **Pros:**
-- ✅ Extremely predictable semantics
-- ✅ Dedup + filters behave exactly as designed
-- ✅ Minimal operational cognitive load
-- ✅ Works for 90% of use cases
+- ✅ Simplest configuration
+- ✅ Lowest resource usage
+- ✅ Predictable semantics (single pod processes everything)
 
 **Cons:**
-- ⚠️ No easy horizontal scale-out
-- ⚠️ Single point of failure (mitigated by Kubernetes restart policies)
+- ⚠️ **No high availability** - any pod restart = processing gap
+- ⚠️ **Processing gap during updates** (even with zero-downtime deployment)
+- ⚠️ Cannot scale horizontally
 
-**This is the recommended approach for v1.0.0-alpha.**
+**Use Only For:** Development, testing, or non-critical workloads where processing gaps are acceptable.
+
+**⚠️ Not recommended for production security monitoring.**
 
 ---
 
-### Option B: Leader Election (✅ Implemented)
+### Option B: Multiple Replicas with Leader Election (✅ Default - Recommended for Production)
 
-**Status:** ✅ **Available now** - Leader election is mandatory and always enabled
+**Status:** ✅ **Mandatory and always enabled** - Default `replicas: 2`
 
 **Design:**
 - Uses `zen-sdk/pkg/leader` (controller-runtime Manager)
-- **Leader responsibilities:**
-  - Informer-based watchers (Kyverno, Trivy)
+- **Leader pod responsibilities:**
+  - Informer-based watchers (Trivy, Kyverno, ConfigMaps) - **SINGLE POINT OF FAILURE**
   - GenericOrchestrator
   - IngesterInformer
   - Garbage collection
-- **All pods (leader + non-leaders):**
-  - Serve webhooks (Falco, audit) - load-balanced
-  - Use same filter + dedup stacks
-  - Process webhook events
+  - Webhook endpoints (also served by followers)
+- **All pods (leader + followers):**
+  - Serve webhooks (Falco, Audit, generic) - **load-balanced, can scale horizontally**
+  - Process webhook events independently
+  - Per-pod deduplication (best-effort, acceptable for webhooks)
 
-**Implications:**
-- ✅ HPA becomes meaningful for webhook traffic
-- ✅ Webhook traffic load-balances across pods
-- ✅ Only leader processes informer-driven sources
-- ✅ Dedup remains per-pod for webhooks (acceptable as "best-effort")
+**High Availability Characteristics:**
+
+✅ **Webhook Sources (Falco, Audit, Generic Webhooks):**
+- ✅ High availability - all pods serve webhooks (load-balanced)
+- ✅ Horizontal scaling supported (HPA works)
+- ✅ Zero downtime during leader failover
+- ✅ Can scale to multiple replicas for high webhook volume
+
+⚠️ **Informer Sources (Trivy, Kyverno, ConfigMaps):**
+- ⚠️ **Single point of failure** - only leader processes
+- ⚠️ **Cannot scale horizontally** - multiple replicas don't increase throughput
+- ⚠️ **Processing gap during leader failover** (10-15 seconds)
+- ⚠️ **Processing gap during leader restart** (until new leader elected)
 
 **Benefits:**
-- ✅ Scale-out for high webhook volume
-- ✅ Keeps CRD semantics intact
-- ✅ Fits cleanly with decoupled "CRD only" vision
-- ✅ Automatic failover if leader crashes
+- ✅ High availability for webhook traffic
+- ✅ Automatic leader failover (10-15 seconds)
+- ✅ Can use HPA to scale webhook processing
+- ✅ Prevents duplicate Observations from informers
+
+**Limitations:**
+- ⚠️ Informer sources remain single point of failure
+- ⚠️ Processing gaps for informers during leader transitions
 
 **Setup:**
-- Set `replicas: 2` (or more) in Deployment
-- Add `POD_NAMESPACE` environment variable (via Downward API)
-- Leader election is automatically enabled (mandatory)
+```yaml
+replicas: 2  # Default in Helm chart
+```
 
-**See [LEADER_ELECTION.md](LEADER_ELECTION.md) for complete documentation.**
+**Best For:** Production workloads where webhook sources (Falco, Audit) are primary. Informer sources have limited HA protection.
+
+**See [HIGH_AVAILABILITY.md](HIGH_AVAILABILITY.md) for complete HA documentation.**  
+**See [LEADER_ELECTION.md](LEADER_ELECTION.md) for technical implementation details.**
 
 ---
 
-### Option C: Sharding by Namespace (Recommended for Scale-Out)
+### Option C: Namespace Sharding (Required for Informer Source HA)
 
-**Official Scale-Out Pattern:** Deploy multiple zen-watcher instances with disjoint namespace scoping.
+**Only way to achieve true high availability for informer-based sources (Trivy, Kyverno).**
+
+Deploy multiple zen-watcher instances, each scoped to different namespaces:
 
 **Deployment Pattern:**
 ```yaml
@@ -180,26 +191,38 @@ env:
 ```
 
 **Benefits:**
-- ✅ No leader election needed
+- ✅ **True horizontal scaling for informer sources** (each instance has its own leader)
+- ✅ **High availability for informer sources** (failures isolated per shard)
 - ✅ Linearly scalable by adding more shards
-- ✅ Each instance has consistent semantics inside its scope
-- ✅ Clear operational boundaries
+- ✅ Operational isolation by namespace/environment
+- ✅ Each shard can use multiple replicas for webhook HA
 
 **Trade-offs:**
-- ⚠️ Operational overhead (multiple Deployments)
-- ⚠️ Must plan namespace distribution
+- ⚠️ Operational overhead (multiple deployments to manage)
+- ⚠️ Must plan namespace distribution carefully
 - ⚠️ Each shard needs its own resources
+- ⚠️ More complex than single deployment
 
-**This is the recommended scale-out pattern for high-volume deployments.**
+**Required For:** Production workloads where informer-based sources (Trivy, Kyverno) are critical and need high availability.
+
+**This is the only way to scale informer sources horizontally.**
 
 ---
 
-## Current Deployment Recommendations
+## Deployment Recommendations
 
-### Standard Deployment (Single Replica)
+### Development/Testing (Single Replica)
 
 ```yaml
 replicas: 1
+```
+
+**Use for:** Development, testing, non-critical workloads where processing gaps are acceptable.
+
+### Production - Webhook-Heavy (Multiple Replicas) ✅ Recommended Default
+
+```yaml
+replicas: 2-3  # Default: 2
 resources:
   requests:
     memory: "128Mi"
@@ -207,48 +230,55 @@ resources:
   limits:
     memory: "512Mi"
     cpu: "500m"
+podDisruptionBudget:
+  minAvailable: 1
 ```
 
-**Use this for:**
-- Standard security monitoring
-- Small to medium clusters
-- Event volumes < 100 obs/sec sustained
+**Use for:**
+- Production workloads with webhook sources (Falco, Audit, generic)
+- Need HA for webhook traffic
+- Acceptable single point of failure for informers (Trivy, Kyverno)
 
-### High-Volume Deployment (Sharding)
+**Provides:** HA for webhooks, automatic leader failover, HPA support for webhook scaling.
+
+### Production - Informer-Critical (Namespace Sharding)
 
 ```yaml
-# Deploy multiple instances, each scoped to different namespaces
-# Instance 1
-replicas: 1
+# Instance 1: Production namespaces
+replicas: 2  # Multiple replicas per shard for webhook HA
 env:
   - name: WATCH_NAMESPACE
     value: "production,prod-staging"
 
-# Instance 2
-replicas: 1
+# Instance 2: Development namespaces
+replicas: 2
 env:
   - name: WATCH_NAMESPACE
     value: "development,dev-staging"
 ```
 
-**Use this for:**
-- Large clusters with high event volume
-- Need to scale horizontally
-- Want operational isolation by namespace
+**Use for:**
+- Critical informer-based sources (Trivy, Kyverno) need HA
+- High-volume informer sources across many namespaces
+- Need true horizontal scaling for informer processing
+
+**Provides:** HA for both webhooks and informers (within each shard).
 
 ---
 
-## Migration Path
+## Current Implementation Status
 
-### Short-Term (v1.0.0-alpha)
-- ✅ Default to single-replica deployment
-- ✅ Document scaling constraints transparently
-- ✅ Offer sharding via namespace scoping as official scale-out pattern
+### ✅ Implemented (v1.0.0-alpha)
+- ✅ Leader election (mandatory, always enabled)
+- ✅ High availability for webhook sources (all pods serve, load-balanced)
+- ✅ HPA support for webhook traffic
+- ✅ Automatic leader failover (10-15 seconds)
+- ✅ Clear separation: leader-bound (informers) vs stateless (webhooks)
 
-### Medium-Term (Future releases)
-- 🔄 Add optional leader election for informers + GC
-- 🔄 Enable HPA for webhook traffic (stateless)
-- 🔄 Document clear separation: leader-bound vs. stateless components
+### Known Limitations
+- ⚠️ Informer sources remain single point of failure (only leader processes)
+- ⚠️ Cannot scale informers horizontally without namespace sharding
+- ⚠️ Processing gaps for informers during leader transitions
 
 ---
 
@@ -292,11 +322,20 @@ env:
 
 ### Q: Can I run multiple replicas for high availability?
 
-**A:** Yes! Enable `haOptimization.enabled: true` in Helm values. HA optimization features provide dynamic deduplication window adjustment, adaptive cache sizing, and load balancing to ensure proper operation across replicas.
+**A:** Yes! Multiple replicas provide:
+- ✅ High availability for **webhook sources** (all pods serve, load-balanced)
+- ⚠️ Limited HA for **informer sources** (only leader processes, single point of failure)
+- ✅ Automatic leader failover (10-15 seconds)
+
+**Default:** Helm chart defaults to `replicas: 2` for HA.
+
+**For true HA of informer sources, use namespace sharding (Option C).**
 
 ### Q: What happens if my single replica dies?
 
-**A:** Kubernetes automatically restarts it. Use PodDisruptionBudget to prevent voluntary disruptions during upgrades.
+**A:** All processing stops until Kubernetes restarts the pod (~30 seconds). This is a **processing gap** with potential data loss.
+
+**For production:** Use multiple replicas (default: 2) to avoid processing gaps for webhook traffic.
 
 ### Q: When should I use sharding?
 
@@ -313,15 +352,24 @@ env:
 
 ## Summary
 
-**Recommended Approach (v1.0.0-alpha):**
-- ✅ Single-replica deployment (default)
-- ✅ Vertical scaling if needed
-- ✅ Sharding by namespace for scale-out
+### Recommended Approaches
 
-**Current (v1.0.0-alpha):**
+**For Production Security Monitoring:**
+- ✅ **Multiple replicas (default: 2)** - Provides HA for webhook traffic
+- ✅ **Namespace sharding** - Required for HA of informer sources (Trivy, Kyverno)
+
+**For Development/Testing:**
+- ✅ Single replica (acceptable for non-critical workloads)
+
+### Current Implementation (v1.0.0-alpha)
 - ✅ Leader election (mandatory, always enabled)
+- ✅ High availability for webhook sources (load-balanced across all pods)
 - ✅ HPA support for webhook traffic
-- ✅ Clear leader-bound vs. stateless separation
+- ⚠️ Single point of failure for informer sources (only leader processes)
+- ✅ Automatic leader failover (10-15 seconds)
 
-**Key Principle:** Keep it simple. We don't need to solve "global perfect dedup across replicas" to be successful or KEP-worthy. Best-effort dedup plus clear semantics is enough.
+### Key Principle
+**Leader election enables horizontal scaling for webhook sources, but informer-based sources remain a single point of failure unless using namespace sharding.**
+
+See [HIGH_AVAILABILITY.md](HIGH_AVAILABILITY.md) for complete HA model documentation.
 
