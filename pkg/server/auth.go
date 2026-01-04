@@ -171,7 +171,9 @@ func (a *WebhookAuth) Authenticate(r *http.Request) bool {
 }
 
 // getClientIP extracts the client IP from the request
-// Only trusts X-Forwarded-For/X-Real-IP headers when RemoteAddr is from a trusted proxy CIDR
+// SECURITY: Only trusts X-Forwarded-For/X-Real-IP headers when RemoteAddr is from a trusted proxy CIDR.
+// This prevents IP spoofing attacks where attackers inject fake proxy headers.
+// When trustedProxyCIDRs is empty (default), proxy headers are NEVER trusted (secure by default).
 func getClientIP(r *http.Request, trustedProxyCIDRs []*net.IPNet) string {
 	// Extract IP from RemoteAddr
 	remoteAddr := r.RemoteAddr
@@ -183,9 +185,11 @@ func getClientIP(r *http.Request, trustedProxyCIDRs []*net.IPNet) string {
 		remoteIP = net.ParseIP(remoteAddr)
 	}
 
-	// Check if RemoteAddr is from a trusted proxy
+	// SECURITY: Check if RemoteAddr is from a trusted proxy
+	// Only if RemoteAddr matches a trusted proxy CIDR will we trust proxy headers
+	// Default behavior (empty trustedProxyCIDRs): isTrustedProxy stays false, headers never trusted
 	isTrustedProxy := false
-	if remoteIP != nil {
+	if remoteIP != nil && len(trustedProxyCIDRs) > 0 {
 		for _, cidr := range trustedProxyCIDRs {
 			if cidr.Contains(remoteIP) {
 				isTrustedProxy = true
@@ -194,7 +198,8 @@ func getClientIP(r *http.Request, trustedProxyCIDRs []*net.IPNet) string {
 		}
 	}
 
-	// Only trust proxy headers if RemoteAddr is from a trusted proxy
+	// SECURITY: Only trust proxy headers if RemoteAddr is from a trusted proxy
+	// If trustedProxyCIDRs is empty (default), this block is NEVER executed
 	if isTrustedProxy {
 		// Check X-Forwarded-For header (for proxies/load balancers)
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
