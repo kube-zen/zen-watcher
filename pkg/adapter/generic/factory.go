@@ -26,7 +26,7 @@ import (
 type Factory struct {
 	informerManager *informers.Manager
 	clientSet       kubernetes.Interface
-	webhookPorts    map[string]int // Track used ports
+	webhookPorts    map[string]int         // Track used ports
 	webhookMetrics  *prometheus.CounterVec // Metrics for webhook requests (optional)
 	webhookDropped  *prometheus.CounterVec // Metrics for webhook events dropped (optional)
 }

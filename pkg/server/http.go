@@ -334,7 +334,7 @@ func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
 
 	// Limit request body size to prevent DoS attacks
 	limitedBody := http.MaxBytesReader(w, r.Body, s.maxRequestBytes)
-	defer limitedBody.Close()
+	defer func() { _ = limitedBody.Close() }()
 
 	var alert map[string]interface{}
 	if err := json.NewDecoder(limitedBody).Decode(&alert); err != nil {
@@ -420,7 +420,7 @@ func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
 
 	// Limit request body size to prevent DoS attacks
 	limitedBody := http.MaxBytesReader(w, r.Body, s.maxRequestBytes)
-	defer limitedBody.Close()
+	defer func() { _ = limitedBody.Close() }()
 
 	var auditEvent map[string]interface{}
 	if err := json.NewDecoder(limitedBody).Decode(&auditEvent); err != nil {
