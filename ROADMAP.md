@@ -84,19 +84,24 @@ Add support for forwarding Observation events to external systems via optional, 
 - ✅ **Namespace sharding** - Official scale-out pattern for high-volume deployments
 - ✅ **Vertical scaling** - Increase resources for higher throughput
 
-**Medium-Term (v1.1.x+):**
-- 🔄 **Leader Election** - Optional leader election for singleton responsibilities:
+**Current (v1.0.0-alpha):**
+- ✅ **Leader Election** - Mandatory leader election for singleton responsibilities:
   - Leader handles: Informer-based watchers (Kyverno, Trivy) + Garbage collection
-  - All pods handle: Webhook endpoints (Falco, audit) - enables HPA for webhook traffic
+  - All pods handle: Webhook endpoints (Falco, audit) - enables HPA/KEDA for webhook traffic
   - Keeps CRD semantics intact while allowing horizontal scaling
+  - See [docs/LEADER_ELECTION.md](docs/LEADER_ELECTION.md) for details
+
+**Medium-Term (v1.1.x+):**
+- 🔄 **HPA Support** - Standard Kubernetes autoscaling for webhook traffic (leader election already implemented)
+- 🔄 **KEDA Support** - Advanced autoscaling with custom metrics (optional, leader election already implemented)
 - 🔄 **Event Batching** - Batch Observation creation for high-volume sources
 - ~~**Caching**~~ ✅ **Partially Complete** - Deduplication cache with LRU eviction implemented; general-purpose caching for frequently accessed data still planned
 
 **Design Philosophy:**
 - Keep it simple and predictable
 - Single-replica default with clear scaling envelope
-- Sharding by namespace for scale-out (no leader election needed)
-- Leader election only when real-world scale pressure demands it
+- Sharding by namespace for scale-out (alternative to multi-replica)
+- Leader election mandatory (enables HPA/KEDA for webhook traffic)
 
 See [docs/SCALING.md](docs/SCALING.md) for complete scaling strategy and recommendations.
 
