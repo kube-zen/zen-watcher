@@ -171,29 +171,34 @@ return &ValidationError{
 
 **Source**: `docs/OBSERVABILITY.md` - "Future Improvements" section
 
-### Missing Critical Metrics
+### Status: ✅ **Mostly Complete**
 
 #### 4.1 Ingester-Specific Metrics
-**Priority**: High  
-**Missing**:
-- Ingester CRD count (active/inactive)
-- Ingester type distribution (informer/webhook/logs)
-- Per-ingester event throughput
-- Per-ingester error rates
-- Ingester configuration validation failures
-- Per-destination delivery metrics
+**Status**: ✅ **Implemented**  
+**Location**: `pkg/orchestrator/generic.go`, `pkg/metrics/definitions.go`
 
-**Impact**: Cannot monitor ingester health or troubleshoot per-ingester issues
+**Implemented Metrics**:
+- ✅ `zen_watcher_ingesters_active` - Ingester CRD count (active/inactive) by source, type, namespace
+- ✅ `zen_watcher_ingesters_status` - Ingester status (1=active, 0=inactive, -1=error)
+- ✅ `zen_watcher_ingester_events_processed_total` - Per-ingester event throughput
+- ✅ `zen_watcher_ingester_events_processed_rate` - Events processed per second per ingester
+- ✅ `zen_watcher_ingester_errors_total` - Per-ingester error rates by error type and stage
+- ✅ `zen_watcher_ingesters_config_errors_total` - Ingester configuration validation failures
+- ✅ `zen_watcher_ingesters_startup_duration_seconds` - Ingester startup duration
+- ✅ `zen_watcher_ingesters_last_event_timestamp_seconds` - Last event timestamp per ingester
+- ✅ `zen_watcher_ingester_processing_latency_seconds` - Processing latency per ingester by stage
+
+**Note**: Ingester type distribution can be derived from `zen_watcher_ingesters_active` metric labels.
 
 #### 4.2 Destination Metrics
-**Priority**: High  
-**Missing**:
-- Destination delivery success/failure rates
-- Destination delivery latency
-- Destination queue depth
-- Destination retry counts
+**Status**: ✅ **Implemented**  
+**Location**: `pkg/watcher/observation_creator.go`, `pkg/metrics/definitions.go`
 
-**Impact**: Cannot monitor destination health or troubleshoot delivery issues
+**Implemented Metrics**:
+- ✅ `zen_watcher_destination_delivery_total` - Destination delivery success/failure rates by source, destination type, status
+- ✅ `zen_watcher_destination_delivery_latency_seconds` - Destination delivery latency by source and destination type
+- ✅ `zen_watcher_destination_queue_depth` - Destination queue depth (defined, needs usage verification)
+- ✅ `zen_watcher_destination_retries_total` - Destination retry counts (defined, needs usage verification)
 
 #### 4.3 Filter/Dedup Enhancement Metrics
 **Priority**: Medium  
