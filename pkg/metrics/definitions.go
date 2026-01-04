@@ -837,13 +837,9 @@ func NewMetrics() *Metrics {
 		DestinationQueueDepth:      destinationQueueDepth,
 		DestinationRetriesTotal:    destinationRetriesTotal,
 
-		// Ingester-specific metrics for KEDA autoscaling
-		IngesterQueueDepth:  ingesterQueueDepth,
-		IngesterEventsTotal: ingesterEventsTotal,
-
-		// Egress-specific metrics for KEDA autoscaling
-		EgressQueueDepth:  egressQueueDepth,
-		EgressEventsTotal: egressEventsTotal,
+		// zen-watcher KEDA autoscaling metrics
+		WatcherQueueDepth:  watcherQueueDepth,
+		WatcherEventsTotal: watcherEventsTotal,
 
 		// ConfigManager metrics (NEW - High Priority)
 		ConfigMapLoadTotal:              configMapLoadTotal,
