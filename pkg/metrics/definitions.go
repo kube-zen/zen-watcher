@@ -416,38 +416,21 @@ func NewMetrics() *Metrics {
 		[]string{"source", "destination_type"},
 	)
 
-	// Ingester-specific metrics for KEDA autoscaling
-	ingesterQueueDepth := prometheus.NewGaugeVec(
+	// zen-watcher KEDA autoscaling metrics
+	watcherQueueDepth := prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
-			Name: "ingester_queue_depth",
-			Help: "Current depth of observation queue for zen-ingester",
+			Name: "zen_watcher_queue_depth",
+			Help: "Current depth of observation queue for zen-watcher",
 		},
-		[]string{"component"}, // component: zen-ingester
+		[]string{"component"}, // component: zen-watcher
 	)
 
-	ingesterEventsTotal := prometheus.NewCounterVec(
+	watcherEventsTotal := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: "ingester_events_total",
-			Help: "Total events processed by zen-ingester",
+			Name: "zen_watcher_events_total",
+			Help: "Total events processed by zen-watcher",
 		},
-		[]string{"component", "status"}, // component: zen-ingester, status: success, error
-	)
-
-	// Egress-specific metrics for KEDA autoscaling
-	egressQueueDepth := prometheus.NewGaugeVec(
-		prometheus.GaugeOpts{
-			Name: "egress_queue_depth",
-			Help: "Current depth of dispatch queue for zen-egress",
-		},
-		[]string{"component"}, // component: zen-egress
-	)
-
-	egressEventsTotal := prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "egress_events_total",
-			Help: "Total events dispatched by zen-egress",
-		},
-		[]string{"component", "status"}, // component: zen-egress, status: success, error
+		[]string{"component", "status"}, // component: zen-watcher, status: success, error
 	)
 
 	// NEW: ConfigManager metrics (High Priority)
@@ -586,13 +569,9 @@ func NewMetrics() *Metrics {
 	prometheus.MustRegister(destinationQueueDepth)
 	prometheus.MustRegister(destinationRetriesTotal)
 
-	// Register Ingester-specific metrics for KEDA
-	prometheus.MustRegister(ingesterQueueDepth)
-	prometheus.MustRegister(ingesterEventsTotal)
-
-	// Register Egress-specific metrics for KEDA
-	prometheus.MustRegister(egressQueueDepth)
-	prometheus.MustRegister(egressEventsTotal)
+	// Register zen-watcher KEDA autoscaling metrics
+	prometheus.MustRegister(watcherQueueDepth)
+	prometheus.MustRegister(watcherEventsTotal)
 	// Register ConfigManager metrics
 	prometheus.MustRegister(configMapLoadTotal)
 	prometheus.MustRegister(configMapReloadDuration)

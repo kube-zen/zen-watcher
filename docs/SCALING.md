@@ -97,36 +97,40 @@ resources:
 
 ---
 
-### Option B: Leader Election (Medium-Term Roadmap)
+### Option B: Leader Election (✅ Implemented)
 
-**Status:** Planned for future release
+**Status:** ✅ **Available now** - Leader election is mandatory and always enabled
 
 **Design:**
-- Use `--enable-leader-election` flag (standard client-go pattern)
+- Uses `zen-sdk/pkg/leader` (controller-runtime Manager)
 - **Leader responsibilities:**
   - Informer-based watchers (Kyverno, Trivy)
+  - GenericOrchestrator
+  - IngesterInformer
   - Garbage collection
 - **All pods (leader + non-leaders):**
-  - Serve webhooks (Falco, audit)
+  - Serve webhooks (Falco, audit) - load-balanced
   - Use same filter + dedup stacks
   - Process webhook events
 
 **Implications:**
-- HPA becomes meaningful for webhook traffic
-- Webhook traffic load-balances across pods
-- Only leader processes informer-driven sources
-- Dedup remains per-pod for webhooks (acceptable as "best-effort")
+- ✅ HPA/KEDA becomes meaningful for webhook traffic
+- ✅ Webhook traffic load-balances across pods
+- ✅ Only leader processes informer-driven sources
+- ✅ Dedup remains per-pod for webhooks (acceptable as "best-effort")
 
 **Benefits:**
 - ✅ Scale-out for high webhook volume
 - ✅ Keeps CRD semantics intact
 - ✅ Fits cleanly with decoupled "CRD only" vision
+- ✅ Automatic failover if leader crashes
 
-**Trade-offs:**
-- ⚠️ More complexity in lifecycle management
-- ⚠️ Must document which components are leader-bound
+**Setup:**
+- Set `replicas: 2` (or more) in Deployment
+- Add `POD_NAMESPACE` environment variable (via Downward API)
+- Leader election is automatically enabled (mandatory)
 
-**See ROADMAP.md for timeline.**
+**See [LEADER_ELECTION.md](LEADER_ELECTION.md) for complete documentation.**
 
 ---
 
@@ -284,7 +288,7 @@ env:
 
 ### Q: Why not support HPA out of the box?
 
-**A:** HPA without leader election creates duplicate processing. We prioritize predictable semantics over automatic scaling. Leader election is planned for a future release.
+**A:** HPA without leader election creates duplicate processing. With leader election now implemented (mandatory), HPA/KEDA is supported for webhook traffic. See [LEADER_ELECTION.md](LEADER_ELECTION.md) for details.
 
 ### Q: Can I run multiple replicas for high availability?
 
@@ -303,7 +307,7 @@ env:
 
 ### Q: Will leader election be added?
 
-**A:** Yes, planned for medium-term (see ROADMAP.md). It will enable HPA for webhook traffic while keeping informers + GC as singleton.
+**A:** ✅ **Already implemented!** Leader election is mandatory and always enabled. It enables HPA/KEDA for webhook traffic while keeping informers + GC as singleton. See [LEADER_ELECTION.md](LEADER_ELECTION.md) for details.
 
 ---
 
@@ -314,10 +318,10 @@ env:
 - ✅ Vertical scaling if needed
 - ✅ Sharding by namespace for scale-out
 
-**Future (Next releases):**
-- 🔄 Optional leader election
-- 🔄 HPA support for webhooks
-- 🔄 Clear leader-bound vs. stateless separation
+**Current (v1.0.0-alpha):**
+- ✅ Leader election (mandatory, always enabled)
+- ✅ HPA/KEDA support for webhook traffic
+- ✅ Clear leader-bound vs. stateless separation
 
 **Key Principle:** Keep it simple. We don't need to solve "global perfect dedup across replicas" to be successful or KEP-worthy. Best-effort dedup plus clear semantics is enough.
 
