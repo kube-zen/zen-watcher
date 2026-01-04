@@ -62,7 +62,7 @@ func NewExpressionFilter(expression string) (*ExpressionFilter, error) {
 
 	ast, err := parser.parse()
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse expression: %w", err)
+		return nil, fmt.Errorf("failed to parse filter expression '%s': %w (suggestion: check syntax, use valid operators: ==, !=, >, <, >=, <=, AND, OR, NOT, IN, NOT IN, CONTAINS, STARTSWITH, ENDSWITH)", expression, err)
 	}
 
 	return &ExpressionFilter{
@@ -79,7 +79,7 @@ func (ef *ExpressionFilter) Evaluate(obs *unstructured.Unstructured) (bool, erro
 
 	result, err := ef.evaluateNode(ef.ast, obs)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("filter expression evaluation failed: %w (suggestion: check field paths and operator types)", err)
 	}
 
 	if boolVal, ok := result.(bool); ok {
@@ -193,9 +193,9 @@ func (ef *ExpressionFilter) compareEqual(left, right interface{}) bool {
 		return false
 	}
 
-	// String comparison
-	leftStr := fmt.Sprintf("%v", left)
-	rightStr := fmt.Sprintf("%v", right)
+	// String comparison (optimize: use type assertion first)
+	leftStr := ef.toString(left)
+	rightStr := ef.toString(right)
 	return strings.EqualFold(leftStr, rightStr)
 }
 
@@ -212,9 +212,9 @@ func (ef *ExpressionFilter) compareGreater(left, right interface{}) bool {
 		return ef.compareSeverity(left, right) > 0
 	}
 
-	// String comparison
-	leftStr := fmt.Sprintf("%v", left)
-	rightStr := fmt.Sprintf("%v", right)
+	// String comparison (optimize: use type assertion first)
+	leftStr := ef.toString(left)
+	rightStr := ef.toString(right)
 	return leftStr > rightStr
 }
 
@@ -230,20 +230,20 @@ func (ef *ExpressionFilter) compareIn(value interface{}, list interface{}) bool 
 }
 
 func (ef *ExpressionFilter) compareContains(str, substr interface{}) bool {
-	strVal := fmt.Sprintf("%v", str)
-	substrVal := fmt.Sprintf("%v", substr)
+	strVal := ef.toString(str)
+	substrVal := ef.toString(substr)
 	return strings.Contains(strings.ToLower(strVal), strings.ToLower(substrVal))
 }
 
 func (ef *ExpressionFilter) compareStartsWith(str, prefix interface{}) bool {
-	strVal := fmt.Sprintf("%v", str)
-	prefixVal := fmt.Sprintf("%v", prefix)
+	strVal := ef.toString(str)
+	prefixVal := ef.toString(prefix)
 	return strings.HasPrefix(strings.ToLower(strVal), strings.ToLower(prefixVal))
 }
 
 func (ef *ExpressionFilter) compareEndsWith(str, suffix interface{}) bool {
-	strVal := fmt.Sprintf("%v", str)
-	suffixVal := fmt.Sprintf("%v", suffix)
+	strVal := ef.toString(str)
+	suffixVal := ef.toString(suffix)
 	return strings.HasSuffix(strings.ToLower(strVal), strings.ToLower(suffixVal))
 }
 
@@ -263,8 +263,19 @@ func (ef *ExpressionFilter) toNumber(val interface{}) (float64, bool) {
 	return 0, false
 }
 
+// toString converts an interface{} to string efficiently (optimize: use type assertion first)
+func (ef *ExpressionFilter) toString(val interface{}) string {
+	if val == nil {
+		return ""
+	}
+	if str, ok := val.(string); ok {
+		return str
+	}
+	return fmt.Sprintf("%v", val)
+}
+
 func (ef *ExpressionFilter) isSeverity(val interface{}) bool {
-	severityStr := strings.ToUpper(fmt.Sprintf("%v", val))
+	severityStr := strings.ToUpper(ef.toString(val))
 	severities := map[string]bool{
 		"CRITICAL": true,
 		"HIGH":     true,
@@ -284,8 +295,8 @@ func (ef *ExpressionFilter) compareSeverity(left, right interface{}) int {
 		"UNKNOWN":  1,
 	}
 
-	leftStr := strings.ToUpper(fmt.Sprintf("%v", left))
-	rightStr := strings.ToUpper(fmt.Sprintf("%v", right))
+	leftStr := strings.ToUpper(ef.toString(left))
+	rightStr := strings.ToUpper(ef.toString(right))
 
 	leftLevel := severityLevels[leftStr]
 	rightLevel := severityLevels[rightStr]
