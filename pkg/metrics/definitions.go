@@ -57,13 +57,9 @@ type Metrics struct {
 	DestinationQueueDepth      *prometheus.GaugeVec     // Queue depth by source and destination type
 	DestinationRetriesTotal    *prometheus.CounterVec   // Retry attempts by source and destination type
 
-	// Ingester-specific metrics for KEDA autoscaling
-	IngesterQueueDepth  *prometheus.GaugeVec   // Queue depth for zen-ingester component
-	IngesterEventsTotal *prometheus.CounterVec // Total events processed by zen-ingester
-
-	// Egress-specific metrics for KEDA autoscaling
-	EgressQueueDepth  *prometheus.GaugeVec   // Queue depth for zen-egress component
-	EgressEventsTotal *prometheus.CounterVec // Total events dispatched by zen-egress
+	// zen-watcher KEDA autoscaling metrics
+	WatcherQueueDepth  *prometheus.GaugeVec   // Queue depth for zen-watcher component
+	WatcherEventsTotal *prometheus.CounterVec // Total events processed by zen-watcher
 
 	// ConfigManager metrics (NEW - High Priority)
 	ConfigMapLoadTotal              *prometheus.CounterVec   // ConfigMap loads by name and result
