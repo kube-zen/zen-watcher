@@ -569,3 +569,20 @@ The integration is working when:
 2. Audit webhook calls create Observations with `source: audit`
 3. All Observations are stored in the `zen-system` namespace
 4. Metrics show webhook requests and event processing
+
+## Next Steps: Operational Monitoring
+
+After validation, set up operational monitoring:
+
+**Prometheus Alert Rules:**
+- Apply alert rules from `config/prometheus/rules/` to monitor HA health
+- See [config/prometheus/rules/README.md](../config/prometheus/rules/README.md) for documentation
+
+**Grafana Dashboards:**
+- Import dashboards from `config/dashboards/` for visualization
+- See [config/dashboards/README.md](../config/dashboards/README.md) for documentation
+- Recommended: `zen-watcher-operations.json` for HA monitoring
+
+**Operational Guides:**
+- [HIGH_AVAILABILITY_AND_SCALING.md](HIGH_AVAILABILITY_AND_SCALING.md) - Complete HA guide with monitoring setup
+- [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Operational best practices
