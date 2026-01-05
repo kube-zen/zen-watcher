@@ -58,26 +58,46 @@ The Helm chart includes pre-configured profiles for different environments.
 
 ### Development Profile
 
-Minimal resources, single replica, debug logging:
+**Recommended:** Use the minimal values file for local development:
+
+```bash
+# Download minimal values
+curl -O https://raw.githubusercontent.com/kube-zen/helm-charts/main/charts/zen-watcher/values-minimal.yaml
+
+# Install with minimal values
+helm install zen-watcher kube-zen/zen-watcher \
+  --namespace zen-system \
+  --create-namespace \
+  -f values-minimal.yaml
+```
+
+**Or install with inline values:**
 
 ```bash
 helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --set replicaCount=1 \
-  --set resources.requests.cpu=50m \
-  --set resources.requests.memory=64Mi \
-  --set resources.limits.cpu=200m \
-  --set resources.limits.memory=256Mi
+  --set resources.requests.cpu=10m \
+  --set resources.requests.memory=32Mi \
+  --set resources.limits.cpu=50m \
+  --set resources.limits.memory=64Mi \
+  --set networkPolicy.enabled=false \
+  --set server.webhook.authDisabled=true
 ```
 
 **Profile characteristics:**
-- 1 replica
-- 10m CPU / 32Mi memory requests (minimal, based on measured ~2-3m CPU / ~9-10MB memory baseline)
-- 50m CPU / 64Mi memory limits
-- Metrics enabled
+- 1 replica (minimal resource usage)
+- 10m CPU / 32Mi memory requests (minimal, actual baseline ~2-3m CPU / ~9-10MB memory)
+- 50m CPU / 64Mi memory limits (enough for basic event processing)
+- NetworkPolicy disabled (local clusters may not support it)
+- Webhook authentication disabled (optional for local development)
+- Metrics enabled (if Prometheus available)
+- Shorter TTL (1 hour vs 24 hours for production)
 
-**Note:** Actual baseline usage is ~2-3m CPU and ~9-10MB memory. These values provide headroom for event processing.
+**Note:** Actual baseline usage is ~2-3m CPU and ~9-10MB memory. These values provide minimal headroom for event processing.
+
+**Minimal values file:** See [helm-charts/charts/zen-watcher/values-minimal.yaml](https://github.com/kube-zen/helm-charts/blob/main/charts/zen-watcher/values-minimal.yaml) for complete minimal configuration.
 
 ### Staging Profile
 
