@@ -42,13 +42,13 @@ Use keyless signing with Sigstore:
 
 ```bash
 # Sign without keys (uses OIDC)
-cosign sign kubezen/zen-watcher:1.0.0
+cosign sign kubezen/zen-watcher:1.2.1
 
 # Verify keyless signature
 cosign verify \
   --certificate-identity=user@example.com \
   --certificate-oidc-issuer=https://github.com/login/oauth \
-  kubezen/zen-watcher:1.0.0
+  kubezen/zen-watcher:1.2.1
 ```
 
 ## Signing Images
@@ -57,20 +57,20 @@ cosign verify \
 
 ```bash
 # Sign image
-cosign sign --key cosign.key kubezen/zen-watcher:1.0.0
+cosign sign --key cosign.key kubezen/zen-watcher:1.2.1
 
 # Sign with annotations
 cosign sign --key cosign.key \
   -a git-sha=$(git rev-parse HEAD) \
   -a build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
-  kubezen/zen-watcher:1.0.0
+  kubezen/zen-watcher:1.2.1
 ```
 
 ### Sign Multiple Tags
 
 ```bash
 # Sign all tags
-for tag in 1.0.0 1.0 latest; do
+for tag in 1.2.1 1.2 latest; do
   cosign sign --key cosign.key kubezen/zen-watcher:$tag
 done
 ```
@@ -118,15 +118,15 @@ sign:
 
 ```bash
 # Verify signature
-cosign verify --key cosign.pub kubezen/zen-watcher:1.0.0
+cosign verify --key cosign.pub kubezen/zen-watcher:1.2.1
 
 # Verify and show annotations
-cosign verify --key cosign.pub kubezen/zen-watcher:1.0.0 | jq
+cosign verify --key cosign.pub kubezen/zen-watcher:1.2.1 | jq
 
 # Verify specific annotation
 cosign verify --key cosign.pub \
   -a git-sha=abc123 \
-  kubezen/zen-watcher:1.0.0
+  kubezen/zen-watcher:1.2.1
 ```
 
 ### Verify in Kubernetes
@@ -191,20 +191,20 @@ EOF
 # Attach attestation
 cosign attest --predicate predicate.json \
   --key cosign.key \
-  kubezen/zen-watcher:1.0.0
+  kubezen/zen-watcher:1.2.1
 ```
 
 ### SBOM Attestation
 
 ```bash
 # Generate SBOM
-syft kubezen/zen-watcher:1.0.0 -o spdx-json > sbom.spdx.json
+syft kubezen/zen-watcher:1.2.1 -o spdx-json > sbom.spdx.json
 
 # Attach SBOM as attestation
 cosign attest --predicate sbom.spdx.json \
   --type spdx \
   --key cosign.key \
-  kubezen/zen-watcher:1.0.0
+  kubezen/zen-watcher:1.2.1
 ```
 
 ### Verify Attestation
@@ -212,11 +212,11 @@ cosign attest --predicate sbom.spdx.json \
 ```bash
 # Verify attestation exists
 cosign verify-attestation --key cosign.pub \
-  kubezen/zen-watcher:1.0.0
+  kubezen/zen-watcher:1.2.1
 
 # View attestation content
 cosign verify-attestation --key cosign.pub \
-  kubezen/zen-watcher:1.0.0 | jq -r .payload | base64 -d | jq
+  kubezen/zen-watcher:1.2.1 | jq -r .payload | base64 -d | jq
 ```
 
 ## Policy Enforcement
@@ -279,12 +279,12 @@ spec:
 
 ```bash
 # Sign and upload to Rekor
-cosign sign --key cosign.key kubezen/zen-watcher:1.0.0
+cosign sign --key cosign.key kubezen/zen-watcher:1.2.1
 
 # Verify with Rekor
 cosign verify --key cosign.pub \
   --rekor-url=https://rekor.sigstore.dev \
-  kubezen/zen-watcher:1.0.0
+  kubezen/zen-watcher:1.2.1
 
 # Search Rekor
 rekor-cli search --email user@example.com
@@ -319,8 +319,8 @@ aws secretsmanager create-secret \
 cosign generate-key-pair -f
 
 # Sign with both keys (transition period)
-cosign sign --key cosign.key.old kubezen/zen-watcher:1.0.0
-cosign sign --key cosign.key kubezen/zen-watcher:1.0.0
+cosign sign --key cosign.key.old kubezen/zen-watcher:1.2.1
+cosign sign --key cosign.key kubezen/zen-watcher:1.2.1
 
 # Update public key distribution
 # After transition period, revoke old key
@@ -358,7 +358,7 @@ cosign sign --key cosign.key kubezen/zen-watcher:1.0.0
 
 ```bash
 # Check if image is signed
-cosign verify --key cosign.pub kubezen/zen-watcher:1.0.0
+cosign verify --key cosign.pub kubezen/zen-watcher:1.2.1
 
 # If not found, check registry supports OCI artifacts
 # Sign again if needed
@@ -368,20 +368,20 @@ cosign verify --key cosign.pub kubezen/zen-watcher:1.0.0
 
 ```bash
 # List all signatures
-crane manifest $(cosign triangulate kubezen/zen-watcher:1.0.0)
+crane manifest $(cosign triangulate kubezen/zen-watcher:1.2.1)
 
 # Verify with correct key
-cosign verify --key correct-cosign.pub kubezen/zen-watcher:1.0.0
+cosign verify --key correct-cosign.pub kubezen/zen-watcher:1.2.1
 ```
 
 ### Expired Signature
 
 ```bash
 # Check expiration
-cosign verify --key cosign.pub kubezen/zen-watcher:1.0.0 | jq .exp
+cosign verify --key cosign.pub kubezen/zen-watcher:1.2.1 | jq .exp
 
 # Re-sign if expired
-cosign sign --key cosign.key kubezen/zen-watcher:1.0.0
+cosign sign --key cosign.key kubezen/zen-watcher:1.2.1
 ```
 
 ## Resources
@@ -397,26 +397,26 @@ Complete workflow from build to deployment:
 
 ```bash
 # 1. Build image
-docker build -t kubezen/zen-watcher:1.0.0 .
+docker build -t kubezen/zen-watcher:1.2.1 .
 
 # 2. Generate SBOM
-syft kubezen/zen-watcher:1.0.0 -o spdx-json > sbom.json
+syft kubezen/zen-watcher:1.2.1 -o spdx-json > sbom.json
 
 # 3. Scan for vulnerabilities
 grype sbom:sbom.json --fail-on critical
 
 # 4. Push image
-docker push kubezen/zen-watcher:1.0.0
+docker push kubezen/zen-watcher:1.2.1
 
 # 5. Sign image
-cosign sign --key cosign.key kubezen/zen-watcher:1.0.0
+cosign sign --key cosign.key kubezen/zen-watcher:1.2.1
 
 # 6. Attach SBOM attestation
 cosign attest --predicate sbom.json --type spdx \
-  --key cosign.key kubezen/zen-watcher:1.0.0
+  --key cosign.key kubezen/zen-watcher:1.2.1
 
 # 7. Verify before deployment
-cosign verify --key cosign.pub kubezen/zen-watcher:1.0.0
+cosign verify --key cosign.pub kubezen/zen-watcher:1.2.1
 
 # 8. Deploy
 helm install zen-watcher kube-zen/zen-watcher \
