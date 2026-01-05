@@ -3,7 +3,7 @@ module github.com/kube-zen/zen-watcher
 go 1.25.0
 
 require (
-	github.com/kube-zen/zen-sdk v0.1.2-alpha.0.20260103151153-a7f1de4a51e3
+	github.com/kube-zen/zen-sdk v0.2.8-alpha
 	github.com/prometheus/client_golang v1.23.2
 	github.com/prometheus/common v0.67.4
 	github.com/shirou/gopsutil/v3 v3.24.5
