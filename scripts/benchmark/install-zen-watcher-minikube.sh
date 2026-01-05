@@ -7,7 +7,7 @@ set -euo pipefail
 CLUSTER_NAME="${1:-zen-watcher-stress}"
 KUBECTL_CONTEXT="minikube"
 NAMESPACE="${NAMESPACE:-zen-system}"
-IMAGE="${IMAGE:-kubezen/zen-watcher:1.0.0-alpha}"
+IMAGE="${IMAGE:-kubezen/zen-watcher:1.2.1}"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "Installing zen-watcher in minikube cluster"

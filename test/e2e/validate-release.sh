@@ -15,7 +15,7 @@
 
 set -euo pipefail
 
-# E2E validation script for zen-watcher 1.0.0-alpha release
+# E2E validation script for zen-watcher 1.2.1 release
 # This script validates the release against a real cluster without modifying kubeconfig.
 
 # Colors

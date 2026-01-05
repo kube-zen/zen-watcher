@@ -30,7 +30,7 @@ livenessProbe:
 {
   "status": "healthy",
   "service": "zen-watcher",
-  "version": "1.0.0",
+  "version": "1.2.1",
   "mode": "independent",
   "timestamp": "2024-11-04T10:00:00Z"
 }
@@ -789,13 +789,13 @@ resources:
 **Pre-deployment**:
 ```bash
 # Scan image
-trivy image zubezen/zen-watcher:1.0.0
+trivy image kubezen/zen-watcher:1.2.1
 
 # Verify signature
-cosign verify --key cosign.pub zubezen/zen-watcher:1.0.0
+cosign verify --key cosign.pub kubezen/zen-watcher:1.2.1
 
 # Check SBOM
-syft zubezen/zen-watcher:1.0.0 -o spdx-json | grype
+syft kubezen/zen-watcher:1.2.1 -o spdx-json | grype
 ```
 
 **Post-deployment**:
@@ -1134,10 +1134,10 @@ make zen-demo-validate
 
 # Example deployment steps (adapt to your CI system):
 # 1. Scan image
-trivy image zubezen/zen-watcher:${IMAGE_TAG}
+trivy image kubezen/zen-watcher:${IMAGE_TAG}
 
 # 2. Verify signature
-cosign verify --key cosign.pub zubezen/zen-watcher:${IMAGE_TAG}
+cosign verify --key cosign.pub kubezen/zen-watcher:${IMAGE_TAG}
 
 # 3. Deploy
 helm upgrade --install zen-watcher kube-zen/zen-watcher \

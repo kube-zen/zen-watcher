@@ -4,7 +4,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/utils/common.sh"
 
-VERSION="1.0.0-alpha"
+VERSION="1.2.1"
 IMAGE="kubezen/zen-watcher"
 
 echo "🔨 Building ${IMAGE}:${VERSION}..."
