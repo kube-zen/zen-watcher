@@ -597,7 +597,8 @@ curl http://victoriametrics:8428/api/v1/query?query=up
 ## 📚 Next Steps
 
 - **Production Checklist**: [docs/OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md)
-- **Security Guide**: [docs/SECURITY.md](SECURITY.md)
+- **Security Features**: [docs/SECURITY_FEATURES.md](docs/SECURITY_FEATURES.md) (threat model, security layers, RBAC)
+- **Vulnerability Reporting**: [SECURITY.md](../SECURITY.md) (root)
 - **Monitoring Guide**: [config/monitoring/README.md](../config/monitoring/README.md)
 - **Dashboard Guide**: [config/dashboards/DASHBOARD_GUIDE.md](../config/dashboards/DASHBOARD_GUIDE.md)
 

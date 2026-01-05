@@ -110,7 +110,9 @@ zen-watcher/
 ├── CONTRIBUTING.md               # Contribution guide
 ├── CHANGELOG.md                  # Version history
 ├── QUICK_START.md                # Quick start guide
-├── SECURITY.md                   # Security policy
+├── SECURITY.md                   # Security policy (vulnerability reporting)
+├── docs/
+│   ├── SECURITY_FEATURES.md      # Security features and model
 └── docs/PROJECT_STRUCTURE.md     # This file
 
 ```

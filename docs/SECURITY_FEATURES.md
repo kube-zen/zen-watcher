@@ -1,4 +1,7 @@
-# Security Policy and Model
+# Security Features and Model
+
+> **📋 For vulnerability reporting process**, see [SECURITY.md](../SECURITY.md) (root).  
+> This document covers **product security features**, threat model, and security configuration.
 
 > **Note:** For detailed RBAC documentation, see [RBAC Security Documentation](./SECURITY_RBAC.md).
 
@@ -25,16 +28,12 @@ Zen Watcher is a security tool and therefore must maintain the highest security 
 
 **Please DO NOT open public GitHub issues for security vulnerabilities.**
 
-Instead, please email security details to: **security@kube-zen.com**
+For vulnerability reporting process, supported versions, and response timeline, see [SECURITY.md](../SECURITY.md) (root).
 
-We will respond within 24 hours and work with you to understand and address the issue.
-
-### What to Include
-
-- Description of the vulnerability
-- Steps to reproduce
-- Potential impact
-- Suggested fix (if any)
+**Quick Reference:**
+- **Email**: security@kube-zen.io (preferred)
+- **GitHub Security Advisory**: Use the "Report a vulnerability" button
+- **Response Time**: Within 24 hours
 
 ---
 

@@ -1540,7 +1540,8 @@ For complete examples, see [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
 - **Main README**: [README.md](README.md)
 - **Architecture Details**: [ARCHITECTURE.md](ARCHITECTURE.md) (in docs/)
-- **Security Docs**: [docs/SECURITY.md](docs/SECURITY.md)
+- **Security Features**: [docs/SECURITY_FEATURES.md](docs/SECURITY_FEATURES.md) (threat model, security layers, RBAC)
+- **Vulnerability Reporting**: [SECURITY.md](../SECURITY.md) (root)
 - **Deployment Guide**: [docs/DEPLOYMENT_SCENARIOS.md](docs/DEPLOYMENT_SCENARIOS.md)
 - **Integrations Guide**: [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)
 - **Helm Charts**: [helm-charts repository](https://github.com/kube-zen/helm-charts)

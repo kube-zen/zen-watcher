@@ -1,5 +1,10 @@
 # Security Policy
 
+> **📖 For product security features** (threat model, security layers, RBAC, NetworkPolicy), see [docs/SECURITY_FEATURES.md](docs/SECURITY_FEATURES.md).  
+> This file covers the **vulnerability reporting process** and supported versions.
+
+---
+
 ## Supported Versions
 
 We release patches to fix security issues. Which versions are eligible for receiving such patches depends on the CVSS v3.0 Rating:
@@ -8,8 +13,11 @@ We release patches to fix security issues. Which versions are eligible for recei
 | ------- | ------------------ |
 | 1.2.x   | :white_check_mark: |
 | 1.1.x   | :white_check_mark: |
-| 1.0.x   | :white_check_mark: |
-| < 1.0   | :x:                |
+| < 1.1   | :x:                |
+
+**Current Stable Version:** 1.2.1
+
+---
 
 ## Reporting a Vulnerability
 
@@ -33,14 +41,29 @@ When reporting a vulnerability, please include:
 
 ### Response Timeline
 
-- **Initial Response**: Within 48 hours
+- **Initial Response**: Within 24 hours
 - **Status Update**: Within 7 days
-- **Fix Timeline**: Depends on severity (Critical: ASAP, High: 30 days, Medium: 90 days)
+- **Fix Timeline**: Depends on severity
+  - **Critical**: ASAP (typically within 7 days)
+  - **High**: 30 days
+  - **Medium**: 90 days
+  - **Low**: Next release cycle
+
+---
 
 ## Security Best Practices
 
 - Keep dependencies up to date
-- Run security scans regularly
+- Run security scans regularly (`govulncheck`, `gosec`)
 - Follow secure coding practices
 - Review security advisories for dependencies
+- See [docs/SECURITY_FEATURES.md](docs/SECURITY_FEATURES.md) for product security features and configuration
+
+---
+
+## Related Documentation
+
+- **[Security Features & Model](docs/SECURITY_FEATURES.md)** - Product security features, threat model, security layers, RBAC, NetworkPolicy
+- **[Stability Guarantees](docs/STABILITY_GUARANTEES.md)** - What we never do, API stability, breaking change policy
+- **[Governance](GOVERNANCE.md)** - Project governance and security response process
 

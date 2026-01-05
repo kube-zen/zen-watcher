@@ -1275,7 +1275,7 @@ For operational issues:
 
 For security incidents:
 - Email: security@kube-zen.com
-- See docs/SECURITY.md
+- See [docs/SECURITY_FEATURES.md](SECURITY_FEATURES.md) for security features and [SECURITY.md](../SECURITY.md) for vulnerability reporting
 
 
 # Operational Invariants and SLOs

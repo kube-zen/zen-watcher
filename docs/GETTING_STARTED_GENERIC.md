@@ -1,4 +1,6 @@
-# Getting Started: Generic Installation Guide
+# Getting Started: Complete Installation Guide
+
+> **⚡ Quick Start?** If you just want to get zen-watcher running quickly, see the [Quick Start section in README.md](../README.md#-quick-start) for a minimal installation. This guide provides comprehensive details, troubleshooting, and advanced configuration.
 
 **For cluster operators who want to install zen-watcher as a standalone Observation operator**
 

@@ -358,7 +358,8 @@ Complete guide to all Zen Watcher documentation files.
 4. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Processing order configuration
 
 **Security?**
-1. [SECURITY.md](SECURITY.md) - Security policy
+1. [SECURITY.md](../SECURITY.md) - Vulnerability reporting process (root)
+2. [SECURITY_FEATURES.md](SECURITY_FEATURES.md) - Product security features and model
 2. [SBOM.md](SBOM.md) - Software Bill of Materials
 3. [COSIGN.md](COSIGN.md) - Image signing
 
@@ -476,7 +477,7 @@ Complete guide to all Zen Watcher documentation files.
 | Helm Install | [README.md#installation](../README.md#installation) / [Helm Charts](https://github.com/kube-zen/helm-charts) |
 | Filtering | [FILTERING.md](FILTERING.md) |
 | Scaling | [SCALING.md](SCALING.md) |
-| Security | [SECURITY.md](SECURITY.md) |
+| Security | [SECURITY.md](../SECURITY.md) (vulnerability reporting), [SECURITY_FEATURES.md](SECURITY_FEATURES.md) (product security) |
 | Operations | [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) |
 | Monitoring | [config/monitoring/README.md](../config/monitoring/README.md) |
 | Dashboard | [config/dashboards/DASHBOARD_GUIDE.md](../config/dashboards/DASHBOARD_GUIDE.md) |
@@ -530,7 +531,7 @@ See [CHANGELOG.md](../CHANGELOG.md) for complete version history and updates.
 ### Operators
 1. [README.md#installation](../README.md#installation) - Installation
 2. [Helm Charts Repository](https://github.com/kube-zen/helm-charts) - Helm charts
-3. [SECURITY.md](SECURITY.md) - Security setup
+3. [SECURITY_FEATURES.md](SECURITY_FEATURES.md) - Security setup and features
 4. [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Operations
 5. [config/monitoring/README.md](../config/monitoring/README.md) - Monitoring
 

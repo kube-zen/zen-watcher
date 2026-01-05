@@ -1,8 +1,15 @@
 # Release Notes: Zen Watcher v1.2.0
 
+> **📋 For complete change history**, see [CHANGELOG.md](CHANGELOG.md).  
+> This file is a **curated release summary** for GitHub release pages and user announcements.
+
 **Version**: v1.2.0  
 **Release Date**: 2025-01-05  
 **Status**: Final
+
+**Purpose:**
+- **RELEASE_NOTES_v*.md** (this file): Curated summary for this specific release (highlights, breaking changes, migration guides)
+- **CHANGELOG.md**: Complete change history for all versions (detailed technical changes)
 
 ---
 
@@ -60,7 +67,7 @@ kubectl create secret generic zen-watcher-webhook-auth \
   -n zen-system
 ```
 
-**Reference**: [Security Documentation](docs/SECURITY.md#webhook-authentication)
+**Reference**: [Security Documentation](docs/SECURITY_FEATURES.md#webhook-authentication)
 
 ### 2. Leader Election Mode Changes
 
@@ -113,7 +120,7 @@ networkPolicy:
       - "10.100.0.0/16"  # Your API server CIDR
 ```
 
-**Reference**: [NetworkPolicy Documentation](docs/SECURITY.md#networkpolicy-configuration)
+**Reference**: [NetworkPolicy Documentation](docs/SECURITY_FEATURES.md#networkpolicy-configuration)
 
 ---
 
@@ -299,7 +306,8 @@ networkPolicy:
 - **Changelog**: [CHANGELOG.md](CHANGELOG.md)
 - **Versioning Strategy**: [docs/VERSIONING.md](docs/VERSIONING.md)
 - **High Availability Guide**: [docs/HIGH_AVAILABILITY_AND_SCALING.md](docs/HIGH_AVAILABILITY_AND_SCALING.md)
-- **Security Documentation**: [docs/SECURITY.md](docs/SECURITY.md)
+- **Security Features**: [docs/SECURITY_FEATURES.md](docs/SECURITY_FEATURES.md) (threat model, security layers, RBAC)
+- **Vulnerability Reporting**: [SECURITY.md](SECURITY.md) (root)
 - **Deployment Guide**: [docs/DEPLOYMENT_HELM.md](docs/DEPLOYMENT_HELM.md)
 - **Roadmap**: [ROADMAP.md](ROADMAP.md)
 
