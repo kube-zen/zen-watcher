@@ -105,36 +105,56 @@ helm install zen-watcher kube-zen/zen-watcher \
 
 ### Production Profile
 
-HA deployment with tuned resources:
+**Recommended:** Use the production values file for best practices:
+
+```bash
+# Download production values
+curl -O https://raw.githubusercontent.com/kube-zen/helm-charts/main/charts/zen-watcher/values-production.yaml
+
+# Install with production values
+helm install zen-watcher kube-zen/zen-watcher \
+  --namespace zen-system \
+  --create-namespace \
+  -f values-production.yaml
+```
+
+**Or install with inline values:**
 
 ```bash
 helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --set replicaCount=2 \
-  --set resources.requests.cpu=200m \
-  --set resources.requests.memory=256Mi \
+  --set resources.requests.cpu=100m \
+  --set resources.requests.memory=128Mi \
   --set resources.limits.cpu=1000m \
   --set resources.limits.memory=512Mi \
   --set crds.enabled=false \
-  --set ingester.createDefaultK8sEvents=true
+  --set ingester.createDefaultK8sEvents=true \
+  --set server.webhook.authDisabled=false \
+  --set networkPolicy.enabled=true \
+  --set networkPolicy.egress.enabled=false
 ```
 
 **Profile characteristics:**
 - 2+ replicas (for HA - webhook traffic load-balances across replicas)
-- 100m CPU / 128Mi memory requests (default chart values, conservative)
-- 500m CPU / 512Mi memory limits (default chart values)
+- 100m CPU / 128Mi memory requests (conservative, actual baseline ~2-3m CPU / ~9-10MB memory)
+- 1000m CPU / 512Mi memory limits (generous for event processing spikes)
 - CRDs managed separately (recommended for production)
 - Default ingester enabled (ensures immediate ingestion)
 - Leader election mandatory (always enabled)
-- HA for webhook sources, single point of failure for informer sources
+- Webhook authentication enabled by default (secure by default)
+- NetworkPolicy enabled (ingress-only, egress disabled by default)
 - Pod Disruption Budget enabled
+- HA for webhook sources, single point of failure for informer sources
 
 **Note:** Default chart values (100m CPU / 128Mi memory requests) are conservative. Actual baseline usage is ~2-3m CPU and ~9-10MB memory. Adjust based on your event volume.
 
 **Note:** For horizontal scaling of webhook processing, configure HPA separately. Informer sources remain single leader only.
 
 **See [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md#high-availability-and-stability-) for HA model details.**
+
+**Production values file:** See [helm-charts/charts/zen-watcher/values-production.yaml](https://github.com/kube-zen/helm-charts/blob/main/charts/zen-watcher/values-production.yaml) for complete production configuration.
 
 ## Custom Configuration
 

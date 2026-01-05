@@ -2,8 +2,10 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?logo=go)](https://go.dev/)
-[![CI](https://github.com/kube-zen/zen-watcher/workflows/CI/badge.svg)](https://github.com/kube-zen/zen-watcher/actions)
 [![Kubernetes](https://img.shields.io/badge/Kubernetes-1.26+-326CE5?logo=kubernetes&logoColor=white)](https://kubernetes.io/)
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/zen-watcher)](https://artifacthub.io/packages/helm/kube-zen/zen-watcher)
+
+**Status:** ✅ Actively Maintained | **Version:** 1.2.1 | **License:** [Apache 2.0](LICENSE)
 
 > **Kubernetes Observation Collector: Turn Any Signal into a CRD**
 
@@ -312,7 +314,11 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## 📄 License
 
-Apache License 2.0 - See [LICENSE](LICENSE) for details.
+**License:** [Apache License 2.0](LICENSE) - See [LICENSE](LICENSE) for full text.
+
+**Third-Party Dependencies:** See [NOTICE](NOTICE) for a summary of third-party software licenses.
+
+**Vulnerability Scanning:** We use `govulncheck` to scan for known vulnerabilities. See [docs/BUILD.md](docs/BUILD.md#dependency-management) for details.
 
 ---
 

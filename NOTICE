@@ -1,7 +1,7 @@
-zen-watcher
-Copyright 2024 The Zen Watcher Authors
+Zen Watcher
+Copyright 2025 Kube-ZEN Contributors
 
-This product includes software developed at The Zen Watcher project
+This product includes software developed by the Kube-ZEN project
 (https://github.com/kube-zen/zen-watcher).
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,24 +16,102 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 
-========================================================================
-Third-Party Notices
-========================================================================
+---
+
+## Third-Party Dependencies
 
 This product includes the following third-party software components:
 
-Kubernetes (k8s.io/api, k8s.io/apimachinery, k8s.io/client-go)
-Copyright 2014-2024 The Kubernetes Authors
-Licensed under the Apache License, Version 2.0
-https://github.com/kubernetes/kubernetes
+### Direct Dependencies
 
-Prometheus Client (github.com/prometheus/client_golang)
-Copyright 2012-2024 The Prometheus Authors
-Licensed under the Apache License, Version 2.0
-https://github.com/prometheus/client_golang
+- **zen-sdk** (github.com/kube-zen/zen-sdk) - v0.2.9-alpha
+  - License: Apache License 2.0
+  - Purpose: Shared SDK components (deduplication, logging, leader election)
 
-Uber Zap Logger (go.uber.org/zap)
-Copyright 2016-2024 Uber Technologies, Inc.
-Licensed under the MIT License
-https://github.com/uber-go/zap
+- **prometheus/client_golang** (github.com/prometheus/client_golang) - v1.23.2
+  - License: Apache License 2.0
+  - Purpose: Prometheus metrics client
 
+- **prometheus/common** (github.com/prometheus/common) - v0.67.4
+  - License: Apache License 2.0
+  - Purpose: Prometheus common utilities
+
+- **golang.org/x/crypto** - v0.46.0
+  - License: BSD-3-Clause
+  - Purpose: Cryptographic primitives
+
+- **golang.org/x/time** - v0.14.0
+  - License: BSD-3-Clause
+  - Purpose: Time utilities
+
+- **k8s.io/api** - v0.35.0
+  - License: Apache License 2.0
+  - Purpose: Kubernetes API types
+
+- **k8s.io/apimachinery** - v0.35.0
+  - License: Apache License 2.0
+  - Purpose: Kubernetes API machinery
+
+- **k8s.io/client-go** - v0.35.0
+  - License: Apache License 2.0
+  - Purpose: Kubernetes client library
+
+- **sigs.k8s.io/controller-runtime** - v0.22.4
+  - License: Apache License 2.0
+  - Purpose: Kubernetes controller runtime
+
+- **sigs.k8s.io/yaml** - v1.6.0
+  - License: MIT
+  - Purpose: YAML utilities
+
+- **gopkg.in/yaml.v3** - v3.0.1
+  - License: Apache License 2.0, MIT
+  - Purpose: YAML parser
+
+- **github.com/shirou/gopsutil/v3** - v3.24.5
+  - License: BSD-3-Clause
+  - Purpose: System and process utilities
+
+### License Summary
+
+The following licenses are used by dependencies:
+
+- **Apache License 2.0**: zen-sdk, prometheus/client_golang, prometheus/common, k8s.io/*, sigs.k8s.io/controller-runtime, gopkg.in/yaml.v3
+- **BSD-3-Clause**: golang.org/x/crypto, golang.org/x/time, github.com/shirou/gopsutil/v3
+- **MIT**: sigs.k8s.io/yaml, gopkg.in/yaml.v3
+
+All dependencies are compatible with Apache License 2.0.
+
+### Generating License Report
+
+To generate an up-to-date license report:
+
+```bash
+# Install license tool
+go install github.com/google/go-licenses@latest
+
+# Generate report
+go-licenses report ./... > LICENSE_REPORT.txt
+
+# Or use go list
+go list -m -json all | jq -r 'select(.Path != "github.com/kube-zen/zen-watcher") | "\(.Path) \(.Version) \(.Dir)"'
+```
+
+### Vulnerability Scanning
+
+To check for known vulnerabilities:
+
+```bash
+# Install govulncheck
+go install golang.org/x/vuln/cmd/govulncheck@latest
+
+# Scan for vulnerabilities
+govulncheck ./...
+```
+
+---
+
+**Last Updated:** 2025-01-05  
+**Version:** 1.2.1
+
+For the most up-to-date dependency list, see `go.mod` and `go.sum`.

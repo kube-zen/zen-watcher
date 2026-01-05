@@ -4,6 +4,62 @@
 
 Zen-watcher uses semantic versioning with synchronized releases across components.
 
+## Version Compatibility Matrix
+
+| Component | Minimum Version | Recommended Version | Tested Versions |
+|-----------|----------------|-------------------|-----------------|
+| **Kubernetes** | 1.26+ | 1.28+ | 1.26, 1.28, 1.30 |
+| **Go** | 1.25+ | 1.25+ | 1.25.0, 1.25.5 |
+| **Helm** | 3.8+ | 3.12+ | 3.8, 3.12, 3.14 |
+| **zen-sdk** | v0.2.9-alpha | v0.2.9-alpha | v0.2.9-alpha |
+| **controller-runtime** | v0.22.0+ | v0.22.4 | v0.22.4 |
+| **k8s.io/client-go** | v0.35.0 | v0.35.0 | v0.35.0 |
+
+### Kubernetes Version Support
+
+**Supported Versions:**
+- ✅ **1.26+**: Fully supported
+- ✅ **1.28+**: Recommended (tested extensively)
+- ⚠️ **1.30+**: Supported (may have newer API features)
+
+**Unsupported Versions:**
+- ❌ **<1.26**: Not supported (API changes)
+
+### Go Version Support
+
+**Supported Versions:**
+- ✅ **1.25+**: Fully supported
+- ✅ **1.25.0**: Minimum required
+- ✅ **1.25.5**: Recommended (latest stable)
+
+**Unsupported Versions:**
+- ❌ **<1.25**: Not supported (language features)
+
+### Dependency Versions
+
+**Core Dependencies:**
+- `zen-sdk`: v0.2.9-alpha (required)
+- `controller-runtime`: v0.22.4 (required)
+- `k8s.io/client-go`: v0.35.0 (required)
+
+**Optional Dependencies:**
+- `prometheus/client_golang`: v1.23.2+ (for metrics)
+- `golang.org/x/crypto`: v0.46.0+ (for cryptographic operations)
+
+### Platform Support
+
+**Tested Platforms:**
+- ✅ Linux (amd64, arm64)
+- ✅ macOS (amd64, arm64)
+- ⚠️ Windows (amd64, via WSL2)
+
+**Architecture Support:**
+- ✅ amd64 (x86_64) - Primary
+- ✅ arm64 (aarch64) - Supported
+- ⚠️ arm32 - Limited testing
+
+---
+
 ## Single Source of Truth
 
 **Version is defined in the root `VERSION` file** and propagated to all components:
