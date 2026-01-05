@@ -1,0 +1,122 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: zen-watcher-leader-election-alerts
+  namespace: zen-system
+  labels:
+    app.kubernetes.io/name: zen-watcher
+    app.kubernetes.io/component: leader-election-monitoring
+spec:
+  groups:
+  - name: zen-watcher.leader-election
+    interval: 30s
+    rules:
+    # Leader transition monitoring
+    - alert: ZenWatcherLeaderFlapping
+      expr: |
+        rate(zenwatcher_leader_election_transitions_total[5m]) > 0.1
+      for: 2m
+      labels:
+        severity: warning
+        component: leader-election
+        team: sre
+      annotations:
+        summary: "Leader election flapping detected"
+        description: "Leader transitions are occurring too frequently ({{$value}} transitions/sec). This may indicate network issues or API server problems."
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/OPERATIONAL_EXCELLENCE.md#informer-failover-gap"
+
+    # Source staleness alerts (critical sources)
+    - alert: ZenWatcherSourceStalenessCritical
+      expr: |
+        (time() - zenwatcher_source_watch_last_event_timestamp_seconds{source=~"trivy|kyverno"}) > 30
+      for: 1m
+      labels:
+        severity: critical
+        component: informer-sources
+        team: security
+      annotations:
+        summary: "Critical informer source has not processed events for {{$value}} seconds"
+        description: "Source {{$labels.source}} has not processed events for {{$value}} seconds. This may indicate leader failover or source connectivity issues."
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/OPERATIONAL_EXCELLENCE.md#informer-failover-gap"
+
+    # Source staleness alerts (standard sources)
+    - alert: ZenWatcherSourceStaleness
+      expr: |
+        (time() - zenwatcher_source_watch_last_event_timestamp_seconds) > 300
+      for: 2m
+      labels:
+        severity: warning
+        component: informer-sources
+        team: sre
+      annotations:
+        summary: "Informer source has not processed events for {{$value}} seconds"
+        description: "Source {{$labels.source}} has not processed events for {{$value}} seconds. Check leader status and source connectivity."
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/OPERATIONAL_EXCELLENCE.md#informer-failover-gap"
+
+    # Ingestion drop alert
+    - alert: ZenWatcherIngestionDrop
+      expr: |
+        (
+          rate(zen_watcher_observations_created_total[5m]) < 0.1
+          and
+          zenwatcher_ingesters_active{source=~"trivy|kyverno"} == 1
+        )
+      for: 3m
+      labels:
+        severity: warning
+        component: ingestion
+        team: sre
+      annotations:
+        summary: "Observation creation rate dropped to near-zero while sources are active"
+        description: "Observation creation rate is {{$value}}/sec while informer sources are active. This may indicate processing issues or leader failover."
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/OPERATIONAL_EXCELLENCE.md#informer-failover-gap"
+
+    # Failover duration alert
+    - alert: ZenWatcherFailoverDurationHigh
+      expr: |
+        histogram_quantile(0.95, 
+          sum(rate(zenwatcher_failover_duration_seconds_bucket[10m])) by (le)
+        ) > 20
+      for: 5m
+      labels:
+        severity: warning
+        component: leader-election
+        team: sre
+      annotations:
+        summary: "Leader failover duration is high (p95: {{$value}}s)"
+        description: "p95 failover duration is {{$value}}s (threshold: 20s). This may indicate API server latency or network issues."
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/OPERATIONAL_EXCELLENCE.md#informer-failover-gap"
+
+    # Watch restart monitoring
+    - alert: ZenWatcherWatchRestartsHigh
+      expr: |
+        rate(zenwatcher_source_watch_restarts_total[10m]) > 0.05
+      for: 5m
+      labels:
+        severity: warning
+        component: informer-sources
+        team: sre
+      annotations:
+        summary: "High rate of watch restarts for source {{$labels.source}}"
+        description: "Watch restarts are occurring at {{$value}}/sec for source {{$labels.source}}. This may indicate connectivity issues."
+        runbook_url: "https://github.com/kube-zen/zen-watcher/docs/OPERATIONAL_EXCELLENCE.md#informer-failover-gap"
+
+  - name: zen-watcher.leader-status
+    interval: 30s
+    rules:
+    # Leader status monitoring (informational)
+    - record: zenwatcher:leader_status
+      expr: |
+        zenwatcher_is_leader
+      labels:
+        component: leader-election
+
+    # Failover window estimation
+    - record: zenwatcher:failover_window_estimate
+      expr: |
+        histogram_quantile(0.95, 
+          sum(rate(zenwatcher_failover_duration_seconds_bucket[1h])) by (le)
+        )
+      labels:
+        component: leader-election
+

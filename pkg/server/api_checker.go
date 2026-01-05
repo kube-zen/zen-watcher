@@ -44,9 +44,5 @@ func (c *kubernetesAPIChecker) CheckAPIHealth(ctx context.Context) error {
 	_, err := c.client.CoreV1().Namespaces().List(ctx, metav1.ListOptions{
 		Limit: 1, // Only need to verify API is reachable, not get all namespaces
 	})
-	if err != nil {
-		return err
-	}
-	return nil
+	return err
 }
-

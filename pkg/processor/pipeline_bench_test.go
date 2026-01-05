@@ -43,6 +43,7 @@ func setupBenchmarkProcessor() (*Processor, dynamic.Interface) {
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
 	deduper := sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+	defer deduper.Stop()                      // Stop cleanup goroutine to prevent RWMutex errors
 
 	// Create observation creator with nil metrics for benchmarking
 	creator := watcher.NewObservationCreator(

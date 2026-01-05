@@ -89,6 +89,7 @@ func TestPipelineOrder_FilterFirst(t *testing.T) {
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
 	deduper := sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+	defer deduper.Stop()                      // Stop cleanup goroutine to prevent RWMutex errors
 
 	creator := watcher.NewObservationCreator(
 		dynamicClient,
@@ -180,6 +181,7 @@ func TestPipelineOrder_DedupFirst(t *testing.T) {
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
 	deduper := sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+	defer deduper.Stop()                      // Stop cleanup goroutine to prevent RWMutex errors
 
 	creator := watcher.NewObservationCreator(
 		dynamicClient,
@@ -265,6 +267,7 @@ func TestPipelineOrder_NormalizationAfterFilterDedup(t *testing.T) {
 	filterConfig := &filter.FilterConfig{Sources: make(map[string]filter.SourceFilter)}
 	f := filter.NewFilter(filterConfig)
 	deduper := sdkdedup.NewDeduper(60, 10000) // windowSeconds=60, maxSize=10000
+	defer deduper.Stop()                      // Stop cleanup goroutine to prevent RWMutex errors
 
 	creator := watcher.NewObservationCreator(
 		dynamicClient,
