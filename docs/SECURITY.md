@@ -1,7 +1,7 @@
 # Security Features and Model
 
-> **📋 For vulnerability reporting process**, see [SECURITY.md](../SECURITY.md) (root).  
-> This document covers **product security features**, threat model, and security configuration.
+> **📋 For vulnerability reporting process**, see [VULNERABILITY_DISCLOSURE.md](../VULNERABILITY_DISCLOSURE.md) (root).  
+> This document is the **central, authoritative document** for all product security features, threat model, and security configuration.
 
 > **Note:** For detailed RBAC documentation, see [RBAC Security Documentation](./SECURITY_RBAC.md).
 
@@ -28,7 +28,7 @@ Zen Watcher is a security tool and therefore must maintain the highest security 
 
 **Please DO NOT open public GitHub issues for security vulnerabilities.**
 
-For vulnerability reporting process, supported versions, and response timeline, see [SECURITY.md](../SECURITY.md) (root).
+For vulnerability reporting process, supported versions, and response timeline, see [VULNERABILITY_DISCLOSURE.md](../VULNERABILITY_DISCLOSURE.md) (root).
 
 **Quick Reference:**
 - **Email**: security@kube-zen.io (preferred)

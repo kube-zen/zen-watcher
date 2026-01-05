@@ -1,5 +1,7 @@
 # E2E Validation Guide
 
+> **📦 Operational Assets**: Pre-built Prometheus alert rules and Grafana dashboards are located in `config/` directory. See [config/prometheus/rules/](../config/prometheus/rules/) for alert rules and [config/dashboards/](../config/dashboards/) for dashboards.
+
 This guide describes how to validate zen-watcher 1.2.1 release against a real Kubernetes cluster.
 
 ## Overview
@@ -58,7 +60,7 @@ helm install zen-watcher kube-zen/zen-watcher \
   --namespace "$NAMESPACE" \
   --create-namespace \
   --kube-context "$CONTEXT" \
-  --set image.tag=1.2.1
+  --set image.tag=1.0.0-alpha
 
 # Verify deployment
 kubectl get pods --namespace "$NAMESPACE" --context "$CONTEXT"

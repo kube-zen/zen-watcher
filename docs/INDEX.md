@@ -139,20 +139,20 @@ Complete guide to all Zen Watcher documentation files.
 
 ## 🔐 Security Documentation
 
-20. **[SECURITY.md](../SECURITY.md)** - Security Policy (Vulnerability Reporting) ⭐ **ROOT FILE**
+20. **[VULNERABILITY_DISCLOSURE.md](../VULNERABILITY_DISCLOSURE.md)** - Vulnerability Disclosure Policy ⭐ **ROOT FILE**
     - Vulnerability reporting process
     - Supported versions
     - Response timeline
     - **Purpose**: GitHub standard security policy file for vulnerability reporting
 
-21. **[SECURITY_FEATURES.md](SECURITY_FEATURES.md)** - Security Features and Model ⭐ **PRODUCT SECURITY**
+21. **[SECURITY.md](SECURITY.md)** - Security Features and Model ⭐ **PRODUCT SECURITY (CENTRAL AUTHORITATIVE DOC)**
     - Security features and configuration
     - Threat model (comprehensive threat analysis)
     - Security layers (container, network, RBAC)
     - Trust boundaries
     - Mitigations
     - Security recommendations
-    - **Purpose**: Product security features, threat model, and security configuration
+    - **Purpose**: Central, authoritative document for all product security features, threat model, and security configuration
 
 22. **[SECURITY_RBAC.md](SECURITY_RBAC.md)** - RBAC permissions
     - Permission rationale
@@ -359,8 +359,8 @@ Complete guide to all Zen Watcher documentation files.
 4. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Processing order configuration
 
 **Security?**
-1. [SECURITY.md](../SECURITY.md) - Vulnerability reporting process (root)
-2. [SECURITY_FEATURES.md](SECURITY_FEATURES.md) - Product security features and model
+1. [VULNERABILITY_DISCLOSURE.md](../VULNERABILITY_DISCLOSURE.md) - Vulnerability reporting process (root)
+2. [SECURITY.md](SECURITY.md) - Product security features and model (central authoritative doc)
 2. [SBOM.md](SBOM.md) - Software Bill of Materials
 3. [COSIGN.md](COSIGN.md) - Image signing
 
@@ -444,8 +444,8 @@ Complete guide to all Zen Watcher documentation files.
 
 ### Security
 
-- [SECURITY.md](../SECURITY.md) - Vulnerability reporting process (root)
-- [SECURITY_FEATURES.md](SECURITY_FEATURES.md) - Product security features and model
+- [VULNERABILITY_DISCLOSURE.md](../VULNERABILITY_DISCLOSURE.md) - Vulnerability reporting process (root)
+- [SECURITY.md](SECURITY.md) - Product security features and model (central authoritative doc)
 - [SECURITY_RBAC.md](SECURITY_RBAC.md) - RBAC permissions
 - [SBOM.md](SBOM.md) - Software Bill of Materials
 - [COSIGN.md](COSIGN.md) - Image signing
@@ -478,7 +478,7 @@ Complete guide to all Zen Watcher documentation files.
 | Helm Install | [README.md#installation](../README.md#installation) / [Helm Charts](https://github.com/kube-zen/helm-charts) |
 | Filtering | [FILTERING.md](FILTERING.md) |
 | Scaling | [SCALING.md](SCALING.md) |
-| Security | [SECURITY.md](../SECURITY.md) (vulnerability reporting), [SECURITY_FEATURES.md](SECURITY_FEATURES.md) (product security) |
+| Security | [VULNERABILITY_DISCLOSURE.md](../VULNERABILITY_DISCLOSURE.md) (vulnerability reporting), [SECURITY.md](SECURITY.md) (product security) |
 | Operations | [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) |
 | Monitoring | [config/monitoring/README.md](../config/monitoring/README.md) |
 | Dashboard | [config/dashboards/DASHBOARD_GUIDE.md](../config/dashboards/DASHBOARD_GUIDE.md) |
@@ -532,7 +532,7 @@ See [CHANGELOG.md](../CHANGELOG.md) for complete version history and updates.
 ### Operators
 1. [README.md#installation](../README.md#installation) - Installation
 2. [Helm Charts Repository](https://github.com/kube-zen/helm-charts) - Helm charts
-3. [SECURITY_FEATURES.md](SECURITY_FEATURES.md) - Security setup and features
+3. [SECURITY.md](SECURITY.md) - Security setup and features
 4. [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Operations
 5. [config/monitoring/README.md](../config/monitoring/README.md) - Monitoring
 

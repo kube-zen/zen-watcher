@@ -280,7 +280,7 @@ This document defines what zen-watcher **will never do**, what stability guarant
 **Vulnerability Response:**
 - ✅ **24-Hour Response:** Security issues acknowledged within 24 hours
 - ✅ **7-Day Fix:** Critical vulnerabilities patched within 7 days
-- ✅ **Disclosure:** Coordinated disclosure (see [SECURITY.md](../SECURITY.md))
+- ✅ **Disclosure:** Coordinated disclosure (see [VULNERABILITY_DISCLOSURE.md](../VULNERABILITY_DISCLOSURE.md))
 
 ### What We Don't Guarantee
 

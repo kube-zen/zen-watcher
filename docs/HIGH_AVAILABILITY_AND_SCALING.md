@@ -676,7 +676,11 @@ See [PERFORMANCE.md](PERFORMANCE.md) for detailed performance benchmarks.
 - `zen_watcher_observations_filtered_total` - Events filtered
 - `zen_watcher_observations_deduped_total` - Events deduplicated
 
-### Alert Rules
+### Prometheus Alert Rules
+
+> **📦 Operational Assets**: Pre-built Prometheus alert rules are located in `config/prometheus/rules/`. See [config/prometheus/rules/README.md](../config/prometheus/rules/README.md) for complete documentation.
+
+**Location**: `config/prometheus/rules/leader-election-alerts.yml`
 
 Enable PrometheusRule via Helm:
 ```yaml
@@ -691,11 +695,44 @@ prometheusRule:
 - **Ingestion Drop**: `rate(zen_watcher_observations_created_total[5m]) < 0.1` while sources are active
 - **Failover Duration**: `histogram_quantile(0.95, sum(rate(zenwatcher_failover_duration_seconds_bucket[10m])) by (le)) > 20`
 
-### Dashboards
+**Installation:**
+```bash
+# Apply PrometheusRule directly
+kubectl apply -f config/prometheus/rules/leader-election-alerts.yml
+
+# Or enable via Helm
+helm upgrade zen-watcher kube-zen/zen-watcher \
+  --set prometheusRule.enabled=true \
+  -n zen-system
+```
+
+**Reference**: See [config/prometheus/rules/README.md](../config/prometheus/rules/README.md) for complete alert rule documentation.
+
+### Grafana Dashboards
+
+> **📦 Operational Assets**: Pre-built Grafana dashboards are located in `config/dashboards/`. See [config/dashboards/README.md](../config/dashboards/README.md) for complete documentation.
+
+**Location**: `config/dashboards/`
 
 Import Grafana dashboards from `config/dashboards/`:
-- `zen-watcher-operations.json` - Leader election and informer status panels
+
+- `zen-watcher-operations.json` - Operations dashboard with leader election and informer status panels ⭐ **RECOMMENDED FOR HA MONITORING**
 - `zen-watcher-dashboard.json` - Overview with navigation to detailed panels
+- `zen-watcher-executive.json` - Executive overview
+- `zen-watcher-security.json` - Security analytics
+- `zen-watcher-namespace-health.json` - Namespace health monitoring
+- `zen-watcher-explorer.json` - Data explorer
+
+**Installation:**
+```bash
+# Import via Grafana UI
+# 1. Port-forward Grafana: kubectl port-forward -n <namespace> svc/grafana 3000:3000
+# 2. Open http://localhost:3000
+# 3. Go to Dashboards → Import
+# 4. Upload dashboard JSON files from config/dashboards/
+```
+
+**Reference**: See [config/dashboards/README.md](../config/dashboards/README.md) for complete dashboard documentation and panel descriptions.
 
 ---
 

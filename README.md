@@ -21,13 +21,9 @@ Zen Watcher is an open-source Kubernetes operator that aggregates structured sig
 
 **Version:** 1.2.1 (OSS release) | **License:** [Apache 2.0](LICENSE) | **Status:** ✅ Actively Maintained
 
-## 📊 How It Works
-
-![Zen Watcher Architecture](docs/images/zen-watcher.png)
-
 ## 🚀 Quick Start
 
-> **📖 For a complete getting started guide**, see [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) which includes detailed prerequisites, troubleshooting, and advanced configuration.
+> **📖 For a complete getting started guide**, see [docs/GETTING_STARTED_GENERIC.md](docs/GETTING_STARTED_GENERIC.md) which includes detailed prerequisites, troubleshooting, and advanced configuration.
 
 ### Prerequisites
 
@@ -76,13 +72,9 @@ obsctl list --namespace zen-system
 kubectl get observations
 ```
 
-<<<<<<< HEAD
-**See [DEPLOYMENT_HELM.md](docs/DEPLOYMENT_HELM.md) for complete installation guide.**
-=======
 **Next Steps:**
 - **Complete Installation Guide**: [docs/DEPLOYMENT_HELM.md](docs/DEPLOYMENT_HELM.md)
-- **Detailed Getting Started**: [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) (includes troubleshooting, monitoring setup, and advanced configuration)
->>>>>>> fee8d0f (docs: add architecture diagram to README)
+- **Detailed Getting Started**: [docs/GETTING_STARTED_GENERIC.md](docs/GETTING_STARTED_GENERIC.md) (includes troubleshooting, monitoring setup, and advanced configuration)
 
 ---
 
@@ -117,7 +109,7 @@ kubectl get observations
 - ⚠️ **Webhook endpoints are unauthenticated by default** - enable authentication for production
 - ⚠️ **No default event collection** - create an Ingester to start collecting events
 
-See [SECURITY.md](docs/SECURITY.md) for complete security documentation.
+See [docs/SECURITY.md](docs/SECURITY.md) for complete security documentation (threat model, security layers, RBAC). For vulnerability reporting, see [VULNERABILITY_DISCLOSURE.md](VULNERABILITY_DISCLOSURE.md).
 
 ---
 
@@ -157,11 +149,10 @@ metadata:
   name: my-tool-source
   namespace: zen-system
 spec:
-  source: my-tool  # Required: Must match pattern ^[a-z0-9-]+$
-                    # Allowed values: kubernetes-events, falco, trivy, kyverno, checkov, kube-bench, cert-manager, sealed-secrets, or any custom source name
-  ingester: logs    # Required: Must be one of: logs, webhook, informer
+  source: my-tool
+  ingester: logs
   logs:
-    podSelector: app=my-tool  # Required: Kubernetes label selector (e.g., "app=my-tool" or "app in (tool1,tool2)")
+    podSelector: app=my-tool
     patterns:
       - regex: "ERROR: (?P<message>.*)"
         type: error
@@ -262,12 +253,6 @@ kubectl get observations -n zen-system -o json | \
 - [Observation API](docs/CRD.md) - API reference
 - [Integrations](docs/INTEGRATIONS.md) - How to consume Observations
 - [Deduplication](docs/DEDUPLICATION.md) - Deduplication strategies
-
-## Compatibility
-
-**zen-watcher v1.2.1** requires **zen-sdk v0.2.9-alpha**
-
-This version compatibility is tested and verified. For other zen-sdk versions, see the [zen-sdk compatibility matrix](https://github.com/kube-zen/zen-sdk#compatibility).
 - [CRD Documentation](docs/CRD.md) - Detailed CRD documentation
 
 ---
@@ -290,25 +275,9 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 **Email Support**: zen@kube-zen.io (general inquiries)
 
-**Security Issues**: security@kube-zen.io (vulnerability reports - see [SECURITY.md](SECURITY.md))
+**Security Issues**: security@kube-zen.io (vulnerability reports - see [VULNERABILITY_DISCLOSURE.md](VULNERABILITY_DISCLOSURE.md))
 
 **Issues**: [GitHub Issues](https://github.com/kube-zen/zen-watcher/issues) for bug reports and feature requests
-
----
-
-## 💰 Funding & Sponsorship
-
-**Support the Project**: Zen Watcher is an open-source project maintained by the community. Your sponsorship helps ensure continued development, maintenance, and support.
-
-**GitHub Sponsors**: [Sponsor us on GitHub](https://github.com/sponsors/kube-zen) - Support the project directly through GitHub Sponsors. (Profile pending approval)
-
-**Why Sponsor?**
-- Ensure long-term maintenance and support
-- Accelerate feature development
-- Support the open-source Kubernetes ecosystem
-- Get priority support and early access to features
-
-**Corporate Sponsors**: For enterprise sponsorship opportunities, contact team@kube-zen.io
 
 ---
 

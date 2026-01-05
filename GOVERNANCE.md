@@ -169,7 +169,7 @@ Maintainers can step down at any time by notifying other maintainers. They may b
 
 ### Response Times
 
-- **Security Issues**: 24 hours (see [SECURITY.md](SECURITY.md))
+- **Security Issues**: 24 hours (see [VULNERABILITY_DISCLOSURE.md](VULNERABILITY_DISCLOSURE.md))
 - **Bug Reports**: 48 hours (acknowledgment)
 - **Feature Requests**: 1 week (initial response)
 - **General Questions**: Best effort
