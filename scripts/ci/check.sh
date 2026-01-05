@@ -28,7 +28,7 @@ echo ""
 echo "Checking required files..."
 REQUIRED_FILES=(
     "README.md"
-    "SECURITY.md"
+    "VULNERABILITY_DISCLOSURE.md"
     "CONTRIBUTING.md"
     "CODE_OF_CONDUCT.md"
     "CHANGELOG.md"
