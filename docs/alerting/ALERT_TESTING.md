@@ -378,7 +378,7 @@ curl -X POST http://alertmanager:9093/api/v1/alerts \
 - [ ] Incident created in PagerDuty
 - [ ] Correct severity level assigned
 - [ ] Incident contains all required details
-- [ ] On-call engineer receives notification
+- [ ] Notification delivered to configured channel (Slack, Email, PagerDuty, etc.)
 - [ ] Incident auto-resolves when alert clears
 
 ## Escalation Policy Testing

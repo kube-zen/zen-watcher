@@ -2,12 +2,64 @@
 
 Thank you for your interest in contributing to Zen Watcher! This document outlines best practices and guidelines for adding new watchers or improving the codebase.
 
+## Code of Conduct
+
+All contributors must follow our [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you agree to uphold this code.
+
+## Developer Certificate of Origin (DCO)
+
+Zen Watcher uses the **Developer Certificate of Origin (DCO)** to certify that contributors have the right to submit their code for inclusion in the project.
+
+### What is DCO?
+
+The DCO is a lightweight alternative to a Contributor License Agreement (CLA). It certifies that you wrote the code or have the right to pass it on as open source.
+
+### How to Sign
+
+**Option 1: Sign-off in commit message**
+```bash
+git commit -s -m "Your commit message"
+```
+
+The `-s` flag adds a `Signed-off-by` line to your commit message:
+```
+Signed-off-by: Your Name <your.email@example.com>
+```
+
+**Option 2: Add sign-off manually**
+Add this line to your commit message:
+```
+Signed-off-by: Your Name <your.email@example.com>
+```
+
+### DCO Bot
+
+We use a DCO bot to verify that all commits are signed. If your PR has unsigned commits, the bot will guide you through signing them.
+
+### Why DCO?
+
+- **No legal complexity**: No need to sign separate agreements
+- **Standard practice**: Used by Linux kernel, Kubernetes, and many CNCF projects
+- **Apache 2.0 compatible**: Aligns with our Apache 2.0 license
+
 ## Where to Start
 
 **New to zen-watcher?** Check out [docs/CONTRIBUTOR_TASKS.md](docs/CONTRIBUTOR_TASKS.md) for a curated list of tasks organized by difficulty:
 - **Good First Tasks**: Documentation, examples, simple tests
 - **Intermediate**: Example sources, dashboard improvements, code contributions
 - **Advanced**: CRD evolution, informer changes, KEP-driven work
+
+### Good First Issues
+
+We label issues with `good first issue` to help new contributors get started. These issues are:
+- Well-documented with clear acceptance criteria
+- Suitable for first-time contributors
+- Reviewed by maintainers before labeling
+
+**Finding Good First Issues:**
+- Filter by label: [good first issue](https://github.com/kube-zen/zen-watcher/labels/good%20first%20issue)
+- Look for issues marked with the `good first issue` label
+- Check [docs/CONTRIBUTOR_TASKS.md](docs/CONTRIBUTOR_TASKS.md) for curated tasks
 
 All tasks are sourced from the roadmap and KEP, ensuring your contributions align with project priorities.
 

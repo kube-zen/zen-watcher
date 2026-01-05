@@ -236,7 +236,7 @@ kubectl exec -n monitoring alertmanager-pod -- amtool config show
 - **Operations Team**: Configuration and operational alerts
 
 ### Emergency Contacts
-- **On-Call Engineer**: Check PagerDuty schedule
+- **Community Support**: [GitHub Issues](https://github.com/kube-zen/zen-watcher/issues) or [GitHub Discussions](https://github.com/kube-zen/zen-watcher/discussions)
 - **Security Incident**: #security-alerts Slack channel
 - **Infrastructure Issue**: #infrastructure Slack channel
 - **General Support**: #devops Slack channel

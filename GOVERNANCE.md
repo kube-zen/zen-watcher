@@ -27,14 +27,54 @@ Maintainers are responsible for:
 
 ### Becoming a Maintainer
 
-Maintainers are selected based on:
-- Consistent, high-quality contributions
-- Deep understanding of the project and its goals
-- Ability to review code and provide constructive feedback
-- Commitment to the project's long-term success
-- Alignment with project values and principles
+**How to Become a Maintainer:**
 
-**Process**: Maintainers are invited by existing maintainers after demonstrating sustained contribution and alignment with project goals.
+1. **Contribute Consistently** (minimum 3-6 months):
+   - Submit high-quality pull requests
+   - Review others' contributions
+   - Help triage issues and answer questions
+   - Improve documentation
+
+2. **Demonstrate Expertise**:
+   - Deep understanding of the project architecture
+   - Ability to make architectural decisions
+   - Knowledge of Kubernetes and Go best practices
+   - Understanding of project goals and principles
+
+3. **Show Commitment**:
+   - Regular participation in discussions
+   - Responsive to community needs
+   - Long-term commitment to project success
+   - Alignment with project values
+
+4. **Get Nominated**:
+   - Existing maintainers nominate candidates
+   - Community feedback is considered
+   - Consensus among current maintainers required
+
+5. **Formal Invitation**:
+   - Maintainers extend formal invitation
+   - New maintainer accepts and commits to responsibilities
+   - Added to maintainer list and granted repository permissions
+
+**Maintainer Responsibilities:**
+- Review and merge pull requests (within 48 hours when possible)
+- Triage issues and security reports
+- Maintain code quality and project standards
+- Release new versions
+- Ensure security and compliance
+- Set project direction and priorities
+- Resolve conflicts and enforce code of conduct
+- Mentor new contributors
+
+**Maintainer Expectations:**
+- Active participation (minimum 2-3 hours/week)
+- Responsive to community questions
+- Regular code reviews
+- Attendance at maintainer meetings (if scheduled)
+
+**Stepping Down:**
+Maintainers can step down at any time by notifying other maintainers. They may be moved to "emeritus" status to recognize past contributions.
 
 ---
 

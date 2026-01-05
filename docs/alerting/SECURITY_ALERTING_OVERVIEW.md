@@ -227,7 +227,7 @@ Pre-built templates for:
 1. **Security Summary**: Generate weekly security report
 2. **Trend Analysis**: Identify patterns and anomalies
 3. **Rule Effectiveness**: Assess alert accuracy and relevance
-4. **Team Handover**: Update on-call team on active issues
+4. **Team Handover**: Update GitHub Issues/Discussions with active issue status
 
 ### Monthly Operations
 1. **Security Posture Review**: Overall security health assessment
@@ -271,7 +271,7 @@ Pre-built templates for:
 
 ### Contact Information
 - **Security Team**: #security on Slack
-- **On-Call Engineer**: PagerDuty
+- **Community Support**: GitHub Issues or Discussions
 - **Development**: GitHub issues in zen-watcher repository
 
 ---

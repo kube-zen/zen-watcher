@@ -274,6 +274,24 @@ This version compatibility is tested and verified. For other zen-sdk versions, s
 
 Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
+**New to open source?** Look for issues labeled `good first issue` to get started.
+
+**Code of Conduct**: All contributors must follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+
+**Governance**: See [GOVERNANCE.md](GOVERNANCE.md) for project governance, maintainer process, and decision-making.
+
+---
+
+## 💬 Support & Community
+
+**Primary Community Platform**: [GitHub Discussions](https://github.com/kube-zen/zen-watcher/discussions) - Ask questions, share ideas, and connect with the community.
+
+**Email Support**: zen@kube-zen.io (general inquiries)
+
+**Security Issues**: security@kube-zen.io (vulnerability reports - see [SECURITY.md](SECURITY.md))
+
+**Issues**: [GitHub Issues](https://github.com/kube-zen/zen-watcher/issues) for bug reports and feature requests
+
 ---
 
 ## 💰 Funding & Sponsorship

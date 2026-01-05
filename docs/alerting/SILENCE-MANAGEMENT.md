@@ -312,7 +312,6 @@ Created By: "performance-team"
 ## Contact Information
 
 For questions about silence management:
-- **On-call Team**: Check PagerDuty schedule
-- **DevOps Team**: #devops channel
+- **Community Support**: [GitHub Discussions](https://github.com/kube-zen/zen-watcher/discussions) or [GitHub Issues](https://github.com/kube-zen/zen-watcher/issues)
 - **Documentation**: This guide and Alertmanager docs
-- **Emergency**: Follow incident response procedures
+- **Emergency**: Follow incident response procedures (see [INCIDENT_RESPONSE_SUMMARY.md](INCIDENT_RESPONSE_SUMMARY.md))
