@@ -193,6 +193,26 @@ See [docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md) for complete examples.
 - 📝 Structured logging
 - 🏥 Health and readiness probes
 
+**Example Output:**
+```bash
+$ kubectl get observations -n zen-system
+NAME                                    SOURCE   SEVERITY   CATEGORY   AGE
+obs-trivy-vuln-abc123                   trivy    HIGH       security   5m
+obs-falco-suspicious-process            falco    CRITICAL   security   2m
+obs-kyverno-policy-violation            kyverno  MEDIUM     security   10m
+obs-k8s-pod-crash                       k8s      WARNING    operations 1h
+```
+
+**Dashboard Preview:**
+- 📊 **Executive Dashboard**: Strategic KPIs, security posture score, ROI metrics
+- 🔧 **Operations Dashboard**: Real-time health, SLA tracking, capacity planning
+- 🔒 **Security Dashboard**: Threat intelligence, attack chain visualization
+- 📈 **Main Dashboard**: Unified navigation, cross-dashboard correlation
+- 🏢 **Namespace Health**: Per-namespace compliance tracking
+- 🔍 **Data Explorer**: Advanced query builder, saved searches
+
+*Note: Screenshots available in [config/dashboards/README.md](config/dashboards/README.md)*
+
 ### Production-Ready
 
 - Non-privileged containers
