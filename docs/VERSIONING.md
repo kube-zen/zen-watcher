@@ -4,15 +4,33 @@
 
 Zen-watcher uses semantic versioning with synchronized releases across components.
 
+## Single Source of Truth
+
+**Version is defined in the root `VERSION` file** and propagated to all components:
+- Code version (main.go)
+- Docker image tags
+- Helm chart version and appVersion
+- Git tags (with v-prefix)
+
 ## Version Sync Policy
 
-**Starting v1.1.0:** Image and Helm chart versions are synchronized.
+**Starting v1.2.0:** All versions are synchronized from the `VERSION` file.
 
 | Component | Version | Location |
 |-----------|---------|----------|
-| Docker Image | 1.0.0-alpha | `kubezen/zen-watcher:1.0.0-alpha` |
-| Helm Chart | 1.1.0 | `kube-zen/zen-watcher` (ArtifactHub) |
-| Git Tag | v1.1.0 | `github.com:kube-zen/zen-watcher` |
+| VERSION file | 1.2.0 | `VERSION` (root) |
+| Docker Image | 1.2.0 | `kubezen/zen-watcher:1.2.0` |
+| Helm Chart | 1.2.0 | `kube-zen/zen-watcher` (ArtifactHub) |
+| Git Tag | v1.2.0 | `github.com:kube-zen/zen-watcher` |
+
+## Versioning Contract
+
+**v-prefix rule**: Git tags use the `v` prefix (e.g., `v1.2.0`), while all other references use the version number without prefix (e.g., `1.2.0`).
+
+- **Git tags**: `v1.2.0`, `v1.2.1`, etc.
+- **Docker images**: `kubezen/zen-watcher:1.2.0` (no v-prefix)
+- **Helm charts**: `version: 1.2.0`, `appVersion: "1.2.0"` (no v-prefix)
+- **Code**: `Version = "1.2.0"` (no v-prefix)
 
 ## Semantic Versioning
 
@@ -73,19 +91,17 @@ git push origin main
 # 7. Update ArtifactHub (if published)
 ```
 
-## Historical Versioning (Pre-1.1.0)
+## Historical Versioning
 
-**v1.0.0 - v1.0.19 (Image):**
+**v1.0.0 - v1.0.19 (Pre-G010):**
 - Image versions incremented independently
 - Chart stayed at 1.0.x
+- Version inconsistencies existed
 
-**v1.0.10 (Chart):**
-- Major Helm chart update with CRDs as templates
-- Corresponds roughly to image 1.0.19
-
-**v1.1.0+ (Synced):**
-- Both image and chart use same version
-- Easier to track and communicate
+**v1.2.0 (G010 - Version Alignment):**
+- All versions synchronized from `VERSION` file
+- Git tag `v1.2.0` ↔ image `1.2.0` ↔ chart `1.2.0` ↔ app `1.2.0`
+- Single source of truth established
 
 ## Version Numbering for Dependent Components
 
@@ -93,11 +109,11 @@ git push origin main
 ```yaml
 image:
   repository: kubezen/zen-watcher
-  tag: "1.1.0"  # Synced with chart version
+  tag: "1.2.0"  # Synced with chart version
 
 Chart.yaml:
-  version: 1.1.0
-  appVersion: "1.1.0"
+  version: 1.2.0
+  appVersion: "1.2.0"
 ```
 
 ### CI/CD
@@ -113,10 +129,13 @@ sed -i "s/^  tag: .*/  tag: \"${VERSION}\"/" values.yaml
 A: Image was iterated quickly during development while chart was more stable. Now synced for clarity.
 
 **Q: Do I need to upgrade both image and chart together?**  
-A: Yes, starting v1.1.0, they're tested together as a unit.
+A: Yes, starting v1.2.0, they're tested together as a unit and synchronized from the `VERSION` file.
 
 **Q: What if I only want to update the chart (e.g., change replica count)?**  
-A: Chart patches (1.1.0 → 1.1.1) are fine without image changes. But we'll keep the versions synced.
+A: Chart patches (1.2.0 → 1.2.1) are fine without image changes. But we'll keep the versions synced from `VERSION`.
+
+**Q: How do I update the version?**  
+A: Update the root `VERSION` file, then run the release script which propagates it to all components.
 
 ## Checking Versions
 

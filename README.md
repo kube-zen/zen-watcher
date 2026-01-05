@@ -7,9 +7,17 @@
 
 > **Kubernetes Observation Collector: Turn Any Signal into a CRD**
 
-Zen Watcher is an open-source Kubernetes operator that aggregates structured signals from security, compliance, and infrastructure tools into unified `Observation` CRDs. Lightweight, standalone, and useful on its own.
+Zen Watcher is an open-source Kubernetes operator that aggregates structured signals from any tool (security, compliance, performance, operations, cost) into unified `Observation` CRDs. Lightweight, standalone, and useful on its own.
 
-**Version:** 1.0.0-alpha (OSS release)
+**What can you collect?** Zen Watcher handles **all event types**, not just security:
+- 🔒 **Security**: Vulnerabilities, threats, policy violations (Trivy, Falco, Kyverno)
+- ✅ **Compliance**: Audit logs, CIS benchmarks, policy checks
+- ⚡ **Performance**: Latency spikes, resource exhaustion, crashes
+- 🔧 **Operations**: Deployment failures, pod crashes, infrastructure health
+- 💰 **Cost**: Resource waste, unused resources
+- 🎯 **Custom**: Any domain you define
+
+**Version:** 1.2.0 (OSS release)
 
 ## 🚀 Quick Start
 
@@ -125,7 +133,7 @@ Add any new source with a simple YAML configuration using the `Ingester` CRD. No
 2. **📡 Webhooks** - Receive HTTP webhooks from external tools (Falco, Audit, etc.) via static nginx configuration
 3. **🗂️ ConfigMaps** - Watch ConfigMaps via informer (event-driven, recommended)
 4. **📋 CRDs (Informers)** - Watch Kubernetes Custom Resource Definitions
-5. **🎯 Kubernetes Events** - Native cluster events (security-focused)
+5. **🎯 Kubernetes Events** - Native cluster events (any category: security, operations, performance, etc.)
 
 **Quick Example:**
 ```yaml
@@ -191,16 +199,23 @@ See [docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md) for complete examples.
 ## 🔌 Integrations
 
 > **Need alerts in Slack, PagerDuty, or SIEM?**  
-> Zen Watcher writes `Observation` CRDs. Use [kubewatch](https://github.com/robusta-dev/kubewatch) or [Robusta](https://home.robusta.dev/) to route them to 30+ destinations—no coding required.
+> Zen Watcher writes `Observation` CRDs for **any event type** (security, operations, performance, compliance, cost). Use [kubewatch](https://github.com/robusta-dev/kubewatch) or [Robusta](https://home.robusta.dev/) to route them to 30+ destinations—no coding required.
 
 **Watch Events with kubectl:**
 ```bash
-# All events
+# All events (any category: security, operations, performance, compliance, cost)
 kubectl get observations -n zen-system
 
 # High severity only
 kubectl get observations -n zen-system -o json | \
   jq '.items[] | select(.spec.severity == "HIGH")'
+
+# Filter by category (examples)
+kubectl get observations -n zen-system -o json | \
+  jq '.items[] | select(.spec.category == "operations")'  # Operations events
+
+kubectl get observations -n zen-system -o json | \
+  jq '.items[] | select(.spec.category == "performance")'  # Performance events
 ```
 
 **For complete integration guide**, see [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
@@ -225,6 +240,7 @@ kubectl get observations -n zen-system -o json | \
 
 ## 📚 Documentation
 
+- [Use Cases](docs/USE_CASES.md) - Practical use cases and how to combine ingester examples ⭐ **NEW**
 - [Installation Guide](docs/DEPLOYMENT_HELM.md) - Complete deployment instructions
 - [Source Adapters](docs/SOURCE_ADAPTERS.md) - How to add new sources
 - [Manual Webhook Adapter](docs/MANUAL_WEBHOOK_ADAPTER.md) - Configure webhooks for Falco, Audit, and other tools
@@ -249,6 +265,6 @@ Apache License 2.0 - See [LICENSE](LICENSE) for details.
 
 **Repository:** [github.com/kube-zen/zen-watcher](https://github.com/kube-zen/zen-watcher)  
 **Helm Charts:** [github.com/kube-zen/helm-charts](https://github.com/kube-zen/helm-charts)  
-**Version:** 1.0.0-alpha  
+**Version:** 1.2.0  
 **Go Version:** 1.25+ (tested on 1.25)  
 **Kubernetes:** Client libs v0.28.15 (tested on clusters 1.26+)

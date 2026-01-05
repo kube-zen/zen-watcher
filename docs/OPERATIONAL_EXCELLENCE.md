@@ -439,34 +439,187 @@ resources:
 - ✅ Automatic leader failover (10-15 seconds)
 - ⚠️ Processing gaps for informers during leader transitions
 
-**See [HIGH_AVAILABILITY.md](HIGH_AVAILABILITY.md) for complete HA model documentation.**
+**See the [High Availability and Stability](#high-availability-and-stability-) section below for complete HA model documentation.**
 
 See [docs/SCALING.md](SCALING.md) for complete scaling strategy.
 
 ---
 
-## High Availability ✅
+## High Availability and Stability ✅
 
-### Pod Disruption Budget
+### Leader Election Architecture
 
-```yaml
-podDisruptionBudget:
-  enabled: true
-  minAvailable: 1  # Maintains availability during disruptions (adjust for HA)
-```
+Zen Watcher uses **leader election** (mandatory, always enabled) to provide high availability with clear operational guarantees and limitations.
 
-### Single Replica + Restart Policy
+**Leader Election (Mandatory):**
+- Uses `zen-sdk/pkg/leader` (controller-runtime Manager)
+- Only one pod processes informer-based sources (prevents duplicate Observations)
+- All pods serve webhook endpoints (load-balanced for horizontal scaling)
+- Automatic failover if leader crashes (new leader elected in 10-15 seconds)
+
+**Component Distribution:**
+
+**Leader Pod Responsibilities:**
+- ✅ Informer-based watchers (Trivy VulnerabilityReports, Kyverno PolicyReports)
+- ✅ GenericOrchestrator (manages informer-based adapters)
+- ✅ IngesterInformer (watches Ingester CRDs)
+- ✅ Garbage collection
+- ✅ Webhook endpoints (Falco, Audit, generic)
+
+**All Pods (Leader + Followers):**
+- ✅ Webhook endpoints (load-balanced across pods)
+- ✅ Webhook event processing
+- ✅ Filtering and deduplication (per-pod, best-effort for webhooks)
+
+### High Availability Guarantees
+
+#### ✅ What Has High Availability
+
+1. **Webhook Sources (Falco, Audit, Generic Webhooks)**
+   - ✅ All pods serve webhook endpoints (load-balanced)
+   - ✅ Horizontal scaling supported (HPA works for webhook traffic)
+   - ✅ Zero downtime during leader failover (webhooks continue serving)
+   - ✅ Deduplication: Per-pod (best-effort, acceptable for webhooks)
+
+2. **Leader Failover**
+   - ✅ Automatic failover if leader crashes (new leader elected in 10-15 seconds)
+   - ✅ Leader election uses Kubernetes Lease API (standard, reliable)
+   - ✅ Components automatically start on new leader
+
+#### ⚠️ Single Point of Failure
+
+**Informer-Based Sources (Trivy, Kyverno, ConfigMaps):**
+- ⚠️ **Only the leader pod processes these sources**
+- ⚠️ **No horizontal scaling** - multiple replicas don't increase throughput for informers
+- ⚠️ **Processing gap during leader failover** (10-15 seconds)
+- ⚠️ **Processing gap during leader pod restart** (until new leader elected)
+
+**This means:**
+- If you rely on Trivy or Kyverno for critical security monitoring, you have a **single point of failure** for these sources
+- During leader failover or restart, **informer-based events may be missed** (10-15 second window)
+- Webhook events continue to be processed (all pods serve webhooks)
+
+### Deployment Patterns
+
+#### Pattern 1: Single Replica (Development/Testing)
 
 ```yaml
 replicas: 1
-spec:
-  restartPolicy: Always  # Kubernetes automatically restarts on failure
+resources:
+  requests:
+    memory: 128Mi
+    cpu: 100m
+  limits:
+    memory: 512Mi
+    cpu: 500m
 ```
 
-**Availability Strategy:**
-- Kubernetes restart policies handle pod failures automatically
-- PodDisruptionBudget prevents voluntary disruptions during upgrades
-- No need for multiple replicas (which would create duplicates)
+**Pros:** Simple, low resource usage  
+**Cons:** No HA during pod restart  
+**Use case:** Dev/test, small clusters (<50 nodes)
+
+#### Pattern 2: Multiple Replicas (Production) ✅ Recommended Default
+
+```yaml
+replicas: 2-3  # Default: 2
+resources:
+  requests:
+    memory: 128Mi
+    cpu: 100m
+  limits:
+    memory: 512Mi
+    cpu: 500m
+
+# Recommended:
+podDisruptionBudget:
+  minAvailable: 1
+```
+
+**Pros:** 
+- ✅ High availability for webhook traffic (all pods serve, load-balanced)
+- ✅ Zero downtime during leader failover for webhooks
+- ✅ Can use HPA to scale webhook processing
+
+**Cons:** 
+- ⚠️ Single point of failure for informer sources (only leader processes)
+- ⚠️ Processing gaps for informers during leader transitions (10-15 seconds)
+- ⚠️ Higher resource usage
+
+**Use case:** Production workloads where webhook sources (Falco, Audit) are primary
+
+**Note:** 
+- Webhook sources: High availability (all pods serve)
+- Informer sources: Single leader only (processing gaps during failover)
+- For HA of informer sources, use namespace sharding (Pattern 3)
+
+#### Pattern 3: Namespace Sharding (High-Volume Informer Sources)
+
+Deploy multiple zen-watcher instances, each scoped to different namespaces:
+
+```yaml
+# Instance 1: Production namespaces
+replicas: 2
+env:
+  - name: WATCH_NAMESPACE
+    value: "production,prod-staging"
+
+# Instance 2: Development namespaces  
+replicas: 2
+env:
+  - name: WATCH_NAMESPACE
+    value: "development,dev-staging"
+```
+
+**Use When:**
+- High-volume informer-based sources (Trivy, Kyverno) across many namespaces
+- Need true horizontal scaling for informer processing
+- Want operational isolation by namespace/environment
+
+**Trade-offs:**
+- ✅ True horizontal scaling for informer sources (each instance has its own leader)
+- ✅ Operational isolation by namespace
+- ✅ Can scale each instance independently
+- ⚠️ Operational overhead (multiple deployments to manage)
+- ⚠️ Requires namespace distribution planning
+
+### Failure Scenarios
+
+#### Single Replica Deployment
+
+| Event | Impact | Duration |
+|-------|--------|----------|
+| Pod crash | All processing stops | Until Kubernetes restarts pod (~30 seconds) |
+| Node drain | Processing gap | During pod migration |
+| Rolling update | Processing gap | During pod replacement |
+
+**Result:** No high availability - guaranteed processing gaps during any disruption.
+
+#### Multiple Replicas (Leader Election)
+
+| Event | Webhook Sources | Informer Sources |
+|-------|----------------|------------------|
+| Leader pod crash | ✅ Continue (load-balanced to other pods) | ⚠️ Gap until new leader elected (10-15s) |
+| Follower pod crash | ✅ Continue (other pods handle traffic) | ✅ No impact (only leader processes) |
+| Leader rolling update | ✅ Continue (other pods serve) | ⚠️ Gap during leader transition |
+| Node drain (leader) | ✅ Continue (traffic shifts) | ⚠️ Gap until new leader elected |
+
+**Result:** High availability for webhooks, single point of failure for informers.
+
+### Pod Disruption Budget
+
+For multiple replicas, configure PDB to ensure at least one pod is always available:
+
+```yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: zen-watcher
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zen-watcher
+```
 
 ### Anti-Affinity
 
@@ -484,6 +637,59 @@ affinity:
             - zen-watcher
         topologyKey: kubernetes.io/hostname
 ```
+
+### Monitoring Leader Status
+
+```bash
+# Check which pod is leader
+kubectl get lease zen-watcher-leader-election -n zen-system \
+  -o jsonpath='{.spec.holderIdentity}'
+
+# Monitor leader election metrics
+kubectl logs -n zen-system -l app.kubernetes.io/name=zen-watcher | grep -i leader
+```
+
+### Leader Failover Time
+
+- **Lease Duration**: 15 seconds
+- **Renew Deadline**: 10 seconds
+- **Retry Period**: 2 seconds
+- **Typical Failover**: 10-15 seconds
+
+During failover, informer-based events may be missed. Webhook events continue processing.
+
+### Production Recommendations
+
+**If webhooks are primary (Falco, Audit):**
+- Use **multiple replicas (2-3)** - provides HA for webhook traffic
+- Accept single point of failure for informers (if Trivy/Kyverno are secondary)
+
+**If informers are critical (Trivy, Kyverno):**
+- Use **namespace sharding** - only way to scale informers horizontally
+- Each shard can use multiple replicas for HA within that shard
+
+**If both are critical:**
+- Use **namespace sharding** with multiple replicas per shard
+- Provides HA for both webhooks and informers (within each shard)
+
+### Stability Features
+
+**Graceful Degradation:**
+- Filter config errors fall back to last-good-config
+- Individual adapter failures don't affect other adapters
+- Webhook channel backpressure prevents memory exhaustion
+
+**Auto-Recovery:**
+- Kubernetes informers automatically reconnect on API server issues
+- ConfigMap and CRD watchers resume from last state
+- Webhook endpoints buffer events during temporary slowdowns
+
+**Resource Management:**
+- Deduplication cache with LRU eviction (configurable max size)
+- Webhook channels with bounded capacity (100 for Falco, 200 for Audit)
+- Automatic garbage collection of old Observations (7-day TTL default)
+
+See [SCALING.md](SCALING.md) for complete scaling strategy and performance tuning.
 
 ---
 
@@ -696,12 +902,20 @@ kubectl get zenevents -n zen-system -o json | \
 
 ### Resource Sizing
 
+**Measured baseline usage (idle, no events):**
+- CPU: ~2-3m actual usage
+- Memory: ~9-10MB working set, ~27MB resident
+
+**Recommended resource sizing:**
+
 | Events/Day | CPU Request | CPU Limit | Memory Request | Memory Limit | Replicas |
 |------------|-------------|-----------|----------------|--------------|----------|
-| < 1,000 | 50m | 100m | 64Mi | 128Mi | 1 |
-| 1,000 - 10,000 | 100m | 200m | 128Mi | 256Mi | 2 |
-| 10,000 - 100,000 | 200m | 500m | 256Mi | 512Mi | 3 |
-| > 100,000 | 500m | 1000m | 512Mi | 1Gi | 5+ |
+| < 1,000 | 10m | 50m | 32Mi | 64Mi | 1 |
+| 1,000 - 10,000 | 50m | 200m | 64Mi | 128Mi | 2 |
+| 10,000 - 100,000 | 100m | 500m | 128Mi | 256Mi | 3 |
+| > 100,000 | 200m | 1000m | 256Mi | 512Mi | 5+ |
+
+**Note:** Default chart values (100m CPU request, 128Mi memory request) are conservative and suitable for most deployments. For resource-constrained environments, you can reduce requests significantly based on actual usage patterns.
 
 ### Storage Requirements
 

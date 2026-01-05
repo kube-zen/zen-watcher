@@ -156,9 +156,11 @@ See `scripts/benchmark/` for benchmark scripts:
 |----------|---------|-----|-----|-------|
 | **Idle** | 2m | 5m | 8m | Background informer sync |
 | **10 events/sec** | 8m | 15m | 25m | Low load |
-| **50 events/sec** | 25m | 50m | 80m | Medium load |
-| **100 events/sec** | 50m | 100m | 150m | High load |
-| **200 events/sec** | 100m | 200m | 300m | Very high load |
+| **50 events/sec** | 10m | 25m | 50m | Medium load |
+| **100 events/sec** | 25m | 50m | 100m | High load |
+| **200 events/sec** | 50m | 100m | 200m | Very high load |
+
+**Note:** Baseline idle usage is ~2-3m CPU and ~9-10MB memory. Values above include event processing overhead.
 
 **CPU Breakdown:**
 - **Informer maintenance**: ~2m (continuous)
@@ -504,7 +506,7 @@ zen_watcher_dedup_decisions_total{strategy="event-stream",decision="drop"}
   - Processing gaps for informers during leader transitions
 - Use when: Need HA for webhook traffic or high webhook volume
 
-**See [HIGH_AVAILABILITY.md](HIGH_AVAILABILITY.md) for complete HA model.**
+**See [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md#high-availability-and-stability-) for complete HA model.**
 
 **Namespace Sharding (For Very Large Clusters)**
 - Deploy multiple zen-watcher instances, each watching specific namespaces
@@ -756,7 +758,7 @@ See [OBSERVABILITY.md](OBSERVABILITY.md) for recommended alerting rules.
 - Single replica sufficient for development/testing only (no HA guarantees)
 - Leader election is mandatory and always enabled
 
-**See [HIGH_AVAILABILITY.md](HIGH_AVAILABILITY.md) for complete HA model.**
+**See [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md#high-availability-and-stability-) for complete HA model.**
 - Resource requests: 500m CPU, 512MB memory
 - Resource limits: 1000m CPU, 1GB memory
 

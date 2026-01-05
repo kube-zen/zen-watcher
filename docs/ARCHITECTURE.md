@@ -14,7 +14,7 @@
 
 ## Overview
 
-Zen Watcher is a Kubernetes-native security event aggregator that consolidates events from multiple security and compliance tools into a unified CRD-based format.
+Zen Watcher is a Kubernetes-native observation aggregator that consolidates events from any tool (security, compliance, performance, operations, cost) into a unified CRD-based format. While commonly used for security monitoring, it is **not limited to security**—it can collect and normalize events from any domain.
 
 ### Key Characteristics
 
@@ -22,7 +22,7 @@ Zen Watcher is a Kubernetes-native security event aggregator that consolidates e
 - **Pure & Secure**: Zero egress traffic, zero secrets, zero external dependencies
 - **Kubernetes-native**: Stores data as CRDs in etcd, no external database
 - **Modular**: Generic Source Adapters (informer, webhook, logs) for all sources, configured via Ingester CRD
-- **Efficient**: <100m CPU, <50MB RAM under normal load (tested with 9 sources)
+- **Efficient**: ~2-3m CPU baseline, scales with event volume (measured: ~9-10MB memory working set, ~27MB resident at idle)
 - **Observable**: 20+ Prometheus metrics, structured logging, health endpoints
 - **Infrastructure-Blind**: Avoids cluster-unique identifiers (AWS account ID, GKE project name) while preserving Kubernetes-native context (namespace, name, kind) for RBAC, auditing, and multi-tenancy
 
@@ -64,7 +64,7 @@ See [docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md) for the complete extensib
 - Minimal privileges (ClusterRole with read-only access)
 - NetworkPolicy support
 
-### 6. **Intelligent Event Integrity**
+### 6. **Event Integrity and Noise Reduction**
 
 Zen Watcher uses multi-layered noise reduction to prevent alert fatigue and etcd bloat:
 
@@ -75,9 +75,36 @@ Zen Watcher uses multi-layered noise reduction to prevent alert fatigue and etcd
 
 This ensures <100ms CPU spikes and minimal etcd churn—even under firehose conditions.
 
-See [docs/DEDUPLICATION.md](DEDUPLICATION.md) for complete deduplication documentation.
+See [docs/PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md#deduplication) for complete deduplication documentation.
 
-### 7. **Pure Core, Extensible Ecosystem: Zero Blast Radius Security**
+### 7. **Automatic Garbage Collection (Prevents etcd Bloat)**
+
+Zen Watcher includes built-in automatic garbage collection to prevent etcd bloat and ensure sustainable long-term operation:
+
+- **TTL-based cleanup**: All Observations support `spec.ttlSecondsAfterCreation` (Kubernetes native pattern, like Jobs)
+- **Built-in garbage collector**: Automatically deletes expired observations (runs every hour by default)
+- **Prevents etcd exhaustion**: Without TTL, high-volume event streams would accumulate indefinitely in etcd
+- **Configurable retention**: Per-observation TTL or global default (default: 7 days)
+- **Rate-limited deletion**: GC respects API server rate limits with chunking and timeouts
+
+**Why TTL is Essential:**
+- etcd has finite storage capacity
+- High-volume event streams can generate millions of observations
+- Without automatic cleanup, etcd would eventually exhaust storage
+- Manual deletion of large observation sets is slow (12+ hours for 10K observations) due to API server rate limits
+- TTL ensures observations are automatically removed before etcd exhaustion
+
+**Implementation:**
+- GC runs automatically when zen-watcher is deployed (no configuration needed)
+- Uses `spec.ttlSecondsAfterCreation` field (aligned with Kubernetes Job TTL pattern)
+- Per-observation TTL takes precedence over global default
+- Configurable via `OBSERVATION_TTL_SECONDS` or `OBSERVATION_TTL_DAYS` environment variables
+
+For production deployments with advanced policies, consider using [zen-gc](https://github.com/kube-zen/zen-gc) for cross-resource cleanup capabilities.
+
+See [docs/CRD.md](CRD.md#ttl-and-retention) for TTL configuration details and [docs/CONFIGURATION.md](CONFIGURATION.md#ttl-configuration) for configuration options.
+
+### 8. **Pure Core, Extensible Ecosystem: Zero Blast Radius Security**
 
 Zen Watcher follows a proven cloud-native pattern: **core is minimal; ecosystem extends it**. This architectural choice delivers a critical security guarantee: **zero blast radius in the event of compromise**.
 
@@ -501,69 +528,24 @@ Create Observation with category=compliance
 
 ### 2. Event Processing Pipeline
 
-All events from any source (informer, webhook, logs) flow through the same centralized processing pipeline:
+All events from any source (informer, webhook, logs) flow through the same centralized processing pipeline.
 
-```mermaid
-graph LR
-    A[Event Source<br/>Informer/Webhook/ConfigMap] --> B[FILTER<br/>Source-level filtering]
-    B -->|if allowed| C[NORMALIZE<br/>Severity/Category/EventType]
-    C --> D[DEDUP<br/>SHA-256 fingerprinting<br/>Rate limiting]
-    D -->|if not duplicate| E[CREATE CRD<br/>Observation CRD]
-    E --> F[METRICS<br/>Update counters]
-    E --> G[LOG<br/>Structured logging]
-    
-    style B fill:#fff3e0
-    style C fill:#e8f5e9
-    style D fill:#e3f2fd
-    style E fill:#f3e5f5
-    style F fill:#fce4ec
-    style G fill:#fce4ec
-```
+**For complete pipeline documentation, see [PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md).**
 
-**Processing Steps:**
+**High-Level Overview:**
 
-1. **FILTER** - Source-level filtering (ConfigMap-based)
-   - MinSeverity per source
-   - Exclude/Include event types, namespaces, kinds, categories
-   - Enable/Disable sources
-   - Filtered events never proceed to next steps
+The pipeline consists of four stages:
+1. **Filter and Dedup Block** (order configurable: filter_first or dedup_first)
+2. **Normalize** (always after filter/dedup)
+3. **Create Observation CRD**
+4. **Metrics and Logging**
 
-2. **NORMALIZE** - Map to standard format
-   - Severity: Normalize to uppercase (CRITICAL, HIGH, MEDIUM, LOW)
-   - Category: Assign standard category (security, compliance, performance, operations, cost)
-   - EventType: Map to standard event types
-   - Resource: Normalize Kubernetes resource references
-
-3. **DEDUP** - Deduplication and rate limiting
-   - SHA-256 content fingerprinting of normalized event
-   - Per-source token bucket rate limiting
-   - Time-bucketed deduplication window
-   - Duplicate events skip CRD creation
-
-4. **CREATE CRD** - Observation CRD creation
-   - Create Observation CRD in Kubernetes
-   - Store in etcd
-   - Set TTL if configured
-
-5. **METRICS** - Update Prometheus metrics
-   - Increment observation counters (by source, category, severity)
-   - Update processing latency histograms
-   - Track deduplication and filtering metrics
-
-6. **LOG** - Structured logging
-   - Log observation creation
-   - Include correlation IDs
-   - Log filtering and deduplication decisions
-
-**Key Principle:**
+**Key Architectural Principles:**
 - All steps are centralized in `ObservationCreator.CreateObservation()`
 - No duplicated code across different source processors
 - Single point of control for the entire pipeline
-
-**Key Architectural Principle:**
-- **Filtering MUST happen before CRD creation** - Filtered events never create CRDs, update metrics, or generate logs
-- **All components inside () are centralized** - No duplicated code across informer/webhook/configmap handlers
-- **Single point of control** - `ObservationCreator.CreateObservation()` is the ONLY place where Observations are created
+- Filtering and deduplication happen before normalization
+- Normalization happens before CRD creation
 
 ### 3. Storage Model
 
@@ -674,13 +656,13 @@ securityContext:
 ### Resource Usage
 
 **Typical Load** (1,000 events/day):
-- CPU: <10m average, 50m burst
-- Memory: <50MB steady state
+- CPU: ~2-3m baseline, scales with event volume
+- Memory: ~9-10MB working set baseline, ~27MB resident
 - Storage: ~2MB in etcd
 - Network: <1KB/s (API calls only)
 
 **Heavy Load** (10,000 events/day):
-- CPU: <20m average, 100m burst
+- CPU: ~2-3m baseline, scales with event volume
 - Memory: <80MB steady state
 - Storage: ~20MB in etcd
 - Network: <5KB/s

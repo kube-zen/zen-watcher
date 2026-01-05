@@ -9,7 +9,7 @@ Zen Watcher uses **leader election** (mandatory, always enabled) to coordinate p
 - ⚠️ **Informer sources (Trivy, Kyverno, ConfigMaps)**: Single leader only (cannot scale horizontally without sharding)
 - ✅ **Default**: 2 replicas for HA (webhook traffic only)
 
-See [HIGH_AVAILABILITY.md](HIGH_AVAILABILITY.md) for complete HA model documentation.
+See [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md#high-availability-and-stability-) for complete HA model documentation.
 
 ---
 
@@ -268,7 +268,7 @@ env:
 
 ## Current Implementation Status
 
-### ✅ Implemented (v1.0.0-alpha)
+### ✅ Implemented (v1.2.0)
 - ✅ Leader election (mandatory, always enabled)
 - ✅ High availability for webhook sources (all pods serve, load-balanced)
 - ✅ HPA support for webhook traffic
@@ -361,7 +361,7 @@ env:
 **For Development/Testing:**
 - ✅ Single replica (acceptable for non-critical workloads)
 
-### Current Implementation (v1.0.0-alpha)
+### Current Implementation (v1.2.0)
 - ✅ Leader election (mandatory, always enabled)
 - ✅ High availability for webhook sources (load-balanced across all pods)
 - ✅ HPA support for webhook traffic
@@ -371,5 +371,5 @@ env:
 ### Key Principle
 **Leader election enables horizontal scaling for webhook sources, but informer-based sources remain a single point of failure unless using namespace sharding.**
 
-See [HIGH_AVAILABILITY.md](HIGH_AVAILABILITY.md) for complete HA model documentation.
+See [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md#high-availability-and-stability-) for complete HA model documentation.
 

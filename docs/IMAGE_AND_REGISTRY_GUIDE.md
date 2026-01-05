@@ -7,7 +7,7 @@ This guide covers building, tagging, and pushing zen-watcher container images.
 ### Basic Build
 
 ```bash
-# Build with default version (1.0.0-alpha)
+# Build with default version (reads from VERSION file, currently 1.2.0)
 make image
 
 # Or use docker-build directly
@@ -18,7 +18,7 @@ make docker-build
 
 ```bash
 # Build with custom version
-VERSION=1.0.0-alpha make image
+VERSION=1.2.0 make image
 
 # Build with custom image name
 IMAGE_NAME=my-registry/zen-watcher make image
@@ -41,15 +41,15 @@ The Dockerfile uses:
 
 ### Recommended Tags
 
-For **1.0.0-alpha release**:
-- `1.0.0-alpha` - Release tag
+For **1.2.0 release**:
+- `1.2.0` - Release tag
 - `latest` - Development tag (optional, for dev builds)
 
 ### Tag Examples
 
 ```bash
 # Tag for release
-docker tag kubezen/zen-watcher:1.0.0-alpha kubezen/zen-watcher:1.0.0-alpha
+docker tag kubezen/zen-watcher:1.2.0 kubezen/zen-watcher:1.2.0
 
 # Tag as latest (dev only)
 docker tag kubezen/zen-watcher:1.0.0-alpha kubezen/zen-watcher:latest
@@ -174,7 +174,7 @@ your-registry.io/
 
 ### Tagging Strategy
 
-- **Release tags**: Use semantic versioning (`1.0.0-alpha`, `1.0.0`, `1.1.0`)
+- **Release tags**: Use semantic versioning (`1.2.0`, `1.2.1`, `1.3.0`)
 - **Dev tags**: Use `latest` or commit SHA for development builds
 - **No mutable tags in production**: Avoid `latest` for production deployments
 

@@ -2,7 +2,7 @@
 
 **For cluster operators who want to install zen-watcher as a standalone Observation operator**
 
-This guide assumes you want to use zen-watcher independently, without any specific vendor integrations. zen-watcher is a vendor-neutral Kubernetes operator that aggregates events from security, compliance, and infrastructure tools into unified `Observation` CRDs.
+This guide assumes you want to use zen-watcher independently, without any specific vendor integrations. zen-watcher is a vendor-neutral Kubernetes operator that aggregates events from **any tool** (security, compliance, performance, operations, cost) into unified `Observation` CRDs.
 
 ---
 

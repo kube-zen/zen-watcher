@@ -36,7 +36,6 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/filter"
 	"github.com/kube-zen/zen-watcher/pkg/gc"
 	"github.com/kube-zen/zen-watcher/pkg/metrics"
-	"github.com/kube-zen/zen-watcher/pkg/optimization"
 	"github.com/kube-zen/zen-watcher/pkg/orchestrator"
 	"github.com/kube-zen/zen-watcher/pkg/processor"
 	"github.com/kube-zen/zen-watcher/pkg/scaling"
@@ -51,8 +50,9 @@ import (
 )
 
 // Version, Commit, and BuildDate are set via ldflags during build
+// Version should match the VERSION file in the repository root
 var (
-	Version   = "1.0.0-alpha"
+	Version   = "1.2.0"
 	Commit    = "unknown"
 	BuildDate = "unknown"
 )
@@ -70,9 +70,8 @@ func init() {
 }
 
 var (
-	leaderElectionMode      = flag.String("leader-election-mode", "builtin", "Leader election mode: builtin (default), zenlead, or disabled")
-	leaderElectionID        = flag.String("leader-election-id", "", "The ID for leader election (default: zen-watcher-leader-election). Required for builtin mode.")
-	leaderElectionLeaseName = flag.String("leader-election-lease-name", "", "The LeaderGroup CRD name (required for zenlead mode)")
+	leaderElectionMode = flag.String("leader-election-mode", "builtin", "Leader election mode: builtin (default) or disabled")
+	leaderElectionID   = flag.String("leader-election-id", "", "The ID for leader election (default: zen-watcher-leader-election). Required for builtin mode.")
 )
 
 func main() {
@@ -96,7 +95,6 @@ func main() {
 
 	// Initialize core components
 	m := metrics.NewMetrics()
-	optimization.RegisterDecisionMetrics()
 
 	// Initialize Kubernetes clients
 	clients, err := kubernetes.NewClients()
@@ -159,18 +157,8 @@ func initializeFilterAndConfig(clients *kubernetes.Clients, m *metrics.Metrics, 
 
 // initializeObservationCreator initializes observation creator and processor
 func initializeObservationCreator(clients *kubernetes.Clients, gvrs *kubernetes.GVRs, filterInstance *filter.Filter, m *metrics.Metrics, setupLog *sdklog.Logger) (*watcher.ObservationCreator, *processor.Processor) {
-	// Create optimization metrics wrapper
-	optimizationMetrics := watcher.NewOptimizationMetrics(
-		m.FilterPassRate,
-		m.DedupEffectiveness,
-		m.LowSeverityPercent,
-		m.ObservationsPerMinute,
-		m.ObservationsPerHour,
-		m.SeverityDistribution,
-	)
-
 	// Create centralized observation creator
-	observationCreator := watcher.NewObservationCreatorWithOptimization(
+	observationCreator := watcher.NewObservationCreator(
 		clients.Dynamic,
 		gvrs.Observations,
 		m.EventsTotal,
@@ -179,7 +167,6 @@ func initializeObservationCreator(clients *kubernetes.Clients, gvrs *kubernetes.
 		m.ObservationsDeduped,
 		m.ObservationsCreateErrors,
 		filterInstance,
-		optimizationMetrics,
 	)
 
 	// Set system metrics tracker for HA coordination
@@ -266,25 +253,14 @@ func configureLeaderElection(namespace string, setupLog *sdklog.Logger) zenlead.
 			ElectionID: electionID,
 			Namespace:  namespace,
 		}
-		setupLog.Info("Leader election mode: builtin (Profile B)", sdklog.Operation("leader_init"))
-	case "zenlead":
-		if *leaderElectionLeaseName == "" {
-			setupLog.Error(fmt.Errorf("--leader-election-lease-name is required when --leader-election-mode=zenlead"), "invalid configuration", sdklog.ErrorCode("INVALID_CONFIG"), sdklog.Operation("leader_init"))
-			os.Exit(1)
-		}
-		leConfig = zenlead.LeaderElectionConfig{
-			Mode:      zenlead.ZenLeadManaged,
-			LeaseName: *leaderElectionLeaseName,
-			Namespace: namespace,
-		}
-		setupLog.Info("Leader election mode: zenlead managed (Profile C)", sdklog.Operation("leader_init"), sdklog.String("leaseName", *leaderElectionLeaseName))
+		setupLog.Info("Leader election mode: builtin", sdklog.Operation("leader_init"))
 	case "disabled":
 		leConfig = zenlead.LeaderElectionConfig{
 			Mode: zenlead.Disabled,
 		}
 		setupLog.Info("Leader election disabled - single replica only (unsafe if replicas > 1)", sdklog.Operation("leader_init"))
 	default:
-		setupLog.Error(fmt.Errorf("invalid --leader-election-mode: %q (must be builtin, zenlead, or disabled)", *leaderElectionMode), "invalid configuration", sdklog.ErrorCode("INVALID_CONFIG"), sdklog.Operation("leader_init"), sdklog.String("mode", *leaderElectionMode))
+		setupLog.Error(fmt.Errorf("invalid --leader-election-mode: %q (must be builtin or disabled)", *leaderElectionMode), "invalid configuration", sdklog.ErrorCode("INVALID_CONFIG"), sdklog.Operation("leader_init"), sdklog.String("mode", *leaderElectionMode))
 		os.Exit(1)
 	}
 
@@ -414,9 +390,6 @@ func startAllServices(ctx context.Context, wg *sync.WaitGroup, configManager *wa
 	// Start GenericOrchestrator
 	startGenericOrchestrator(ctx, wg, genericOrchestrator, leaderElectedCh, setupLog)
 
-	// Start optimizer
-	startOptimizer(ctx, wg, observationCreator, setupLog)
-
 	// Start garbage collector
 	startGarbageCollector(ctx, wg, clients, gvrs, m, leaderElectedCh, setupLog)
 
@@ -445,31 +418,6 @@ func startGenericOrchestrator(ctx context.Context, wg *sync.WaitGroup, genericOr
 		}
 		if err := genericOrchestrator.Start(ctx); err != nil {
 			setupLog.Error(err, "GenericOrchestrator stopped", sdklog.Operation("generic_orchestrator"))
-		}
-	}()
-}
-
-// startOptimizer starts the optimization engine
-func startOptimizer(ctx context.Context, wg *sync.WaitGroup, observationCreator *watcher.ObservationCreator, setupLog *sdklog.Logger) {
-	obsSmartProc := observationCreator.GetSmartProcessor()
-	var optimizer *optimization.Optimizer
-
-	if obsSmartProc != nil {
-		optimizer = optimization.NewOptimizerWithProcessor(obsSmartProc, nil)
-		setupLog.Info("Optimization engine initialized with shared SmartProcessor",
-			sdklog.Operation("optimizer_integration"),
-			sdklog.Bool("optimization_enabled", true))
-	} else {
-		optimizer = optimization.NewOptimizer(nil)
-		setupLog.Info("Optimization engine initialized with independent SmartProcessor",
-			sdklog.Operation("optimizer_integration"))
-	}
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		if err := optimizer.Start(ctx); err != nil {
-			setupLog.Error(err, "Optimizer stopped", sdklog.Operation("optimizer"))
 		}
 	}()
 }
@@ -505,23 +453,13 @@ func startHAComponents(ctx context.Context, wg *sync.WaitGroup, observationCreat
 		return
 	}
 
-	setupLog.Info("HA optimization enabled, initializing HA components", sdklog.Operation("ha_init"))
+	setupLog.Info("HA enabled, initializing HA components", sdklog.Operation("ha_init"))
 
 	haMetrics := metrics.NewHAMetrics()
 	replicaID := sdkconfig.RequireEnvWithDefault("HOSTNAME", fmt.Sprintf("replica-%d", time.Now().UnixNano()))
 
-	var haDedupOptimizer *optimization.HADedupOptimizer
 	var haScalingCoordinator *scaling.HPACoordinator
 	var haLoadBalancer *balancer.LoadBalancer
-
-	if haConfig.DedupOptimization.Enabled {
-		eventCounter := m.EventsTotal.WithLabelValues("", "", "", "", "", "")
-		haDedupOptimizer = optimization.NewHADedupOptimizer(&haConfig.DedupOptimization, eventCounter)
-		if haDedupOptimizer != nil {
-			haDedupOptimizer.Start(30 * time.Second)
-			setupLog.Info("HA dedup optimizer started", sdklog.Operation("ha_dedup_init"))
-		}
-	}
 
 	if haConfig.AutoScaling.Enabled {
 		haScalingCoordinator = scaling.NewHPACoordinator(&haConfig.AutoScaling, haMetrics, replicaID)
@@ -542,20 +480,20 @@ func startHAComponents(ctx context.Context, wg *sync.WaitGroup, observationCreat
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			startHAMetricsLoop(ctx, haScalingCoordinator, haLoadBalancer, haDedupOptimizer, observationCreator, httpServer, falcoAlertsChan, auditEventsChan, setupLog)
+			startHAMetricsLoop(ctx, haScalingCoordinator, haLoadBalancer, observationCreator, httpServer, falcoAlertsChan, auditEventsChan, setupLog)
 		}()
 	}
 }
 
 // startHAMetricsLoop starts the HA metrics collection loop
-func startHAMetricsLoop(ctx context.Context, haScalingCoordinator *scaling.HPACoordinator, haLoadBalancer *balancer.LoadBalancer, haDedupOptimizer *optimization.HADedupOptimizer, observationCreator *watcher.ObservationCreator, httpServer *server.Server, falcoAlertsChan, auditEventsChan chan map[string]interface{}, setupLog *sdklog.Logger) {
+func startHAMetricsLoop(ctx context.Context, haScalingCoordinator *scaling.HPACoordinator, haLoadBalancer *balancer.LoadBalancer, observationCreator *watcher.ObservationCreator, httpServer *server.Server, falcoAlertsChan, auditEventsChan chan map[string]interface{}, setupLog *sdklog.Logger) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			updateHAMetrics(haScalingCoordinator, haLoadBalancer, haDedupOptimizer, observationCreator, httpServer, falcoAlertsChan, auditEventsChan, setupLog)
+			updateHAMetrics(haScalingCoordinator, haLoadBalancer, observationCreator, httpServer, falcoAlertsChan, auditEventsChan, setupLog)
 		case <-ctx.Done():
 			return
 		}
@@ -563,7 +501,7 @@ func startHAMetricsLoop(ctx context.Context, haScalingCoordinator *scaling.HPACo
 }
 
 // updateHAMetrics updates HA metrics
-func updateHAMetrics(haScalingCoordinator *scaling.HPACoordinator, haLoadBalancer *balancer.LoadBalancer, haDedupOptimizer *optimization.HADedupOptimizer, observationCreator *watcher.ObservationCreator, httpServer *server.Server, falcoAlertsChan, auditEventsChan chan map[string]interface{}, setupLog *sdklog.Logger) {
+func updateHAMetrics(haScalingCoordinator *scaling.HPACoordinator, haLoadBalancer *balancer.LoadBalancer, observationCreator *watcher.ObservationCreator, httpServer *server.Server, falcoAlertsChan, auditEventsChan chan map[string]interface{}, setupLog *sdklog.Logger) {
 	// Collect real system metrics
 	cpuUsage := systemMetrics.GetCPUUsagePercent()
 	memoryUsage := float64(systemMetrics.GetMemoryUsage())
@@ -596,15 +534,6 @@ func updateHAMetrics(haScalingCoordinator *scaling.HPACoordinator, haLoadBalance
 
 	// Update HTTP server HA status
 	httpServer.UpdateHAStatus(cpuUsage, memoryUsage, eventsPerSec, 0.0, queueDepth)
-
-	// Update HA dedup optimizer with events
-	if haDedupOptimizer != nil {
-		optimalWindow := haDedupOptimizer.GetOptimalWindow()
-		deduper := observationCreator.GetDeduper()
-		if deduper != nil {
-			deduper.SetDefaultWindow(int(optimalWindow.Seconds()))
-		}
-	}
 
 	// Update queue depth from actual channels
 	if systemMetrics != nil {

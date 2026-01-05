@@ -68,16 +68,16 @@ helm install zen-watcher kube-zen/zen-watcher \
   --set resources.requests.cpu=50m \
   --set resources.requests.memory=64Mi \
   --set resources.limits.cpu=200m \
-  --set resources.limits.memory=256Mi \
-  --set config.logLevel=DEBUG
+  --set resources.limits.memory=256Mi
 ```
 
 **Profile characteristics:**
 - 1 replica
-- 50m CPU / 64Mi memory requests
-- 200m CPU / 256Mi memory limits
-- DEBUG log level
+- 10m CPU / 32Mi memory requests (minimal, based on measured ~2-3m CPU / ~9-10MB memory baseline)
+- 50m CPU / 64Mi memory limits
 - Metrics enabled
+
+**Note:** Actual baseline usage is ~2-3m CPU and ~9-10MB memory. These values provide headroom for event processing.
 
 ### Staging Profile
 
@@ -91,49 +91,50 @@ helm install zen-watcher kube-zen/zen-watcher \
   --set resources.requests.cpu=100m \
   --set resources.requests.memory=128Mi \
   --set resources.limits.cpu=500m \
-  --set resources.limits.memory=512Mi \
-  --set config.logLevel=INFO
+  --set resources.limits.memory=512Mi
 ```
 
 **Profile characteristics:**
 - 2 replicas (default - provides HA for webhook traffic)
-- 100m CPU / 128Mi memory requests
-- 500m CPU / 512Mi memory limits
-- INFO log level
+- 50m CPU / 64Mi memory requests (conservative, actual baseline ~2-3m CPU / ~9-10MB memory)
+- 200m CPU / 256Mi memory limits
 - Leader election mandatory (always enabled)
 - HA for webhook sources, single point of failure for informer sources
 
-**See [HIGH_AVAILABILITY.md](../docs/HIGH_AVAILABILITY.md) for HA model details.**
+**See [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md#high-availability-and-stability-) for HA model details.**
 
 ### Production Profile
 
-HA deployment with autoscaling and tuned resources:
+HA deployment with tuned resources:
 
 ```bash
 helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --set replicaCount=2 \
-  --set autoscaling.enabled=true \
   --set resources.requests.cpu=200m \
   --set resources.requests.memory=256Mi \
   --set resources.limits.cpu=1000m \
   --set resources.limits.memory=512Mi \
-  --set config.logLevel=INFO
+  --set crds.enabled=false \
+  --set ingester.createDefaultK8sEvents=true
 ```
 
 **Profile characteristics:**
-- 2+ replicas (autoscaling enabled - scales webhook processing)
-- 200m CPU / 256Mi memory requests
-- 1000m CPU / 512Mi memory limits
-- INFO log level
+- 2+ replicas (for HA - webhook traffic load-balances across replicas)
+- 100m CPU / 128Mi memory requests (default chart values, conservative)
+- 500m CPU / 512Mi memory limits (default chart values)
+- CRDs managed separately (recommended for production)
+- Default ingester enabled (ensures immediate ingestion)
 - Leader election mandatory (always enabled)
 - HA for webhook sources, single point of failure for informer sources
 - Pod Disruption Budget enabled
 
-**Note:** HPA scales webhook processing horizontally. Informer sources remain single leader only.
+**Note:** Default chart values (100m CPU / 128Mi memory requests) are conservative. Actual baseline usage is ~2-3m CPU and ~9-10MB memory. Adjust based on your event volume.
 
-**See [HIGH_AVAILABILITY.md](../docs/HIGH_AVAILABILITY.md) for HA model details.**
+**Note:** For horizontal scaling of webhook processing, configure HPA separately. Informer sources remain single leader only.
+
+**See [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md#high-availability-and-stability-) for HA model details.**
 
 ## Custom Configuration
 
@@ -146,7 +147,6 @@ helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --set replicaCount=3 \
-  --set config.logLevel=DEBUG \
   --set resources.requests.cpu=200m
 ```
 
@@ -154,10 +154,12 @@ helm install zen-watcher kube-zen/zen-watcher \
 
 **Watch specific namespaces:**
 ```bash
+# Set WATCH_NAMESPACE environment variable via extraEnv
 helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --create-namespace \
-  --set config.watchNamespace="prod,staging"
+  --set extraEnv[0].name=WATCH_NAMESPACE \
+  --set extraEnv[0].value="prod,staging"
 ```
 
 **Disable CRD installation (if already installed):**

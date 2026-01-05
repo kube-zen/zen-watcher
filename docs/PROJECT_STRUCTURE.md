@@ -9,69 +9,109 @@ Clean, simple project organization for an event aggregator.
 ```
 zen-watcher/
 ├── cmd/                          # Main applications
-│   └── zen-watcher/              # Zen Watcher application
-│       ├── main.go               # Application entrypoint
-│       └── main_test.go          # Main tests
+│   ├── zen-watcher/              # Zen Watcher application
+│   │   └── main.go               # Application entrypoint
+│   ├── ingester-lint/            # Ingester validation tool
+│   │   └── main.go
+│   ├── obsctl/                   # Observation CLI tool
+│   │   └── main.go
+│   └── schema-doc-gen/           # Schema documentation generator
+│       └── main.go
 │
 ├── pkg/                          # Library code
-│   ├── actions/                  # Event action handlers
-│   ├── adapters/                 # Tool adapters
-│   ├── config/                   # Configuration
-│   ├── controller/               # Controllers
-│   ├── detection/                # Tool detection
-│   ├── installation/             # Tool installation
-│   ├── manager/                  # Watcher management
+│   ├── adapter/                  # Source adapters
+│   │   └── generic/              # Generic adapter implementations
+│   ├── balancer/                 # Load balancing
+│   ├── cli/                      # CLI utilities
+│   ├── config/                   # Configuration loading and management
+│   ├── dispatcher/               # Event dispatching and batching
+│   ├── errors/                   # Error handling
+│   ├── filter/                   # Event filtering logic
+│   ├── gc/                       # Garbage collection
+│   ├── hooks/                    # Plugin hooks system
 │   ├── metrics/                  # Prometheus metrics
 │   ├── models/                   # Data models
-│   ├── actions/                  # Action templates
-│   ├── types/                    # CRD types & client
-│   ├── watcher/                  # Source watchers
-│   └── writer/                   # CRD writer
+│   ├── monitoring/               # Monitoring and thresholds
+│   ├── orchestrator/             # Adapter orchestration
+│   ├── processor/                # Event processing pipeline
+│   ├── scaling/                  # HPA coordination
+│   ├── sdk/                      # Zen SDK integration
+│   ├── server/                   # HTTP server and middleware
+│   └── watcher/                  # Source watchers and observation creation
+│
+├── internal/                     # Internal packages (not for external use)
+│   ├── informers/                # Kubernetes informers
+│   └── kubernetes/               # Kubernetes client utilities
 │
 ├── build/                        # Build files
 │   ├── Dockerfile                # Multi-stage Dockerfile
-│   └── .dockerignore             # Docker ignore rules
+│   └── Dockerfile.optimized      # Optimized Dockerfile
 │
 ├── config/                       # Configuration files
+│   ├── alertmanager/             # Alertmanager configurations
 │   ├── dashboards/               # Grafana dashboards
+│   ├── demo-manifests/           # Demo deployment manifests
 │   ├── monitoring/               # Monitoring configs
-│   └── samples/                  # Sample configurations
+│   └── prometheus/               # Prometheus rules
+│       └── rules/                # Alert rules
 │
 ├── deployments/                  # Deployment manifests
 │   ├── crds/                     # CRD definitions
-│   ├── k8s-deployment.yaml       # Kubernetes deployment
-│   ├── victoriametrics.yaml      # VictoriaMetrics
-│   └── grafana-deployment.yaml   # Grafana
+│   │   ├── *.yaml                # CRD YAML manifests
+│   │   └── *.go                  # CRD type definitions
+│   └── configmaps/               # ConfigMap examples
 │
 ├── docs/                         # Documentation
-│   ├── SECURITY.md               # Security policy
-│   ├── SBOM.md                   # SBOM guide
-│   ├── COSIGN.md                 # Image signing
-│   └── OPERATIONAL_EXCELLENCE.md # Operations guide
+│   ├── alerting/                 # Alerting documentation
+│   ├── playbooks/                # Operational playbooks
+│   └── *.md                      # Various documentation files
 │
 ├── examples/                     # Integration examples
-│   ├── query-examples.sh         # Query examples
-│   ├── loki-promtail-config.yaml # Loki config
-│   └── README.md                 # Examples guide
+│   ├── adapters/                 # Adapter examples
+│   ├── aggregator/               # Aggregation examples
+│   ├── hooks/                    # Hook examples
+│   ├── ingesters/                # Ingester examples
+│   ├── observations/             # Observation examples
+│   ├── use-cases/                # Use case examples
+│   └── *.yaml                    # Various example configurations
 │
-├── scripts/lint/                 # Lint and validation scripts
-│   ├── check-branding.sh         # Check for forbidden compatibility labels
-│   └── check-no-github-actions.sh # Guardrail for GitHub Actions
+├── fixtures/                     # Test fixtures
+│   └── report/                   # Test report data
 │
-├── .github.disabled/             # Disabled GitHub workflows (per guardrails)
-│   └── workflows/                # Disabled GitHub Actions workflows
-│       └── security-scan.yml     # Security scanning (disabled)
+├── scripts/                      # Utility scripts
+│   ├── benchmark/                # Benchmark scripts
+│   ├── ci/                       # CI scripts
+│   ├── cleanup/                  # Cleanup scripts
+│   ├── cluster/                  # Cluster management
+│   ├── data/                     # Data generation scripts
+│   ├── hack/                     # Development utilities
+│   ├── lint/                     # Linting scripts
+│   ├── observability/            # Observability setup
+│   ├── test/                     # Test scripts
+│   ├── utils/                    # Utility scripts
+│   ├── demo.sh                   # Full demo script
+│   ├── quick-demo.sh             # Quick demo script
+│   ├── install.sh                # Installation script
+│   └── helmfile.yaml.gotmpl      # Helmfile template
+│
+├── test/                         # Test code
+│   ├── e2e/                      # End-to-end tests
+│   ├── helpers/                  # Test helpers
+│   ├── integration/              # Integration tests
+│   ├── pipeline/                 # Pipeline tests
+│   └── validation/               # Validation tests
 │
 ├── go.mod                        # Go module definition
 ├── go.sum                        # Go dependencies
+├── Makefile                      # Build targets
 ├── .gitignore                    # Git ignore rules
 ├── README.md                     # Main documentation
 ├── LICENSE                       # Apache 2.0 license
 ├── CONTRIBUTING.md               # Contribution guide
 ├── CHANGELOG.md                  # Version history
 ├── QUICK_START.md                # Quick start guide
-├── docs/PROJECT_STRUCTURE.md      # This file
-└── docs/DOCUMENTATION_INDEX.md    # Doc index
+├── SECURITY.md                   # Security policy
+└── docs/PROJECT_STRUCTURE.md     # This file
 
 ```
 
@@ -88,8 +128,7 @@ zen-watcher/
 - ❌ Webhook servers - Not validating/mutating resources
 
 ### What We DO Have
-- ✅ `pkg/types/` - CRD definitions where they belong
-- ✅ `deployments/crds/` - CRD manifests with other K8s resources
+- ✅ `deployments/crds/` - CRD definitions with other K8s resources
 - ✅ Clean, simple structure
 - ✅ Easy to understand and contribute to
 
@@ -100,6 +139,10 @@ zen-watcher/
 ### `/cmd`
 **Purpose**: Main application entry points
 
+- `zen-watcher/` - Main controller application
+- `ingester-lint/` - Ingester validation tool
+- `obsctl/` - Observation CLI tool
+- `schema-doc-gen/` - Schema documentation generator
 - Keep minimal - just wiring
 - Each subdirectory = one binary
 - Logic lives in `pkg/`
@@ -110,15 +153,28 @@ zen-watcher/
 - Well-organized packages
 - Business logic
 - Can be imported by other projects
-- Includes CRD types in `pkg/types/`
+- **Key packages:**
+  - `adapter/` - Source adapters (generic, webhook, informer, logs)
+  - `config/` - Configuration loading and management
+  - `processor/` - Event processing pipeline
+  - `watcher/` - Source watchers and observation creation
+  - `filter/` - Event filtering logic
+  - `server/` - HTTP server and middleware (auth, rate limiting)
+  - `metrics/` - Prometheus metrics definitions
+  - `orchestrator/` - Adapter orchestration and management
+  - `sdk/` - Zen SDK integration
+  - `dispatcher/` - Event dispatching and batching
+  - `hooks/` - Plugin hooks system
+  - `gc/` - Garbage collection for observations
+  - `monitoring/` - Monitoring and threshold checking
+  - `scaling/` - HPA coordination
 
-### `/pkg/types`
-**Purpose**: CRD type definitions and client
+### `/internal`
+**Purpose**: Internal packages not intended for external use
 
-- Observation CRD types
-- CRD client implementation
-- Type constants
-- **Note**: For simple projects like this, types belong in pkg/ not a separate api/ directory
+- `informers/` - Kubernetes informer implementations
+- `kubernetes/` - Kubernetes client utilities
+- Not part of the public API
 
 ### `/build`
 **Purpose**: Build artifacts
@@ -126,7 +182,6 @@ zen-watcher/
 - Dockerfile
 - .dockerignore
 - Build configs
-- CI/CD files
 
 ### Helm Charts
 **Note**: Helm charts are maintained in the separate [helm-charts](https://github.com/kube-zen/helm-charts) repository and published to ArtifactHub.
@@ -137,18 +192,20 @@ zen-watcher/
 ### `/config`
 **Purpose**: Configuration files
 
-- Dashboards (Grafana)
-- Monitoring (Prometheus alerts)
-- Sample configs
+- `dashboards/` - Grafana dashboards (JSON)
+- `prometheus/rules/` - Prometheus alert rules
+- `alertmanager/` - Alertmanager configurations
+- `monitoring/` - Monitoring configurations
+- `demo-manifests/` - Demo deployment manifests
 - **Not** application code
 
 ### `/deployments`
 **Purpose**: Kubernetes manifests
 
+- `crds/` - CRD definitions (YAML and Go types)
+- `configmaps/` - ConfigMap examples
 - Plain YAML manifests
-- CRD definitions
 - Direct `kubectl apply` usage
-- **Includes** `/deployments/crds/` for CRD YAMLs
 
 ### `/docs`
 **Purpose**: User documentation
@@ -157,20 +214,42 @@ zen-watcher/
 - Best practices
 - Security policies
 - Operations manuals
+- API documentation
+- Architecture and design docs
 
 ### `/examples`
 **Purpose**: Working examples
 
+- `ingesters/` - Ingester CRD examples
+- `observations/` - Observation CRD examples
+- `adapters/` - Adapter implementation examples
+- `hooks/` - Hook examples
+- `use-cases/` - Practical use case examples
 - Integration examples
 - Sample queries
 - Tutorial configs
 
-### `/hack`
-**Purpose**: Development utilities
+### `/scripts`
+**Purpose**: Utility scripts
 
-- Build scripts
-- Test helpers
-- Development tools
+- `demo.sh` - Full-featured demo script
+- `quick-demo.sh` - Quick demo script
+- `install.sh` - Installation script
+- `ci/` - CI/CD scripts
+- `benchmark/` - Benchmark scripts
+- `lint/` - Linting and validation scripts
+- `hack/` - Development utilities
+- `observability/` - Observability setup scripts
+- `cluster/` - Cluster management scripts
+
+### `/test`
+**Purpose**: Test code
+
+- `e2e/` - End-to-end tests
+- `integration/` - Integration tests
+- `pipeline/` - Pipeline processing tests
+- `validation/` - Validation tests
+- `helpers/` - Test helper utilities
 
 ---
 
@@ -179,15 +258,23 @@ zen-watcher/
 | What | Where |
 |------|-------|
 | Main code | `cmd/zen-watcher/main.go` |
-| CRD types | `pkg/types/types.go` |
-| CRD client | `pkg/types/zen_client.go` |
-| CRD YAML | `deployments/crds/zen_event_crd.yaml` |
-| Business logic | `pkg/*/` subdirectories |
+| CRD YAML | `deployments/crds/*.yaml` |
+| CRD types | `deployments/crds/*.go` |
+| Processing pipeline | `pkg/processor/pipeline.go` |
+| Observation creation | `pkg/watcher/observation_creator.go` |
+| Source adapters | `pkg/adapter/generic/` |
+| Filtering logic | `pkg/filter/` |
+| HTTP server | `pkg/server/http.go` |
+| Authentication | `pkg/server/auth.go` |
+| Rate limiting | `pkg/server/ratelimit_wrapper.go` |
+| Metrics | `pkg/metrics/definitions.go` |
+| Configuration | `pkg/config/` |
+| Orchestration | `pkg/orchestrator/` |
 | Dockerfile | `build/Dockerfile` |
 | Helm chart | `kube-zen/zen-watcher` (from ArtifactHub) |
 | K8s manifests | `deployments/` |
-| Monitoring | `config/monitoring/` |
-| Dashboard | `config/dashboards/` |
+| Monitoring | `config/prometheus/rules/` |
+| Dashboards | `config/dashboards/` |
 | Examples | `examples/` |
 | Documentation | `docs/` + root `.md` files |
 
@@ -215,7 +302,7 @@ helm install zen-watcher kube-zen/zen-watcher --namespace zen-system --create-na
 ### kubectl Deploy
 ```bash
 kubectl apply -f deployments/crds/
-kubectl apply -f deployments/k8s-deployment.yaml
+kubectl apply -f deployments/configmaps/
 ```
 
 ---
@@ -224,16 +311,17 @@ kubectl apply -f deployments/k8s-deployment.yaml
 
 ```go
 import (
-    "github.com/kube-zen/zen-watcher/pkg/types"    // CRD types
-    "github.com/kube-zen/zen-watcher/pkg/actions"  // Event handlers
-    "github.com/kube-zen/zen-watcher/pkg/config"   // Configuration
-    "github.com/kube-zen/zen-watcher/pkg/manager"  // Watcher manager
-    "github.com/kube-zen/zen-watcher/pkg/metrics"  // Prometheus metrics
-    "github.com/kube-zen/zen-watcher/pkg/writer"   // CRD writer
+    "github.com/kube-zen/zen-watcher/pkg/adapter/generic"  // Source adapters
+    "github.com/kube-zen/zen-watcher/pkg/config"           // Configuration
+    "github.com/kube-zen/zen-watcher/pkg/processor"        // Processing pipeline
+    "github.com/kube-zen/zen-watcher/pkg/watcher"          // Watchers
+    "github.com/kube-zen/zen-watcher/pkg/filter"           // Filtering
+    "github.com/kube-zen/zen-watcher/pkg/server"           // HTTP server
+    "github.com/kube-zen/zen-watcher/pkg/metrics"          // Prometheus metrics
+    "github.com/kube-zen/zen-watcher/pkg/orchestrator"     // Orchestration
+    "github.com/kube-zen/zen-watcher/pkg/sdk"              // SDK integration
 )
 ```
-
-**Note**: No complex `api/v1` aliasing needed - simple `pkg/types` import!
 
 ---
 
@@ -244,7 +332,7 @@ import (
 1. **Not an Operator Framework Project**
    - We're not using Kubebuilder or Operator SDK
    - Don't need api/ versioning structure
-   - Simple CRD types belong in pkg/types
+   - CRD types are in deployments/crds/
 
 2. **Event Aggregator, Not Controller**
    - We watch and write, we don't reconcile

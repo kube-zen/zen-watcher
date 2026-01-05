@@ -171,17 +171,13 @@ zen-watcher (client-go)
 
 ---
 
-## Alternative Approaches
+## Configuration Modes
 
-**Recommended Alternative**: For more advanced leader election scenarios or if you need service-level leader routing, consider using [zen-lead](https://github.com/kube-zen/zen-lead). zen-lead provides a dedicated leader election controller with service-level leader routing capabilities.
+**Built-in Leader Election (default)**: zen-watcher uses zen-sdk/pkg/leader for built-in leader election (mode: `builtin`), which is sufficient for most use cases.
 
-**Current Implementation**: zen-watcher uses zen-sdk/pkg/leader for built-in leader election, which is sufficient for most use cases. zen-lead is recommended when you need:
-- Service-level leader routing (DNS-based leader access)
-- More sophisticated leader election policies
-- Cross-namespace leader coordination
+**Disabled Mode**: Use `disabled` mode only for single-replica deployments. This completely disables leader election - all pods will act as leaders, which is unsafe if replicas > 1.
 
 **See also:**
 - [zen-sdk Documentation](https://github.com/kube-zen/zen-sdk)
-- [zen-lead Documentation](https://github.com/kube-zen/zen-lead) - Advanced leader election with service routing
 - [SCALING.md](SCALING.md) - Scaling options for zen-watcher
 

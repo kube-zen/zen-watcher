@@ -40,7 +40,7 @@ Small improvements that help you learn the codebase without requiring deep archi
 
 4. **Add unit tests for filter rules**
    - **Description**: Extend `pkg/filter/rules_test.go` with more test cases for edge cases
-   - **Design Doc**: `docs/DEDUPLICATION.md`
+   - **Design Doc**: `docs/PROCESSING_PIPELINE.md` (deduplication section)
    - **Blockers**: None
    - **Difficulty**: Low
 

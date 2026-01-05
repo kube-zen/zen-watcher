@@ -18,7 +18,16 @@ Complete guide to all Zen Watcher documentation files.
    - Configuration reference
    - Usage examples
 
-2. **[QUICK_START.md](../QUICK_START.md)** - 5-minute setup guide
+2. **[USE_CASES.md](USE_CASES.md)** - Practical use cases and examples ⭐ **NEW**
+   - How to combine multiple ingester examples
+   - Security monitoring dashboard setup
+   - Compliance reporting workflows
+   - Operations monitoring patterns
+   - Multi-domain observability
+   - Custom tool integration
+   - Query examples for aggregated events
+
+3. **[QUICK_START.md](../QUICK_START.md)** - 5-minute setup guide
    - Fast installation
    - Basic usage
    - Monitoring setup
@@ -36,24 +45,19 @@ Complete guide to all Zen Watcher documentation files.
    - Performance tuning
    - Security hardening
 
-5. **[STABILITY.md](STABILITY.md)** - Production readiness guide
-   - HA configuration (see [HIGH_AVAILABILITY.md](HIGH_AVAILABILITY.md) for details)
-   - Capacity planning
-   - Failure modes
-   - Recovery procedures
+5. **[OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md)** - Operational excellence guide ⭐ **CONSOLIDATED**
+    - High availability and stability (leader election, deployment patterns)
+    - Health checks and monitoring
+    - Resource management and capacity planning
+    - Failure modes and recovery procedures
+    - Performance optimization
+    - Security operations
 
 6. **[SCALING.md](SCALING.md)** - Scaling strategy and recommendations
-   - Multiple replicas with leader election (default, recommended for production)
-   - Single-replica (development/testing only)
-   - Namespace sharding for informer source HA
-   - Performance tuning
-
-7. **[HIGH_AVAILABILITY.md](HIGH_AVAILABILITY.md)** - High availability model ⭐ **NEW**
-   - Leader election architecture
-   - HA guarantees and limitations
-   - Deployment recommendations
-   - Failure scenarios
-   - Operational considerations
+    - Multiple replicas with leader election (default, recommended for production)
+    - Single-replica (development/testing only)
+    - Namespace sharding for informer source HA
+    - Performance tuning
 
 ### Source Management
 
@@ -75,7 +79,7 @@ Complete guide to all Zen Watcher documentation files.
    - Examples and best practices
    - Troubleshooting
 
-9. **[DEDUPLICATION.md](DEDUPLICATION.md)** - Deduplication system
+9. **[PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md#deduplication)** - Deduplication system
    - SHA-256 content fingerprinting
    - Per-source rate limiting
    - Time-bucketed deduplication
@@ -83,12 +87,9 @@ Complete guide to all Zen Watcher documentation files.
    - Performance characteristics
    - Troubleshooting
 
-10. **[NORMALIZATION.md](NORMALIZATION.md)** - Event normalization
-    - Severity normalization rules
-    - Category and event type assignment
-    - Resource normalization
-    - Tool-specific mappings
-    - Normalization in processing pipeline
+10. **Normalization** - See [PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md#stage-2-normalize)
+    - Normalization is documented as part of the processing pipeline
+    - Includes severity normalization rules, category assignment, resource normalization, and tool-specific mappings
 
 ### Processing Order Configuration
 
@@ -120,15 +121,13 @@ Complete guide to all Zen Watcher documentation files.
     - Response workflows
     - Escalation procedures
 
-17. **[alerting/alert-testing-procedures.md](alerting/alert-testing-procedures.md)** - Alert testing procedures ⭐ **NEW**
-    - Production validation
-    - Testing workflows
-    - Alert verification
-
-18. **[alerting/testing-procedures.md](alerting/testing-procedures.md)** - Comprehensive testing procedures ⭐ **NEW**
-    - End-to-end testing
-    - Validation workflows
-    - Quality assurance
+17. **[alerting/ALERT_TESTING.md](alerting/ALERT_TESTING.md)** - Comprehensive alert testing and validation ⭐ **CONSOLIDATED**
+    - Alert rule testing
+    - Alertmanager configuration testing
+    - Notification channel testing
+    - Escalation policy testing
+    - Performance testing
+    - Alert tuning and optimization
 
 19. **[alerting/silence-management.md](alerting/silence-management.md)** - Alert silence management ⭐ **NEW**
     - Silence configuration
@@ -146,21 +145,17 @@ Complete guide to all Zen Watcher documentation files.
     - Compliance
     - Incident response
 
-21. **[SECURITY.md](SECURITY.md)** - Security policy, model & best practices
+21. **[SECURITY.md](SECURITY.md)** - Security policy, model & best practices ⭐ **CONSOLIDATED**
     - Trust boundaries
-    - Threat model
+    - Threat model (comprehensive threat analysis)
     - Security layers
     - Mitigations
+    - Security recommendations
 
 22. **[SECURITY_RBAC.md](SECURITY_RBAC.md)** - RBAC permissions
     - Permission rationale
     - ClusterRole details
     - Security audit guide
-
-23. **[SECURITY_THREAT_MODEL.md](SECURITY_THREAT_MODEL.md)** - Threat modeling
-    - Threat identification
-    - Risk assessment
-    - Mitigation strategies
 
 24. **[SBOM.md](SBOM.md)** - Software Bill of Materials
     - SBOM generation
@@ -385,8 +380,8 @@ Complete guide to all Zen Watcher documentation files.
 
 **Understanding internals?**
 1. [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
-2. [DEDUPLICATION.md](DEDUPLICATION.md) - Deduplication system
-3. [NORMALIZATION.md](NORMALIZATION.md) - Event normalization
+2. [PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md#deduplication) - Deduplication system
+3. Normalization - See [PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md#stage-2-normalize) (consolidated into processing pipeline)
 
 ---
 
@@ -435,13 +430,13 @@ Complete guide to all Zen Watcher documentation files.
 
 ### Deduplication
 
-- [DEDUPLICATION.md](DEDUPLICATION.md) - Complete deduplication documentation
-- [README.md#intelligent-noise-reduction](../README.md#intelligent-noise-reduction) - Quick reference
-- [ARCHITECTURE.md#intelligent-event-integrity](ARCHITECTURE.md#intelligent-event-integrity) - Design principles
+- [PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md#deduplication) - Complete deduplication documentation
+- [README.md#advanced-noise-reduction](../README.md#advanced-noise-reduction) - Quick reference
+- [ARCHITECTURE.md#event-integrity-and-noise-reduction](ARCHITECTURE.md#event-integrity-and-noise-reduction) - Design principles
 
 ### Normalization
 
-- [NORMALIZATION.md](NORMALIZATION.md) - Event normalization rules and mappings
+- [PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md#stage-2-normalize) - Event normalization rules and mappings
 - [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - How to implement normalization in adapters
 
 ### Security

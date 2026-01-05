@@ -166,136 +166,22 @@ Use for log-based ingestion (monitoring pod logs with regex patterns).
 
 Each Ingester defines a canonical processing pipeline that is enforced at runtime.
 
-### Runtime Pipeline (v1, for all Ingester-driven flows)
+**For complete pipeline documentation, including configuration details, see [PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md).**
 
+The pipeline flow is:
 ```
-source → (filter | dedup, both applied, order chosen dynamically) → normalize → destinations[]
-```
-
-### Pipeline Stages
-
-**Stage 1: Filter and Dedup Block**
-
-#### Deduplication Configuration (W33 - v1.1)
-
-Deduplication can be configured per Ingester using `spec.processing.dedup`:
-
-```yaml
-spec:
-  processing:
-    dedup:
-      enabled: true
-      strategy: "fingerprint"  # fingerprint (default), event-stream, or key
-      window: "60s"           # Deduplication window duration
-      maxEventsPerWindow: 10  # For event-stream strategy only
-      fields:                  # For key strategy only
-        - "source"
-        - "kind"
-        - "name"
+source → (filter | dedup, order: filter_first or dedup_first) → normalize → create Observation CRD → update metrics & log
 ```
 
-**Available Strategies:**
+**Quick Configuration Reference:**
 
-1. **`fingerprint` (default)**
-   - Content-based fingerprinting using source, category, severity, eventType, resource, and critical details
-   - Best for: General-purpose deduplication, most event sources
-   - Example:
-     ```yaml
-     spec:
-       processing:
-         dedup:
-           enabled: true
-           strategy: "fingerprint"
-           window: "60s"
-     ```
-
-2. **`event-stream`**
-   - Strict window-based deduplication optimized for high-volume, noisy event streams
-   - Best for: Kubernetes events, log-based sources with repetitive patterns
-   - Example:
-     ```yaml
-     spec:
-       processing:
-         dedup:
-           enabled: true
-           strategy: "event-stream"
-           window: "5m"
-           maxEventsPerWindow: 10
-     ```
-
-3. **`key`**
-   - Field-based deduplication using explicit fields
-   - Best for: Custom deduplication logic based on specific resource fields
-   - Example:
-     ```yaml
-     spec:
-       processing:
-         dedup:
-           enabled: true
-           strategy: "key"
-           window: "60s"
-           fields:
-             - "source"
-             - "kind"
-             - "name"
-     ```
-
-**Backward Compatibility:**
-
-If `spec.processing.dedup.strategy` is not set, the default `fingerprint` strategy is used, preserving existing behavior.
-- Both filter and dedup are **always applied** to every event
-- Order is implementation-defined (filter → dedup → normalize → destinations is typical)
-- **Note**: Optimization engine (auto-choosing filter_first vs dedup_first) is commercial-only and not part of OSS base Ingester CRD
-
-**Stage 2: Normalize**
-- Single normalization function
-- Always runs after filter/dedup block and before any destination
-- No destination sees un-normalized payloads
-
-**Normalization Configuration:**
-
-Normalization can be configured via `spec.normalization` or `spec.destinations[].mapping`:
-
-```yaml
-spec:
-  normalization:
-    domain: security  # Domain classification (see enum below)
-    type: vulnerability
-    priority:
-      critical: 0.9
-      high: 0.7
-  destinations:
-    - type: crd
-      value: observations
-      mapping:
-        domain: security  # Override normalization.domain for this destination
-        type: vulnerability
-```
-
-**Domain Enum Values** (for `normalization.domain` and `destinations[].mapping.domain`):
-- `security` - Security-related events (vulnerabilities, threats, policy violations)
-- `operations` - Operations-related events (deployment failures, pod crashes, infrastructure health)
-- `performance` - Performance-related events (latency spikes, resource exhaustion, crashes)
-- `cost` - Cost/efficiency-related events (resource waste, unused resources)
-- `compliance` - Compliance-related events (audit findings, policy checks)
-- `custom` - Custom domains for user-defined classifications
-
-**Stage 3: Destinations**
-- Fan-out to destinations[] from the normalized event
-- Each destination receives fully normalized data
-
-### Processing Order
-
-**OSS Base Behavior:**
-- Filter and dedup are both applied to every event
-- Order is implementation-defined (typically filter → dedup → normalize → destinations)
-- No optimization engine in OSS base
-
-**Note**: The processing order is implementation-defined and optimized for performance.
+- **Deduplication**: Configure via `spec.processing.dedup` (see [PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md#deduplication))
+- **Processing Order**: Configure via `spec.processing.order` (`filter_first` or `dedup_first`) (see [PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md#processing-order-configuration))
+- **Normalization**: Automatic, no configuration required (see [PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md#stage-2-normalize))
 
 ## Destination Types
 
-### `type: crd` (Official OSS Destination - zen-watcher 1.0.0-alpha)
+### `type: crd` (Official OSS Destination - zen-watcher 1.2.0)
 
 Write to **any Kubernetes resource** (CRD or core resource). zen-watcher is completely generic and supports writing to any GVR (GroupVersionResource).
 
@@ -350,7 +236,7 @@ destinations:
 - The code is completely generic - no special handling for observations, ConfigMaps, or any other resource
 - Observations CRD is kept as a useful community example with dashboards, but the code treats it like any other CRD
 
-**OSS Policy (zen-watcher 1.0.0-alpha):**
+**OSS Policy (zen-watcher 1.2.0):**
 - zen-watcher is a core engine only; no external egress
 - `type: crd` destinations support any GVR (not just observations)
 - Community is free to build sinks, but they are out-of-tree
@@ -361,7 +247,7 @@ destinations:
 
 ### Other Destination Types (Not Supported in OSS)
 
-The following destination types are **not supported** in zen-watcher OSS 1.0.0-alpha:
+The following destination types are **not supported** in zen-watcher OSS 1.2.0:
 - `type: webhook` - Use external agents to watch Observations CRDs and forward to webhooks
 - `type: saas` - Use zen-bridge (platform component) for SaaS ingestion
 - `type: queue` - Use external agents to watch Observations CRDs and forward to queues

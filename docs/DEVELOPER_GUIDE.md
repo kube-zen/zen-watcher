@@ -718,7 +718,7 @@ func (ep *EventProcessor) ProcessMyTool(ctx context.Context, report *unstructure
     }
     
     // 3. Use centralized observation creator
-    // Flow: filter() → normalize() → dedup() → create CRD + update metrics + log
+    // Flow: (filter | dedup, order: filter_first or dedup_first) → normalize() → create CRD + update metrics + log
     err := ep.observationCreator.CreateObservation(ctx, event)
     if err != nil {
         log.Printf("  ⚠️  Failed to create Observation: %v", err)
@@ -772,7 +772,7 @@ func (wp *WebhookProcessor) ProcessMyTool(ctx context.Context, event map[string]
     }
     
     // 3. Use centralized observation creator
-    // Flow: filter() → normalize() → dedup() → create CRD + update metrics + log
+    // Flow: (filter | dedup, order: filter_first or dedup_first) → normalize() → create CRD + update metrics + log
     err := wp.observationCreator.CreateObservation(ctx, observation)
     if err != nil {
         return fmt.Errorf("failed to create Observation: %w", err)

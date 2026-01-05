@@ -88,7 +88,7 @@ kubectl label configmap zen-watcher-dashboard \
 ## Related Documentation
 
 - [SECURITY_ALERTING_OVERVIEW.md](SECURITY_ALERTING_OVERVIEW.md) - Security alerting system overview and incident response
-- [TESTING-PROCEDURES.md](TESTING-PROCEDURES.md) - AlertManager testing procedures
+- [ALERT_TESTING.md](ALERT_TESTING.md) - Comprehensive alert testing procedures (includes Alertmanager testing)
 - [SILENCE-MANAGEMENT.md](SILENCE-MANAGEMENT.md) - Alert silence management
 - [OPERATIONAL_EXCELLENCE.md](../OPERATIONAL_EXCELLENCE.md) - Operational monitoring and metrics
 - [OBSERVABILITY.md](../OBSERVABILITY.md) - Metrics and observability guide

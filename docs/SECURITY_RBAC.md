@@ -125,10 +125,10 @@ verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 - Rate limiting prevents flooding (see threat model)
 - GC prevents unbounded growth
 
-#### Ingesters (Read-Only) ✨ NEW in v1.0.10
+#### Ingesters (Read-Only)
 ```yaml
 apiGroups: ["zen.kube-zen.io"]
-resources: ["observationfilters"]
+resources: ["ingesters"]
 verbs: ["get", "list", "watch"]
 ```
 **Rationale:**
@@ -141,10 +141,6 @@ verbs: ["get", "list", "watch"]
 - Filters are validated before application
 - Invalid filters fall back to last-good-config
 - Filter changes are logged for audit trail
-
-- Read-only access prevents mapping tampering
-- Watches for changes to dynamically create/destroy informers for source CRDs
-- Enables "long tail" tool integration without code changes
 
 **Security Considerations:**
 - Mappings validated before informer creation

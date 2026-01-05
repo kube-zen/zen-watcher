@@ -145,7 +145,7 @@ This section describes the validation guarantees provided by zen-watcher CRD sch
 - **`spec.filters.minSeverity`** (optional, enum)
   - Valid values: `CRITICAL`, `HIGH`, `MEDIUM`, `LOW`, `UNKNOWN`
 
-- **`spec.optimization.order`** (optional, enum)
+- **`spec.processing.order`** (optional, enum)
   - Valid values: `filter_first`, `dedup_first`
   - Default: `filter_first`
 

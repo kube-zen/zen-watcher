@@ -15,7 +15,7 @@ config/alertmanager/
 ├── kubernetes-manifest.yaml      # Complete K8s deployment manifest
 ├── README.md                     # Configuration overview and deployment guide
 ├── silence-management.md         # Guide for managing alert silences
-├── testing-procedures.md         # Comprehensive testing procedures
+├── ALERT_TESTING.md              # Comprehensive alert testing procedures (consolidated)
 └── INCIDENT_RESPONSE_SUMMARY.md  # This summary document
 ```
 

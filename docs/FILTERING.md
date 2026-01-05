@@ -7,31 +7,14 @@ Zen Watcher supports **per-source filtering** to reduce noise, cost, and keep Ob
 **Architectural Principle:**
 > Filtering MUST happen before CRD creation, not after.
 
-**Flow:**
-```
-informer|cm|webhook → filter() → normalize() → dedup() → create Observation CRD → update metrics & log
-```
+**Pipeline Position:**
 
-**Processing Pipeline:**
+Filtering is part of Stage 1 of the processing pipeline. See [PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md) for the complete pipeline flow.
 
-```mermaid
-graph LR
-    A[Event Source] --> B[FILTER<br/>Source-level filtering]
-    B -->|if allowed| C[NORMALIZE<br/>Severity/Category]
-    C --> D[DEDUP<br/>SHA-256 fingerprinting]
-    D -->|if not duplicate| E[CREATE CRD<br/>Observation CRD]
-    E --> F[METRICS<br/>Update counters]
-    E --> G[LOG<br/>Structured logging]
-    
-    style B fill:#fff3e0
-    style C fill:#e8f5e9
-    style D fill:#e3f2fd
-    style E fill:#f3e5f5
-```
-
-All components are centralized in `ObservationCreator.CreateObservation()` - no duplicated code.
-
-See [ARCHITECTURE.md](ARCHITECTURE.md#2-event-processing-pipeline) for complete pipeline documentation.
+**Key Points:**
+- Filtering happens in the filter/dedup block (order configurable: filter_first or dedup_first)
+- Filtered events never proceed to normalization or CRD creation
+- All filtering logic is centralized in `ObservationCreator.CreateObservation()`
 
 ## Configuration
 
@@ -107,9 +90,9 @@ spec:
 
 **Watching Namespaces:**
 - Default: Watches all namespaces (cluster-wide)
-- Set `OBSERVATION_FILTER_NAMESPACE` env var to watch specific namespace only
+- Set `WATCH_NAMESPACE` env var to watch specific namespace only
 
-See [Ingester CRD Reference](#observationfilter-crd-reference) for complete CRD specification.
+See [INGESTER_API.md](INGESTER_API.md) for complete Ingester CRD specification.
 
 ### Environment Variables
 
@@ -118,7 +101,6 @@ See [Ingester CRD Reference](#observationfilter-crd-reference) for complete CRD 
 | `FILTER_CONFIGMAP_NAME` | Filter ConfigMap name | `zen-watcher-filter` |
 | `FILTER_CONFIGMAP_NAMESPACE` | Filter ConfigMap namespace | `zen-system` (or `WATCH_NAMESPACE`) |
 | `FILTER_CONFIGMAP_KEY` | Filter ConfigMap data key | `filter.json` |
-| `OBSERVATION_FILTER_NAMESPACE` | Namespace to watch for Ingester CRDs (empty = all namespaces) | `""` (all namespaces) |
 
 ### Filter Configuration Format
 

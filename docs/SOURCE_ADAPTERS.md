@@ -404,13 +404,13 @@ spec:
 
 Zen Watcher supports configurable processing order to optimize performance based on your workload patterns.
 
-### Processing Order Modes
+**For complete pipeline documentation, see [PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md).**
 
-Zen Watcher supports two processing order modes:
+### Quick Reference
 
-| Mode | Description | When to Use |
-|------|-------------|-------------|
-| **filter_first** | Filter → Normalize → Dedup → Create | High LOW severity (>70%), many events to filter |
+| Mode | Flow | When to Use |
+|------|------|-------------|
+| **filter_first** | Filter → Dedup → Normalize → Create | High LOW severity (>70%), many events to filter |
 | **dedup_first** | Dedup → Filter → Normalize → Create | High duplicate rate (>50%), retry patterns |
 
 ### Configuring Processing Order
@@ -421,23 +421,7 @@ spec:
     order: filter_first  # filter_first or dedup_first
 ```
 
-When configured, Zen Watcher will:
-- Monitor metrics continuously
-- Adjust processing order based on patterns
-- Generate optimization suggestions
-- Track optimization impact
-
-### Optimization CLI Commands
-
-Zen Watcher provides CLI commands for optimization management:
-
-```bash
-# Analyze optimization opportunities
-zen-watcher-optimize --command=analyze --source=trivy
-
-# Configure processing order globally
-# Processing order can be configured directly in the Ingester CRD
-# See the processing.order field in the examples above
+Processing order must be manually configured. There is no automatic optimization - you choose the order based on your workload characteristics.
 
 ---
 
@@ -932,7 +916,7 @@ Common event types:
 
 ### 6. Severity Normalization
 
-See [NORMALIZATION.md](NORMALIZATION.md) for complete normalization documentation.
+See [PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md#stage-2-normalize) for complete normalization documentation.
 
 Always normalize to uppercase:
 - `CRITICAL` > `HIGH` > `MEDIUM` > `LOW` > `UNKNOWN`

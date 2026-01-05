@@ -1,8 +1,6 @@
 # Security Policy and Model
 
-> **Note:** For detailed security documentation, see:
-> - [RBAC Security Documentation](./SECURITY_RBAC.md) - Detailed RBAC permissions and rationale
-> - [Threat Model](./SECURITY_THREAT_MODEL.md) - Comprehensive threat analysis and mitigations
+> **Note:** For detailed RBAC documentation, see [RBAC Security Documentation](./SECURITY_RBAC.md).
 
 ---
 
@@ -225,7 +223,7 @@ webhookSecurity:
     requestsPerMinute: 100
 ```
 
-See [SECURITY_THREAT_MODEL.md](SECURITY_THREAT_MODEL.md) for details.
+See the [Threat Model](#threat-model) section below for details.
 
 ---
 
@@ -622,9 +620,7 @@ Future security enhancements:
 ## Related Documentation
 
 - [SECURITY_RBAC.md](SECURITY_RBAC.md) - Detailed RBAC permissions
-- [SECURITY_THREAT_MODEL.md](SECURITY_THREAT_MODEL.md) - Comprehensive threat analysis
-- [STABILITY.md](STABILITY.md) - Production operations
-- [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Operational excellence guide
+- [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Operational excellence guide (includes stability and HA)
 
 ---
 
