@@ -444,11 +444,11 @@ Complete guide to all Zen Watcher documentation files.
 
 ### Security
 
-- [SECURITY.md](SECURITY.md) - Security policy
+- [SECURITY.md](../SECURITY.md) - Vulnerability reporting process (root)
+- [SECURITY_FEATURES.md](SECURITY_FEATURES.md) - Product security features and model
+- [SECURITY_RBAC.md](SECURITY_RBAC.md) - RBAC permissions
 - [SBOM.md](SBOM.md) - Software Bill of Materials
 - [COSIGN.md](COSIGN.md) - Image signing
-- [SECURITY.md](SECURITY.md) - Security policy and model
-- [SECURITY_RBAC.md](SECURITY_RBAC.md) - RBAC permissions
 - [Helm Charts Repository - Security](https://github.com/kube-zen/helm-charts) - Chart security settings
 
 ### Monitoring
