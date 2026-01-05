@@ -8,7 +8,7 @@ require (
 	github.com/prometheus/common v0.67.4
 	github.com/shirou/gopsutil/v3 v3.24.5
 	golang.org/x/crypto v0.44.0
-	golang.org/x/time v0.9.0
+	golang.org/x/time v0.14.0
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.35.0
 	k8s.io/apimachinery v0.35.0
