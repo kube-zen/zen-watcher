@@ -18,19 +18,19 @@ Zen-watcher uses semantic versioning with synchronized releases across component
 
 | Component | Version | Location |
 |-----------|---------|----------|
-| VERSION file | 1.2.0 | `VERSION` (root) |
-| Docker Image | 1.2.0 | `kubezen/zen-watcher:1.2.0` |
-| Helm Chart | 1.2.0 | `kube-zen/zen-watcher` (ArtifactHub) |
-| Git Tag | v1.2.0 | `github.com:kube-zen/zen-watcher` |
+| VERSION file | 1.2.1 | `VERSION` (root) |
+| Docker Image | 1.2.1 | `kubezen/zen-watcher:1.2.1` |
+| Helm Chart | 1.2.1 | `kube-zen/zen-watcher` (ArtifactHub) |
+| Git Tag | v1.2.1 | `github.com:kube-zen/zen-watcher` |
 
 ## Versioning Contract
 
 **v-prefix rule**: Git tags use the `v` prefix (e.g., `v1.2.0`), while all other references use the version number without prefix (e.g., `1.2.0`).
 
 - **Git tags**: `v1.2.0`, `v1.2.1`, etc.
-- **Docker images**: `kubezen/zen-watcher:1.2.0` (no v-prefix)
-- **Helm charts**: `version: 1.2.0`, `appVersion: "1.2.0"` (no v-prefix)
-- **Code**: `Version = "1.2.0"` (no v-prefix)
+- **Docker images**: `kubezen/zen-watcher:1.2.1` (no v-prefix)
+- **Helm charts**: `version: 1.2.1`, `appVersion: "1.2.1"` (no v-prefix)
+- **Code**: `Version = "1.2.1"` (no v-prefix)
 
 ## Semantic Versioning
 

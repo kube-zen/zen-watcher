@@ -5,6 +5,37 @@ All notable changes to zen-watcher will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.1] - 2025-01-25
+
+### Fixed
+
+- **Helm Chart**: Fixed NetworkPolicy defaults requiring explicit destinations when egress enabled
+- **Helm Chart**: Exposed critical hardening controls (extraEnv, webhook auth, retention/GC knobs)
+- **Helm Chart**: CRDs now properly shipped and installable via Helm (crds.enabled: true by default)
+- **Documentation**: Updated all version references from 1.0.0-alpha/1.2.0 to 1.2.1
+- **CI Script**: Fixed version fallback to read from VERSION file instead of hardcoded 1.0.19
+
+### Changed
+
+- **Helm Chart**: NetworkPolicy now requires explicit `kubernetesServiceIP` and/or `kubernetesAPICIDRs[]` when `egress.enabled=true` and `allowKubernetesAPI=true`
+- **Helm Chart**: Default remains `egress.enabled=false` for safer community posture
+
+## [1.2.0] - 2025-01-05
+
+### 🎉 Production-Ready Release
+
+**First production-ready release** with synchronized versioning, enhanced security defaults, comprehensive observability, and consolidated documentation.
+
+#### Added
+
+- **Secure by Default**: Webhook authentication now required by default
+- **Enhanced Observability**: Leader election metrics and PrometheusRule alerts
+- **Helm Chart Improvements**: TTL/GC tuning, PrometheusRule installation
+- **Documentation Consolidation**: Single source of truth for HA and scaling
+- **Version Synchronization**: All components aligned to 1.2.0
+
+See [RELEASE_NOTES_v1.2.0.md](RELEASE_NOTES_v1.2.0.md) for complete details.
+
 ## [1.0.0-alpha] - 2025-12-11
 
 ### 🎉 Initial Alpha Release

@@ -9,7 +9,7 @@ Complete guide to all Zen Watcher documentation files.
 ### Getting Started
 
 1. **[README.md](../README.md)** - Main project documentation
-   - Features overview (9 sources: Trivy, Falco, Kyverno, Checkov, KubeBench, Audit, cert-manager, sealed-secrets, Kubernetes Events)
+   - Features overview (extensible sources: Trivy, Falco, Kyverno, Checkov, KubeBench, Audit, cert-manager, sealed-secrets, Kubernetes Events, and many more)
    - Architecture overview
    - Quick start guide (4 minutes to working system)
    - YAML-only source creation

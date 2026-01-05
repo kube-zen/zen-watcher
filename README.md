@@ -247,6 +247,12 @@ kubectl get observations -n zen-system -o json | \
 - [Observation API](docs/CRD.md) - API reference
 - [Integrations](docs/INTEGRATIONS.md) - How to consume Observations
 - [Deduplication](docs/DEDUPLICATION.md) - Deduplication strategies
+
+## Compatibility
+
+**zen-watcher v1.2.1** requires **zen-sdk v0.2.9-alpha**
+
+This version compatibility is tested and verified. For other zen-sdk versions, see the [zen-sdk compatibility matrix](https://github.com/kube-zen/zen-sdk#compatibility).
 - [CRD Documentation](docs/CRD.md) - Detailed CRD documentation
 
 ---

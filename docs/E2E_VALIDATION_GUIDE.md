@@ -1,6 +1,6 @@
 # E2E Validation Guide
 
-This guide describes how to validate zen-watcher 1.0.0-alpha release against a real Kubernetes cluster.
+This guide describes how to validate zen-watcher 1.2.1 release against a real Kubernetes cluster.
 
 ## Overview
 
@@ -58,7 +58,7 @@ helm install zen-watcher kube-zen/zen-watcher \
   --namespace "$NAMESPACE" \
   --create-namespace \
   --kube-context "$CONTEXT" \
-  --set image.tag=1.0.0-alpha
+  --set image.tag=1.2.1
 
 # Verify deployment
 kubectl get pods --namespace "$NAMESPACE" --context "$CONTEXT"

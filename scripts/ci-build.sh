@@ -20,7 +20,20 @@ cd "$(dirname "$0")/.."
 # Determine version
 VERSION="${1:-}"
 if [ -z "$VERSION" ]; then
-    VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo "1.0.19")
+    # Try to read from VERSION file first (OSS standard)
+    if [ -f "VERSION" ]; then
+        VERSION=$(cat VERSION | tr -d '[:space:]')
+        if [ -z "$VERSION" ]; then
+            echo "❌ ERROR: VERSION file exists but is empty" >&2
+            exit 1
+        fi
+    else
+        # Fallback to git describe if VERSION file doesn't exist
+        VERSION=$(git describe --tags --always --dirty 2>/dev/null || {
+            echo "❌ ERROR: Cannot determine version. VERSION file missing and git describe failed." >&2
+            exit 1
+        })
+    fi
 fi
 
 IMAGE="kubezen/zen-watcher"

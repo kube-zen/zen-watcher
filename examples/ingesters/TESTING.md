@@ -1,6 +1,6 @@
 # Example Ingester Testing Guide
 
-This document provides step-by-step instructions for testing each example Ingester in zen-watcher 1.0.0-alpha.
+This document provides step-by-step instructions for testing each example Ingester in zen-watcher 1.2.1.
 
 ## Prerequisites
 

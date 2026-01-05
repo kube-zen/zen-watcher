@@ -1,6 +1,6 @@
-# Canonical Ingester Examples (zen-watcher 1.0.0-alpha)
+# Canonical Ingester Examples (zen-watcher 1.2.1)
 
-This directory contains canonical examples of Ingester CRDs for common use cases in zen-watcher 1.0.0-alpha.
+This directory contains canonical examples of Ingester CRDs for common use cases in zen-watcher 1.2.1.
 
 ## Examples
 
@@ -66,7 +66,7 @@ The optimization engine automatically chooses the optimal order (filter_first vs
 
 Set `spec.optimization.order: auto` to enable automatic optimization, or specify `filter_first` or `dedup_first` explicitly.
 
-## Destination Policy (zen-watcher 1.0.0-alpha)
+## Destination Policy (zen-watcher 1.2.1)
 
 All examples use `type: crd` destinations. zen-watcher is completely generic and supports writing to any GVR.
 

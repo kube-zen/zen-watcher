@@ -139,7 +139,7 @@ global:
   
 image:
   repository: your-registry.io/zen-watcher
-  tag: 1.0.0-alpha
+  tag: 1.2.1
   pullPolicy: Always
 
 replicas: 3
