@@ -1011,7 +1011,7 @@ spec:
 helm upgrade zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --reuse-values \
-  --set image.tag=1.1.0 \
+  --set image.tag=1.2.1 \
   --wait
 
 # Verify rollout

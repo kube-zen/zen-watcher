@@ -169,12 +169,14 @@ your-registry.io/
       ├── 1.2.1
       ├── 1.0.0-beta
       ├── 1.0.0
+      ├── 1.2.0
+      ├── 1.2.1
       └── latest (dev only)
 ```
 
 ### Tagging Strategy
 
-- **Release tags**: Use semantic versioning (`1.2.0`, `1.2.1`, `1.3.0`)
+- **Release tags**: Use semantic versioning (`1.2.1`, `1.2.2`, `1.3.0`)
 - **Dev tags**: Use `latest` or commit SHA for development builds
 - **No mutable tags in production**: Avoid `latest` for production deployments
 

@@ -27,11 +27,12 @@ Complete guide to all Zen Watcher documentation files.
    - Custom tool integration
    - Query examples for aggregated events
 
-3. **[QUICK_START.md](../QUICK_START.md)** - 5-minute setup guide
-   - Fast installation
-   - Basic usage
-   - Monitoring setup
-   - Troubleshooting
+3. **[QUICKSTART.md](QUICKSTART.md)** - Quick start guide ⭐ **NEW**
+   - Installation (Helm vs out-of-band CRDs)
+   - Apply one Ingester (mandatory step)
+   - Verification commands (Observations, metrics, logs)
+   - Uninstall/cleanup (CRDs note)
+   - Troubleshooting top 3 failure modes
 
 ---
 
