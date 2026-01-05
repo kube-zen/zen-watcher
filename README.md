@@ -11,6 +11,8 @@
 
 Zen Watcher is an open-source Kubernetes operator that aggregates structured signals from any tool (security, compliance, performance, operations, cost) into unified `Observation` CRDs. Lightweight, standalone, and useful on its own.
 
+> **💡 Project Philosophy:** This project is **built by operators, for operators**. We built Zen Watcher because we were tired of reinventing the same event aggregation wheel in every Kubernetes cluster. After spending 3 hours manually correlating security events from 4 different tools during a 2 AM incident, we realized: *operators need a single source of truth for all events, in a format they already understand: CRDs.* [Read our origin story →](docs/ORIGIN_STORY.md)
+
 **What can you collect?** Zen Watcher handles **all event types**, not just security:
 - 🔒 **Security**: Vulnerabilities, threats, policy violations (Trivy, Falco, Kyverno)
 - ✅ **Compliance**: Audit logs, CIS benchmarks, policy checks

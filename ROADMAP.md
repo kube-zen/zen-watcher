@@ -111,6 +111,27 @@ See [docs/SCALING.md](docs/SCALING.md) for complete scaling strategy and recomme
 - **Helm Chart** - Enhanced Helm chart with more configuration options
 - **Kustomize** - Better Kustomize support for different environments
 
+## What's Next: 90-Day Plan
+
+**Next 90 Days (Q1 2025):**
+
+### Immediate (Next 30 Days)
+- ✅ **v1.2.1 Release** - OSS launch with secure defaults
+- 🔄 **Community On-Ramp** - Improve contributor experience
+- 🔄 **Documentation Polish** - Complete missing docs, add examples
+
+### Short-Term (30-60 Days)
+- 🔄 **v1.3.0 Release** - Leader takeover catch-up scan (reduces informer failover gap)
+- 🔄 **Additional Sources** - Community-requested integrations (Polaris, OPA Gatekeeper, Kubescape)
+- 🔄 **Performance Improvements** - Event batching for high-volume deployments
+
+### Medium-Term (60-90 Days)
+- 🔄 **v1.4.0 Release** - Optional active-active informer processing (eliminates failover gap)
+- 🔄 **Observability Enhancements** - OpenTelemetry tracing support
+- 🔄 **Ecosystem Growth** - Community sink controllers (Slack, PagerDuty, SIEM integrations)
+
+**This roadmap is living and evolves based on community feedback.** See [GitHub Discussions](https://github.com/kube-zen/zen-watcher/discussions) to influence priorities.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on:

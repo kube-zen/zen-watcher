@@ -2,22 +2,51 @@
 
 This file lists the maintainers of the Zen Watcher project.
 
+## Who We Are
+
+We're a team of **Kubernetes operators** who got tired of reinventing the same event aggregation wheel in every cluster. We built Zen Watcher because we needed it, and we're open sourcing it because we think you might need it too.
+
+**Our philosophy:** This project is built by operators, for operators. We bleed when things break, and we built this so you don't have to.
+
+[Read our origin story →](docs/ORIGIN_STORY.md)
+
 ## Maintainers
 
 **Zen Team** - zen@kube-zen.io
 
+We're actively maintaining this project and committed to its long-term success. We review PRs, triage issues, and release new versions regularly.
+
 ### Responsibilities
 
 Maintainers are responsible for:
-- Reviewing and merging pull requests
-- Triaging issues
+- Reviewing and merging pull requests (target: 48 hours)
+- Triaging issues and security reports
 - Maintaining code quality and project standards
 - Releasing new versions
 - Ensuring security and compliance
+- Setting project direction and priorities
+- Mentoring new contributors
+
+### Our Commitment
+
+- ✅ **Active maintenance** - Regular releases, responsive to issues
+- ✅ **Production-ready** - We use this in production, so it needs to work
+- ✅ **Operator-first** - Built by operators, for operators
+- ✅ **Long-term** - This isn't a side project; it's a core tool we depend on
 
 ### Contact
 
 For questions, concerns, or to report issues, please contact:
-- Email: zen@kube-zen.io
-- GitHub Issues: https://github.com/kube-zen/zen-watcher/issues
+- **Email:** zen@kube-zen.io (general inquiries)
+- **Security:** security@kube-zen.io (vulnerability reports - see [VULNERABILITY_DISCLOSURE.md](../VULNERABILITY_DISCLOSURE.md))
+- **GitHub Issues:** https://github.com/kube-zen/zen-watcher/issues
+- **GitHub Discussions:** https://github.com/kube-zen/zen-watcher/discussions
+
+### Becoming a Maintainer
+
+See [GOVERNANCE.md](../GOVERNANCE.md#becoming-a-maintainer) for the process of becoming a maintainer. We welcome contributors who demonstrate:
+- Consistent, high-quality contributions
+- Deep understanding of the project
+- Commitment to long-term project success
+- Alignment with our operator-first philosophy
 
