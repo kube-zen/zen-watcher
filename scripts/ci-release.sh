@@ -58,13 +58,31 @@ echo "────────────────────────�
 if [ -f "Makefile" ]; then
     sed -i "s/^VERSION ?= .*/VERSION ?= ${VERSION}/" Makefile 2>/dev/null || true
 fi
-# Update Chart.yaml in helm-charts repo if accessible
+# Update Helm chart in helm-charts repo if accessible
 # Requires: CHARTS_REPO environment variable pointing to cloned helm-charts repo
 # Clone with: git clone https://github.com/kube-zen/helm-charts.git
-if [ -n "$CHARTS_REPO" ] && [ -d "$HELM_CHART_PATH" ]; then
-    sed -i "s/^version: .*/version: ${VERSION}/" "${HELM_CHART_PATH}/Chart.yaml"
-    sed -i "s/^  tag: .*/  tag: \"${VERSION}\"/" "${HELM_CHART_PATH}/values.yaml"
-    echo "  ✅ Updated helm chart version"
+if [ -n "$CHARTS_REPO" ] && [ -d "$CHARTS_REPO" ]; then
+    echo "  → Updating Helm chart using automation script..."
+    if [ -f "$CHARTS_REPO/scripts/release/update-chart-version.sh" ]; then
+        # Use automated script (packages chart, updates index.yaml)
+        export ZEN_WATCHER_ROOT="$(dirname "$0")/.."
+        cd "$CHARTS_REPO"
+        if ./scripts/release/update-chart-version.sh "$VERSION"; then
+            echo "  ✅ Updated helm chart (version, package, index.yaml)"
+            cd - > /dev/null
+        else
+            echo "  ⚠️  Helm chart update failed, continuing..."
+            cd - > /dev/null
+        fi
+    else
+        # Fallback to manual update (legacy)
+        if [ -d "$HELM_CHART_PATH" ]; then
+            sed -i "s/^version: .*/version: ${VERSION}/" "${HELM_CHART_PATH}/Chart.yaml"
+            sed -i "s/^appVersion:.*/appVersion: \"${VERSION}\"/" "${HELM_CHART_PATH}/Chart.yaml"
+            sed -i "s/^  tag: .*/  tag: \"${VERSION}\"/" "${HELM_CHART_PATH}/values.yaml"
+            echo "  ✅ Updated helm chart version (manual)"
+        fi
+    fi
 elif [ -z "$CHARTS_REPO" ]; then
     echo "  ℹ️  CHARTS_REPO not set - skipping helm chart version update"
     echo "     To update chart: git clone https://github.com/kube-zen/helm-charts.git"
