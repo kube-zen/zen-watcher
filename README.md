@@ -19,7 +19,7 @@ Zen Watcher is an open-source Kubernetes operator that aggregates structured sig
 - 💰 **Cost**: Resource waste, unused resources
 - 🎯 **Custom**: Any domain you define
 
-**Version:** 1.2.1 (OSS release)
+**Version:** 1.2.1 (OSS release) | **License:** [Apache 2.0](LICENSE) | **Status:** ✅ Actively Maintained
 
 ## 📊 How It Works
 
