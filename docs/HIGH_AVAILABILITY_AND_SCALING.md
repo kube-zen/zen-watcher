@@ -782,7 +782,7 @@ During failover, informer-based events may be missed. Webhook events continue pr
 **For Development/Testing:**
 - ✅ Single replica (acceptable for non-critical workloads)
 
-### Current Implementation (v1.2.0)
+### Current Implementation (v1.2.1)
 
 - ✅ Leader election (mandatory, always enabled)
 - ✅ High availability for webhook sources (load-balanced across all pods)
