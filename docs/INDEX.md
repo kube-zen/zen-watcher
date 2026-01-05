@@ -139,19 +139,20 @@ Complete guide to all Zen Watcher documentation files.
 
 ## 🔐 Security Documentation
 
-20. **[SECURITY.md](SECURITY.md)** - Security policy
-    - Vulnerability reporting
-    - Security features
-    - Best practices
-    - Compliance
-    - Incident response
+20. **[SECURITY.md](../SECURITY.md)** - Security Policy (Vulnerability Reporting) ⭐ **ROOT FILE**
+    - Vulnerability reporting process
+    - Supported versions
+    - Response timeline
+    - **Purpose**: GitHub standard security policy file for vulnerability reporting
 
-21. **[SECURITY.md](SECURITY.md)** - Security policy, model & best practices ⭐ **CONSOLIDATED**
-    - Trust boundaries
+21. **[SECURITY_FEATURES.md](SECURITY_FEATURES.md)** - Security Features and Model ⭐ **PRODUCT SECURITY**
+    - Security features and configuration
     - Threat model (comprehensive threat analysis)
-    - Security layers
+    - Security layers (container, network, RBAC)
+    - Trust boundaries
     - Mitigations
     - Security recommendations
+    - **Purpose**: Product security features, threat model, and security configuration
 
 22. **[SECURITY_RBAC.md](SECURITY_RBAC.md)** - RBAC permissions
     - Permission rationale
