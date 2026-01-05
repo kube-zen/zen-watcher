@@ -27,6 +27,9 @@ import (
 
 // WebhookAuth handles authentication for webhook endpoints
 type WebhookAuth struct {
+	// Authentication disabled flag (explicit opt-out)
+	authDisabled bool
+
 	// Token-based authentication
 	tokenEnabled bool
 	token        string
@@ -57,6 +60,15 @@ func NewWebhookAuthWithMetrics(webhookMetrics *prometheus.CounterVec) *WebhookAu
 		webhookMetrics: webhookMetrics,
 	}
 
+	// Check if authentication is explicitly disabled
+	if os.Getenv("WEBHOOK_AUTH_DISABLED") == "true" {
+		auth.authDisabled = true
+		logger := sdklog.NewLogger("zen-watcher-server")
+		logger.Warn("Webhook authentication explicitly disabled via WEBHOOK_AUTH_DISABLED environment variable. This is NOT recommended for production.",
+			sdklog.Operation("auth_init"))
+		return auth // No further auth config needed if disabled
+	}
+
 	// Token authentication
 	if token := os.Getenv("WEBHOOK_AUTH_TOKEN"); token != "" {
 		auth.tokenEnabled = true
@@ -77,6 +89,15 @@ func NewWebhookAuthWithMetrics(webhookMetrics *prometheus.CounterVec) *WebhookAu
 		logger.Info("Webhook IP allowlist enabled",
 			sdklog.Operation("auth_init"),
 			sdklog.Strings("allowed_ips", auth.allowedIPs))
+	}
+
+	// If authentication is not disabled, but no token or IP allowlist is configured,
+	// then authentication is implicitly required but will fail.
+	// This ensures "secure by default" posture.
+	if !auth.authDisabled && !auth.tokenEnabled && !auth.ipAllowlistEnabled {
+		logger := sdklog.NewLogger("zen-watcher-server")
+		logger.Warn("Webhook authentication is enabled by default, but no WEBHOOK_AUTH_TOKEN or WEBHOOK_ALLOWED_IPS configured. All webhook requests will be rejected. Explicitly disable with WEBHOOK_AUTH_DISABLED=true if unauthenticated access is intended.",
+			sdklog.Operation("auth_init"))
 	}
 
 	// Trusted proxy CIDRs
@@ -117,6 +138,22 @@ func (a *WebhookAuth) GetTrustedProxyCIDRs() []*net.IPNet {
 
 // Authenticate validates the request
 func (a *WebhookAuth) Authenticate(r *http.Request) bool {
+	if a.authDisabled {
+		return true // Authentication is explicitly disabled
+	}
+
+	// If authentication is not disabled, but no token or IP allowlist is configured,
+	// then all requests are rejected.
+	if !a.tokenEnabled && !a.ipAllowlistEnabled {
+		logger := sdklog.NewLogger("zen-watcher-server")
+		logger.Warn("Webhook request rejected: authentication enabled but no token or IP allowlist configured",
+				sdklog.Operation("auth_validate"),
+				sdklog.String("reason", "no_auth_config"),
+				sdklog.String("remote_addr", r.RemoteAddr),
+				sdklog.String("path", r.URL.Path))
+		return false
+	}
+
 	// Token authentication
 	if a.tokenEnabled {
 		authHeader := r.Header.Get("Authorization")
