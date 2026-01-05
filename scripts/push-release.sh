@@ -4,7 +4,19 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/utils/common.sh"
 
-VERSION="1.2.1"
+# Read version from VERSION file (OSS standard) or use fallback
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+if [ -f "$REPO_ROOT/VERSION" ]; then
+    VERSION=$(cat "$REPO_ROOT/VERSION" | tr -d '[:space:]')
+    if [ -z "$VERSION" ]; then
+        echo "❌ ERROR: VERSION file exists but is empty" >&2
+        exit 1
+    fi
+else
+    echo "⚠️  WARNING: VERSION file not found, using fallback 1.2.1" >&2
+    VERSION="1.2.1"
+fi
+
 IMAGE="kubezen/zen-watcher"
 
 echo "🔨 Building ${IMAGE}:${VERSION}..."

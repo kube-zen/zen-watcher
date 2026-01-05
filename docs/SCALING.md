@@ -268,7 +268,7 @@ env:
 
 ## Current Implementation Status
 
-### ✅ Implemented (v1.2.0)
+### ✅ Implemented (v1.2.1)
 - ✅ Leader election (mandatory, always enabled)
 - ✅ High availability for webhook sources (all pods serve, load-balanced)
 - ✅ HPA support for webhook traffic
@@ -361,7 +361,7 @@ env:
 **For Development/Testing:**
 - ✅ Single replica (acceptable for non-critical workloads)
 
-### Current Implementation (v1.2.0)
+### Current Implementation (v1.2.1)
 - ✅ Leader election (mandatory, always enabled)
 - ✅ High availability for webhook sources (load-balanced across all pods)
 - ✅ HPA support for webhook traffic

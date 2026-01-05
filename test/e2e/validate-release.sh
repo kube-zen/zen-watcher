@@ -15,7 +15,16 @@
 
 set -euo pipefail
 
-# E2E validation script for zen-watcher 1.2.1 release
+# Determine version from VERSION file or default
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+if [ -f "$REPO_ROOT/VERSION" ]; then
+    VERSION=$(cat "$REPO_ROOT/VERSION" | tr -d '[:space:]')
+else
+    VERSION="1.2.1"  # Fallback if VERSION file missing
+fi
+
+# E2E validation script for zen-watcher ${VERSION} release
 # This script validates the release against a real cluster without modifying kubeconfig.
 
 # Colors
@@ -88,7 +97,7 @@ validate_helm_chart() {
     # Template and validate
     helm template zen-watcher "$HELM_CHART_PATH" \
         --namespace "$NAMESPACE" \
-        --set image.tag=1.0.0-alpha \
+        --set image.tag=${VERSION} \
         > /tmp/zen-watcher-manifests.yaml
     
     # Dry-run validation
@@ -170,7 +179,7 @@ validate_observations() {
 
 main() {
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo "zen-watcher 1.0.0-alpha E2E Validation"
+    echo "zen-watcher ${VERSION} E2E Validation"
     echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
     echo ""
     echo "Configuration:"
