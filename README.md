@@ -19,7 +19,13 @@ Zen Watcher is an open-source Kubernetes operator that aggregates structured sig
 
 **Version:** 1.2.1 (OSS release)
 
+## 📊 How It Works
+
+![Zen Watcher Architecture](docs/images/zen-watcher.png)
+
 ## 🚀 Quick Start
+
+> **📖 For a complete getting started guide**, see [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) which includes detailed prerequisites, troubleshooting, and advanced configuration.
 
 ### Prerequisites
 
@@ -68,7 +74,13 @@ obsctl list --namespace zen-system
 kubectl get observations
 ```
 
+<<<<<<< HEAD
 **See [DEPLOYMENT_HELM.md](docs/DEPLOYMENT_HELM.md) for complete installation guide.**
+=======
+**Next Steps:**
+- **Complete Installation Guide**: [docs/DEPLOYMENT_HELM.md](docs/DEPLOYMENT_HELM.md)
+- **Detailed Getting Started**: [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) (includes troubleshooting, monitoring setup, and advanced configuration)
+>>>>>>> fee8d0f (docs: add architecture diagram to README)
 
 ---
 
@@ -143,10 +155,11 @@ metadata:
   name: my-tool-source
   namespace: zen-system
 spec:
-  source: my-tool
-  ingester: logs
+  source: my-tool  # Required: Must match pattern ^[a-z0-9-]+$
+                    # Allowed values: kubernetes-events, falco, trivy, kyverno, checkov, kube-bench, cert-manager, sealed-secrets, or any custom source name
+  ingester: logs    # Required: Must be one of: logs, webhook, informer
   logs:
-    podSelector: app=my-tool
+    podSelector: app=my-tool  # Required: Kubernetes label selector (e.g., "app=my-tool" or "app in (tool1,tool2)")
     patterns:
       - regex: "ERROR: (?P<message>.*)"
         type: error
@@ -260,6 +273,22 @@ This version compatibility is tested and verified. For other zen-sdk versions, s
 ## 🤝 Contributing
 
 Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+---
+
+## 💰 Funding & Sponsorship
+
+**Support the Project**: Zen Watcher is an open-source project maintained by the community. Your sponsorship helps ensure continued development, maintenance, and support.
+
+**GitHub Sponsors**: [Sponsor us on GitHub](https://github.com/sponsors/kube-zen) - Support the project directly through GitHub Sponsors. (Profile pending approval)
+
+**Why Sponsor?**
+- Ensure long-term maintenance and support
+- Accelerate feature development
+- Support the open-source Kubernetes ecosystem
+- Get priority support and early access to features
+
+**Corporate Sponsors**: For enterprise sponsorship opportunities, contact team@kube-zen.io
 
 ---
 
