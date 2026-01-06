@@ -23,9 +23,13 @@ Zen Watcher is an open-source Kubernetes operator that aggregates structured sig
 
 **Version:** 1.2.1 (OSS release) | **License:** [Apache 2.0](LICENSE) | **Status:** ✅ Actively Maintained
 
+## 📊 How It Works
+
+![Zen Watcher Architecture](docs/images/zen-watcher.png)
+
 ## 🚀 Quick Start
 
-> **📖 For a complete getting started guide**, see [docs/GETTING_STARTED_GENERIC.md](docs/GETTING_STARTED_GENERIC.md) which includes detailed prerequisites, troubleshooting, and advanced configuration.
+> **📖 For a complete getting started guide**, see [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) which includes detailed prerequisites, troubleshooting, and advanced configuration.
 
 ### Prerequisites
 
@@ -76,7 +80,7 @@ kubectl get observations
 
 **Next Steps:**
 - **Complete Installation Guide**: [docs/DEPLOYMENT_HELM.md](docs/DEPLOYMENT_HELM.md)
-- **Detailed Getting Started**: [docs/GETTING_STARTED_GENERIC.md](docs/GETTING_STARTED_GENERIC.md) (includes troubleshooting, monitoring setup, and advanced configuration)
+- **Detailed Getting Started**: [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) (includes troubleshooting, monitoring setup, and advanced configuration)
 
 ---
 
@@ -151,10 +155,11 @@ metadata:
   name: my-tool-source
   namespace: zen-system
 spec:
-  source: my-tool
-  ingester: logs
+  source: my-tool  # Required: Must match pattern ^[a-z0-9-]+$
+                    # Allowed values: kubernetes-events, falco, trivy, kyverno, checkov, kube-bench, cert-manager, sealed-secrets, or any custom source name
+  ingester: logs    # Required: Must be one of: logs, webhook, informer
   logs:
-    podSelector: app=my-tool
+    podSelector: app=my-tool  # Required: Kubernetes label selector (e.g., "app=my-tool" or "app in (tool1,tool2)")
     patterns:
       - regex: "ERROR: (?P<message>.*)"
         type: error
@@ -300,6 +305,22 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 **Security Issues**: security@kube-zen.io (vulnerability reports - see [VULNERABILITY_DISCLOSURE.md](VULNERABILITY_DISCLOSURE.md))
 
 **Issues**: [GitHub Issues](https://github.com/kube-zen/zen-watcher/issues) for bug reports and feature requests
+
+---
+
+## 💰 Funding & Sponsorship
+
+**Support the Project**: Zen Watcher is an open-source project maintained by the community. Your sponsorship helps ensure continued development, maintenance, and support.
+
+**GitHub Sponsors**: [Sponsor us on GitHub](https://github.com/sponsors/kube-zen) - Support the project directly through GitHub Sponsors. (Profile pending approval)
+
+**Why Sponsor?**
+- Ensure long-term maintenance and support
+- Accelerate feature development
+- Support the open-source Kubernetes ecosystem
+- Get priority support and early access to features
+
+**Corporate Sponsors**: For enterprise sponsorship opportunities, contact team@kube-zen.io
 
 ---
 
