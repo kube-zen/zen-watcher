@@ -37,8 +37,7 @@ Zen Watcher is an open-source Kubernetes operator that aggregates structured sig
 - Helm 3.8+ (for Helm installation)
 - kubectl configured to access your cluster
 
-**Helm Repositories:** When using installation scripts, the following repositories are automatically added:
-- `ingress-nginx`, `vm`, `grafana`, `aqua`, `falcosecurity`, `kyverno`, `kube-zen`
+**Helm Repository:** The standard installation requires only the `kube-zen` repository (added in the Quick Start steps below). Additional repositories (`ingress-nginx`, `vm`, `grafana`, `aqua`, `falcosecurity`, `kyverno`) are only needed if using `scripts/install.sh` for a full demo environment with monitoring and security tools.
 
 For air-gapped environments, use `--offline` flag (see [DEPLOYMENT_HELM.md](docs/DEPLOYMENT_HELM.md)).
 

@@ -10,7 +10,13 @@ This guide covers deploying zen-watcher using Helm, the recommended installation
 
 ### Helm Repositories
 
-When using the installation scripts (`scripts/install.sh` or `scripts/quick-demo.sh`), the following Helm repositories are automatically added:
+**Standard Installation:** The standard Helm installation (shown in Quick Start below) only requires the `kube-zen` repository:
+
+```bash
+helm repo add kube-zen https://kube-zen.github.io/helm-charts
+```
+
+**Full Demo Setup:** When using `scripts/install.sh` for a full demo environment with monitoring and security tools, the following additional Helm repositories are automatically added:
 
 | Repository | URL | Purpose |
 |------------|-----|---------|
@@ -20,7 +26,6 @@ When using the installation scripts (`scripts/install.sh` or `scripts/quick-demo
 | `aqua` | https://aquasecurity.github.io/helm-charts | Trivy scanner |
 | `falcosecurity` | https://falcosecurity.github.io/charts | Falco runtime security |
 | `kyverno` | https://kyverno.github.io/kyverno/ | Kyverno policy engine |
-| `kube-zen` | https://kube-zen.github.io/helm-charts | Zen Watcher chart (optional) |
 
 **Note:** For air-gapped environments, use the `--offline` flag to skip repository setup. Repositories must be pre-configured in that case.
 
