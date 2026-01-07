@@ -20,8 +20,8 @@ source "${SCRIPT_DIR}/../utils/common.sh"
 NAMESPACE="${1:-${NAMESPACE:-zen-system}}"
 
 log_step "Creating demo namespace..."
-kubectl create namespace ${NAMESPACE} 2>/dev/null || true
-kubectl create namespace demo-manifests 2>/dev/null || true
+kubectl --context=k3d-sandbox create namespace ${NAMESPACE} 2>/dev/null || true
+kubectl --context=k3d-sandbox create namespace demo-manifests 2>/dev/null || true
 
 log_step "Creating demo Observation CRDs..."
 
@@ -32,7 +32,7 @@ deploy_with_retry() {
     local delay=10
     
     for i in $(seq 1 $retries); do
-        if kubectl apply -f "$file" 2>/dev/null; then
+        if kubectl --context=k3d-sandbox apply -f "$file" 2>/dev/null; then
             return 0
         else
             if [ $i -lt $retries ]; then
@@ -200,14 +200,14 @@ log_step "Deploying demo manifests for Checkov scanning..."
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 DEMO_MANIFESTS_DIR="${REPO_ROOT}/config/demo-manifests"
 if [ -d "$DEMO_MANIFESTS_DIR" ]; then
-    kubectl apply -f "${DEMO_MANIFESTS_DIR}/" -n demo-manifests 2>/dev/null || echo "⚠ Demo manifests already exist or not found"
+    kubectl --context=k3d-sandbox apply -f "${DEMO_MANIFESTS_DIR}/" -n demo-manifests 2>/dev/null || echo "⚠ Demo manifests already exist or not found"
 else
     log_warn "Demo manifests directory not found: $DEMO_MANIFESTS_DIR (skipping)"
 fi
 
 # Deploy a mock metrics server that exposes Prometheus metrics
 log_step "Deploying mock metrics server..."
-kubectl apply -f - <<EOF
+kubectl --context=k3d-sandbox apply -f - <<EOF
 apiVersion: v1
 kind: Pod
 metadata:
@@ -312,12 +312,12 @@ EOF
 
 log_success "Mock metrics server deployed"
 log_step "Waiting for pod..."
-kubectl wait --for=condition=ready pod/zen-watcher-mock -n ${NAMESPACE} --timeout=60s 2>/dev/null || log_warn "Pod may take longer to start"
+kubectl --context=k3d-sandbox wait --for=condition=ready pod/zen-watcher-mock -n ${NAMESPACE} --timeout=60s 2>/dev/null || log_warn "Pod may take longer to start"
 log_success "Demo data ready!"
 echo ""
 echo "📊 Created:"
-echo "  - $(kubectl get observations -n ${NAMESPACE} --no-headers 2>/dev/null | wc -l | tr -d ' ') Observation CRDs"
+echo "  - $(kubectl --context=k3d-sandbox get observations -n ${NAMESPACE} --no-headers 2>/dev/null | wc -l | tr -d ' ') Observation CRDs"
 echo "  - Mock metrics server on :9090"
 echo "  - Demo manifests in demo-manifests namespace"
 echo ""
-echo "💡 View observations: kubectl get observations -n ${NAMESPACE}"
+echo "💡 View observations: kubectl --context=k3d-sandbox get observations -n ${NAMESPACE}"
