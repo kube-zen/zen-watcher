@@ -331,6 +331,31 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 	// Extract category, severity, and eventType from spec for metrics BEFORE creation (optimized)
 	category, severity, eventType := oc.extractMetricsFields(observation, observationLogger, source)
 
+	// CRITICAL: Normalize severity and eventType in the observation spec before creation
+	// This ensures validation passes even if the observation was created/modified elsewhere
+	if severity != "" {
+		normalizedSeverity := normalizeSeverity(severity)
+		if err := unstructured.SetNestedField(observation.Object, normalizedSeverity, "spec", "severity"); err != nil {
+			observationLogger.Warn("Failed to normalize severity in observation spec",
+				sdklog.Operation("normalize_severity"),
+				sdklog.String("source", source),
+				sdklog.Error(err))
+		} else {
+			severity = normalizedSeverity // Update for metrics
+		}
+	}
+	if eventType != "" {
+		normalizedEventType := normalizeEventType(eventType)
+		if err := unstructured.SetNestedField(observation.Object, normalizedEventType, "spec", "eventType"); err != nil {
+			observationLogger.Warn("Failed to normalize eventType in observation spec",
+				sdklog.Operation("normalize_event_type"),
+				sdklog.String("source", source),
+				sdklog.Error(err))
+		} else {
+			eventType = normalizedEventType // Update for metrics
+		}
+	}
+
 	// Set TTL in spec if not already set (Kubernetes native style)
 	oc.setTTLIfNotSet(observation)
 
