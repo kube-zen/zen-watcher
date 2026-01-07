@@ -107,6 +107,10 @@ func EventToObservation(event *Event) *unstructured.Unstructured {
 		detectedAt = time.Now().Format(time.RFC3339)
 	}
 
+	// Normalize severity and eventType before creating Observation
+	normalizedSeverity := normalizeSeverity(event.Severity)
+	normalizedEventType := normalizeEventType(event.EventType)
+
 	obs := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "zen.kube-zen.io/v1",
@@ -117,14 +121,14 @@ func EventToObservation(event *Event) *unstructured.Unstructured {
 				"labels": map[string]interface{}{
 					"source":   event.Source,
 					"category": event.Category,
-					"severity": event.Severity,
+					"severity": normalizedSeverity,
 				},
 			},
 			"spec": map[string]interface{}{
 				"source":     event.Source,
 				"category":   event.Category,
-				"severity":   event.Severity,
-				"eventType":  event.EventType,
+				"severity":   normalizedSeverity,
+				"eventType":  normalizedEventType,
 				"detectedAt": detectedAt,
 			},
 		},

@@ -37,3 +37,27 @@ func normalizeSeverity(severity string) string {
 		return "info" // Default to info instead of unknown
 	}
 }
+
+// normalizeEventType normalizes eventType to match CRD validation pattern ^[a-z0-9_]+$
+// Replaces hyphens and other invalid characters with underscores, converts to lowercase
+func normalizeEventType(eventType string) string {
+	if eventType == "" {
+		return "custom_event" // Default
+	}
+	// Convert to lowercase and replace hyphens and other non-alphanumeric chars (except underscore) with underscores
+	normalized := strings.ToLower(eventType)
+	normalized = strings.ReplaceAll(normalized, "-", "_")
+	// Remove any remaining invalid characters (keep only a-z, 0-9, _)
+	var result strings.Builder
+	for _, r := range normalized {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '_' {
+			result.WriteRune(r)
+		} else {
+			result.WriteRune('_')
+		}
+	}
+	if result.Len() == 0 {
+		return "custom_event" // Fallback if all chars were invalid
+	}
+	return result.String()
+}

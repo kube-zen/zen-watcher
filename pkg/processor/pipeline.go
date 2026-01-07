@@ -225,7 +225,7 @@ func (p *Processor) normalizeObservation(observation *unstructured.Unstructured,
 		priority := p.extractPriority(raw, config)
 		event.Severity = p.priorityToSeverity(priority)
 		event.Category = "security"
-		event.EventType = "custom-event"
+		event.EventType = "custom_event" // Use underscore instead of hyphen to match CRD validation
 		if p.metrics != nil {
 			p.metrics.FilterDecisions.WithLabelValues(source, "normalization", "default").Inc()
 		}
@@ -274,7 +274,7 @@ func (p *Processor) normalize(raw *generic.RawEvent, config *generic.SourceConfi
 			Source:    raw.Source,
 			Category:  "security", // Default
 			Severity:  "MEDIUM",   // Default
-			EventType: "custom-event",
+			EventType: "custom_event",
 			Details:   raw.RawData, // Preserve all raw data
 		}
 	}
