@@ -118,7 +118,7 @@ func main() {
 	}
 
 	zenlead.ControllerRuntimeDefaults(clients.Config)
-	_, leaderElectedCh := setupLeaderElection(clients, namespace, setupLog)
+	leaderManager, leaderElectedCh := setupLeaderElection(clients, namespace, setupLog)
 
 	// Initialize adapters and orchestrator
 	genericOrchestrator, _, ingesterInformer, httpServer, falcoAlertsChan, auditEventsChan := initializeAdapters(clients, proc, m, gvrs, observationCreator, setupLog)
@@ -126,7 +126,7 @@ func main() {
 	// Start all services
 	var wg sync.WaitGroup
 	startAllServices(ctx, &wg, configManager, configMapLoader, ingesterInformer, genericOrchestrator, httpServer,
-		observationCreator, clients, gvrs, m, leaderElectedCh, filterInstance, log, setupLog, falcoAlertsChan, auditEventsChan)
+		observationCreator, clients, gvrs, m, leaderElectedCh, filterInstance, log, setupLog, falcoAlertsChan, auditEventsChan, leaderManager)
 
 	// Wait for shutdown
 	<-ctx.Done()
@@ -329,7 +329,15 @@ func initializeAdapters(clients *kubernetes.Clients, proc *processor.Processor, 
 }
 
 // startAllServices starts all services
-func startAllServices(ctx context.Context, wg *sync.WaitGroup, configManager *watcherconfig.ConfigManager, configMapLoader *watcherconfig.ConfigMapLoader, ingesterInformer *watcherconfig.IngesterInformer, genericOrchestrator *orchestrator.GenericOrchestrator, httpServer *server.Server, observationCreator *watcher.ObservationCreator, clients *kubernetes.Clients, gvrs *kubernetes.GVRs, m *metrics.Metrics, leaderElectedCh <-chan struct{}, filterInstance *filter.Filter, log *sdklog.Logger, setupLog *sdklog.Logger, falcoAlertsChan, auditEventsChan chan map[string]interface{}) {
+func startAllServices(ctx context.Context, wg *sync.WaitGroup, configManager *watcherconfig.ConfigManager, configMapLoader *watcherconfig.ConfigMapLoader, ingesterInformer *watcherconfig.IngesterInformer, genericOrchestrator *orchestrator.GenericOrchestrator, httpServer *server.Server, observationCreator *watcher.ObservationCreator, clients *kubernetes.Clients, gvrs *kubernetes.GVRs, m *metrics.Metrics, leaderElectedCh <-chan struct{}, filterInstance *filter.Filter, log *sdklog.Logger, setupLog *sdklog.Logger, falcoAlertsChan, auditEventsChan chan map[string]interface{}, leaderManager ctrl.Manager) {
+	// Start leader election manager (required for leader election to work)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := leaderManager.Start(ctx); err != nil {
+			setupLog.Error(err, "Leader election manager stopped", sdklog.Operation("leader_manager"))
+		}
+	}()
 	// Create adapter factory and launcher
 	adapterFactory := watcher.NewAdapterFactory(clients.Standard)
 	adapters := adapterFactory.CreateAdapters()

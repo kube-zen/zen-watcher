@@ -7,6 +7,8 @@
 
 **Status:** ✅ Actively Maintained | **Version:** 1.2.1 | **License:** [Apache 2.0](LICENSE)
 
+⭐ **Star us on GitHub** if Zen-Watcher helps you! [github.com/kube-zen/zen-watcher](https://github.com/kube-zen/zen-watcher)
+
 > **Kubernetes Observation Collector: Turn Any Signal into a CRD**
 
 Zen Watcher is an open-source Kubernetes operator that aggregates structured signals from any tool (security, compliance, performance, operations, cost) into unified `Observation` CRDs. Lightweight, standalone, and useful on its own.
@@ -22,6 +24,18 @@ Zen Watcher is an open-source Kubernetes operator that aggregates structured sig
 - 🎯 **Custom**: Any domain you define
 
 **Version:** 1.2.1 (OSS release) | **License:** [Apache 2.0](LICENSE) | **Status:** ✅ Actively Maintained
+
+---
+
+## 💡 Why Zen-Watcher?
+
+**The problem:** Your Kubernetes cluster generates events from dozens of tools—Trivy finds vulnerabilities, Falco detects threats, Kyverno flags policy violations, pods crash, nodes fail. Each tool has its own format, its own API, its own way to query. During a 2 AM incident, you're manually correlating events from 4 different tools, copying data between dashboards, trying to understand what's actually happening.
+
+**The solution:** Zen-Watcher aggregates **all events** into unified `Observation` CRDs. One `kubectl get observations` command shows you everything. No more switching between tools. No more manual correlation. Just Kubernetes-native CRDs that you already know how to query, filter, and integrate.
+
+**The result:** Faster incident response, better visibility, and a single source of truth for all cluster events—in a format operators already understand.
+
+[Read our origin story →](docs/ORIGIN_STORY.md)
 
 ---
 
@@ -55,9 +69,24 @@ pod-crashloop-detected   runtime    medium     operations    5m
 node-not-ready           runtime    warning    infrastructure 10m
 ```
 
+> **Note:** Observations appear as events happen in your cluster. If you see "No resources found", wait 1-2 minutes for Kubernetes events to populate, or check [Troubleshooting](#-troubleshooting) below.
+
 **That's it!** You now have a unified view of all events in your cluster. See [Configuration](#-configuration) below for production-ready settings.
 
-> **📖 Need more details?** See [docs/GETTING_STARTED_GENERIC.md](docs/GETTING_STARTED_GENERIC.md) for troubleshooting, advanced configuration, and integration guides.
+### Troubleshooting
+
+**No observations showing up?**
+- Wait 1-2 minutes for events to populate (observations appear as events happen)
+- Check pods are ready: `kubectl get pods -n zen-system`
+- Check logs: `kubectl logs -n zen-system -l app.kubernetes.io/name=zen-watcher`
+
+**Pods not starting?**
+- Check CRDs are installed: `kubectl get crd observations.zen.kube-zen.io`
+- Verify RBAC: `kubectl get clusterrole zen-watcher`
+
+**Need more help?**
+- 📖 **Complete guide**: [docs/GETTING_STARTED_GENERIC.md](docs/GETTING_STARTED_GENERIC.md) - Installation, advanced configuration, and integration guides
+- 🔧 **Troubleshooting**: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) - Common issues and solutions
 
 ---
 
@@ -340,12 +369,13 @@ kubectl get observations -n zen-system -o json | \
 
 - [Use Cases](docs/USE_CASES.md) - Practical use cases and how to combine ingester examples ⭐ **NEW**
 - [Installation Guide](docs/DEPLOYMENT_HELM.md) - Complete deployment instructions
+- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [Source Adapters](docs/SOURCE_ADAPTERS.md) - How to add new sources
 - [Manual Webhook Adapter](docs/MANUAL_WEBHOOK_ADAPTER.md) - Configure webhooks for Falco, Audit, and other tools
 - [Observation API](docs/CRD.md) - API reference
 - [Integrations](docs/INTEGRATIONS.md) - How to consume Observations
 - [Deduplication](docs/DEDUPLICATION.md) - Deduplication strategies
-- [CRD Documentation](docs/CRD.md) - Detailed CRD documentation
+- [Roadmap](ROADMAP.md) - What's coming next
 
 ---
 
@@ -361,7 +391,7 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ---
 
-## 👥 Maintainers
+## 👥 Maintainers & Support
 
 **Zen-Watcher is actively maintained by the Zen Team.**
 
@@ -372,25 +402,13 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 - ✅ **Production-ready** - We use this in production ourselves
 - ✅ **Long-term** - This isn't a side project; it's a core tool we depend on
 
-**Where to talk:**
+**Where to get help:**
 - 💬 **GitHub Discussions**: [github.com/kube-zen/zen-watcher/discussions](https://github.com/kube-zen/zen-watcher/discussions) - Ask questions, share ideas, connect with the community
 - 📧 **Email**: zen@kube-zen.io (general inquiries)
 - 🔒 **Security**: security@kube-zen.io (vulnerability reports - see [VULNERABILITY_DISCLOSURE.md](VULNERABILITY_DISCLOSURE.md))
 - 🐛 **Issues**: [GitHub Issues](https://github.com/kube-zen/zen-watcher/issues) for bug reports and feature requests
 
 **Who answers when this breaks?** We do. See [MAINTAINERS](MAINTAINERS) for our commitment and responsibilities.
-
----
-
-## 💬 Support & Community
-
-**Primary Community Platform**: [GitHub Discussions](https://github.com/kube-zen/zen-watcher/discussions) - Ask questions, share ideas, and connect with the community.
-
-**Email Support**: zen@kube-zen.io (general inquiries)
-
-**Security Issues**: security@kube-zen.io (vulnerability reports - see [VULNERABILITY_DISCLOSURE.md](VULNERABILITY_DISCLOSURE.md))
-
-**Issues**: [GitHub Issues](https://github.com/kube-zen/zen-watcher/issues) for bug reports and feature requests
 
 ---
 

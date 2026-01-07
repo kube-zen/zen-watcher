@@ -56,8 +56,10 @@ func (a *InformerAdapter) Validate(config *SourceConfig) error {
 	if config.Informer == nil {
 		return fmt.Errorf("informer config is required for informer adapter")
 	}
-	if config.Informer.GVR.Group == "" || config.Informer.GVR.Version == "" || config.Informer.GVR.Resource == "" {
-		return fmt.Errorf("informer.gvr.group, version, and resource are required")
+	// Group can be empty for core Kubernetes resources (e.g., events, pods)
+	// Version and resource are required
+	if config.Informer.GVR.Version == "" || config.Informer.GVR.Resource == "" {
+		return fmt.Errorf("informer.gvr.version and resource are required")
 	}
 	return nil
 }

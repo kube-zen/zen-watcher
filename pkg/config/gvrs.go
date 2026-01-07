@@ -33,7 +33,8 @@ func getDefaultAPIGroup() string {
 }
 
 // DefaultAPIVersion is the default API version for observations and other resources.
-const DefaultAPIVersion = "v1"
+// Note: Currently using v1alpha1 as that's what's installed in the cluster
+const DefaultAPIVersion = "v1alpha1"
 
 // IngesterGVR is the GroupVersionResource for Ingester CRDs
 var IngesterGVR = schema.GroupVersionResource{
