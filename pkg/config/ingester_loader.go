@@ -61,9 +61,11 @@ type GVRConfig struct {
 
 // WebhookConfig holds webhook-specific configuration
 type WebhookConfig struct {
-	Path      string
-	Auth      *AuthConfig
-	RateLimit *RateLimitConfig
+	Path       string
+	Port       int
+	BufferSize int
+	Auth       *AuthConfig
+	RateLimit  *RateLimitConfig
 }
 
 // AuthConfig holds authentication configuration

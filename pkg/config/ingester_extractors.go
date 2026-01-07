@@ -16,6 +16,7 @@ package config
 
 import (
 	"fmt"
+	"strconv"
 
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -444,6 +445,23 @@ func extractWebhookConfigFromMap(sourceMap map[string]interface{}) *WebhookConfi
 	config := &WebhookConfig{
 		Path: getString(webhook, "path"),
 	}
+	// Extract port (default to 8080 if not specified)
+	if port, ok := webhook["port"].(int); ok {
+		config.Port = port
+	} else if portStr, ok := webhook["port"].(string); ok {
+		// Handle string port (YAML might parse as string)
+		if parsed, err := strconv.Atoi(portStr); err == nil {
+			config.Port = parsed
+		} else {
+			config.Port = 8080 // Default
+		}
+	} else {
+		config.Port = 8080 // Default
+	}
+	// Extract buffer size
+	if bufferSize, ok := webhook["bufferSize"].(int); ok {
+		config.BufferSize = bufferSize
+	}
 	if auth, ok := webhook["auth"].(map[string]interface{}); ok {
 		config.Auth = &AuthConfig{
 			Type:      getString(auth, "type"),
@@ -488,6 +506,23 @@ func extractWebhookConfig(spec map[string]interface{}) *WebhookConfig {
 	}
 	config := &WebhookConfig{
 		Path: getString(webhook, "path"),
+	}
+	// Extract port (default to 8080 if not specified)
+	if port, ok := webhook["port"].(int); ok {
+		config.Port = port
+	} else if portStr, ok := webhook["port"].(string); ok {
+		// Handle string port (YAML might parse as string)
+		if parsed, err := strconv.Atoi(portStr); err == nil {
+			config.Port = parsed
+		} else {
+			config.Port = 8080 // Default
+		}
+	} else {
+		config.Port = 8080 // Default
+	}
+	// Extract buffer size
+	if bufferSize, ok := webhook["bufferSize"].(int); ok {
+		config.BufferSize = bufferSize
 	}
 	if auth, ok := webhook["auth"].(map[string]interface{}); ok {
 		config.Auth = &AuthConfig{

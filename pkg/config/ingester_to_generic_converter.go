@@ -47,7 +47,9 @@ func ConvertIngesterConfigToGeneric(ingesterConfig *IngesterConfig) *generic.Sou
 	// Convert webhook config
 	if ingesterConfig.Webhook != nil {
 		config.Webhook = &generic.WebhookConfig{
-			Path: ingesterConfig.Webhook.Path,
+			Path:       ingesterConfig.Webhook.Path,
+			Port:       ingesterConfig.Webhook.Port,
+			BufferSize: ingesterConfig.Webhook.BufferSize,
 		}
 		if ingesterConfig.Webhook.Auth != nil {
 			config.Webhook.Auth = &generic.AuthConfig{
