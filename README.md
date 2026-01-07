@@ -23,63 +23,129 @@ Zen Watcher is an open-source Kubernetes operator that aggregates structured sig
 
 **Version:** 1.2.1 (OSS release) | **License:** [Apache 2.0](LICENSE) | **Status:** ✅ Actively Maintained
 
+---
+
+## 🚀 Quick Start (5 Minutes)
+
+**Get Zen-Watcher running and see observations in your cluster:**
+
+```bash
+# 1. Add Helm repository
+helm repo add kube-zen https://kube-zen.github.io/helm-charts
+helm repo update
+
+# 2. Install zen-watcher
+helm install zen-watcher kube-zen/zen-watcher \
+  --namespace zen-system \
+  --create-namespace \
+  --set ingester.createDefaultK8sEvents=true
+
+# 3. Wait for pods to be ready
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=zen-watcher -n zen-system --timeout=60s
+
+# 4. Query observations (this is what you get!)
+kubectl get observations
+```
+
+**Expected Output:**
+```
+NAME                     TYPE       SEVERITY   CATEGORY      AGE
+kube-apiserver-error     runtime    high       operations    2m
+pod-crashloop-detected   runtime    medium     operations    5m
+node-not-ready           runtime    warning    infrastructure 10m
+```
+
+**That's it!** You now have a unified view of all events in your cluster. See [Configuration](#-configuration) below for production-ready settings.
+
+> **📖 Need more details?** See [docs/GETTING_STARTED_GENERIC.md](docs/GETTING_STARTED_GENERIC.md) for troubleshooting, advanced configuration, and integration guides.
+
+---
+
 ## 📊 How It Works
 
 ![Zen Watcher Architecture](docs/images/zen-watcher.png)
 
-## 🚀 Quick Start
+---
 
-> **📖 For a complete getting started guide**, see [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) which includes detailed prerequisites, troubleshooting, and advanced configuration.
+## 🎯 What Zen-Watcher Is (And Is NOT)
 
-### Prerequisites
+**Zen-Watcher is:**
+- ✅ **An observation aggregator** - Collects events from any tool into unified CRDs
+- ✅ **A Kubernetes-native operator** - Uses CRDs, informers, and standard Kubernetes patterns
+- ✅ **Read-only by design** - Never modifies or deletes your workloads
+- ✅ **Tool-agnostic** - Works with Trivy, Falco, Kyverno, or any custom source
+- ✅ **Standalone** - Useful on its own, no external dependencies
 
-- Kubernetes 1.26+
-- Helm 3.8+ (for Helm installation)
-- kubectl configured to access your cluster
+**Zen-Watcher is NOT:**
+- ❌ **An alerting system** - We don't send alerts. We create CRDs. Use [kubewatch](https://github.com/robusta-dev/kubewatch) or [Robusta](https://home.robusta.dev/) to route observations to Slack/PagerDuty/SIEM
+- ❌ **A Falco replacement** - We don't detect threats. We aggregate what Falco (and others) detect
+- ❌ **An auto-remediation tool** - We intentionally avoid auto-remediation. You decide what to do with observations
+- ❌ **A monitoring stack** - We don't replace Prometheus/Grafana. We complement them by providing structured event data
+- ❌ **A policy engine** - We don't enforce policies. We observe policy violations from tools like Kyverno
 
-**Helm Repository:** The standard installation requires only the `kube-zen` repository (added in the Quick Start steps below). Additional repositories (`ingress-nginx`, `vm`, `grafana`, `aqua`, `falcosecurity`, `kyverno`) are only needed if using `scripts/install.sh` for a full demo environment with monitoring and security tools.
+**Our philosophy:** Zen-Watcher does one thing well—aggregate events into CRDs. Everything else (alerting, remediation, visualization) is handled by tools that specialize in those domains.
 
-For air-gapped environments, use `--offline` flag (see [DEPLOYMENT_HELM.md](docs/DEPLOYMENT_HELM.md)).
+---
 
-### Install via Helm
+## 🔒 Stability Guarantees
+
+**Zen-Watcher will never:**
+- ❌ **Mutate workloads** - We never modify, patch, or delete your pods, deployments, or any cluster resources
+- ❌ **Delete resources** - We only create `Observation` CRDs. We never delete anything except our own CRDs (via TTL)
+- ❌ **Apply remediations automatically** - We intentionally avoid auto-remediation. You control what happens with observations
+- ❌ **Store secrets** - We never hold credentials, API keys, or secrets in our code or ConfigMaps
+- ❌ **Make external calls** - We only talk to the Kubernetes API. No cloud APIs, no external webhooks, no SaaS dependencies
+
+**What we do:**
+- ✅ **Create Observation CRDs** - That's it. Everything else is up to you
+- ✅ **Read-only access** - We watch resources via informers (read-only)
+- ✅ **Safe defaults** - Secure by default, opt-in for advanced features
+
+**For production use:** Zen-Watcher is safe to run in production. We use it in production ourselves. See [docs/STABILITY_GUARANTEES.md](docs/STABILITY_GUARANTEES.md) for complete guarantees and API stability policy.
+
+---
+
+## ⚙️ Configuration
+
+**If you don't know what to choose, use this. This is what we run.**
+
+### Recommended (Production)
 
 ```bash
-# Add the Helm repository
-helm repo add kube-zen https://kube-zen.github.io/helm-charts
-helm repo update
-
-# Install zen-watcher
 helm install zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
-  --create-namespace
-
-# Verify installation
-kubectl get pods -n zen-system
+  --create-namespace \
+  -f https://raw.githubusercontent.com/kube-zen/helm-charts/main/charts/zen-watcher/values-production.yaml
 ```
 
-### Apply Example Ingester
+**What this gives you:**
+- 2 replicas for HA
+- NetworkPolicy enabled
+- Webhook authentication enabled
+- Conservative resource requests with generous limits
+- 24-hour TTL on observations
+
+**File:** [`values-production.yaml`](https://github.com/kube-zen/helm-charts/blob/main/charts/zen-watcher/values-production.yaml) in the Helm chart
+
+### Minimal (Development/Local)
 
 ```bash
-# Apply Trivy Ingester
-kubectl apply -f examples/ingesters/trivy-informer.yaml
-
-# Check Ingesters
-kubectl get ingesters
+helm install zen-watcher kube-zen/zen-watcher \
+  --namespace zen-system \
+  --create-namespace \
+  -f https://raw.githubusercontent.com/kube-zen/helm-charts/main/charts/zen-watcher/values-minimal.yaml
 ```
 
-### Query Observations
+**What this gives you:**
+- 1 replica (single-node clusters)
+- NetworkPolicy disabled (for local dev)
+- Webhook authentication disabled (for local dev)
+- Minimal resource requests
+- 1-hour TTL on observations
 
-```bash
-# Using obsctl CLI
-obsctl list --namespace zen-system
+**File:** [`values-minimal.yaml`](https://github.com/kube-zen/helm-charts/blob/main/charts/zen-watcher/values-minimal.yaml) in the Helm chart
 
-# Or using kubectl
-kubectl get observations
-```
-
-**Next Steps:**
-- **Complete Installation Guide**: [docs/DEPLOYMENT_HELM.md](docs/DEPLOYMENT_HELM.md)
-- **Detailed Getting Started**: [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md) (includes troubleshooting, monitoring setup, and advanced configuration)
+> **Note:** For air-gapped environments, download the values files and use `-f values-production.yaml` locally. See [docs/DEPLOYMENT_HELM.md](docs/DEPLOYMENT_HELM.md) for details.
 
 ---
 
@@ -292,6 +358,27 @@ Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 **Code of Conduct**: All contributors must follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 **Governance**: See [GOVERNANCE.md](GOVERNANCE.md) for project governance, maintainer process, and decision-making.
+
+---
+
+## 👥 Maintainers
+
+**Zen-Watcher is actively maintained by the Zen Team.**
+
+**Who we are:** We're Kubernetes operators who built this because we needed it. We use Zen-Watcher in production, so it needs to work.
+
+**Maintainer commitment:**
+- ✅ **Actively maintained** - Regular releases, responsive to issues (target: 48-hour PR review)
+- ✅ **Production-ready** - We use this in production ourselves
+- ✅ **Long-term** - This isn't a side project; it's a core tool we depend on
+
+**Where to talk:**
+- 💬 **GitHub Discussions**: [github.com/kube-zen/zen-watcher/discussions](https://github.com/kube-zen/zen-watcher/discussions) - Ask questions, share ideas, connect with the community
+- 📧 **Email**: zen@kube-zen.io (general inquiries)
+- 🔒 **Security**: security@kube-zen.io (vulnerability reports - see [VULNERABILITY_DISCLOSURE.md](VULNERABILITY_DISCLOSURE.md))
+- 🐛 **Issues**: [GitHub Issues](https://github.com/kube-zen/zen-watcher/issues) for bug reports and feature requests
+
+**Who answers when this breaks?** We do. See [MAINTAINERS](MAINTAINERS) for our commitment and responsibilities.
 
 ---
 
