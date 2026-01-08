@@ -6,10 +6,13 @@
 # All demo resources are clearly labeled with demo.zen.kube-zen.io labels
 #
 # Usage:
-#   ./scripts/data/mock-data.sh [namespace]
+#   ./scripts/data/mock-data.sh [options]
+#   ./scripts/data/mock-data.sh --context k3d-zen-demo
+#   KUBECTL_CONTEXT=k3d-zen-demo ./scripts/data/mock-data.sh
 #
-# Environment Variables:
-#   NAMESPACE=zen-system           # Namespace for mock data (default: zen-system)
+# Options:
+#   --context <context>           Kubernetes context to use
+#   --namespace <namespace>       Namespace for mock data (default: zen-system)
 
 set -e
 
@@ -17,11 +20,54 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/../utils/common.sh"
 
-NAMESPACE="${1:-${NAMESPACE:-zen-system}}"
+# Parse arguments
+KUBECTL_CONTEXT="${KUBECTL_CONTEXT:-}"
+NAMESPACE="${NAMESPACE:-zen-system}"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --context)
+            KUBECTL_CONTEXT="$2"
+            shift 2
+            ;;
+        --namespace)
+            NAMESPACE="$2"
+            shift 2
+            ;;
+        *)
+            # Legacy support: first positional arg is namespace
+            if [ -z "${1#--*}" ]; then
+                NAMESPACE="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Build kubectl command with context if provided
+KUBECTL_CMD="kubectl"
+if [ -n "$KUBECTL_CONTEXT" ]; then
+    KUBECTL_CMD="kubectl --context=${KUBECTL_CONTEXT}"
+fi
+
+# Verify cluster is accessible
+if ! $KUBECTL_CMD cluster-info >/dev/null 2>&1; then
+    log_error "Cannot access Kubernetes cluster"
+    if [ -n "$KUBECTL_CONTEXT" ]; then
+        log_error "Context: $KUBECTL_CONTEXT"
+    fi
+    exit 1
+fi
+
+log_step "Deploying mock data..."
+if [ -n "$KUBECTL_CONTEXT" ]; then
+    log_info "Context: $KUBECTL_CONTEXT"
+fi
+log_info "Namespace: $NAMESPACE"
 
 log_step "Creating demo namespace..."
-kubectl --context=k3d-sandbox create namespace ${NAMESPACE} 2>/dev/null || true
-kubectl --context=k3d-sandbox create namespace demo-manifests 2>/dev/null || true
+$KUBECTL_CMD create namespace ${NAMESPACE} 2>/dev/null || true
+$KUBECTL_CMD create namespace demo-manifests 2>/dev/null || true
 
 log_step "Creating demo Observation CRDs..."
 
@@ -32,7 +78,7 @@ deploy_with_retry() {
     local delay=10
     
     for i in $(seq 1 $retries); do
-        if kubectl --context=k3d-sandbox apply -f "$file" 2>/dev/null; then
+        if $KUBECTL_CMD apply -f "$file" 2>/dev/null; then
             return 0
         else
             if [ $i -lt $retries ]; then
@@ -200,14 +246,14 @@ log_step "Deploying demo manifests for Checkov scanning..."
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 DEMO_MANIFESTS_DIR="${REPO_ROOT}/config/demo-manifests"
 if [ -d "$DEMO_MANIFESTS_DIR" ]; then
-    kubectl --context=k3d-sandbox apply -f "${DEMO_MANIFESTS_DIR}/" -n demo-manifests 2>/dev/null || echo "⚠ Demo manifests already exist or not found"
+    $KUBECTL_CMD apply -f "${DEMO_MANIFESTS_DIR}/" -n demo-manifests 2>/dev/null || echo "⚠ Demo manifests already exist or not found"
 else
     log_warn "Demo manifests directory not found: $DEMO_MANIFESTS_DIR (skipping)"
 fi
 
 # Deploy a mock metrics server that exposes Prometheus metrics
 log_step "Deploying mock metrics server..."
-kubectl --context=k3d-sandbox apply -f - <<EOF
+$KUBECTL_CMD apply -f - <<EOF
 apiVersion: v1
 kind: Pod
 metadata:
@@ -312,12 +358,16 @@ EOF
 
 log_success "Mock metrics server deployed"
 log_step "Waiting for pod..."
-kubectl --context=k3d-sandbox wait --for=condition=ready pod/zen-watcher-mock -n ${NAMESPACE} --timeout=60s 2>/dev/null || log_warn "Pod may take longer to start"
+$KUBECTL_CMD wait --for=condition=ready pod/zen-watcher-mock -n ${NAMESPACE} --timeout=60s 2>/dev/null || log_warn "Pod may take longer to start"
 log_success "Demo data ready!"
 echo ""
 echo "📊 Created:"
-echo "  - $(kubectl --context=k3d-sandbox get observations -n ${NAMESPACE} --no-headers 2>/dev/null | wc -l | tr -d ' ') Observation CRDs"
+echo "  - $($KUBECTL_CMD get observations -n ${NAMESPACE} --no-headers 2>/dev/null | wc -l | tr -d ' ') Observation CRDs"
 echo "  - Mock metrics server on :9090"
 echo "  - Demo manifests in demo-manifests namespace"
 echo ""
-echo "💡 View observations: kubectl --context=k3d-sandbox get observations -n ${NAMESPACE}"
+if [ -n "$KUBECTL_CONTEXT" ]; then
+    echo "💡 View observations: kubectl --context=${KUBECTL_CONTEXT} get observations -n ${NAMESPACE}"
+else
+    echo "💡 View observations: kubectl get observations -n ${NAMESPACE}"
+fi

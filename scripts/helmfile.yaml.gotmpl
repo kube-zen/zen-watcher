@@ -76,6 +76,8 @@ releases:
           service:
             type: ClusterIP
             servicePort: 8428
+          # CRITICAL: Do NOT use extraArgs.promscrape as nested object - it creates invalid --promscrape='{"config":"..."}' flag
+          # Instead, use the built-in scrape.config which is properly handled by the Helm chart
           scrape:
             enabled: true
             config:
@@ -171,24 +173,107 @@ releases:
           persistentVolume:
             enabled: false
           emptyDir: {}
-          extraArgs:
-            http.pathPrefix: /victoriametrics
-            promscrape.dropOriginalLabels: false
+          # CRITICAL: Do NOT use extraArgs.http.pathPrefix - it creates invalid --http='{"pathPrefix":"..."}' flag
+          # Do NOT use extraArgs.promscrape as nested object - it creates invalid --promscrape='{"config":"..."}' flag
+          # Use only simple key-value extraArgs that don't get converted to JSON, or leave empty
+          extraArgs: {}
           vmServiceScrape:
             enabled: true
 
-  # Grafana (depends on VictoriaMetrics for datasource)
-  - name: grafana
-    namespace: grafana
-    chart: grafana/grafana
-    version: 10.2.0
+  # VictoriaMetrics Agent (vmagent) - Scrapes metrics and forwards to VictoriaMetrics
+  - name: vmagent
+    namespace: victoriametrics
+    chart: vm/victoria-metrics-agent
     createNamespace: true
     needs:
       - victoriametrics/victoriametrics-single
     installed: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
     wait: true
     values:
-      - adminUser: zen
+      - server:
+          enabled: false  # vmagent doesn't need server mode
+      - remoteWrite:
+          - url: http://victoriametrics-vms-server.victoriametrics:8428/api/v1/write
+      - config:
+          global:
+            scrape_interval: 30s
+            scrape_timeout: 10s
+          scrape_configs:
+            - job_name: kubernetes-services
+              kubernetes_sd_configs:
+                - role: service
+              relabel_configs:
+                - action: keep
+                  regex: zen-watcher
+                  source_labels:
+                    - __meta_kubernetes_service_name
+                - action: keep
+                  regex: "true"
+                  source_labels:
+                    - __meta_kubernetes_service_annotation_prometheus_io_scrape
+                - action: replace
+                  regex: (https?)
+                  source_labels:
+                    - __meta_kubernetes_service_annotation_prometheus_io_scheme
+                  target_label: __scheme__
+                - action: replace
+                  regex: (.+)
+                  source_labels:
+                    - __meta_kubernetes_service_annotation_prometheus_io_path
+                  target_label: __metrics_path__
+                - action: replace
+                  regex: ([^:]+)(?::\d+)?;(\d+)
+                  replacement: $1:$2
+                  source_labels:
+                    - __address__
+                    - __meta_kubernetes_service_annotation_prometheus_io_port
+                  target_label: __address__
+            - job_name: kubernetes-service-endpoints
+              kubernetes_sd_configs:
+                - role: endpoints
+              relabel_configs:
+                - action: keep
+                  regex: "true"
+                  source_labels:
+                    - __meta_kubernetes_service_annotation_prometheus_io_scrape
+                - action: replace
+                  regex: (https?)
+                  source_labels:
+                    - __meta_kubernetes_service_annotation_prometheus_io_scheme
+                  target_label: __scheme__
+                - action: replace
+                  regex: (.+)
+                  source_labels:
+                    - __meta_kubernetes_service_annotation_prometheus_io_path
+                  target_label: __metrics_path__
+                - action: replace
+                  regex: ([^:]+)(?::\d+)?;(\d+)
+                  replacement: $1:$2
+                  source_labels:
+                    - __address__
+                    - __meta_kubernetes_service_annotation_prometheus_io_port
+                  target_label: __address__
+      - resources:
+          requests:
+            memory: {{ if eq $demoMinimal "true" }}64Mi{{ else }}128Mi{{ end }}
+            cpu: {{ if eq $demoMinimal "true" }}50m{{ else }}100m{{ end }}
+          limits:
+            memory: {{ if eq $demoMinimal "true" }}256Mi{{ else }}512Mi{{ end }}
+            cpu: {{ if eq $demoMinimal "true" }}250m{{ else }}500m{{ end }}
+
+  # Grafana (depends on VictoriaMetrics for datasource)
+  - name: grafana
+    namespace: grafana
+    chart: grafana/grafana
+    # Chart version 10.5.4 supports Grafana 12.3.1
+    version: 10.5.4
+    createNamespace: true
+    needs:
+      - victoriametrics/victoriametrics-single
+    installed: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
+    wait: true
+    values:
+      - adminUser: admin
       - adminPassword: {{ $grafanaPassword }}
       - env:
           GF_USERS_ALLOW_SIGN_UP: false
@@ -198,7 +283,8 @@ releases:
           GF_SERVER_DOMAIN: localhost
       - service:
           type: ClusterIP
-          port: 3000
+          port: 80
+          targetPort: 3000
       - ingress:
           enabled: true
           ingressClassName: nginx
@@ -217,7 +303,7 @@ releases:
                 type: prometheus
                 access: proxy
                 uid: victoriametrics
-                url: http://victoriametrics-single-vms-server.victoriametrics:8428
+                url: http://victoriametrics-vms-server.victoriametrics:8428
                 isDefault: true
                 jsonData:
                   timeInterval: 30s

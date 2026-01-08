@@ -6,7 +6,7 @@ spec:
   source: falco
   ingester: webhook
   webhook:
-    path: /falco
+    path: /ingest/falco
     port: 8080
     bufferSize: 200
     auth:

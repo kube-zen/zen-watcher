@@ -1145,7 +1145,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "topk(10, zen_watcher_events_total{severity=~\"CRITICAL|severity=~\"critical|high\",source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"})",
+          "expr": "topk(10, zen_watcher_events_total{severity=~\"critical|high\",source=~\"$source\",category=~\"$category\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"})",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -1636,7 +1636,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(zen_watcher_events_total{severity=~\"CRITICAL|severity=~\"critical|high\"}[1h])) by (source, category)",
+          "expr": "sum(rate(zen_watcher_events_total{severity=~\"critical|high\"}[1h])) by (source, category)",
           "format": "heatmap",
           "refId": "A"
         }

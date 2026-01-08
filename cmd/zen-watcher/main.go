@@ -121,12 +121,12 @@ func main() {
 	leaderManager, leaderElectedCh := setupLeaderElection(clients, namespace, setupLog)
 
 	// Initialize adapters and orchestrator
-	genericOrchestrator, _, ingesterInformer, httpServer, falcoAlertsChan, auditEventsChan := initializeAdapters(clients, proc, m, gvrs, observationCreator, setupLog)
+	genericOrchestrator, _, ingesterInformer, httpServer := initializeAdapters(clients, proc, m, gvrs, observationCreator, setupLog)
 
 	// Start all services
 	var wg sync.WaitGroup
 	startAllServices(ctx, &wg, configManager, configMapLoader, ingesterInformer, genericOrchestrator, httpServer,
-		observationCreator, clients, gvrs, m, leaderElectedCh, filterInstance, log, setupLog, falcoAlertsChan, auditEventsChan, leaderManager)
+		observationCreator, clients, gvrs, m, leaderElectedCh, filterInstance, log, setupLog, leaderManager)
 
 	// Wait for shutdown
 	<-ctx.Done()
@@ -268,7 +268,7 @@ func configureLeaderElection(namespace string, setupLog *sdklog.Logger) zenlead.
 }
 
 // initializeAdapters initializes adapters and orchestrator
-func initializeAdapters(clients *kubernetes.Clients, proc *processor.Processor, m *metrics.Metrics, gvrs *kubernetes.GVRs, observationCreator *watcher.ObservationCreator, setupLog *sdklog.Logger) (*orchestrator.GenericOrchestrator, *watcherconfig.IngesterStore, *watcherconfig.IngesterInformer, *server.Server, chan map[string]interface{}, chan map[string]interface{}) {
+func initializeAdapters(clients *kubernetes.Clients, proc *processor.Processor, m *metrics.Metrics, gvrs *kubernetes.GVRs, observationCreator *watcher.ObservationCreator, setupLog *sdklog.Logger) (*orchestrator.GenericOrchestrator, *watcherconfig.IngesterStore, *watcherconfig.IngesterInformer, *server.Server) {
 	// Create informer manager for generic adapters
 	informerManager := informers.NewManager(informers.Config{
 		DynamicClient: clients.Dynamic,
@@ -283,6 +283,12 @@ func initializeAdapters(clients *kubernetes.Clients, proc *processor.Processor, 
 		m.WebhookDropped,
 	)
 
+	// Create HTTP server (webhook routes will be registered dynamically)
+	httpServer := server.NewServer(m.WebhookRequests, m.WebhookDropped)
+
+	// Set route registrar on factory so webhook adapters register routes on main server
+	genericAdapterFactory.SetRouteRegistrar(httpServer.RegisterWebhookHandler)
+
 	// Create GenericOrchestrator with metrics
 	genericOrchestrator := orchestrator.NewGenericOrchestratorWithMetrics(
 		genericAdapterFactory,
@@ -290,13 +296,6 @@ func initializeAdapters(clients *kubernetes.Clients, proc *processor.Processor, 
 		proc,
 		m,
 	)
-
-	// Create webhook channels for Falco and Audit webhooks
-	// Make channel buffer sizes configurable for better backpressure handling
-	falcoBufferSize := sdkconfig.RequireEnvIntWithDefault("FALCO_BUFFER_SIZE", 100)
-	auditBufferSize := sdkconfig.RequireEnvIntWithDefault("AUDIT_BUFFER_SIZE", 200)
-	falcoAlertsChan := make(chan map[string]interface{}, falcoBufferSize)
-	auditEventsChan := make(chan map[string]interface{}, auditBufferSize)
 
 	// Create Ingester store and informer
 	ingesterStore := watcherconfig.NewIngesterStore()
@@ -315,21 +314,11 @@ func initializeAdapters(clients *kubernetes.Clients, proc *processor.Processor, 
 		return gvrs.Observations
 	})
 
-	// Create HTTP server
-	httpServer := server.NewServerWithIngester(
-		falcoAlertsChan,
-		auditEventsChan,
-		m.WebhookRequests,
-		m.WebhookDropped,
-		ingesterStore,
-		observationCreator,
-	)
-
-	return genericOrchestrator, ingesterStore, ingesterInformer, httpServer, falcoAlertsChan, auditEventsChan
+	return genericOrchestrator, ingesterStore, ingesterInformer, httpServer
 }
 
 // startAllServices starts all services
-func startAllServices(ctx context.Context, wg *sync.WaitGroup, configManager *watcherconfig.ConfigManager, configMapLoader *watcherconfig.ConfigMapLoader, ingesterInformer *watcherconfig.IngesterInformer, genericOrchestrator *orchestrator.GenericOrchestrator, httpServer *server.Server, observationCreator *watcher.ObservationCreator, clients *kubernetes.Clients, gvrs *kubernetes.GVRs, m *metrics.Metrics, leaderElectedCh <-chan struct{}, filterInstance *filter.Filter, log *sdklog.Logger, setupLog *sdklog.Logger, falcoAlertsChan, auditEventsChan chan map[string]interface{}, leaderManager ctrl.Manager) {
+func startAllServices(ctx context.Context, wg *sync.WaitGroup, configManager *watcherconfig.ConfigManager, configMapLoader *watcherconfig.ConfigMapLoader, ingesterInformer *watcherconfig.IngesterInformer, genericOrchestrator *orchestrator.GenericOrchestrator, httpServer *server.Server, observationCreator *watcher.ObservationCreator, clients *kubernetes.Clients, gvrs *kubernetes.GVRs, m *metrics.Metrics, leaderElectedCh <-chan struct{}, filterInstance *filter.Filter, log *sdklog.Logger, setupLog *sdklog.Logger, leaderManager ctrl.Manager) {
 	// Start leader election manager (required for leader election to work)
 	wg.Add(1)
 	go func() {
@@ -402,7 +391,7 @@ func startAllServices(ctx context.Context, wg *sync.WaitGroup, configManager *wa
 	startGarbageCollector(ctx, wg, clients, gvrs, m, leaderElectedCh, setupLog)
 
 	// Start HA components
-	startHAComponents(ctx, wg, observationCreator, m, httpServer, falcoAlertsChan, auditEventsChan, setupLog)
+	startHAComponents(ctx, wg, observationCreator, m, httpServer, setupLog)
 
 	// Log configuration
 	setupLog.Info("zen-watcher ready", sdklog.Operation("startup_complete"))
@@ -455,7 +444,7 @@ func startGarbageCollector(ctx context.Context, wg *sync.WaitGroup, clients *kub
 }
 
 // startHAComponents starts HA optimization components
-func startHAComponents(ctx context.Context, wg *sync.WaitGroup, observationCreator *watcher.ObservationCreator, m *metrics.Metrics, httpServer *server.Server, falcoAlertsChan, auditEventsChan chan map[string]interface{}, setupLog *sdklog.Logger) {
+func startHAComponents(ctx context.Context, wg *sync.WaitGroup, observationCreator *watcher.ObservationCreator, m *metrics.Metrics, httpServer *server.Server, setupLog *sdklog.Logger) {
 	haConfig := watcherconfig.LoadHAConfig()
 	if !haConfig.IsHAEnabled() {
 		return
@@ -488,20 +477,20 @@ func startHAComponents(ctx context.Context, wg *sync.WaitGroup, observationCreat
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			startHAMetricsLoop(ctx, haScalingCoordinator, haLoadBalancer, observationCreator, httpServer, falcoAlertsChan, auditEventsChan, setupLog)
+			startHAMetricsLoop(ctx, haScalingCoordinator, haLoadBalancer, observationCreator, httpServer, setupLog)
 		}()
 	}
 }
 
 // startHAMetricsLoop starts the HA metrics collection loop
-func startHAMetricsLoop(ctx context.Context, haScalingCoordinator *scaling.HPACoordinator, haLoadBalancer *balancer.LoadBalancer, observationCreator *watcher.ObservationCreator, httpServer *server.Server, falcoAlertsChan, auditEventsChan chan map[string]interface{}, setupLog *sdklog.Logger) {
+func startHAMetricsLoop(ctx context.Context, haScalingCoordinator *scaling.HPACoordinator, haLoadBalancer *balancer.LoadBalancer, observationCreator *watcher.ObservationCreator, httpServer *server.Server, setupLog *sdklog.Logger) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			updateHAMetrics(haScalingCoordinator, haLoadBalancer, observationCreator, httpServer, falcoAlertsChan, auditEventsChan, setupLog)
+			updateHAMetrics(haScalingCoordinator, haLoadBalancer, observationCreator, httpServer, setupLog)
 		case <-ctx.Done():
 			return
 		}
@@ -509,7 +498,7 @@ func startHAMetricsLoop(ctx context.Context, haScalingCoordinator *scaling.HPACo
 }
 
 // updateHAMetrics updates HA metrics
-func updateHAMetrics(haScalingCoordinator *scaling.HPACoordinator, haLoadBalancer *balancer.LoadBalancer, observationCreator *watcher.ObservationCreator, httpServer *server.Server, falcoAlertsChan, auditEventsChan chan map[string]interface{}, setupLog *sdklog.Logger) {
+func updateHAMetrics(haScalingCoordinator *scaling.HPACoordinator, haLoadBalancer *balancer.LoadBalancer, observationCreator *watcher.ObservationCreator, httpServer *server.Server, setupLog *sdklog.Logger) {
 	// Collect real system metrics
 	cpuUsage := systemMetrics.GetCPUUsagePercent()
 	memoryUsage := float64(systemMetrics.GetMemoryUsage())
@@ -543,11 +532,8 @@ func updateHAMetrics(haScalingCoordinator *scaling.HPACoordinator, haLoadBalance
 	// Update HTTP server HA status
 	httpServer.UpdateHAStatus(cpuUsage, memoryUsage, eventsPerSec, 0.0, queueDepth)
 
-	// Update queue depth from actual channels
-	if systemMetrics != nil {
-		queueDepth := len(falcoAlertsChan) + len(auditEventsChan)
-		systemMetrics.SetQueueDepth(queueDepth)
-	}
+	// Update queue depth: webhook events are now handled generically via adapters
+	// Queue depth is already calculated from systemMetrics above, so no additional update needed
 }
 
 // handleConfigChange handles configuration changes from ConfigMap

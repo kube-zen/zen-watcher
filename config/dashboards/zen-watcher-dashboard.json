@@ -1313,7 +1313,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "topk(10, zen_watcher_events_total{severity=~\"CRITICAL|severity=~\"critical|high\",source=~\"$source\"})",
+          "expr": "topk(10, zen_watcher_events_total{severity=~\"critical|high\",source=~\"$source\"})",
           "format": "table",
           "instant": true,
           "refId": "A"

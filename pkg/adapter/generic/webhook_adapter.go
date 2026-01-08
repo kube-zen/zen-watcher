@@ -28,6 +28,7 @@ import (
 	"time"
 
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
+	"github.com/kube-zen/zen-sdk/pkg/k8s/secrets"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"
@@ -38,21 +39,17 @@ import (
 
 // WebhookAdapter handles ALL webhook-based sources
 type WebhookAdapter struct {
-	server         *http.Server
+	server         *http.Server // DEPRECATED: Only used if routeRegistrar is nil (backward compatibility)
 	events         chan RawEvent
 	mu             sync.RWMutex
 	configs        map[string]*SourceConfig // path -> config
 	clientSet      kubernetes.Interface
-	secretCache    map[string]*secretCacheEntry // namespace/secretName -> cached secret
-	secretMu       sync.RWMutex
+	secretCache    *secrets.Cache // Secret cache from zen-sdk
 	webhookMetrics *prometheus.CounterVec // Metrics for webhook requests (optional)
 	webhookDropped *prometheus.CounterVec // Metrics for webhook events dropped (optional)
+	routeRegistrar func(path string, handler http.HandlerFunc) error // Function to register routes on main server
 }
 
-type secretCacheEntry struct {
-	secret    *corev1.Secret
-	timestamp time.Time
-}
 
 // NewWebhookAdapter creates a new generic webhook adapter
 func NewWebhookAdapter(clientSet kubernetes.Interface) *WebhookAdapter {
@@ -65,7 +62,7 @@ func NewWebhookAdapterWithMetrics(clientSet kubernetes.Interface, webhookMetrics
 		events:         make(chan RawEvent, 100),
 		configs:        make(map[string]*SourceConfig),
 		clientSet:      clientSet,
-		secretCache:    make(map[string]*secretCacheEntry),
+		secretCache:    secrets.NewCache(clientSet), // Use zen-sdk secret cache
 		webhookMetrics: webhookMetrics,
 		webhookDropped: webhookDropped,
 	}
@@ -99,6 +96,14 @@ func (a *WebhookAdapter) Validate(config *SourceConfig) error {
 	return nil
 }
 
+// SetRouteRegistrar sets the function to register webhook routes on the main server
+// If set, webhook handlers will be registered on the main server instead of creating separate servers
+func (a *WebhookAdapter) SetRouteRegistrar(registrar func(path string, handler http.HandlerFunc) error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.routeRegistrar = registrar
+}
+
 // Start starts the webhook adapter
 func (a *WebhookAdapter) Start(ctx context.Context, config *SourceConfig) (<-chan RawEvent, error) {
 	if err := a.Validate(config); err != nil {
@@ -108,9 +113,32 @@ func (a *WebhookAdapter) Start(ctx context.Context, config *SourceConfig) (<-cha
 	// Store config for this path
 	a.mu.Lock()
 	a.configs[config.Webhook.Path] = config
+	routeRegistrar := a.routeRegistrar
 	a.mu.Unlock()
 
-	// Create HTTP server if not already created
+	// Use route registrar if available (preferred - registers on main server)
+	if routeRegistrar != nil {
+		handler := a.handleWebhook(config)
+		if err := routeRegistrar(config.Webhook.Path, handler); err != nil {
+			return nil, fmt.Errorf("failed to register webhook route %s: %w", config.Webhook.Path, err)
+		}
+
+		logger := sdklog.NewLogger("zen-watcher-adapter")
+		logger.Info("Webhook handler registered on main server",
+			sdklog.Operation("webhook_register"),
+			sdklog.String("source", config.Source),
+			sdklog.String("path", config.Webhook.Path))
+
+		return a.events, nil
+	}
+
+	// Fallback: Create separate HTTP server (backward compatibility, deprecated)
+	logger := sdklog.NewLogger("zen-watcher-adapter")
+	logger.Warn("Route registrar not set, creating separate webhook server (deprecated)",
+		sdklog.Operation("webhook_start"),
+		sdklog.String("source", config.Source),
+		sdklog.String("path", config.Webhook.Path))
+
 	if a.server == nil {
 		mux := http.NewServeMux()
 
@@ -134,7 +162,7 @@ func (a *WebhookAdapter) Start(ctx context.Context, config *SourceConfig) (<-cha
 		// Start server in goroutine
 		go func() {
 			logger := sdklog.NewLogger("zen-watcher-adapter")
-			logger.Info("Webhook adapter server starting",
+			logger.Info("Webhook adapter server starting (separate server - deprecated)",
 				sdklog.Operation("webhook_start"),
 				sdklog.String("source", config.Source),
 				sdklog.Int("port", config.Webhook.Port),
@@ -163,10 +191,8 @@ func (a *WebhookAdapter) Start(ctx context.Context, config *SourceConfig) (<-cha
 			}
 		}()
 	} else {
-		// Add handler to existing server
-		// Note: This is simplified - in production, you'd need to manage multiple paths
-		logger := sdklog.NewLogger("zen-watcher-adapter")
-		logger.Warn("Webhook server already running, adding handler",
+		// Add handler to existing server (fallback behavior)
+		logger.Warn("Webhook server already running, adding handler (deprecated)",
 			sdklog.Operation("webhook_add_handler"),
 			sdklog.String("source", config.Source))
 	}
@@ -261,35 +287,9 @@ func (a *WebhookAdapter) handleWebhook(config *SourceConfig) http.HandlerFunc {
 }
 
 // loadSecret loads a secret from Kubernetes, with caching (5 minute TTL)
+// Uses zen-sdk secret cache
 func (a *WebhookAdapter) loadSecret(ctx context.Context, namespace, secretName string) (*corev1.Secret, error) {
-	cacheKey := fmt.Sprintf("%s/%s", namespace, secretName)
-
-	// Check cache first
-	a.secretMu.RLock()
-	if entry, found := a.secretCache[cacheKey]; found {
-		// Cache is valid for 5 minutes
-		if time.Since(entry.timestamp) < 5*time.Minute {
-			a.secretMu.RUnlock()
-			return entry.secret, nil
-		}
-	}
-	a.secretMu.RUnlock()
-
-	// Load from Kubernetes
-	secret, err := a.clientSet.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("failed to load secret %s/%s: %w", namespace, secretName, err)
-	}
-
-	// Update cache
-	a.secretMu.Lock()
-	a.secretCache[cacheKey] = &secretCacheEntry{
-		secret:    secret,
-		timestamp: time.Now(),
-	}
-	a.secretMu.Unlock()
-
-	return secret, nil
+	return a.secretCache.Get(ctx, namespace, secretName)
 }
 
 // authenticate handles webhook authentication

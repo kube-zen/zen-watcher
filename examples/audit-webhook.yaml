@@ -6,7 +6,7 @@ spec:
   source: audit
   ingester: webhook
   webhook:
-    path: /audit
+    path: /ingest/k8s-audit
     port: 8080
     bufferSize: 500
     auth:

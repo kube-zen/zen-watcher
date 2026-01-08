@@ -653,7 +653,7 @@
       },
       "id": 201,
       "options": {
-        "content": "## \ud83d\udd0d Advanced Query Builder\n\n### Pre-built Queries (Saved Searches)\n\n**Critical Security Events:**\n\\`\\`\\`\nsum(rate(zen_watcher_events_total{severity=\"critical\"}[5m]))\n\\`\\`\\`\n\n**Compliance Failures:**\n\\`\\`\\`\nsum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"FAIL|severity=~\"fail|critical\"}[5m]))\n\\`\\`\\`\n\n**High Severity by Source:**\n\\`\\`\\`\nsum(rate(zen_watcher_events_total{severity=\"high\"}[5m])) by (source)\n\\`\\`\\`\n\n**Namespace Event Distribution:**\n\\`\\`\\`\nsum(rate(zen_watcher_events_total[5m])) by (namespace, severity)\n\\`\\`\\`\n\n### Query Performance\n- Execution time displayed for each query\n- Optimized queries use recording rules when available",
+        "content": "## \ud83d\udd0d Advanced Query Builder\n\n### Pre-built Queries (Saved Searches)\n\n**Critical Security Events:**\n\\`\\`\\`\nsum(rate(zen_watcher_events_total{severity=\"critical\"}[5m]))\n\\`\\`\\`\n\n**Compliance Failures:**\n\\`\\`\\`\nsum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"critical|high\"}[5m]))\n\\`\\`\\`\n\n**High Severity by Source:**\n\\`\\`\\`\nsum(rate(zen_watcher_events_total{severity=\"high\"}[5m])) by (source)\n\\`\\`\\`\n\n**Namespace Event Distribution:**\n\\`\\`\\`\nsum(rate(zen_watcher_events_total[5m])) by (namespace, severity)\n\\`\\`\\`\n\n### Query Performance\n- Execution time displayed for each query\n- Optimized queries use recording rules when available",
         "mode": "markdown"
       },
       "pluginVersion": "10.0.0",

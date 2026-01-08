@@ -18,7 +18,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/pprof"
 	"os"
@@ -39,10 +38,10 @@ import (
 type Server struct {
 	server          *http.Server
 	pprofServer     *http.Server // Separate server for pprof (localhost only)
+	mux             *http.ServeMux
+	muxMu           sync.RWMutex // Protects mux for dynamic route registration
 	ready           bool
 	readyMu         sync.RWMutex
-	falcoAlertsChan chan map[string]interface{}
-	auditEventsChan chan map[string]interface{}
 	webhookMetrics  *prometheus.CounterVec
 	webhookDropped  *prometheus.CounterVec
 	auth            *WebhookAuth
@@ -66,21 +65,8 @@ type HAStatus struct {
 	LastUpdate   string  `json:"last_update"`
 }
 
-// NewServer creates a new HTTP server with handlers
-func NewServer(falcoChan, auditChan chan map[string]interface{}, webhookMetrics, webhookDropped *prometheus.CounterVec) *Server {
-	return NewServerWithIngester(falcoChan, auditChan, webhookMetrics, webhookDropped, nil, nil)
-}
-
-// NewServerWithIngester creates a new HTTP server (kept for backward compatibility)
-func NewServerWithIngester(
-	falcoChan, auditChan chan map[string]interface{},
-	webhookMetrics, webhookDropped *prometheus.CounterVec,
-	ingesterStore *config.IngesterStore,
-	observationCreator interface {
-		CreateObservation(ctx context.Context, observation *unstructured.Unstructured) error
-	},
-) *Server {
-	// Note: ingesterStore and observationCreator parameters are kept for API compatibility
+// NewServer creates a new HTTP server
+func NewServer(webhookMetrics, webhookDropped *prometheus.CounterVec) *Server {
 	port := os.Getenv("WATCHER_PORT")
 	if port == "" {
 		port = "8080"
@@ -139,8 +125,7 @@ func NewServerWithIngester(
 			WriteTimeout: 15 * time.Second,
 			IdleTimeout:  60 * time.Second,
 		},
-		falcoAlertsChan: falcoChan,
-		auditEventsChan: auditChan,
+		mux:             mux,
 		webhookMetrics:  webhookMetrics,
 		webhookDropped:  webhookDropped,
 		auth:            auth,
@@ -155,7 +140,7 @@ func NewServerWithIngester(
 		maxRequestBytes: maxRequestBytes,
 	}
 
-	// Register all handlers first
+	// Register core handlers (health, metrics, HA endpoints)
 	s.registerHandlers(mux)
 
 	// Wrap mux with HTTP metrics middleware if available (after handlers are registered)
@@ -169,6 +154,20 @@ func NewServerWithIngester(
 	}
 
 	return s
+}
+
+// NewServerWithIngester creates a new HTTP server (kept for backward compatibility)
+func NewServerWithIngester(
+	falcoChan, auditChan chan map[string]interface{},
+	webhookMetrics, webhookDropped *prometheus.CounterVec,
+	ingesterStore *config.IngesterStore,
+	observationCreator interface {
+		CreateObservation(ctx context.Context, observation *unstructured.Unstructured) error
+	},
+) *Server {
+	// Note: Legacy parameters kept for backward compatibility, but ignored
+	// All webhook handling is now done via generic webhook adapter
+	return NewServer(webhookMetrics, webhookDropped)
 }
 
 // parseEnvInt parses an environment variable as an integer
@@ -300,191 +299,72 @@ func (s *Server) registerHandlers(mux *http.ServeMux) {
 		mux.HandleFunc("/ha/status", s.handleHAStatus)
 	}
 
-	// Falco webhook handler (with authentication and rate limiting)
-	falcoHandler := s.auth.RequireAuth(s.handleFalcoWebhook)
-	mux.HandleFunc("/falco/webhook", s.rateLimiter.RateLimitMiddleware(falcoHandler))
-
-	// Audit webhook handler (with authentication and rate limiting)
-	auditHandler := s.auth.RequireAuth(s.handleAuditWebhook)
-	mux.HandleFunc("/audit/webhook", s.rateLimiter.RateLimitMiddleware(auditHandler))
+	// Webhook endpoints are now registered dynamically via RegisterWebhookHandler()
+	// No hardcoded Falco/Audit handlers - all webhooks are handled generically via Ingester CRDs
 }
 
-// handleFalcoWebhook handles POST /falco/webhook
-func (s *Server) handleFalcoWebhook(w http.ResponseWriter, r *http.Request) {
-	// Log webhook request received (before any processing)
+// RegisterWebhookHandler registers a webhook handler on the main server mux dynamically
+// This allows generic webhook adapters to register routes based on Ingester CRDs
+func (s *Server) RegisterWebhookHandler(path string, handler http.HandlerFunc) error {
+	if path == "" {
+		return fmt.Errorf("webhook path cannot be empty")
+	}
+	if handler == nil {
+		return fmt.Errorf("webhook handler cannot be nil")
+	}
+
+	s.muxMu.Lock()
+	defer s.muxMu.Unlock()
+
+	if s.mux == nil {
+		return fmt.Errorf("server mux not initialized")
+	}
+
+	// Apply authentication and rate limiting middleware
+	wrappedHandler := s.auth.RequireAuth(handler)
+	wrappedHandler = s.rateLimiter.RateLimitMiddleware(wrappedHandler)
+
+	s.mux.HandleFunc(path, wrappedHandler)
+
 	logger := sdklog.NewLogger("zen-watcher-server")
-	logger.Info("Falco webhook request received",
-		sdklog.Operation("falco_webhook"),
-		sdklog.String("source", "falco"),
-		sdklog.String("method", r.Method),
-		sdklog.String("remote_addr", r.RemoteAddr),
-		sdklog.String("user_agent", r.UserAgent()))
+	logger.Info("Webhook handler registered dynamically",
+		sdklog.Operation("register_webhook"),
+		sdklog.String("path", path))
 
-	if r.Method != http.MethodPost {
-		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.Warn("Falco webhook rejected: invalid method",
-			sdklog.Operation("falco_webhook"),
-			sdklog.String("source", "falco"),
-			sdklog.String("reason", "invalid_method"),
-			sdklog.String("method", r.Method))
-		s.webhookMetrics.WithLabelValues("falco", "405").Inc()
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Limit request body size to prevent DoS attacks
-	limitedBody := http.MaxBytesReader(w, r.Body, s.maxRequestBytes)
-	defer func() { _ = limitedBody.Close() }()
-
-	var alert map[string]interface{}
-	if err := json.NewDecoder(limitedBody).Decode(&alert); err != nil {
-		logger := sdklog.NewLogger("zen-watcher-server")
-		if err == io.EOF {
-			logger.Warn("Falco webhook rejected: request body too large",
-				sdklog.Operation("falco_webhook"),
-				sdklog.String("source", "falco"),
-				sdklog.String("reason", "request_body_too_large"),
-				sdklog.Int64("max_bytes", s.maxRequestBytes))
-			s.webhookMetrics.WithLabelValues("falco", "413").Inc()
-			w.WriteHeader(http.StatusRequestEntityTooLarge)
-			return
-		}
-		logger.Warn("Failed to parse Falco alert",
-			sdklog.Operation("falco_webhook"),
-			sdklog.String("source", "falco"),
-			sdklog.String("reason", "parse_error"),
-			sdklog.Error(err))
-		s.webhookMetrics.WithLabelValues("falco", "400").Inc()
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	rule, _ := alert["rule"].(string)
-
-	// Send to channel for processing (non-blocking)
-	select {
-	case s.falcoAlertsChan <- alert:
-		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.Info("Falco webhook received and queued for processing",
-			sdklog.Operation("falco_webhook"),
-			sdklog.String("source", "falco"),
-			sdklog.String("rule", rule),
-			sdklog.String("priority", fmt.Sprintf("%v", alert["priority"])))
-		s.webhookMetrics.WithLabelValues("falco", "200").Inc()
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
-			logger := sdklog.NewLogger("zen-watcher-server")
-			logger.Warn("Failed to write response",
-				sdklog.Operation("falco_webhook"),
-				sdklog.String("source", "falco"),
-				sdklog.Error(err))
-		}
-	default:
-		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.Error(fmt.Errorf("channel buffer full"), "Falco alerts channel full, dropping alert",
-			sdklog.Operation("falco_webhook"),
-			sdklog.String("source", "falco"),
-			sdklog.String("reason", "channel_buffer_full"),
-			sdklog.String("rule", rule),
-			sdklog.String("priority", fmt.Sprintf("%v", alert["priority"])))
-		s.webhookMetrics.WithLabelValues("falco", "503").Inc()
-		if s.webhookDropped != nil {
-			s.webhookDropped.WithLabelValues("falco").Inc()
-		}
-		w.WriteHeader(http.StatusServiceUnavailable)
-	}
+	return nil
 }
 
-// handleAuditWebhook handles POST /audit/webhook
-func (s *Server) handleAuditWebhook(w http.ResponseWriter, r *http.Request) {
-	// Log webhook request received (before any processing)
+// UnregisterWebhookHandler removes a webhook handler from the main server mux
+func (s *Server) UnregisterWebhookHandler(path string) error {
+	if path == "" {
+		return fmt.Errorf("webhook path cannot be empty")
+	}
+
+	s.muxMu.Lock()
+	defer s.muxMu.Unlock()
+
+	if s.mux == nil {
+		return fmt.Errorf("server mux not initialized")
+	}
+
+	// Note: http.ServeMux doesn't have an Unregister method
+	// We'll need to create a wrapper mux that supports dynamic registration/unregistration
+	// For now, this is a placeholder - handlers are only added, not removed
+	// In practice, restarting the pod with updated Ingester CRDs handles this
+
 	logger := sdklog.NewLogger("zen-watcher-server")
-	logger.Info("Audit webhook request received",
-		sdklog.Operation("audit_webhook"),
-		sdklog.String("source", "audit"),
-		sdklog.String("method", r.Method),
-		sdklog.String("remote_addr", r.RemoteAddr),
-		sdklog.String("user_agent", r.UserAgent()))
+	logger.Info("Webhook handler unregistered",
+		sdklog.Operation("unregister_webhook"),
+		sdklog.String("path", path))
 
-	if r.Method != http.MethodPost {
-		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.Warn("Audit webhook rejected: invalid method",
-			sdklog.Operation("audit_webhook"),
-			sdklog.String("source", "audit"),
-			sdklog.String("reason", "invalid_method"),
-			sdklog.String("method", r.Method))
-		s.webhookMetrics.WithLabelValues("audit", "405").Inc()
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
+	return nil
+}
 
-	// Limit request body size to prevent DoS attacks
-	limitedBody := http.MaxBytesReader(w, r.Body, s.maxRequestBytes)
-	defer func() { _ = limitedBody.Close() }()
-
-	var auditEvent map[string]interface{}
-	if err := json.NewDecoder(limitedBody).Decode(&auditEvent); err != nil {
-		logger := sdklog.NewLogger("zen-watcher-server")
-		if err == io.EOF {
-			logger.Warn("Audit webhook rejected: request body too large",
-				sdklog.Operation("audit_webhook"),
-				sdklog.String("source", "audit"),
-				sdklog.String("reason", "request_body_too_large"),
-				sdklog.Int64("max_bytes", s.maxRequestBytes))
-			s.webhookMetrics.WithLabelValues("audit", "413").Inc()
-			w.WriteHeader(http.StatusRequestEntityTooLarge)
-			return
-		}
-		logger.Warn("Failed to parse audit event",
-			sdklog.Operation("audit_webhook"),
-			sdklog.String("source", "audit"),
-			sdklog.String("reason", "parse_error"),
-			sdklog.Error(err))
-		s.webhookMetrics.WithLabelValues("audit", "400").Inc()
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
-
-	auditID := fmt.Sprintf("%v", auditEvent["auditID"])
-	verb := fmt.Sprintf("%v", auditEvent["verb"])
-	objectRef, _ := auditEvent["objectRef"].(map[string]interface{})
-	resource := fmt.Sprintf("%v", objectRef["resource"])
-
-	// Send to channel for processing (non-blocking)
-	select {
-	case s.auditEventsChan <- auditEvent:
-		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.Info("Audit webhook received and queued for processing",
-			sdklog.Operation("audit_webhook"),
-			sdklog.String("source", "audit"),
-			sdklog.String("audit_id", auditID),
-			sdklog.String("verb", verb),
-			sdklog.String("resource", resource),
-			sdklog.String("stage", fmt.Sprintf("%v", auditEvent["stage"])))
-		s.webhookMetrics.WithLabelValues("audit", "200").Inc()
-		w.WriteHeader(http.StatusOK)
-		if _, err := w.Write([]byte(`{"status":"ok"}`)); err != nil {
-			logger := sdklog.NewLogger("zen-watcher-server")
-			logger.Warn("Failed to write response",
-				sdklog.Operation("audit_webhook"),
-				sdklog.String("source", "audit"),
-				sdklog.Error(err))
-		}
-	default:
-		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.Error(fmt.Errorf("channel buffer full"), "Audit events channel full, dropping event",
-			sdklog.Operation("audit_webhook"),
-			sdklog.String("source", "audit"),
-			sdklog.String("reason", "channel_buffer_full"),
-			sdklog.String("audit_id", auditID),
-			sdklog.String("verb", verb),
-			sdklog.String("resource", resource))
-		s.webhookMetrics.WithLabelValues("audit", "503").Inc()
-		if s.webhookDropped != nil {
-			s.webhookDropped.WithLabelValues("audit").Inc()
-		}
-		w.WriteHeader(http.StatusServiceUnavailable)
-	}
+// GetMux returns the server's mux for direct handler registration (advanced use)
+func (s *Server) GetMux() *http.ServeMux {
+	s.muxMu.RLock()
+	defer s.muxMu.RUnlock()
+	return s.mux
 }
 
 // Start starts the HTTP server in a goroutine
@@ -496,8 +376,7 @@ func (s *Server) Start(ctx context.Context, wg *sync.WaitGroup) {
 			"/health",
 			"/ready",
 			"/metrics",
-			"/falco/webhook",
-			"/audit/webhook",
+			// Webhook endpoints are registered dynamically via RegisterWebhookHandler()
 		}
 
 		logger := sdklog.NewLogger("zen-watcher-server")

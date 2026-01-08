@@ -155,7 +155,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count(count by (namespace) (zen_watcher_events_total{severity=~\"critical|high\",source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}))",
+          "expr": "count(count by (namespace) (zen_watcher_events_total{severity=~\"critical|high\",source=~\"$source\",category=~\"$category\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}))",
           "refId": "A"
         }
       ],
@@ -1367,7 +1367,7 @@
       },
       "targets": [
         {
-          "expr": "100 * (\n            1 - (sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"FAIL|severity=~\"fail|critical\"}[1h])) by (namespace) / \n            max(sum(rate(zen_watcher_events_total{category=\"compliance\"}[1h])) by (namespace), 1))\n        )",
+          "expr": "100 * (\n            1 - (sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"critical|high\"}[1h])) by (namespace) / \n            max(sum(rate(zen_watcher_events_total{category=\"compliance\"}[1h])) by (namespace), 1))\n        )",
           "legendFormat": "{{namespace}} Compliance",
           "refId": "A"
         }

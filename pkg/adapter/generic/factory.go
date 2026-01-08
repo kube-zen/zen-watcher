@@ -16,6 +16,7 @@ package generic
 
 import (
 	"fmt"
+	"net/http"
 
 	"github.com/kube-zen/zen-watcher/internal/informers"
 	"github.com/prometheus/client_golang/prometheus"
@@ -29,6 +30,7 @@ type Factory struct {
 	webhookPorts    map[string]int         // Track used ports
 	webhookMetrics  *prometheus.CounterVec // Metrics for webhook requests (optional)
 	webhookDropped  *prometheus.CounterVec // Metrics for webhook events dropped (optional)
+	routeRegistrar  func(path string, handler http.HandlerFunc) error // Function to register webhook routes on main server
 }
 
 // NewFactory creates a new adapter factory using InformerManager
@@ -52,7 +54,13 @@ func NewFactoryWithMetrics(
 		webhookPorts:    make(map[string]int),
 		webhookMetrics:  webhookMetrics,
 		webhookDropped:  webhookDropped,
+		routeRegistrar:  nil, // Set via SetRouteRegistrar if needed
 	}
+}
+
+// SetRouteRegistrar sets the function to register webhook routes on the main server
+func (f *Factory) SetRouteRegistrar(registrar func(path string, handler http.HandlerFunc) error) {
+	f.routeRegistrar = registrar
 }
 
 // NewAdapter creates a new generic adapter based on ingester type
@@ -67,7 +75,12 @@ func (f *Factory) NewAdapter(ingester string) (GenericAdapter, error) {
 		if f.clientSet == nil {
 			return nil, fmt.Errorf("kubernetes client required for webhook adapter")
 		}
-		return NewWebhookAdapterWithMetrics(f.clientSet, f.webhookMetrics, f.webhookDropped), nil
+		adapter := NewWebhookAdapterWithMetrics(f.clientSet, f.webhookMetrics, f.webhookDropped)
+		// Set route registrar if available (registers routes on main server)
+		if f.routeRegistrar != nil {
+			adapter.SetRouteRegistrar(f.routeRegistrar)
+		}
+		return adapter, nil
 	case "logs":
 		if f.clientSet == nil {
 			return nil, fmt.Errorf("kubernetes client required for logs adapter")
