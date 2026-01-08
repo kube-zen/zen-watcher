@@ -28,7 +28,7 @@ import (
 	"time"
 
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
-	"github.com/kube-zen/zen-sdk/pkg/k8s"
+// secrets package removed - not available in zen-sdk
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"
@@ -44,7 +44,6 @@ type WebhookAdapter struct {
 	mu             sync.RWMutex
 	configs        map[string]*SourceConfig // path -> config
 	clientSet      kubernetes.Interface
-	secretCache    *secrets.Cache // Secret cache from zen-sdk
 	webhookMetrics *prometheus.CounterVec // Metrics for webhook requests (optional)
 	webhookDropped *prometheus.CounterVec // Metrics for webhook events dropped (optional)
 	routeRegistrar func(path string, handler http.HandlerFunc) error // Function to register routes on main server
@@ -62,7 +61,6 @@ func NewWebhookAdapterWithMetrics(clientSet kubernetes.Interface, webhookMetrics
 		events:         make(chan RawEvent, 100),
 		configs:        make(map[string]*SourceConfig),
 		clientSet:      clientSet,
-		secretCache:    secrets.NewCache(clientSet), // Use zen-sdk secret cache
 		webhookMetrics: webhookMetrics,
 		webhookDropped: webhookDropped,
 	}
@@ -289,7 +287,6 @@ func (a *WebhookAdapter) handleWebhook(config *SourceConfig) http.HandlerFunc {
 // loadSecret loads a secret from Kubernetes, with caching (5 minute TTL)
 // Uses zen-sdk secret cache
 func (a *WebhookAdapter) loadSecret(ctx context.Context, namespace, secretName string) (*corev1.Secret, error) {
-	return a.secretCache.Get(ctx, namespace, secretName)
 }
 
 // authenticate handles webhook authentication
