@@ -79,6 +79,11 @@ func NewProcessorWithMetrics(
 // 4. Normalization (after filter/dedup, prepares data for destinations)
 // 5. Create Observation (write to destinations)
 func (p *Processor) ProcessEvent(ctx context.Context, raw *generic.RawEvent, config *generic.SourceConfig) error {
+	processorLogger.Debug("Processing event",
+		sdklog.Operation("process_event_start"),
+		sdklog.String("source", raw.Source),
+		sdklog.String("ingester", config.Ingester))
+	
 	// Step 1: Check thresholds (rate limits, warnings)
 	// Note: Thresholds are warnings only - they log but don't block events
 	// Rate limiting is the only thing that blocks events
@@ -86,6 +91,9 @@ func (p *Processor) ProcessEvent(ctx context.Context, raw *generic.RawEvent, con
 		allowed := p.genericThresholdMonitor.CheckEvent(raw, config)
 		if !allowed {
 			// Rate limited - drop event
+			processorLogger.Debug("Event rate limited",
+				sdklog.Operation("rate_limit"),
+				sdklog.String("source", raw.Source))
 			return nil
 		}
 	}
@@ -105,7 +113,16 @@ func (p *Processor) ProcessEvent(ctx context.Context, raw *generic.RawEvent, con
 	filtered, deduped := p.applyFilterAndDedup(observation, raw, config, order)
 
 	// If filtered or deduped, stop here (no normalization needed)
-	if filtered || deduped {
+	if filtered {
+		processorLogger.Debug("Event filtered",
+			sdklog.Operation("event_filtered"),
+			sdklog.String("source", raw.Source))
+		return nil
+	}
+	if deduped {
+		processorLogger.Debug("Event deduplicated",
+			sdklog.Operation("event_deduplicated"),
+			sdklog.String("source", raw.Source))
 		return nil
 	}
 
@@ -121,7 +138,20 @@ func (p *Processor) ProcessEvent(ctx context.Context, raw *generic.RawEvent, con
 
 	// Step 6: Create Observation (write to destinations)
 	// ObservationCreator should NOT decide order - it receives already-processed events
-	return p.observationCreator.CreateObservation(ctx, observation)
+	processorLogger.Debug("Creating observation",
+		sdklog.Operation("create_observation"),
+		sdklog.String("source", raw.Source))
+	err := p.observationCreator.CreateObservation(ctx, observation)
+	if err != nil {
+		processorLogger.Error(err, "Failed to create observation",
+			sdklog.Operation("create_observation_error"),
+			sdklog.String("source", raw.Source))
+	} else {
+		processorLogger.Debug("Observation created successfully",
+			sdklog.Operation("observation_created"),
+			sdklog.String("source", raw.Source))
+	}
+	return err
 }
 
 // determineProcessingOrder determines the processing order based on config and optimization

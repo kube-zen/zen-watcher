@@ -324,7 +324,18 @@ func (s *Server) RegisterWebhookHandler(path string, handler http.HandlerFunc) e
 	wrappedHandler := s.auth.RequireAuth(handler)
 	wrappedHandler = s.rateLimiter.RateLimitMiddleware(wrappedHandler)
 
-	s.mux.HandleFunc(path, wrappedHandler)
+	// Add logging middleware to track requests
+	loggingHandler := func(w http.ResponseWriter, r *http.Request) {
+		logger := sdklog.NewLogger("zen-watcher-server")
+		logger.Debug("Webhook request received",
+			sdklog.Operation("webhook_request"),
+			sdklog.String("path", r.URL.Path),
+			sdklog.String("method", r.Method),
+			sdklog.String("remote", r.RemoteAddr))
+		wrappedHandler(w, r)
+	}
+
+	s.mux.HandleFunc(path, loggingHandler)
 
 	logger := sdklog.NewLogger("zen-watcher-server")
 	logger.Info("Webhook handler registered dynamically",
