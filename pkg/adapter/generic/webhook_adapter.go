@@ -28,7 +28,7 @@ import (
 	"time"
 
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
-	"github.com/kube-zen/zen-sdk/pkg/k8s/secrets"
+	"github.com/kube-zen/zen-sdk/pkg/k8s"
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"
