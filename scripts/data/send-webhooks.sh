@@ -124,7 +124,7 @@ spec:
       runAsUser: 65534
       seccompProfile:
         type: RuntimeDefault
-    command: ["sh", "-c", "curl -s -X POST -H 'Content-Type: application/json' -d '${ESCAPED_PAYLOAD}' ${ZEN_WATCHER_URL}/falco/webhook"]
+    command: ["sh", "-c", "curl -s -X POST -H 'Content-Type: application/json' -d '${ESCAPED_PAYLOAD}' ${ZEN_WATCHER_URL}/ingest/falco"]
   restartPolicy: Never
 EOF
     if kubectl wait --for=condition=Ready pod/${POD_NAME} -n ${NAMESPACE} --timeout=15s >/dev/null 2>&1; then
@@ -214,7 +214,7 @@ spec:
       runAsUser: 65534
       seccompProfile:
         type: RuntimeDefault
-    command: ["sh", "-c", "curl -s -X POST -H 'Content-Type: application/json' -d '${payload}' ${ZEN_WATCHER_URL}/audit/webhook"]
+    command: ["sh", "-c", "curl -s -X POST -H 'Content-Type: application/json' -d '${payload}' ${ZEN_WATCHER_URL}/ingest/k8s-audit"]
   restartPolicy: Never
 EOF
     if kubectl wait --for=condition=Ready pod/${POD_NAME} -n ${NAMESPACE} --timeout=10s >/dev/null 2>&1; then
