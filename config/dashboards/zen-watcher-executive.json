@@ -96,7 +96,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "up{job=\"zen-watcher\"}",
+          "expr": "up{job=~\"kubernetes-service-endpoints|kubernetes-services\",instance=~\".*zen-watcher.*\"} or vector(0)",
           "refId": "A"
         }
       ],
@@ -165,7 +165,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count(count by (source) (zen_watcher_events_total))",
+          "expr": "count(count by (source) (zen_watcher_events_total)) or vector(0)",
           "legendFormat": "Active Tools",
           "refId": "A"
         }
@@ -235,7 +235,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(zen_watcher_observations_created_total[24h]))",
+          "expr": "sum(increase(zen_watcher_observations_created_total[24h])) or vector(0)",
           "legendFormat": "24h Total",
           "refId": "A"
         }
@@ -305,7 +305,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1h]))",
+          "expr": "sum(increase(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1h])) or vector(0)",
           "legendFormat": "Critical (1h)",
           "refId": "A"
         }
@@ -377,7 +377,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "100 * (1 - (sum(rate(zen_watcher_observations_create_errors_total[5m])) / (sum(rate(zen_watcher_observations_created_total[5m])) + sum(rate(zen_watcher_observations_create_errors_total[5m])) + 0.001)))",
+          "expr": "100 * (1 - (sum(rate(zen_watcher_observations_create_errors_total[5m])) or vector(0) / (sum(rate(zen_watcher_observations_created_total[5m])) or vector(0) + sum(rate(zen_watcher_observations_create_errors_total[5m])) or vector(0) + 0.001)))",
           "legendFormat": "Success Rate",
           "refId": "A"
         }
@@ -531,7 +531,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (severity) (rate(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1m]))",
+          "expr": "sum by (severity) (rate(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1m])) or vector(0)",
           "legendFormat": "{{severity}}",
           "refId": "A"
         }
@@ -602,7 +602,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (source) (increase(zen_watcher_observations_created_total[24h]))",
+          "expr": "sum by (source) (increase(zen_watcher_observations_created_total[24h])) or vector(0)",
           "legendFormat": "{{source}}",
           "refId": "A"
         }
@@ -673,7 +673,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (category) (increase(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[24h]))",
+          "expr": "sum by (category) (increase(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[24h])) or vector(0)",
           "legendFormat": "{{category}}",
           "refId": "A"
         }
@@ -785,7 +785,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count by (source) (zen_watcher_events_total) > 0",
+          "expr": "(count by (source) (zen_watcher_events_total) > 0) or vector(0)",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
@@ -796,7 +796,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (source) (increase(zen_watcher_observations_created_total[1h]))",
+          "expr": "sum by (source) (increase(zen_watcher_observations_created_total[1h])) or vector(0)",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -914,7 +914,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (eventType) (increase(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[24h]))",
+          "expr": "sum by (eventType) (increase(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[24h])) or vector(0)",
           "legendFormat": "{{eventType}}",
           "refId": "A"
         }
@@ -991,7 +991,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (eventType, severity) (increase(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1h]))",
+          "expr": "sum by (eventType, severity) (increase(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1h])) or vector(0)",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
@@ -1095,7 +1095,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (eventType) (rate(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[5m])) * 60",
+          "expr": "(sum by (eventType) (rate(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[5m])) or vector(0)) * 60",
           "legendFormat": "{{eventType}}",
           "refId": "A"
         }
@@ -1171,7 +1171,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "100 - (\n            (sum(rate(zen_watcher_events_total{severity=\"critical\"}[24h])) * 10) +\n            (sum(rate(zen_watcher_events_total{severity=\"high\"}[24h])) * 5) +\n            (sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"critical|high\"}[24h])) * 15)\n        ) / max(sum(rate(zen_watcher_events_total[24h])), 1) * 100",
+          "expr": "100 - (\n            ((sum(rate(zen_watcher_events_total{severity=\"critical\"}[24h])) or vector(0)) * 10) +\n            ((sum(rate(zen_watcher_events_total{severity=\"high\"}[24h])) or vector(0)) * 5) +\n            ((sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"critical|high\"}[24h])) or vector(0)) * 15)\n        ) / max((sum(rate(zen_watcher_events_total[24h])) or vector(0)), 1) * 100",
           "refId": "A"
         }
       ],
@@ -1232,7 +1232,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(zen_watcher_events_total{severity=~\"critical|high\"}[1h])) by (severity)",
+          "expr": "sum(rate(zen_watcher_events_total{severity=~\"critical|high\"}[1h])) by (severity) or vector(0)",
           "legendFormat": "{{severity}}",
           "refId": "A"
         }
@@ -1308,7 +1308,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "100 * (\n            1 - (sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"critical|high\"}[24h])) / \n            max(sum(rate(zen_watcher_events_total{category=\"compliance\"}[24h])), 1))\n        )",
+          "expr": "100 * (\n            1 - ((sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"critical|high\"}[24h])) or vector(0)) / \n            max((sum(rate(zen_watcher_events_total{category=\"compliance\"}[24h])) or vector(0)), 1))\n        )",
           "refId": "A"
         }
       ],
@@ -1369,7 +1369,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "(\n            sum(rate(zen_watcher_events_total{severity=\"critical\"}[24h])) * 50000 +\n            sum(rate(zen_watcher_events_total{severity=\"high\"}[24h])) * 10000 +\n            sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"critical|high\"}[24h])) * 25000\n        ) * 24 * 30",
+          "expr": "(\n            (sum(rate(zen_watcher_events_total{severity=\"critical\"}[24h])) or vector(0)) * 50000 +\n            (sum(rate(zen_watcher_events_total{severity=\"high\"}[24h])) or vector(0)) * 10000 +\n            (sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"critical|high\"}[24h])) or vector(0)) * 25000\n        ) * 24 * 30",
           "refId": "A"
         }
       ],
@@ -1426,7 +1426,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(zen_watcher_events_total{severity=\"critical\"}[1h]))",
+          "expr": "sum(rate(zen_watcher_events_total{severity=\"critical\"}[1h])) or vector(0)",
           "legendFormat": "Actual Critical Events",
           "refId": "A"
         },
@@ -1435,7 +1435,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "predict_linear(sum(rate(zen_watcher_events_total{severity=\"critical\"}[1h]))[7d:1h], 7*24*3600)",
+          "expr": "predict_linear((sum(rate(zen_watcher_events_total{severity=\"critical\"}[1h])) or vector(0))[7d:1h], 7*24*3600) or vector(0)",
           "legendFormat": "7-Day Forecast",
           "refId": "B"
         }
@@ -1492,7 +1492,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "topk(5, sum(rate(zen_watcher_events_total{severity=\"critical\"}[1h])) by (source, category))",
+          "expr": "topk(5, (sum(rate(zen_watcher_events_total{severity=\"critical\"}[1h])) by (source, category)) or vector(0))",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -1558,7 +1558,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(zen_watcher_events_total, source)",
+        "definition": "label_values(zen_watcher_events_total, source) or label_values(zen_watcher_observations_created_total, source)",
         "hide": 0,
         "includeAll": true,
         "label": "Source",
@@ -1566,7 +1566,7 @@
         "name": "source",
         "options": [],
         "query": {
-          "query": "label_values(zen_watcher_events_total, source)",
+          "query": "label_values(zen_watcher_events_total, source) or label_values(zen_watcher_observations_created_total, source)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -1584,7 +1584,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(zen_watcher_events_total, category)",
+        "definition": "label_values(zen_watcher_events_total, category) or vector(0)",
         "hide": 0,
         "includeAll": true,
         "label": "Category",
@@ -1592,7 +1592,7 @@
         "name": "category",
         "options": [],
         "query": {
-          "query": "label_values(zen_watcher_events_total, category)",
+          "query": "label_values(zen_watcher_events_total, category) or vector(0)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -1610,7 +1610,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(zen_watcher_events_total, severity)",
+        "definition": "label_values(zen_watcher_events_total, severity) or vector(0)",
         "hide": 0,
         "includeAll": true,
         "label": "Severity",
@@ -1618,7 +1618,7 @@
         "name": "severity",
         "options": [],
         "query": {
-          "query": "label_values(zen_watcher_events_total, severity)",
+          "query": "label_values(zen_watcher_events_total, severity) or vector(0)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -1636,7 +1636,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(zen_watcher_events_total, eventType)",
+        "definition": "label_values(zen_watcher_events_total, eventType) or vector(0)",
         "hide": 0,
         "includeAll": true,
         "label": "Event Type",
@@ -1644,7 +1644,7 @@
         "name": "eventType",
         "options": [],
         "query": {
-          "query": "label_values(zen_watcher_events_total, eventType)",
+          "query": "label_values(zen_watcher_events_total, eventType) or vector(0)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -1662,7 +1662,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(zen_watcher_events_total, namespace)",
+        "definition": "label_values(zen_watcher_events_total, namespace) or vector(0)",
         "hide": 0,
         "includeAll": true,
         "label": "Namespace",
@@ -1670,7 +1670,7 @@
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(zen_watcher_events_total, namespace)",
+          "query": "label_values(zen_watcher_events_total, namespace) or vector(0)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -1688,7 +1688,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(zen_watcher_events_total, kind)",
+        "definition": "label_values(zen_watcher_events_total, kind) or vector(0)",
         "hide": 0,
         "includeAll": true,
         "label": "Kind",
@@ -1696,7 +1696,7 @@
         "name": "kind",
         "options": [],
         "query": {
-          "query": "label_values(zen_watcher_events_total, kind)",
+          "query": "label_values(zen_watcher_events_total, kind) or vector(0)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -1714,7 +1714,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(zen_watcher_events_total, namespace)",
+        "definition": "label_values(zen_watcher_events_total, namespace) or vector(0)",
         "hide": 0,
         "includeAll": true,
         "label": "Namespace",
@@ -1722,7 +1722,7 @@
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(zen_watcher_events_total, namespace)",
+          "query": "label_values(zen_watcher_events_total, namespace) or vector(0)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
@@ -1740,7 +1740,7 @@
           "type": "prometheus",
           "uid": "${datasource}"
         },
-        "definition": "label_values(zen_watcher_events_total, severity)",
+        "definition": "label_values(zen_watcher_events_total, severity) or vector(0)",
         "hide": 0,
         "includeAll": true,
         "label": "Severity",
@@ -1748,7 +1748,7 @@
         "name": "severity",
         "options": [],
         "query": {
-          "query": "label_values(zen_watcher_events_total, severity)",
+          "query": "label_values(zen_watcher_events_total, severity) or vector(0)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,
