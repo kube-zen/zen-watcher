@@ -108,10 +108,19 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 	}
 
 	// Start informer manager (starts default factory and all custom factories)
+	// Must be called AFTER GetInformer() so custom factories are created first
 	a.manager.Start(ctx)
+	
 	// Wait for cache sync via manager (waits for both default and custom factories)
 	if err := a.manager.WaitForCacheSync(ctx); err != nil {
 		return nil, fmt.Errorf("failed to sync informer cache for %s: %w", gvr.String(), err)
+	}
+	
+	// Additional check: ensure this specific informer's cache has synced
+	// This is important for custom factories where WaitForCacheSync might return
+	// before the specific informer is ready
+	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
+		return nil, fmt.Errorf("informer cache for %s did not sync in time", gvr.String())
 	}
 
 	// Process existing resources from cache (informer handlers only fire for NEW events)
