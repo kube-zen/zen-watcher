@@ -1,0 +1,23 @@
+apiVersion: zen.kube-zen.io/v1alpha1
+kind: Ingester
+metadata:
+  name: falco-webhook
+  namespace: default
+spec:
+  source: falco
+  type: webhook
+  webhook:
+    path: /ingest/falco
+    port: 8080
+    bufferSize: 100
+    auth:
+      type: none
+    rateLimit:
+      requestsPerMinute: 1000
+  processing:
+    deduplication:
+      enabled: true
+      windowSeconds: 60
+    filtering:
+      enabled: false
+
