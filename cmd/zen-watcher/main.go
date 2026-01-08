@@ -52,7 +52,7 @@ import (
 // Version, Commit, and BuildDate are set via ldflags during build
 // Version should match the VERSION file in the repository root
 var (
-	Version   = "1.2.1"
+	Version   = "1.0.3"
 	Commit    = "unknown"
 	BuildDate = "unknown"
 )
@@ -222,7 +222,7 @@ func setupLeaderElection(clients *kubernetes.Clients, namespace string, setupLog
 		setupLog.Error(err, "Failed to create leader election manager", sdklog.ErrorCode("MANAGER_CREATE_ERROR"), sdklog.Operation("leader_manager_init"))
 		os.Exit(1)
 	}
-	
+
 	// Register a minimal dummy controller to ensure leader election starts
 	// controller-runtime requires at least one runnable for leader election to work
 	if mgrOpts.LeaderElection {
@@ -240,7 +240,7 @@ func setupLeaderElection(clients *kubernetes.Clients, namespace string, setupLog
 	var leaderElectedCh <-chan struct{}
 	if mgrOpts.LeaderElection {
 		leaderElectedCh = leaderManager.Elected()
-		setupLog.Info("Leader election enabled", 
+		setupLog.Info("Leader election enabled",
 			sdklog.Operation("leader_init"),
 			sdklog.String("election_id", mgrOpts.LeaderElectionID),
 			sdklog.String("namespace", mgrOpts.LeaderElectionNamespace))
