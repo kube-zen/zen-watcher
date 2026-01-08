@@ -228,21 +228,7 @@ func (o *GenericOrchestrator) processBatchEvents(source string, config *generic.
 
 // processSingleEvents processes events one-by-one
 func (o *GenericOrchestrator) processSingleEvents(source string, config *generic.SourceConfig, events <-chan generic.RawEvent, eventCount *int, lastRateUpdate *time.Time) {
-	orchestratorLogger.Info("Starting event processing loop",
-		sdklog.Operation("process_events_start"),
-		sdklog.String("source", source),
-		sdklog.String("ingester", config.Ingester))
-	
-	eventLoopCount := 0
 	for rawEvent := range events {
-		eventLoopCount++
-		if eventLoopCount%100 == 0 {
-			orchestratorLogger.Debug("Processing events",
-				sdklog.Operation("process_events_loop"),
-				sdklog.String("source", source),
-				sdklog.Int("count", eventLoopCount))
-		}
-		
 		processStart := time.Now()
 		if err := o.processor.ProcessEvent(o.ctx, &rawEvent, config); err != nil {
 			if o.metrics != nil {
@@ -261,11 +247,6 @@ func (o *GenericOrchestrator) processSingleEvents(source string, config *generic
 			}
 		}
 	}
-	
-	orchestratorLogger.Info("Event processing loop ended",
-		sdklog.Operation("process_events_end"),
-		sdklog.String("source", source),
-		sdklog.Int("total_processed", eventLoopCount))
 }
 
 // updateEventMetrics updates event processing metrics

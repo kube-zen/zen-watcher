@@ -257,26 +257,17 @@ func (a *WebhookAdapter) handleWebhook(config *SourceConfig) http.HandlerFunc {
 		}
 
 		// Send event (non-blocking with buffer)
-		logger := sdklog.NewLogger("zen-watcher-adapter")
-		logger.Debug("Webhook event received",
-			sdklog.Operation("webhook_event_received"),
-			sdklog.String("source", config.Source),
-			sdklog.String("path", r.URL.Path),
-			sdklog.String("method", r.Method))
-		
 		select {
 		case a.events <- event:
 			// Track successful request in metrics
 			if a.webhookMetrics != nil {
 				a.webhookMetrics.WithLabelValues(endpoint, "200").Inc()
 			}
-			logger.Debug("Webhook event sent to channel",
-				sdklog.Operation("webhook_event_sent"),
-				sdklog.String("source", config.Source))
 			w.WriteHeader(http.StatusOK)
 			_, _ = fmt.Fprintf(w, "OK")
 		default:
 			// Buffer full - backpressure
+			logger := sdklog.NewLogger("zen-watcher-adapter")
 			logger.Warn("Webhook event buffer full, dropping event",
 				sdklog.Operation("webhook_backpressure"),
 				sdklog.String("source", config.Source))

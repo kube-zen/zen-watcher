@@ -127,7 +127,6 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 
 // createEventHandlers creates event handlers for the informer
 func (a *InformerAdapter) createEventHandlers(ctx context.Context, events chan<- RawEvent, source string, gvr schema.GroupVersionResource) cache.ResourceEventHandlerFuncs {
-	logger := sdklog.NewLogger("zen-watcher-adapter")
 	return cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			u := obj.(*unstructured.Unstructured)
@@ -142,17 +141,8 @@ func (a *InformerAdapter) createEventHandlers(ctx context.Context, events chan<-
 					"gvr":       gvr.String(),
 				},
 			}
-			logger.Debug("Informer event received",
-				sdklog.Operation("informer_event_add"),
-				sdklog.String("source", source),
-				sdklog.String("namespace", u.GetNamespace()),
-				sdklog.String("name", u.GetName()),
-				sdklog.String("gvr", gvr.String()))
 			select {
 			case events <- event:
-				logger.Debug("Event sent to channel",
-					sdklog.Operation("informer_event_sent"),
-					sdklog.String("source", source))
 			case <-ctx.Done():
 				return
 			}
@@ -170,11 +160,6 @@ func (a *InformerAdapter) createEventHandlers(ctx context.Context, events chan<-
 					"gvr":       gvr.String(),
 				},
 			}
-			logger.Debug("Informer event received (update)",
-				sdklog.Operation("informer_event_update"),
-				sdklog.String("source", source),
-				sdklog.String("namespace", u.GetNamespace()),
-				sdklog.String("name", u.GetName()))
 			select {
 			case events <- event:
 			case <-ctx.Done():
