@@ -17,6 +17,7 @@ package informers
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +33,9 @@ type Manager struct {
 	dynamicClient dynamic.Interface
 	factory       dynamicinformer.DynamicSharedInformerFactory
 	defaultResync time.Duration
+	// Track custom factories created for specific GVRs with custom resync periods
+	customFactories map[string]dynamicinformer.DynamicSharedInformerFactory
+	customFactoriesMu sync.RWMutex
 }
 
 // Config holds configuration for the informer manager
@@ -53,9 +57,10 @@ func NewManager(config Config) *Manager {
 	)
 
 	return &Manager{
-		dynamicClient: config.DynamicClient,
-		factory:       factory,
-		defaultResync: config.DefaultResync,
+		dynamicClient:    config.DynamicClient,
+		factory:          factory,
+		defaultResync:    config.DefaultResync,
+		customFactories: make(map[string]dynamicinformer.DynamicSharedInformerFactory),
 	}
 }
 
@@ -66,7 +71,15 @@ func (m *Manager) GetInformer(gvr schema.GroupVersionResource, resyncPeriod time
 	// Otherwise use the default factory
 	if resyncPeriod > 0 && resyncPeriod != m.defaultResync {
 		// Create a separate factory for this GVR with custom resync
-		customFactory := dynamicinformer.NewDynamicSharedInformerFactory(m.dynamicClient, resyncPeriod)
+		// Use GVR string as key to track custom factories
+		gvrKey := gvr.String()
+		m.customFactoriesMu.Lock()
+		customFactory, exists := m.customFactories[gvrKey]
+		if !exists {
+			customFactory = dynamicinformer.NewDynamicSharedInformerFactory(m.dynamicClient, resyncPeriod)
+			m.customFactories[gvrKey] = customFactory
+		}
+		m.customFactoriesMu.Unlock()
 		return customFactory.ForResource(gvr).Informer()
 	}
 
@@ -93,20 +106,51 @@ func (m *Manager) GetFilteredInformer(
 }
 
 // Start starts all informers in the factory
+// Also starts any custom factories that were created for specific GVRs
 func (m *Manager) Start(ctx context.Context) {
+	// Start default factory
 	m.factory.Start(ctx.Done())
+
+	// Start all custom factories
+	m.customFactoriesMu.RLock()
+	for _, customFactory := range m.customFactories {
+		customFactory.Start(ctx.Done())
+	}
+	m.customFactoriesMu.RUnlock()
 }
 
 // WaitForCacheSync waits for all informer caches to sync
+// Waits for both default factory and all custom factories
 func (m *Manager) WaitForCacheSync(ctx context.Context) error {
 	stopCh := ctx.Done()
+
+	// Wait for default factory caches to sync
 	synced := m.factory.WaitForCacheSync(stopCh)
 	for gvr, ok := range synced {
 		if !ok {
 			return fmt.Errorf("failed to sync informer cache for %v", gvr)
 		}
 	}
+
+	// Wait for all custom factory caches to sync
+	m.customFactoriesMu.RLock()
+	for gvrKey, customFactory := range m.customFactories {
+		synced := customFactory.WaitForCacheSync(stopCh)
+		for gvr, ok := range synced {
+			if !ok {
+				m.customFactoriesMu.RUnlock()
+				return fmt.Errorf("failed to sync custom informer cache for %v (key: %s)", gvr, gvrKey)
+			}
+		}
+	}
+	m.customFactoriesMu.RUnlock()
+
 	return nil
+}
+
+// GetDefaultResync returns the default resync period
+func (m *Manager) GetDefaultResync() time.Duration {
+	return m.defaultResync
 }
 
 // GetFactory returns the underlying factory

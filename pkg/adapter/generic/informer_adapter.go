@@ -107,9 +107,9 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 		return nil, fmt.Errorf("failed to add event handlers: %w", err)
 	}
 
-	// Start informer manager
+	// Start informer manager (starts default factory and all custom factories)
 	a.manager.Start(ctx)
-	// Wait for cache sync via manager
+	// Wait for cache sync via manager (waits for both default and custom factories)
 	if err := a.manager.WaitForCacheSync(ctx); err != nil {
 		return nil, fmt.Errorf("failed to sync informer cache for %s: %w", gvr.String(), err)
 	}
