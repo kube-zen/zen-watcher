@@ -215,21 +215,41 @@ func setupLeaderElection(clients *kubernetes.Clients, namespace string, setupLog
 	}
 
 	// Always create manager (leader election is configured via options)
+	// NOTE: controller-runtime manager requires at least one runnable to start leader election
+	// We'll register a dummy controller to ensure leader election works
 	leaderManager, err := ctrl.NewManager(clients.Config, mgrOpts)
 	if err != nil {
 		setupLog.Error(err, "Failed to create leader election manager", sdklog.ErrorCode("MANAGER_CREATE_ERROR"), sdklog.Operation("leader_manager_init"))
 		os.Exit(1)
 	}
+	
+	// Register a minimal dummy controller to ensure leader election starts
+	// controller-runtime requires at least one runnable for leader election to work
+	if mgrOpts.LeaderElection {
+		// Create a simple runnable that does nothing but allows leader election to start
+		dummyRunnable := &dummyController{}
+		if err := leaderManager.Add(dummyRunnable); err != nil {
+			setupLog.Error(err, "Failed to add dummy controller for leader election", sdklog.ErrorCode("DUMMY_CONTROLLER_ERROR"), sdklog.Operation("leader_manager_init"))
+			os.Exit(1)
+		}
+		setupLog.Info("Registered dummy controller for leader election", sdklog.Operation("leader_init"))
+	}
 
-	// Get elected channel
+	// Get elected channel BEFORE starting the manager
+	// The channel will signal when leadership is acquired after Start() is called
 	var leaderElectedCh <-chan struct{}
 	if mgrOpts.LeaderElection {
 		leaderElectedCh = leaderManager.Elected()
+		setupLog.Info("Leader election enabled", 
+			sdklog.Operation("leader_init"),
+			sdklog.String("election_id", mgrOpts.LeaderElectionID),
+			sdklog.String("namespace", mgrOpts.LeaderElectionNamespace))
 	} else {
 		// No leader election - create a channel that's immediately ready
 		ch := make(chan struct{})
 		close(ch)
 		leaderElectedCh = ch
+		setupLog.Info("Leader election disabled", sdklog.Operation("leader_init"))
 	}
 
 	return leaderManager, leaderElectedCh
@@ -320,11 +340,17 @@ func initializeAdapters(clients *kubernetes.Clients, proc *processor.Processor, 
 // startAllServices starts all services
 func startAllServices(ctx context.Context, wg *sync.WaitGroup, configManager *watcherconfig.ConfigManager, configMapLoader *watcherconfig.ConfigMapLoader, ingesterInformer *watcherconfig.IngesterInformer, genericOrchestrator *orchestrator.GenericOrchestrator, httpServer *server.Server, observationCreator *watcher.ObservationCreator, clients *kubernetes.Clients, gvrs *kubernetes.GVRs, m *metrics.Metrics, leaderElectedCh <-chan struct{}, filterInstance *filter.Filter, log *sdklog.Logger, setupLog *sdklog.Logger, leaderManager ctrl.Manager) {
 	// Start leader election manager (required for leader election to work)
+	// CRITICAL: This must be started in a goroutine so it doesn't block, but it MUST run
+	// for leader election to work. The manager will acquire leadership and signal via
+	// the Elected() channel.
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		setupLog.Info("Starting leader election manager", sdklog.Operation("leader_manager_start"))
 		if err := leaderManager.Start(ctx); err != nil {
-			setupLog.Error(err, "Leader election manager stopped", sdklog.Operation("leader_manager"))
+			setupLog.Error(err, "Leader election manager stopped", sdklog.Operation("leader_manager_stop"), sdklog.ErrorCode("LEADER_MANAGER_ERROR"))
+		} else {
+			setupLog.Info("Leader election manager exited normally", sdklog.Operation("leader_manager_exit"))
 		}
 	}()
 	// Create adapter factory and launcher
@@ -644,6 +670,17 @@ func handleConfigChange(
 			log.Info("Namespace filtering disabled via configuration", sdklog.Operation("config_update"))
 		}
 	}
+}
+
+// dummyController is a minimal runnable that does nothing but allows leader election to start
+// controller-runtime requires at least one runnable for leader election to work
+type dummyController struct{}
+
+func (d *dummyController) Start(ctx context.Context) error {
+	// Do nothing - this is just to enable leader election
+	// The manager will start leader election because we have a runnable
+	<-ctx.Done()
+	return nil
 }
 
 // Helper functions for type conversion
