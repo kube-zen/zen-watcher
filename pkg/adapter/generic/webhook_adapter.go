@@ -287,6 +287,7 @@ func (a *WebhookAdapter) handleWebhook(config *SourceConfig) http.HandlerFunc {
 // Uses zen-sdk secret cache
 func (a *WebhookAdapter) loadSecret(ctx context.Context, namespace, secretName string) (*corev1.Secret, error) {
 }
+	return nil, fmt.Errorf("secret cache not available")
 
 // authenticate handles webhook authentication
 // Security: If Auth is configured (non-nil) and Type is not "none", authentication is REQUIRED.
