@@ -12,4 +12,7 @@ spec:
     bufferSize: 100
     auth:
       type: none
+  destinations:
+    - type: crd
+      value: observations
 
