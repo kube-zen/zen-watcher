@@ -273,7 +273,7 @@ releases:
     installed: {{ if ne $skipMonitoring "true" }}true{{ else }}false{{ end }}
     wait: true
     values:
-      - adminUser: admin
+      - adminUser: zen
       - adminPassword: {{ $grafanaPassword }}
       - env:
           GF_USERS_ALLOW_SIGN_UP: false
