@@ -433,7 +433,7 @@ sudo vi /etc/kubernetes/manifests/kube-apiserver.yaml
 # --audit-log-maxsize=100
 ```
 
-**Test 1.2.1** ( kubelet configuration):
+**Test 1.2.2** ( kubelet configuration):
 ```bash
 # Edit kubelet config
 sudo vi /var/lib/kubelet/config.yaml

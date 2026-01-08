@@ -1,6 +1,6 @@
 # Stability Guarantees
 
-**Version:** 1.2.1  
+**Version:** 1.2.2  
 **Last Updated:** 2025-01-05
 
 This document defines what zen-watcher **will never do**, what stability guarantees we provide, and our breaking change policy.
@@ -100,7 +100,7 @@ This document defines what zen-watcher **will never do**, what stability guarant
 
 **Example:**
 - Deprecated in v1.2.0: `leaderElection.mode=zenlead`
-- Removed in v1.2.1: Immediate removal (security issue)
+- Removed in v1.2.2: Immediate removal (security issue)
 - Normal process: Deprecated in v1.2.0, removed in v1.4.0
 
 ---
@@ -115,7 +115,7 @@ This document defines what zen-watcher **will never do**, what stability guarant
 - ⚠️ **Not Production Ready:** Use at your own risk
 - ✅ **Experimental Features:** New features may be alpha
 
-**Current Status:** v1.2.1 is **stable** (not alpha)
+**Current Status:** v1.2.2 is **stable** (not alpha)
 
 ### Beta (v1.x.x-beta)
 
@@ -125,7 +125,7 @@ This document defines what zen-watcher **will never do**, what stability guarant
 - ⚠️ **Production Use:** Supported but not recommended for critical workloads
 - ✅ **Feature Complete:** All planned features implemented
 
-**Current Status:** Not applicable (v1.2.1 is stable)
+**Current Status:** Not applicable (v1.2.2 is stable)
 
 ### Stable (v1.x.x)
 
@@ -135,7 +135,7 @@ This document defines what zen-watcher **will never do**, what stability guarant
 - ✅ **Production Ready:** Recommended for production use
 - ✅ **Long-Term Support:** Security patches for 12 months
 
-**Current Status:** v1.2.1 is **stable**
+**Current Status:** v1.2.2 is **stable**
 
 ---
 
@@ -169,7 +169,7 @@ This document defines what zen-watcher **will never do**, what stability guarant
 - ⚠️ **Alpha APIs:** Breaking changes allowed (Ingester CRD)
 - ✅ **Stable APIs:** No breaking changes (Observation CRD)
 
-**For Patch Releases (1.2.0 → 1.2.1):**
+**For Patch Releases (1.2.0 → 1.2.2):**
 - ✅ **No Breaking Changes:** Only bug fixes and security patches
 
 ---
@@ -178,7 +178,7 @@ This document defines what zen-watcher **will never do**, what stability guarant
 
 ### Safe Upgrades
 
-**Patch Releases (1.2.0 → 1.2.1):**
+**Patch Releases (1.2.0 → 1.2.2):**
 - ✅ **Zero Downtime:** Rolling update safe
 - ✅ **No Data Loss:** Observations preserved
 - ✅ **Backward Compatible:** No schema changes
@@ -211,7 +211,7 @@ This document defines what zen-watcher **will never do**, what stability guarant
 
 ### Supported Versions
 
-**Current Stable:** v1.2.1
+**Current Stable:** v1.2.2
 - ✅ **Security Patches:** 12 months from release
 - ✅ **Bug Fixes:** 6 months from release
 - ✅ **Documentation:** Updated for current version
@@ -310,7 +310,7 @@ This document defines what zen-watcher **will never do**, what stability guarant
 - ❌ Zero vulnerabilities (we patch promptly)
 
 **For Production Use:**
-- ✅ Safe to run in production (v1.2.1+)
+- ✅ Safe to run in production (v1.2.2+)
 - ✅ Follow upgrade recommendations
 - ✅ Monitor resource usage
 - ✅ Configure TTL to prevent etcd bloat

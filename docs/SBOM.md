@@ -22,13 +22,13 @@ Syft generates SBOMs for container images:
 curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh
 
 # Generate SBOM in SPDX format
-syft kubezen/zen-watcher:1.2.1 -o spdx-json > sbom.spdx.json
+syft kubezen/zen-watcher:1.2.2 -o spdx-json > sbom.spdx.json
 
 # Generate SBOM in CycloneDX format
-syft kubezen/zen-watcher:1.2.1 -o cyclonedx-json > sbom.cyclonedx.json
+syft kubezen/zen-watcher:1.2.2 -o cyclonedx-json > sbom.cyclonedx.json
 
 # Generate SBOM in Syft native format
-syft kubezen/zen-watcher:1.2.1 -o json > sbom.syft.json
+syft kubezen/zen-watcher:1.2.2 -o json > sbom.syft.json
 ```
 
 ### Using Docker SBOM
@@ -37,7 +37,7 @@ Docker Desktop includes SBOM generation:
 
 ```bash
 # Generate SBOM
-docker sbom kubezen/zen-watcher:1.2.1 > sbom.spdx.json
+docker sbom kubezen/zen-watcher:1.2.2 > sbom.spdx.json
 ```
 
 ### During Build
@@ -60,7 +60,7 @@ syft kubezen/zen-watcher:${IMAGE_TAG} -o cyclonedx-json > sbom.cyclonedx.json
 Industry standard, ISO/IEC 5962:2021:
 
 ```bash
-syft kubezen/zen-watcher:1.2.1 -o spdx-json
+syft kubezen/zen-watcher:1.2.2 -o spdx-json
 ```
 
 ### CycloneDX
@@ -68,7 +68,7 @@ syft kubezen/zen-watcher:1.2.1 -o spdx-json
 OWASP standard for SBOM and VEX:
 
 ```bash
-syft kubezen/zen-watcher:1.2.1 -o cyclonedx-json
+syft kubezen/zen-watcher:1.2.2 -o cyclonedx-json
 ```
 
 ## Vulnerability Scanning with SBOM
@@ -97,7 +97,7 @@ grype sbom:sbom.spdx.json -o sarif
 trivy sbom sbom.spdx.json
 
 # Scan image directly
-trivy image kubezen/zen-watcher:1.2.1
+trivy image kubezen/zen-watcher:1.2.2
 ```
 
 ## SBOM Attestation
@@ -106,12 +106,12 @@ trivy image kubezen/zen-watcher:1.2.1
 
 ```bash
 # Generate SBOM
-syft kubezen/zen-watcher:1.2.1 -o spdx-json > sbom.spdx.json
+syft kubezen/zen-watcher:1.2.2 -o spdx-json > sbom.spdx.json
 
 # Attach as attestation with Cosign
 cosign attest --predicate sbom.spdx.json \
   --key cosign.key \
-  kubezen/zen-watcher:1.2.1
+  kubezen/zen-watcher:1.2.2
 ```
 
 ### Verify SBOM Attestation
@@ -120,7 +120,7 @@ cosign attest --predicate sbom.spdx.json \
 # Verify and retrieve SBOM
 cosign verify-attestation \
   --key cosign.pub \
-  kubezen/zen-watcher:1.2.1 | jq -r .payload | base64 -d | jq .predicate
+  kubezen/zen-watcher:1.2.2 | jq -r .payload | base64 -d | jq .predicate
 ```
 
 ## SBOM in CI/CD
@@ -174,8 +174,8 @@ scan:
 
 ```bash
 # GitHub Release
-gh release create v1.2.1 \
-  --title "Release v1.2.1" \
+gh release create v1.2.2 \
+  --title "Release v1.2.2" \
   --notes "Release notes here" \
   sbom.spdx.json \
   sbom.cyclonedx.json
@@ -187,7 +187,7 @@ Store SBOM in OCI registry:
 
 ```bash
 # Using ORAS
-oras push ghcr.io/kube-zen/zen-watcher-sbom:1.2.1 \
+oras push ghcr.io/kube-zen/zen-watcher-sbom:1.2.2 \
   --artifact-type application/spdx+json \
   sbom.spdx.json
 ```
@@ -238,7 +238,7 @@ Compliant with NTIA minimum elements:
     "created": "2024-11-04T00:00:00Z",
     "creators": ["Tool: syft-0.98.0"]
   },
-  "name": "kubezen/zen-watcher:1.2.1",
+  "name": "kubezen/zen-watcher:1.2.2",
   "dataLicense": "CC0-1.0",
   "packages": [
     {

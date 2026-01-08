@@ -52,7 +52,7 @@ import (
 // Version, Commit, and BuildDate are set via ldflags during build
 // Version should match the VERSION file in the repository root
 var (
-	Version   = "1.0.3"
+	Version   = "1.2.2"
 	Commit    = "unknown"
 	BuildDate = "unknown"
 )

@@ -30,7 +30,7 @@ livenessProbe:
 {
   "status": "healthy",
   "service": "zen-watcher",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "mode": "independent",
   "timestamp": "2024-11-04T10:00:00Z"
 }
@@ -789,13 +789,13 @@ resources:
 **Pre-deployment**:
 ```bash
 # Scan image
-trivy image kubezen/zen-watcher:1.2.1
+trivy image kubezen/zen-watcher:1.2.2
 
 # Verify signature
-cosign verify --key cosign.pub kubezen/zen-watcher:1.2.1
+cosign verify --key cosign.pub kubezen/zen-watcher:1.2.2
 
 # Check SBOM
-syft kubezen/zen-watcher:1.2.1 -o spdx-json | grype
+syft kubezen/zen-watcher:1.2.2 -o spdx-json | grype
 ```
 
 **Post-deployment**:
@@ -1011,7 +1011,7 @@ spec:
 helm upgrade zen-watcher kube-zen/zen-watcher \
   --namespace zen-system \
   --reuse-values \
-  --set image.tag=1.2.1 \
+  --set image.tag=1.2.2 \
   --wait
 
 # Verify rollout

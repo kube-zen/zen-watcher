@@ -264,7 +264,7 @@ All official images are signed with Cosign:
 
 ```bash
 # Verify image signature
-cosign verify --key cosign.pub kubezen/zen-watcher:1.2.1
+cosign verify --key cosign.pub kubezen/zen-watcher:1.2.2
 ```
 
 #### SBOM (Software Bill of Materials)
@@ -272,7 +272,7 @@ Every release includes an SBOM:
 
 ```bash
 # Generate SBOM
-syft kubezen/zen-watcher:1.2.1 -o spdx-json > sbom.json
+syft kubezen/zen-watcher:1.2.2 -o spdx-json > sbom.json
 
 # Scan SBOM for vulnerabilities
 grype sbom:sbom.json
@@ -451,10 +451,10 @@ namespace:
 2. **Verify Updates**
    ```bash
    # Verify new image signature
-   cosign verify --key cosign.pub kubezen/zen-watcher:1.2.1
+   cosign verify --key cosign.pub kubezen/zen-watcher:1.2.2
    
    # Check for vulnerabilities
-   trivy image kubezen/zen-watcher:1.2.1
+   trivy image kubezen/zen-watcher:1.2.2
    ```
 
 ---
@@ -489,13 +489,13 @@ kubectl logs -n zen-system deployment/zen-watcher | jq 'select(.level=="error" o
 
 ```bash
 # Trivy
-trivy image kubezen/zen-watcher:1.2.1
+trivy image kubezen/zen-watcher:1.2.2
 
 # Grype
-grype kubezen/zen-watcher:1.2.1
+grype kubezen/zen-watcher:1.2.2
 
 # Snyk (if you have access)
-snyk container test kubezen/zen-watcher:1.2.1
+snyk container test kubezen/zen-watcher:1.2.2
 ```
 
 ### Scan the Deployment

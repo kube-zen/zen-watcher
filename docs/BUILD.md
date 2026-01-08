@@ -121,7 +121,7 @@ make build
 **Makefile Variables:**
 ```bash
 # Override version
-make build VERSION=1.2.1
+make build VERSION=1.2.2
 
 # Override commit
 make build COMMIT=abc1234
@@ -180,10 +180,10 @@ docker buildx build \
 **Example:**
 ```bash
 docker build \
-  --build-arg VERSION=1.2.1 \
+  --build-arg VERSION=1.2.2 \
   --build-arg COMMIT=abc1234 \
   --build-arg BUILD_DATE=2025-01-05T12:00:00Z \
-  -t kubezen/zen-watcher:1.2.1 \
+  -t kubezen/zen-watcher:1.2.2 \
   -f build/Dockerfile \
   .
 ```
@@ -439,7 +439,7 @@ build:
 **Manual Release Build:**
 ```bash
 # Set version
-VERSION=1.2.1
+VERSION=1.2.2
 echo $VERSION > VERSION
 
 # Build

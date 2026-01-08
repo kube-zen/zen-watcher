@@ -74,19 +74,19 @@ Zen-watcher uses semantic versioning with synchronized releases across component
 
 | Component | Version | Location |
 |-----------|---------|----------|
-| VERSION file | 1.0.3 | `VERSION` (root) |
-| Docker Image | 1.0.3 | `kubezen/zen-watcher:1.0.3` |
-| Helm Chart | 1.0.3 | `kube-zen/zen-watcher` (ArtifactHub) |
-| Git Tag | v1.0.3 | `github.com:kube-zen/zen-watcher` |
+| VERSION file | 1.2.2 | `VERSION` (root) |
+| Docker Image | 1.2.2 | `kubezen/zen-watcher:1.2.2` |
+| Helm Chart | 1.2.2 | `kube-zen/zen-watcher` (ArtifactHub) |
+| Git Tag | v1.2.2 | `github.com:kube-zen/zen-watcher` |
 
 ## Versioning Contract
 
 **v-prefix rule**: Git tags use the `v` prefix (e.g., `v1.2.0`), while all other references use the version number without prefix (e.g., `1.2.0`).
 
-- **Git tags**: `v1.2.0`, `v1.2.1`, etc.
-- **Docker images**: `kubezen/zen-watcher:1.2.1` (no v-prefix)
-- **Helm charts**: `version: 1.2.1`, `appVersion: "1.2.1"` (no v-prefix)
-- **Code**: `Version = "1.2.1"` (no v-prefix)
+- **Git tags**: `v1.2.0`, `v1.2.2`, etc.
+- **Docker images**: `kubezen/zen-watcher:1.2.2` (no v-prefix)
+- **Helm charts**: `version: 1.2.2`, `appVersion: "1.2.2"` (no v-prefix)
+- **Code**: `Version = "1.2.2"` (no v-prefix)
 
 ## Semantic Versioning
 
@@ -188,7 +188,7 @@ A: Image was iterated quickly during development while chart was more stable. No
 A: Yes, starting v1.2.0, they're tested together as a unit and synchronized from the `VERSION` file.
 
 **Q: What if I only want to update the chart (e.g., change replica count)?**  
-A: Chart patches (1.2.0 → 1.2.1) are fine without image changes. But we'll keep the versions synced from `VERSION`.
+A: Chart patches (1.2.0 → 1.2.2) are fine without image changes. But we'll keep the versions synced from `VERSION`.
 
 **Q: How do I update the version?**  
 A: Update the root `VERSION` file, then run the release script which propagates it to all components.

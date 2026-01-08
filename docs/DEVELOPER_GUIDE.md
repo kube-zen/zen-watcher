@@ -1,6 +1,6 @@
 # Zen Watcher Developer Guide
 
-**Version:** 1.2.1  
+**Version:** 1.2.2  
 **Go Version:** 1.25+ (tested on 1.25)  
 **License:** Apache 2.0
 
@@ -312,7 +312,7 @@ cosign generate-key-pair
 
 ```bash
 # Sign image
-cosign sign --key cosign.key kubezen/zen-watcher:1.2.1
+cosign sign --key cosign.key kubezen/zen-watcher:1.2.2
 
 # Or use Makefile
 make docker-sign
@@ -322,7 +322,7 @@ make docker-sign
 
 ```bash
 # Verify signature
-cosign verify --key cosign.pub kubezen/zen-watcher:1.2.1
+cosign verify --key cosign.pub kubezen/zen-watcher:1.2.2
 
 # Or use Makefile
 make docker-verify
@@ -1049,16 +1049,16 @@ go build \
 docker build \
     --no-cache \
     --pull \
-    -t kubezen/zen-watcher:1.2.1 \
+    -t kubezen/zen-watcher:1.2.2 \
     -f build/Dockerfile \
     .
 
 # Or with Podman (drop-in replacement):
-# podman build --no-cache --pull -t kubezen/zen-watcher:1.2.1 -f build/Dockerfile .
+# podman build --no-cache --pull -t kubezen/zen-watcher:1.2.2 -f build/Dockerfile .
 
 # Push to registry
-docker push kubezen/zen-watcher:1.2.1
-# Or: podman push kubezen/zen-watcher:1.2.1
+docker push kubezen/zen-watcher:1.2.2
+# Or: podman push kubezen/zen-watcher:1.2.2
 ```
 
 **Dockerfile optimization:**
@@ -1350,7 +1350,7 @@ _, err := dynClient.Resource(eventGVR).Namespace(namespace).Create(ctx, event, m
 
 ```bash
 # Update version in VERSION file (source of truth)
-echo "1.2.1" > VERSION
+echo "1.2.2" > VERSION
 
 # Update CHANGELOG.md
 vim CHANGELOG.md
@@ -1376,18 +1376,18 @@ make ci
 ```bash
 # Commit changes
 git add .
-git commit -m "Release v1.2.1"
+git commit -m "Release v1.2.2"
 
 # Tag
-git tag -a v1.2.1 -m "Release v1.2.1"
-git push origin v1.2.1
+git tag -a v1.2.2 -m "Release v1.2.2"
+git push origin v1.2.2
 ```
 
 ### 4. Build and Push
 
 ```bash
 # Build production image
-make docker-build VERSION=1.2.1
+make docker-build VERSION=1.2.2
 
 # Scan
 make docker-scan
@@ -1399,8 +1399,8 @@ make docker-sbom
 make docker-sign
 
 # Push
-docker push kubezen/zen-watcher:1.2.1
-docker tag kubezen/zen-watcher:1.2.1 kubezen/zen-watcher:latest
+docker push kubezen/zen-watcher:1.2.2
+docker tag kubezen/zen-watcher:1.2.2 kubezen/zen-watcher:latest
 docker push kubezen/zen-watcher:latest
 ```
 
@@ -1415,11 +1415,11 @@ cd helm-charts/charts/zen-watcher
 
 # Update values.yaml
 vim values.yaml
-# Change: tag: "1.2.1"
+# Change: tag: "1.2.2"
 
 # Commit and push
 git add values.yaml
-git commit -m "zen-watcher v1.2.1"
+git commit -m "zen-watcher v1.2.2"
 git push
 ```
 

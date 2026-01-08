@@ -276,7 +276,7 @@ helm install zen-watcher ./zen-watcher \
   --namespace zen-system \
   --create-namespace \
   --set image.repository=your-registry/zen-watcher \
-  --set image.tag=1.2.1
+  --set image.tag=1.2.2
 ```
 
 **Note:** The zen-watcher Helm chart itself has no external dependencies. All required charts are bundled or can be installed separately.

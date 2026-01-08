@@ -7,7 +7,7 @@ This guide covers building, tagging, and pushing zen-watcher container images.
 ### Basic Build
 
 ```bash
-# Build with default version (reads from VERSION file, currently 1.2.1)
+# Build with default version (reads from VERSION file, currently 1.2.2)
 make image
 
 # Or use docker-build directly
@@ -18,7 +18,7 @@ make docker-build
 
 ```bash
 # Build with custom version
-VERSION=1.2.1 make image
+VERSION=1.2.2 make image
 
 # Build with custom image name
 IMAGE_NAME=my-registry/zen-watcher make image
@@ -41,18 +41,18 @@ The Dockerfile uses:
 
 ### Recommended Tags
 
-For **1.2.1 release**:
-- `1.2.1` - Release tag
+For **1.2.2 release**:
+- `1.2.2` - Release tag
 - `latest` - Development tag (optional, for dev builds)
 
 ### Tag Examples
 
 ```bash
 # Tag for release
-docker tag kubezen/zen-watcher:1.2.1 kubezen/zen-watcher:1.2.1
+docker tag kubezen/zen-watcher:1.2.2 kubezen/zen-watcher:1.2.2
 
 # Tag as latest (dev only)
-docker tag kubezen/zen-watcher:1.2.1 kubezen/zen-watcher:latest
+docker tag kubezen/zen-watcher:1.2.2 kubezen/zen-watcher:latest
 ```
 
 ## Pushing to Registry
@@ -61,23 +61,23 @@ docker tag kubezen/zen-watcher:1.2.1 kubezen/zen-watcher:latest
 
 ```bash
 # Set registry and tag
-make image-push REGISTRY=your-registry.io TAG=1.2.1
+make image-push REGISTRY=your-registry.io TAG=1.2.2
 
 # Example: Docker Hub
-make image-push REGISTRY=docker.io TAG=1.2.1
+make image-push REGISTRY=docker.io TAG=1.2.2
 
 # Example: Custom registry
-make image-push REGISTRY=registry.example.com:5000 TAG=1.2.1
+make image-push REGISTRY=registry.example.com:5000 TAG=1.2.2
 ```
 
 ### Manual Push
 
 ```bash
 # Tag for your registry
-docker tag kubezen/zen-watcher:1.2.1 your-registry.io/zen-watcher:1.2.1
+docker tag kubezen/zen-watcher:1.2.2 your-registry.io/zen-watcher:1.2.2
 
 # Push
-docker push your-registry.io/zen-watcher:1.2.1
+docker push your-registry.io/zen-watcher:1.2.2
 ```
 
 ### Authentication
@@ -85,13 +85,13 @@ docker push your-registry.io/zen-watcher:1.2.1
 **Docker Hub:**
 ```bash
 docker login
-make image-push REGISTRY=docker.io TAG=1.2.1
+make image-push REGISTRY=docker.io TAG=1.2.2
 ```
 
 **Custom Registry:**
 ```bash
 docker login your-registry.io
-make image-push REGISTRY=your-registry.io TAG=1.2.1
+make image-push REGISTRY=your-registry.io TAG=1.2.2
 ```
 
 ## CI/CD Integration
@@ -130,7 +130,7 @@ build:
 make docker-scan
 
 # Or with Trivy directly
-trivy image --severity HIGH,CRITICAL kubezen/zen-watcher:1.2.1
+trivy image --severity HIGH,CRITICAL kubezen/zen-watcher:1.2.2
 ```
 
 ### SBOM Generation
@@ -166,17 +166,17 @@ make docker-verify
 ```
 your-registry.io/
   └── zen-watcher/
-      ├── 1.2.1
+      ├── 1.2.2
       ├── 1.0.0-beta
       ├── 1.0.0
       ├── 1.2.0
-      ├── 1.2.1
+      ├── 1.2.2
       └── latest (dev only)
 ```
 
 ### Tagging Strategy
 
-- **Release tags**: Use semantic versioning (`1.2.1`, `1.2.2`, `1.3.0`)
+- **Release tags**: Use semantic versioning (`1.2.2`, `1.2.2`, `1.3.0`)
 - **Dev tags**: Use `latest` or commit SHA for development builds
 - **No mutable tags in production**: Avoid `latest` for production deployments
 
@@ -207,7 +207,7 @@ docker login your-registry.io
 
 **Solution**: Verify distroless base and stripped binary:
 ```bash
-docker images kubezen/zen-watcher:1.2.1
+docker images kubezen/zen-watcher:1.2.2
 ```
 
 ## Related Documentation

@@ -2,7 +2,7 @@
 
 > **📦 Operational Assets**: Pre-built Prometheus alert rules and Grafana dashboards are located in `config/` directory. See [config/prometheus/rules/](../config/prometheus/rules/) for alert rules and [config/dashboards/](../config/dashboards/) for dashboards.
 
-This guide describes how to validate zen-watcher 1.2.1 release against a real Kubernetes cluster.
+This guide describes how to validate zen-watcher 1.2.2 release against a real Kubernetes cluster.
 
 ## Overview
 
