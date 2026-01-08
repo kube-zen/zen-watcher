@@ -1,4 +1,4 @@
-apiVersion: zen.kube-zen.io/v1
+apiVersion: zen.kube-zen.io/v1alpha1
 kind: Ingester
 metadata:
   name: trivy-informer
