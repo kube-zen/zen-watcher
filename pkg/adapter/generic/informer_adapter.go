@@ -114,6 +114,53 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 		return nil, fmt.Errorf("failed to sync informer cache for %s: %w", gvr.String(), err)
 	}
 
+	// Process existing resources from cache (informer handlers only fire for NEW events)
+	// This ensures we don't miss resources that existed before the informer started
+	go func() {
+		// Get all existing resources from the informer cache
+		existingObjs := informer.GetStore().List()
+		logger := sdklog.NewLogger("zen-watcher-adapter")
+		logger.Info("Processing existing resources from cache",
+			sdklog.Operation("process_existing_resources"),
+			sdklog.String("source", config.Source),
+			sdklog.String("gvr", gvr.String()),
+			sdklog.Int("count", len(existingObjs)))
+
+		for _, obj := range existingObjs {
+			u, ok := obj.(*unstructured.Unstructured)
+			if !ok {
+				continue
+			}
+
+			// Create event for existing resource (as if it were a new Add event)
+			event := RawEvent{
+				Source:    config.Source,
+				Timestamp: time.Now(),
+				RawData:   u.Object,
+				Metadata: map[string]interface{}{
+					"event":     "add",
+					"namespace": u.GetNamespace(),
+					"name":      u.GetName(),
+					"gvr":       gvr.String(),
+					"existing":  true, // Mark as existing resource
+				},
+			}
+
+			select {
+			case events <- event:
+			case <-ctx.Done():
+				return
+			case <-a.stopCh:
+				return
+			}
+		}
+
+		logger.Info("Finished processing existing resources",
+			sdklog.Operation("process_existing_resources_done"),
+			sdklog.String("source", config.Source),
+			sdklog.Int("count", len(existingObjs)))
+	}()
+
 	logger := sdklog.NewLogger("zen-watcher-adapter")
 	logger.Info("Informer adapter started",
 		sdklog.Operation("informer_start"),
