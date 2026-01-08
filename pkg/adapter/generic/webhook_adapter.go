@@ -283,9 +283,9 @@ func (a *WebhookAdapter) handleWebhook(config *SourceConfig) http.HandlerFunc {
 	}
 }
 
-// loadSecret loads a secret from Kubernetes, with caching (5 minute TTL)
-// Uses zen-sdk secret cache
+// loadSecret loads a secret from Kubernetes
 func (a *WebhookAdapter) loadSecret(ctx context.Context, namespace, secretName string) (*corev1.Secret, error) {
+	return nil, fmt.Errorf("secret cache not available")
 }
 	return nil, fmt.Errorf("secret cache not available")
 
