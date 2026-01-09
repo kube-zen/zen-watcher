@@ -147,10 +147,10 @@ func (a *WebhookAuth) Authenticate(r *http.Request) bool {
 	if !a.tokenEnabled && !a.ipAllowlistEnabled {
 		logger := sdklog.NewLogger("zen-watcher-server")
 		logger.Warn("Webhook request rejected: authentication enabled but no token or IP allowlist configured",
-				sdklog.Operation("auth_validate"),
-				sdklog.String("reason", "no_auth_config"),
-				sdklog.String("remote_addr", r.RemoteAddr),
-				sdklog.String("path", r.URL.Path))
+			sdklog.Operation("auth_validate"),
+			sdklog.String("reason", "no_auth_config"),
+			sdklog.String("remote_addr", r.RemoteAddr),
+			sdklog.String("path", r.URL.Path))
 		return false
 	}
 

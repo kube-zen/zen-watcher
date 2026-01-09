@@ -34,7 +34,7 @@ type Manager struct {
 	factory       dynamicinformer.DynamicSharedInformerFactory
 	defaultResync time.Duration
 	// Track custom factories created for specific GVRs with custom resync periods
-	customFactories map[string]dynamicinformer.DynamicSharedInformerFactory
+	customFactories   map[string]dynamicinformer.DynamicSharedInformerFactory
 	customFactoriesMu sync.RWMutex
 }
 
@@ -57,9 +57,9 @@ func NewManager(config Config) *Manager {
 	)
 
 	return &Manager{
-		dynamicClient:    config.DynamicClient,
-		factory:          factory,
-		defaultResync:    config.DefaultResync,
+		dynamicClient:   config.DynamicClient,
+		factory:         factory,
+		defaultResync:   config.DefaultResync,
 		customFactories: make(map[string]dynamicinformer.DynamicSharedInformerFactory),
 	}
 }

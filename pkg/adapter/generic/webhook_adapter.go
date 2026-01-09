@@ -28,7 +28,7 @@ import (
 	"time"
 
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
-// secrets package removed - not available in zen-sdk
+	// secrets package removed - not available in zen-sdk
 	"github.com/prometheus/client_golang/prometheus"
 	"golang.org/x/crypto/bcrypt"
 	corev1 "k8s.io/api/core/v1"
@@ -43,11 +43,10 @@ type WebhookAdapter struct {
 	mu             sync.RWMutex
 	configs        map[string]*SourceConfig // path -> config
 	clientSet      kubernetes.Interface
-	webhookMetrics *prometheus.CounterVec // Metrics for webhook requests (optional)
-	webhookDropped *prometheus.CounterVec // Metrics for webhook events dropped (optional)
+	webhookMetrics *prometheus.CounterVec                            // Metrics for webhook requests (optional)
+	webhookDropped *prometheus.CounterVec                            // Metrics for webhook events dropped (optional)
 	routeRegistrar func(path string, handler http.HandlerFunc) error // Function to register routes on main server
 }
-
 
 // NewWebhookAdapter creates a new generic webhook adapter
 func NewWebhookAdapter(clientSet kubernetes.Interface) *WebhookAdapter {
