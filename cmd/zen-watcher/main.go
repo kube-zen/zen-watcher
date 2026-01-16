@@ -19,6 +19,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -176,6 +177,14 @@ func initializeObservationCreator(clients *kubernetes.Clients, gvrs *kubernetes.
 
 	// Set destination metrics for tracking delivery
 	observationCreator.SetDestinationMetrics(m)
+
+	// H037: Initialize and set GVR allowlist for write restrictions
+	gvrAllowlist := watcher.NewGVRAllowlist()
+	observationCreator.SetGVRAllowlist(gvrAllowlist)
+	setupLog.Info("GVR allowlist initialized",
+		sdklog.Operation("gvr_allowlist_init"),
+		sdklog.String("allowed_gvrs", strings.Join(gvrAllowlist.GetAllowedGVRs(), ",")),
+		sdklog.String("allowed_namespaces", strings.Join(gvrAllowlist.GetAllowedNamespaces(), ",")))
 
 	// Create processor for GenericOrchestrator
 	deduper := observationCreator.GetDeduper()

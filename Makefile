@@ -51,6 +51,22 @@ test:
 	go test -v -race -coverprofile=coverage.out ./...
 	@echo "$(GREEN)✅ Tests complete$(NC)"
 
+## test-unit: Run unit tests only
+test-unit:
+	@echo "$(GREEN)Running unit tests...$(NC)"
+	go test -v -race -short ./pkg/... ./cmd/...
+	@echo "$(GREEN)✅ Unit tests complete$(NC)"
+
+## test-integration: Run integration tests (requires envtest)
+test-integration:
+	@echo "$(GREEN)Running integration tests...$(NC)"
+	@if [ -d "./test/integration" ]; then \
+		go test -v -race -timeout 15m ./test/integration/...; \
+		echo "$(GREEN)✅ Integration tests complete$(NC)"; \
+	else \
+		echo "$(YELLOW)ℹ️  No integration tests found$(NC)"; \
+	fi
+
 ## fuzz: Run fuzz tests (optional)
 fuzz:
 	@echo "$(GREEN)Running fuzz tests...$(NC)"

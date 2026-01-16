@@ -16,6 +16,7 @@ package watcher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -59,14 +60,29 @@ func (cc *CRDCreator) CreateCRD(ctx context.Context, observation *unstructured.U
 		namespace = "default"
 	}
 
-	// H037: Validate GVR and namespace against allowlist
+	// H037: Validate GVR and namespace against allowlist (hard safety rail)
+	// This is the second layer of defense - even if ObservationCreator validation is bypassed
 	if cc.allowlist != nil {
 		if err := cc.allowlist.IsAllowed(cc.gvr, namespace); err != nil {
 			logger := sdklog.NewLogger("zen-watcher")
-			logger.Error(err, "GVR write blocked by allowlist",
-				sdklog.Operation("crd_create_blocked"),
-				sdklog.String("gvr", cc.gvr.String()),
-				sdklog.String("namespace", namespace))
+			// Check if this is a security policy violation
+			isSecurityViolation := errors.Is(err, ErrGVRNotAllowed) ||
+				errors.Is(err, ErrGVRDenied) ||
+				errors.Is(err, ErrNamespaceNotAllowed) ||
+				errors.Is(err, ErrClusterScopedNotAllowed)
+
+			if isSecurityViolation {
+				logger.Warn("GVR write blocked by security policy",
+					sdklog.Operation("crd_create_blocked_security"),
+					sdklog.String("gvr", cc.gvr.String()),
+					sdklog.String("namespace", namespace),
+					sdklog.Error(err))
+			} else {
+				logger.Error(err, "GVR write blocked by allowlist",
+					sdklog.Operation("crd_create_blocked"),
+					sdklog.String("gvr", cc.gvr.String()),
+					sdklog.String("namespace", namespace))
+			}
 			return fmt.Errorf("GVR write blocked: %w", err)
 		}
 	}

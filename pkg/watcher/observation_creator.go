@@ -16,6 +16,7 @@ package watcher
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strconv"
@@ -374,8 +375,24 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 		gvr = oc.gvrResolver(source)
 	}
 
+	// H037: Pre-validate GVR and namespace before creating writer (defense in depth)
+	// This prevents malicious/buggy gvrResolver from attempting writes to unsafe GVRs
+	if oc.gvrAllowlist != nil {
+		if err := oc.gvrAllowlist.IsAllowed(gvr, namespace); err != nil {
+			// Blocked at routing gate - don't attempt Kubernetes write
+			oc.handleCreationError(err, source, gvr.Resource, 0)
+			observationLogger.Warn("GVR write blocked at routing gate",
+				sdklog.Operation("observation_create_blocked"),
+				sdklog.String("source", source),
+				sdklog.String("gvr", gvr.String()),
+				sdklog.String("namespace", namespace),
+				sdklog.Error(err))
+			return fmt.Errorf("GVR write blocked at routing gate: %w", err)
+		}
+	}
+
 	// Use CRDCreator for generic GVR support (works with any resource type)
-	// H037: Pass allowlist to enforce GVR write restrictions
+	// H037: Pass allowlist to enforce GVR write restrictions (second layer of defense)
 	crdCreator := NewCRDCreator(oc.dynClient, gvr, oc.gvrAllowlist)
 	deliveryStartTime := time.Now()
 	err := crdCreator.CreateCRD(ctx, observation)
@@ -467,16 +484,32 @@ func (oc *ObservationCreator) extractMetricsFields(observation *unstructured.Uns
 }
 
 // handleCreationError handles observation creation errors
+// Security: Tracks security policy violations separately
 func (oc *ObservationCreator) handleCreationError(err error, source, resource string, deliveryDuration time.Duration) {
+	// Check if this is a security policy violation (allowlist denial)
+	isSecurityViolation := errors.Is(err, ErrGVRNotAllowed) ||
+		errors.Is(err, ErrGVRDenied) ||
+		errors.Is(err, ErrNamespaceNotAllowed) ||
+		errors.Is(err, ErrClusterScopedNotAllowed)
+
 	// Track creation errors
 	if oc.metrics != nil && oc.metrics.ObservationsCreateErrors != nil {
 		errorType := classifyError(err)
 		oc.metrics.ObservationsCreateErrors.WithLabelValues(source, errorType).Inc()
 	}
+
 	// Track destination delivery failure
 	if oc.destinationMetrics != nil {
-		oc.destinationMetrics.DestinationDeliveryTotal.WithLabelValues(source, "crd", "failure").Inc()
-		oc.destinationMetrics.DestinationDeliveryLatency.WithLabelValues(source, "crd").Observe(deliveryDuration.Seconds())
+		if isSecurityViolation {
+			// Security policy violation - track as "not_allowed"
+			oc.destinationMetrics.DestinationDeliveryTotal.WithLabelValues(source, "crd", "not_allowed").Inc()
+		} else {
+			// Regular failure
+			oc.destinationMetrics.DestinationDeliveryTotal.WithLabelValues(source, "crd", "failure").Inc()
+			if deliveryDuration > 0 {
+				oc.destinationMetrics.DestinationDeliveryLatency.WithLabelValues(source, "crd").Observe(deliveryDuration.Seconds())
+			}
+		}
 	}
 }
 
