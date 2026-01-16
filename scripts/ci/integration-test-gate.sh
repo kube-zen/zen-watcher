@@ -35,19 +35,13 @@ log_info "━━━━━━━━━━━━━━━━━━━━━━━�
 log_info "H039: Integration Test Gate"
 log_info "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-# Artifact directory
-ARTIFACT_DIR="./artifacts/test-run/ci-$(date +%Y%m%d-%H%M%S)"
-mkdir -p "${ARTIFACT_DIR}"
-
 # Step 1: Unit tests
 log_info "Step 1: Running unit tests..."
-UNIT_OUTPUT="${ARTIFACT_DIR}/unit-test-output.log"
-if make test-unit 2>&1 | tee "${UNIT_OUTPUT}"; then
+if make test-unit 2>&1; then
     log_success "Unit tests passed"
-    UNIT_EXIT_CODE=0
 else
     log_error "Unit tests failed"
-    UNIT_EXIT_CODE=1
+    exit 1
 fi
 
 # Step 2: Integration tests (envtest)
@@ -75,30 +69,10 @@ if [ -z "$KUBEBUILDER_ASSETS" ]; then
 fi
 
 # Run integration tests
-INTEGRATION_OUTPUT="${ARTIFACT_DIR}/integration-test-output.log"
-if make test-integration 2>&1 | tee "${INTEGRATION_OUTPUT}"; then
+if make test-integration 2>&1; then
     log_success "Integration tests passed"
-    INTEGRATION_EXIT_CODE=0
 else
     log_error "Integration tests failed"
-    INTEGRATION_EXIT_CODE=1
-fi
-
-# H048: Classify failures if tests failed
-if [ ${UNIT_EXIT_CODE:-0} -ne 0 ] || [ ${INTEGRATION_EXIT_CODE:-0} -ne 0 ]; then
-    log_info "Classifying failures..."
-    COMBINED_OUTPUT="${ARTIFACT_DIR}/combined-test-output.log"
-    cat "${UNIT_OUTPUT}" "${INTEGRATION_OUTPUT}" > "${COMBINED_OUTPUT}" 2>/dev/null || true
-    
-    "${SCRIPT_DIR}/classify-failures.sh" "${COMBINED_OUTPUT}" > "${ARTIFACT_DIR}/failure-classification.txt" || true
-    
-    if [ -f "${ARTIFACT_DIR}/failure-classification.txt" ]; then
-        cat "${ARTIFACT_DIR}/failure-classification.txt"
-    fi
-fi
-
-# Exit with appropriate code
-if [ ${UNIT_EXIT_CODE:-0} -ne 0 ] || [ ${INTEGRATION_EXIT_CODE:-0} -ne 0 ]; then
     exit 1
 fi
 
