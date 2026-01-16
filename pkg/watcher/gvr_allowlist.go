@@ -117,56 +117,6 @@ func NewGVRAllowlist() *GVRAllowlist {
 	return allowlist
 }
 
-// NewGVRAllowlistFromConfig creates a GVR allowlist from explicit configuration
-// H041: Allows tests to configure allowlist deterministically without relying on environment variables
-func NewGVRAllowlistFromConfig(config GVRAllowlistConfig) *GVRAllowlist {
-	allowlist := &GVRAllowlist{
-		allowedGVRs:          make(map[string]bool),
-		allowedNamespaces:    make(map[string]bool),
-		defaultNamespace:     config.DefaultNamespace,
-		clusterScopedAllowed: make(map[string]bool),
-	}
-
-	// Set default allowed GVR if not provided
-	if len(config.AllowedGVRs) == 0 {
-		allowlist.allowedGVRs["zen.kube-zen.io/v1/observations"] = true
-	} else {
-		for _, gvrStr := range config.AllowedGVRs {
-			gvrStr = strings.TrimSpace(gvrStr)
-			if gvrStr != "" {
-				allowlist.allowedGVRs[gvrStr] = true
-			}
-		}
-	}
-
-	// Set allowed namespaces
-	for _, ns := range config.AllowedNamespaces {
-		ns = strings.TrimSpace(ns)
-		if ns != "" {
-			allowlist.allowedNamespaces[ns] = true
-		}
-	}
-
-	// Set allowed cluster-scoped resources
-	for _, gvrStr := range config.ClusterScopedAllowed {
-		gvrStr = strings.TrimSpace(gvrStr)
-		if gvrStr != "" {
-			allowlist.clusterScopedAllowed[gvrStr] = true
-		}
-	}
-
-	return allowlist
-}
-
-// GVRAllowlistConfig holds explicit configuration for GVR allowlist
-// H041: Used for deterministic test configuration
-type GVRAllowlistConfig struct {
-	AllowedGVRs          []string // List of allowed GVRs (format: "group/version/resource" or "version/resource" for core)
-	AllowedNamespaces    []string // List of allowed namespaces
-	DefaultNamespace     string   // Default namespace if not specified
-	ClusterScopedAllowed []string // List of explicitly allowed cluster-scoped GVRs
-}
-
 // buildGVRKey builds a normalized GVR key string
 // Handles empty groups (core resources) correctly
 func buildGVRKey(gvr schema.GroupVersionResource) string {

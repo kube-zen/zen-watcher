@@ -16,43 +16,49 @@ make test-integration   # Run integration tests (requires envtest)
 make test-e2e           # Run E2E tests (requires k3d clusters)
 ```
 
-## ✅ H041 — Wire Real Creator Implementation (COMPLETE)
-**Status:** Implemented and committed
+## 🔄 H041 — Wire Real Creator Implementation (IN PROGRESS)
+**Status:** Tests scaffolded, needs allowlist config helper
 
-**Changes:**
-- ✅ Added `NewGVRAllowlistFromConfig()` helper function for programmatic allowlist configuration
-- ✅ Updated all integration tests to use programmatic config instead of environment variables
-- ✅ Tests now have explicit, deterministic allowlist configuration (no global env dependency)
-- ✅ All tests use real `CRDCreator` and `ObservationCreator` implementations
-- ✅ Allowlist/denylist behavior verified: denies secrets/RBAC/webhooks/CRDs, enforces namespace/GVR allowlists
+**Current State:**
+- Integration tests exist: `test/integration/creator_integration_test.go`
+- Security tests exist: `test/integration/creator_security_test.go`
+- Real `CRDCreator` and `ObservationCreator` implementations exist with allowlist enforcement
+- Tests use environment variables to configure allowlist
 
-**Implementation:**
-- `pkg/watcher/gvr_allowlist.go`: Added `GVRAllowlistConfig` struct and `NewGVRAllowlistFromConfig()` function
-- `test/integration/creator_integration_test.go`: Migrated to programmatic config
-- `test/integration/creator_security_test.go`: Migrated to programmatic config, all security regression tests pass
+**Remaining Work:**
+- Add helper function `newTestGVRAllowlist()` for deterministic test config (not relying on global env)
+- Verify tests pass against real creator code
+- Ensure deny list (secrets/RBAC/webhooks/CRDs) is enforced
 
-## ✅ H042 — Bulletproof envtest + CRD Install (COMPLETE)
-**Status:** Implemented and committed
+**Implementation Plan:**
+1. Add `NewGVRAllowlistFromConfig()` in `gvr_allowlist.go` for programmatic config
+2. Update integration tests to use programmatic config
+3. Verify deny list enforcement in `creator_security_test.go`
 
-**Changes:**
-- ✅ Added `validateCRDsInstalled()` function that verifies CRDs before test execution
-- ✅ Retry logic with exponential backoff for discovery lag (up to 5 attempts)
-- ✅ Fail fast with actionable error messages including CRD file paths
-- ✅ Version-pinned CRD validation (checks specific group/version/kind)
-- ✅ Validates both `observations.zen.kube-zen.io` and `ingesters.zen.kube-zen.io` CRDs
+## 📋 H042 — Bulletproof envtest + CRD Install (TODO)
+**Status:** Needs enhancement
 
-**Implementation:**
-- `test/integration/creator_integration_test.go`: Added `validateCRDsInstalled()` in `TestMain()`
+**Requirements:**
+- Idempotent CRD install
+- Version-pinned CRDs
+- Fail fast with actionable errors
+- Validate CRDs are installed before creating objects
+
+**Implementation Plan:**
+1. Add CRD validation helper that checks if CRD exists before proceeding
+2. Add retry logic with exponential backoff for CRD discovery lag
+3. Add version pinning check (ensure CRD version matches expected)
+4. Enhance error messages to include actionable guidance
 
 ## 📋 H043 — Run Tests Across Repos + Failure Heatmap (TODO)
-**Status:** Pending
+**Status:** Pending H041/H042 completion
 
 **Requirements:**
 - Run unit + integration across: zen-watcher, zen-platform, zen-admin
 - Bucket failures: build/deps, logic regression, flake/timing/race, environment coupling
 - Create concise failure matrix with P0/P1 ordering
 
-**Script:** `scripts/test/run-all-repos.sh` (needs to be created)
+**Script:** `scripts/test/run-all-repos.sh`
 
 ## 📋 H044 — Fix P0/P1 Failures (TODO)
 **Status:** Pending H043 completion
@@ -100,12 +106,12 @@ make test-e2e           # Run E2E tests (requires k3d clusters)
 
 ## Summary
 
-**Completed:** H040, H041, H042
-**In Progress:** None
-**Pending:** H043-H048
+**Completed:** H040
+**In Progress:** H041 (needs test helper function)
+**Pending:** H042-H048 (blocked by H041 completion or can be done in parallel)
 
 **Next Steps:**
-1. H043: Create cross-repo test execution script and failure heatmap generator
-2. H044: Fix identified P0/P1 failures from H043
-3. H045-H047: Validate and stabilize E2E harness, then run E2E suite
-4. H048: Add failure classification to CI gates
+1. Complete H041: Add `NewGVRAllowlistFromConfig()` helper
+2. Complete H042: Enhance envtest CRD validation
+3. Run H043: Execute test suite across repos
+4. Continue with remaining tasks in sequence

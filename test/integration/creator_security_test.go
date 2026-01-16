@@ -24,6 +24,7 @@ package integration
 import (
 	"context"
 	"errors"
+	"os"
 	"testing"
 	"time"
 
@@ -55,12 +56,14 @@ func TestSecurityRegression_SecretsDenied(t *testing.T) {
 			ctx := context.Background()
 
 			// Set up allowlist (even if secrets are in allowlist, they should be denied)
-			// H041: Use programmatic config for deterministic tests
-			allowlist := watcher.NewGVRAllowlistFromConfig(watcher.GVRAllowlistConfig{
-				AllowedGVRs:       []string{"v1/secrets"}, // Try to allow secrets (should still be denied)
-				AllowedNamespaces: []string{allowedNamespace},
-				DefaultNamespace:  allowedNamespace,
-			})
+			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
+			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
+			os.Setenv("ALLOWED_GVRS", "v1/secrets") // Try to allow secrets
+			defer os.Unsetenv("WATCH_NAMESPACE")
+			defer os.Unsetenv("ALLOWED_NAMESPACES")
+			defer os.Unsetenv("ALLOWED_GVRS")
+
+			allowlist := watcher.NewGVRAllowlist()
 
 			secretsGVR := schema.GroupVersionResource{
 				Group:    "",
@@ -150,12 +153,12 @@ func TestSecurityRegression_RBACDenied(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			// H041: Use programmatic config for deterministic tests
-			allowlist := watcher.NewGVRAllowlistFromConfig(watcher.GVRAllowlistConfig{
-				AllowedGVRs:       []string{"zen.kube-zen.io/v1alpha1/observations"},
-				AllowedNamespaces: []string{allowedNamespace},
-				DefaultNamespace:  allowedNamespace,
-			})
+			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
+			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
+			defer os.Unsetenv("WATCH_NAMESPACE")
+			defer os.Unsetenv("ALLOWED_NAMESPACES")
+
+			allowlist := watcher.NewGVRAllowlist()
 			creator := watcher.NewCRDCreator(dynamicClient, tc.gvr, allowlist)
 
 			observation := &unstructured.Unstructured{
@@ -213,12 +216,12 @@ func TestSecurityRegression_WebhooksDenied(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			// H041: Use programmatic config for deterministic tests
-			allowlist := watcher.NewGVRAllowlistFromConfig(watcher.GVRAllowlistConfig{
-				AllowedGVRs:       []string{"zen.kube-zen.io/v1alpha1/observations"},
-				AllowedNamespaces: []string{allowedNamespace},
-				DefaultNamespace:  allowedNamespace,
-			})
+			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
+			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
+			defer os.Unsetenv("WATCH_NAMESPACE")
+			defer os.Unsetenv("ALLOWED_NAMESPACES")
+
+			allowlist := watcher.NewGVRAllowlist()
 			creator := watcher.NewCRDCreator(dynamicClient, tc.gvr, allowlist)
 
 			observation := &unstructured.Unstructured{
@@ -276,12 +279,12 @@ func TestSecurityRegression_CRDsDenied(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			// H041: Use programmatic config for deterministic tests
-			allowlist := watcher.NewGVRAllowlistFromConfig(watcher.GVRAllowlistConfig{
-				AllowedGVRs:       []string{"zen.kube-zen.io/v1alpha1/observations"},
-				AllowedNamespaces: []string{allowedNamespace},
-				DefaultNamespace:  allowedNamespace,
-			})
+			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
+			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
+			defer os.Unsetenv("WATCH_NAMESPACE")
+			defer os.Unsetenv("ALLOWED_NAMESPACES")
+
+			allowlist := watcher.NewGVRAllowlist()
 			creator := watcher.NewCRDCreator(dynamicClient, tc.gvr, allowlist)
 
 			observation := &unstructured.Unstructured{
@@ -339,12 +342,13 @@ func TestSecurityRegression_NonAllowlistedGVRDenied(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			// H041: Use programmatic config (explicitly NOT including this GVR)
-			allowlist := watcher.NewGVRAllowlistFromConfig(watcher.GVRAllowlistConfig{
-				AllowedGVRs:       []string{"zen.kube-zen.io/v1alpha1/observations"}, // Note: NOT adding tc.gvr
-				AllowedNamespaces: []string{allowedNamespace},
-				DefaultNamespace:  allowedNamespace,
-			})
+			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
+			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
+			// Note: NOT adding this GVR to ALLOWED_GVRS
+			defer os.Unsetenv("WATCH_NAMESPACE")
+			defer os.Unsetenv("ALLOWED_NAMESPACES")
+
+			allowlist := watcher.NewGVRAllowlist()
 			creator := watcher.NewCRDCreator(dynamicClient, tc.gvr, allowlist)
 
 			observation := &unstructured.Unstructured{
@@ -398,12 +402,12 @@ func TestSecurityRegression_DisallowedNamespaceDenied(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			// H041: Use programmatic config for deterministic tests
-			allowlist := watcher.NewGVRAllowlistFromConfig(watcher.GVRAllowlistConfig{
-				AllowedGVRs:       []string{"zen.kube-zen.io/v1alpha1/observations"},
-				AllowedNamespaces: []string{allowedNamespace}, // Only allow allowedNamespace
-				DefaultNamespace:  allowedNamespace,
-			})
+			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
+			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace) // Only allow allowedNamespace
+			defer os.Unsetenv("WATCH_NAMESPACE")
+			defer os.Unsetenv("ALLOWED_NAMESPACES")
+
+			allowlist := watcher.NewGVRAllowlist()
 
 			creator := watcher.NewCRDCreator(dynamicClient, observationGVR, allowlist)
 
@@ -458,12 +462,12 @@ func TestSecurityRegression_PositivePath(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			// H041: Use programmatic config for deterministic tests
-			allowlist := watcher.NewGVRAllowlistFromConfig(watcher.GVRAllowlistConfig{
-				AllowedGVRs:       []string{"zen.kube-zen.io/v1alpha1/observations"},
-				AllowedNamespaces: []string{allowedNamespace},
-				DefaultNamespace:  allowedNamespace,
-			})
+			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
+			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
+			defer os.Unsetenv("WATCH_NAMESPACE")
+			defer os.Unsetenv("ALLOWED_NAMESPACES")
+
+			allowlist := watcher.NewGVRAllowlist()
 
 			creator := watcher.NewCRDCreator(dynamicClient, tc.gvr, allowlist)
 

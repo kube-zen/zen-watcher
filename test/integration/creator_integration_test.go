@@ -16,10 +16,8 @@ package integration
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 	"time"
 
@@ -29,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -52,14 +49,12 @@ var (
 func TestMain(m *testing.M) {
 	log.SetLogger(zap.New(zap.UseDevMode(true)))
 
-	// H042: Setup test environment with CRDs (bulletproof CRD install)
+	// Setup test environment with CRDs
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths: []string{
 			filepath.Join("..", "..", "deployments", "crds"),
 		},
 		ErrorIfCRDPathMissing: true,
-		// H042: UseAttachControlPlaneOutput helps with debugging but can be removed for CI
-		UseExistingCluster: nil, // Always use envtest (no existing cluster)
 	}
 
 	cfg, err := testEnv.Start()
@@ -76,11 +71,6 @@ func TestMain(m *testing.M) {
 	kubeClient, err = kubernetes.NewForConfig(cfg)
 	if err != nil {
 		panic("Failed to create kubernetes client: " + err.Error())
-	}
-
-	// H042: Validate CRDs are installed before proceeding (fails fast)
-	if err := validateCRDsInstalled(cfg); err != nil {
-		panic("CRD validation failed: " + err.Error())
 	}
 
 	// Define GVRs
@@ -108,82 +98,6 @@ func TestMain(m *testing.M) {
 	}
 
 	os.Exit(code)
-}
-
-// validateCRDsInstalled validates that required CRDs are installed in envtest
-// H042: Fails fast with actionable errors if CRDs are missing
-func validateCRDsInstalled(cfg interface{}) error {
-	// Wait for CRD discovery to settle (envtest can have discovery lag)
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// Expected CRDs (version-pinned)
-	expectedCRDs := []struct {
-		name    string
-		group   string
-		version string
-		kind    string
-	}{
-		{
-			name:    "observations.zen.kube-zen.io",
-			group:   "zen.kube-zen.io",
-			version: "v1alpha1",
-			kind:    "Observation",
-		},
-		{
-			name:    "ingesters.zen.kube-zen.io",
-			group:   "zen.kube-zen.io",
-			version: "v1alpha1",
-			kind:    "Ingester",
-		},
-	}
-
-	// Use dynamic client to check CRD existence via API discovery
-	dynClient, err := dynamic.NewForConfig(cfg.(*rest.Config))
-	if err != nil {
-		return fmt.Errorf("failed to create dynamic client for CRD validation: %w", err)
-	}
-
-	for _, expected := range expectedCRDs {
-		gvr := schema.GroupVersionResource{
-			Group:    expected.group,
-			Version:  expected.version,
-			Resource: strings.ToLower(expected.kind) + "s",
-		}
-
-		// Try to list resources (this will fail if CRD doesn't exist)
-		// Use retry with exponential backoff to handle discovery lag
-		var lastErr error
-		for attempt := 0; attempt < 5; attempt++ {
-			_, err := dynClient.Resource(gvr).List(ctx, metav1.ListOptions{Limit: 1})
-			if err == nil {
-				// Success: CRD exists and is discoverable
-				lastErr = nil
-				break
-			}
-			if !errors.IsNotFound(err) && !strings.Contains(err.Error(), "no matches for kind") {
-				// Non-discovery error - probably real issue
-				lastErr = err
-				break
-			}
-			// Discovery lag - retry with backoff
-			select {
-			case <-ctx.Done():
-				lastErr = fmt.Errorf("timeout waiting for CRD discovery")
-				break
-			case <-time.After(time.Duration(attempt+1) * 200 * time.Millisecond):
-				// Continue retry
-			}
-		}
-
-		if lastErr != nil {
-			return fmt.Errorf("CRD validation failed for %s (group: %s, version: %s): %w\n"+
-				"Action: Ensure CRD file exists at deployments/crds/%s_crd.yaml",
-				expected.name, expected.group, expected.version, lastErr, strings.ToLower(expected.kind))
-		}
-	}
-
-	return nil
 }
 
 // setupTestNamespace creates a test namespace and service account
@@ -283,12 +197,13 @@ func TestObservationCreator_CreateObservation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			// H041: Use programmatic config for deterministic tests
-			allowlist := watcher.NewGVRAllowlistFromConfig(watcher.GVRAllowlistConfig{
-				AllowedGVRs:       []string{"zen.kube-zen.io/v1alpha1/observations"},
-				AllowedNamespaces: []string{allowedNamespace},
-				DefaultNamespace:  allowedNamespace,
-			})
+			// Set up allowlist
+			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
+			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
+			defer os.Unsetenv("WATCH_NAMESPACE")
+			defer os.Unsetenv("ALLOWED_NAMESPACES")
+
+			allowlist := watcher.NewGVRAllowlist()
 
 			// Create ObservationCreator
 			creator := watcher.NewObservationCreator(
@@ -368,12 +283,13 @@ func TestCRDCreator_CreateCRD(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			// H041: Use programmatic config for deterministic tests
-			allowlist := watcher.NewGVRAllowlistFromConfig(watcher.GVRAllowlistConfig{
-				AllowedGVRs:       []string{"zen.kube-zen.io/v1alpha1/observations"},
-				AllowedNamespaces: []string{allowedNamespace},
-				DefaultNamespace:  allowedNamespace,
-			})
+			// Set up allowlist
+			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
+			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
+			defer os.Unsetenv("WATCH_NAMESPACE")
+			defer os.Unsetenv("ALLOWED_NAMESPACES")
+
+			allowlist := watcher.NewGVRAllowlist()
 
 			// Create CRDCreator
 			creator := watcher.NewCRDCreator(dynamicClient, tc.gvr, allowlist)
@@ -420,12 +336,13 @@ func TestObservationCreator_WithAllowlist(t *testing.T) {
 
 	ctx := context.Background()
 
-	// Set up allowlist using programmatic config (H041: deterministic test config)
-	allowlist := watcher.NewGVRAllowlistFromConfig(watcher.GVRAllowlistConfig{
-		AllowedGVRs:       []string{"zen.kube-zen.io/v1alpha1/observations"},
-		AllowedNamespaces: []string{allowedNamespace},
-		DefaultNamespace:  allowedNamespace,
-	})
+	// Set up allowlist with specific namespace
+	os.Setenv("WATCH_NAMESPACE", allowedNamespace)
+	os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
+	defer os.Unsetenv("WATCH_NAMESPACE")
+	defer os.Unsetenv("ALLOWED_NAMESPACES")
+
+	allowlist := watcher.NewGVRAllowlist()
 
 	creator := watcher.NewObservationCreator(
 		dynamicClient,
