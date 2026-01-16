@@ -32,7 +32,7 @@ import (
 const (
 	defaultClusterName = "test-cluster"
 	namespace          = "zen-system"
-	// testNamespace is defined in e2e_framework.go
+	testNamespace      = "default"
 )
 
 var (
