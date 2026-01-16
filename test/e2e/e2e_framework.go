@@ -29,10 +29,45 @@ import (
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 )
+
+// Common test constants
+const (
+	testNamespace = "zen-watcher-test"
+)
+
+// getKubeClientForCluster returns a Kubernetes client for a specific cluster
+func getKubeClientForCluster(clusterName string) (*kubernetes.Clientset, error) {
+	home, _ := os.UserHomeDir()
+	kubeconfig := fmt.Sprintf("%s/.config/k3d/kubeconfig-%s.yaml", home, clusterName)
+
+	// Check if kubeconfig exists
+	if _, err := os.Stat(kubeconfig); os.IsNotExist(err) {
+		return nil, fmt.Errorf("kubeconfig not found for cluster %s: %w", clusterName, err)
+	}
+
+	config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build config: %w", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create clientset: %w", err)
+	}
+
+	return clientset, nil
+}
+
+// isAlreadyExists checks if an error indicates a resource already exists
+func isAlreadyExists(err error) bool {
+	return errors.IsAlreadyExists(err)
+}
 
 // ArtifactCollector collects test artifacts (logs, metrics, traces, receipts)
 type ArtifactCollector struct {
