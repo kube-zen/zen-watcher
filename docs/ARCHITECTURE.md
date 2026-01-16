@@ -25,6 +25,7 @@ Zen Watcher is a Kubernetes-native observation aggregator that consolidates even
 - **Efficient**: ~2-3m CPU baseline, scales with event volume (measured: ~9-10MB memory working set, ~27MB resident at idle)
 - **Observable**: 20+ Prometheus metrics, structured logging, health endpoints
 - **Infrastructure-Blind**: Avoids cluster-unique identifiers (AWS account ID, GKE project name) while preserving Kubernetes-native context (namespace, name, kind) for RBAC, auditing, and multi-tenancy
+- **Reliability Profiles**: Baseline (no Redis) default; optional Redis-enabled HA profile for edge resilience (see [Reliability Profiles](docs/RELIABILITY_PROFILES.md))
 
 ---
 
@@ -914,18 +915,27 @@ This follows the proven pattern of Prometheus Alertmanager, Flux, and Crossplane
 
 ### Scalability Path
 
-**Current (Single Instance):**
+**Current (Single Instance - Baseline):**
 - Handles 10,000 events/day
 - Single namespace watching
+- **No external dependencies** (in-memory caches only)
 
-**Phase 2 (Sharded):**
+**Phase 2 (Sharded - Baseline):**
 - Multiple instances, namespace-based sharding
 - Handles 100,000 events/day
+- **No external dependencies** (Kubernetes primitives only)
 
-**Phase 3 (Distributed):**
-- Leader election with etcd
-- Work queue with Redis
+**Phase 3 (Distributed - Baseline):**
+- Leader election with etcd (Kubernetes-native)
+- In-memory work queues
 - Handles 1,000,000+ events/day
+- **No Redis required** - fully functional baseline
+
+**Reliability Acceleration (Optional - 1.x):**
+- Redis-enabled HA profile available as optional acceleration
+- Shared caches, spool, rate limiting (when Redis available)
+- **Graceful degradation** - system operates without Redis
+- See [Reliability Profiles](docs/RELIABILITY_PROFILES.md) for details
 
 ---
 
