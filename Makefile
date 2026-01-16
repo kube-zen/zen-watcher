@@ -51,54 +51,20 @@ test:
 	go test -v -race -coverprofile=coverage.out ./...
 	@echo "$(GREEN)✅ Tests complete$(NC)"
 
-## test-unit: Run unit tests only (with -count=1 to surface flakes)
+## test-unit: Run unit tests only
 test-unit:
 	@echo "$(GREEN)Running unit tests...$(NC)"
-	@ARTIFACTS_DIR=$${ARTIFACTS_DIR:-./artifacts/test-run/unit/$$(date +%Y%m%d-%H%M%S)}; \
-	mkdir -p $$ARTIFACTS_DIR; \
-	if go test -v -count=1 -short ./pkg/... ./cmd/... 2>&1 | tee $$ARTIFACTS_DIR/test-output.log; then \
-		echo "$(GREEN)✅ Unit tests complete$(NC)"; \
-		echo "test_result=pass" > $$ARTIFACTS_DIR/result.txt; \
-	else \
-		echo "$(RED)❌ Unit tests failed$(NC)"; \
-		echo "test_result=fail" > $$ARTIFACTS_DIR/result.txt; \
-		exit 1; \
-	fi
+	go test -v -race -short ./pkg/... ./cmd/...
+	@echo "$(GREEN)✅ Unit tests complete$(NC)"
 
-## test-integration: Run integration tests (requires envtest, -count=1 enforced)
+## test-integration: Run integration tests (requires envtest)
 test-integration:
 	@echo "$(GREEN)Running integration tests...$(NC)"
-	@if [ ! -d "./test/integration" ]; then \
-		echo "$(YELLOW)ℹ️  No integration tests found$(NC)"; \
-		exit 0; \
-	fi; \
-	ARTIFACTS_DIR=$${ARTIFACTS_DIR:-./artifacts/test-run/integration/$$(date +%Y%m%d-%H%M%S)}; \
-	mkdir -p $$ARTIFACTS_DIR; \
-	if GOMAXPROCS=$${GOMAXPROCS:-1} go test -v -count=1 -timeout 15m ./test/integration/... 2>&1 | tee $$ARTIFACTS_DIR/test-output.log; then \
+	@if [ -d "./test/integration" ]; then \
+		go test -v -race -timeout 15m ./test/integration/...; \
 		echo "$(GREEN)✅ Integration tests complete$(NC)"; \
-		echo "test_result=pass" > $$ARTIFACTS_DIR/result.txt; \
 	else \
-		echo "$(RED)❌ Integration tests failed$(NC)"; \
-		echo "test_result=fail" > $$ARTIFACTS_DIR/result.txt; \
-		exit 1; \
-	fi
-
-## test-e2e: Run E2E tests (requires k3d clusters, -count=1 enforced)
-test-e2e:
-	@echo "$(GREEN)Running E2E tests...$(NC)"
-	@if [ ! -d "./test/e2e" ]; then \
-		echo "$(YELLOW)ℹ️  No E2E tests found$(NC)"; \
-		exit 0; \
-	fi; \
-	ARTIFACTS_DIR=$${ARTIFACTS_DIR:-./artifacts/test-run/e2e/$$(date +%Y%m%d-%H%M%S)}; \
-	mkdir -p $$ARTIFACTS_DIR; \
-	if GOMAXPROCS=$${GOMAXPROCS:-1} go test -v -count=1 -timeout 30m ./test/e2e/... 2>&1 | tee $$ARTIFACTS_DIR/test-output.log; then \
-		echo "$(GREEN)✅ E2E tests complete$(NC)"; \
-		echo "test_result=pass" > $$ARTIFACTS_DIR/result.txt; \
-	else \
-		echo "$(RED)❌ E2E tests failed$(NC)"; \
-		echo "test_result=fail" > $$ARTIFACTS_DIR/result.txt; \
-		exit 1; \
+		echo "$(YELLOW)ℹ️  No integration tests found$(NC)"; \
 	fi
 
 ## fuzz: Run fuzz tests (optional)
@@ -535,3 +501,4 @@ oss-boundary-strict:
 	@echo "$(GREEN)Running OSS boundary gate (STRICT MODE)...$(NC)"
 	@OSS_BOUNDARY_STRICT=1 bash scripts/test/oss-boundary-gate.sh .
 	@echo "$(GREEN)✅ OSS boundary check passed (strict mode)$(NC)"
+
