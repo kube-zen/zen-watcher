@@ -44,10 +44,12 @@ var (
 // ObservationCreator handles creation of resources (any GVR) with centralized filtering, normalization, deduplication, and metrics
 // Flow: filter() → normalize() → dedup() → create resource (any GVR) + update metrics + log
 // Note: Named "ObservationCreator" for backward compatibility, but it creates any resource type based on destination GVR
+// H037: GVR writes are restricted by allowlist
 type ObservationCreator struct {
-	dynClient   dynamic.Interface
-	eventGVR    schema.GroupVersionResource                     // Default GVR (for backward compatibility)
-	gvrResolver func(source string) schema.GroupVersionResource // Optional: Resolve GVR from source
+	dynClient    dynamic.Interface
+	eventGVR     schema.GroupVersionResource                     // Default GVR (for backward compatibility)
+	gvrResolver  func(source string) schema.GroupVersionResource // Optional: Resolve GVR from source
+	gvrAllowlist *GVRAllowlist                                   // H037: GVR allowlist for write restrictions
 
 	// Metrics tracking
 	metrics *MetricsTracker
@@ -212,6 +214,12 @@ func (oc *ObservationCreator) SetGVRResolver(resolver func(source string) schema
 	oc.gvrResolver = resolver
 }
 
+// SetGVRAllowlist sets the GVR allowlist for write restrictions
+// H037: Enforces namespace + allowlist restrictions
+func (oc *ObservationCreator) SetGVRAllowlist(allowlist *GVRAllowlist) {
+	oc.gvrAllowlist = allowlist
+}
+
 // CreateObservation creates an Observation CRD and increments metrics
 // IMPORTANT: This method assumes the event has already been processed (filtered and deduplicated)
 // by the Processor. It does NOT re-run filter or dedup logic.
@@ -367,7 +375,8 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 	}
 
 	// Use CRDCreator for generic GVR support (works with any resource type)
-	crdCreator := NewCRDCreator(oc.dynClient, gvr)
+	// H037: Pass allowlist to enforce GVR write restrictions
+	crdCreator := NewCRDCreator(oc.dynClient, gvr, oc.gvrAllowlist)
 	deliveryStartTime := time.Now()
 	err := crdCreator.CreateCRD(ctx, observation)
 	deliveryDuration := time.Since(deliveryStartTime)

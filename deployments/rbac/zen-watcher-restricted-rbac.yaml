@@ -1,0 +1,69 @@
+---
+# H037: Restricted RBAC for zen-watcher
+# Restricts GVR writes to namespace + allowlist
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zen-watcher
+  namespace: zen-system
+---
+# H037: ClusterRole with restricted GVR write permissions
+# Only allows writes to allowed GVRs in specific namespaces
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zen-watcher-restricted
+rules:
+  # Read-only access to core resources
+  - apiGroups: [""]
+    resources: ["configmaps", "pods", "namespaces", "events"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list"]
+
+  # Read-only access to policy reports
+  - apiGroups: ["wgpolicyk8s.io"]
+    resources: ["policyreports", "clusterpolicyreports"]
+    verbs: ["get", "list", "watch"]
+
+  # Read-only access to Kyverno policies
+  - apiGroups: ["kyverno.io"]
+    resources: ["clusterpolicies", "policies"]
+    verbs: ["get", "list", "watch"]
+
+  # Read-only access to vulnerability reports
+  - apiGroups: ["aquasecurity.github.io"]
+    resources: ["vulnerabilityreports", "clustervulnerabilityreports"]
+    verbs: ["get", "list", "watch"]
+
+  # H037: Restricted write access - only to allowed GVRs in allowed namespaces
+  # Default: observations.zen.kube-zen.io (zen-watcher's own resource)
+  - apiGroups: ["zen.kube-zen.io"]
+    resources: ["observations"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # H037: Allow reads to Ingester CRDs (for status updates only)
+  - apiGroups: ["zen.kube-zen.io"]
+    resources: ["ingesters"]
+    verbs: ["get", "list", "watch"]
+    # Note: zen-watcher should NOT create/update Ingesters - only read them
+    # Status updates are handled via status subresource (if needed)
+
+  # H037: Restricted dynamic GVR writes - only to allowlisted GVRs
+  # This is enforced via code-level validation, not RBAC
+  # (RBAC can't restrict by GVR dynamically)
+  # See: zen-watcher/pkg/watcher/gvr_allowlist.go for enforcement
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: zen-watcher-restricted
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: zen-watcher-restricted
+subjects:
+  - kind: ServiceAccount
+    name: zen-watcher
+    namespace: zen-system

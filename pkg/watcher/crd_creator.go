@@ -31,27 +31,44 @@ import (
 // This is a completely generic creator that can write to any Kubernetes resource type
 // (CRDs, core resources like ConfigMaps, Secrets, etc.). It's similar to zen-egress's CRDDispatcher.
 // There are no special cases - observations and ConfigMaps are just examples in documentation.
+// H037: GVR writes are restricted by allowlist
 type CRDCreator struct {
 	dynClient dynamic.Interface
 	gvr       schema.GroupVersionResource
+	allowlist *GVRAllowlist // H037: GVR allowlist enforcement
 }
 
 // NewCRDCreator creates a new generic CRD creator that can write to any GVR.
-func NewCRDCreator(dynClient dynamic.Interface, gvr schema.GroupVersionResource) *CRDCreator {
+// H037: GVR writes are restricted by allowlist
+func NewCRDCreator(dynClient dynamic.Interface, gvr schema.GroupVersionResource, allowlist *GVRAllowlist) *CRDCreator {
 	return &CRDCreator{
 		dynClient: dynClient,
 		gvr:       gvr,
+		allowlist: allowlist,
 	}
 }
 
 // CreateCRD creates a resource from an unstructured observation.
 // The observation structure is converted generically to match the target GVR's format.
 // The observation spec is copied to the target resource spec (or equivalent field).
+// H037: Validates GVR and namespace against allowlist before creating
 func (cc *CRDCreator) CreateCRD(ctx context.Context, observation *unstructured.Unstructured) error {
 	// Extract namespace
 	namespace, found := extractNamespace(observation)
 	if !found || namespace == "" {
 		namespace = "default"
+	}
+
+	// H037: Validate GVR and namespace against allowlist
+	if cc.allowlist != nil {
+		if err := cc.allowlist.IsAllowed(cc.gvr, namespace); err != nil {
+			logger := sdklog.NewLogger("zen-watcher")
+			logger.Error(err, "GVR write blocked by allowlist",
+				sdklog.Operation("crd_create_blocked"),
+				sdklog.String("gvr", cc.gvr.String()),
+				sdklog.String("namespace", namespace))
+			return fmt.Errorf("GVR write blocked: %w", err)
+		}
 	}
 
 	// Convert observation to target CRD format
