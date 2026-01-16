@@ -1,0 +1,25 @@
+# CODEOWNERS for zen-watcher
+# H043: Guardrail to prevent platform coupling - all changes require OSS-maintainer approval
+
+# Global default: OSS maintainers must approve all changes
+* @kube-zen/oss-maintainers
+
+# Platform-coupled files (require explicit OSS-only label in PR)
+/pkg/watcher/gvr_allowlist.go @kube-zen/oss-maintainers
+/pkg/watcher/crd_creator.go @kube-zen/oss-maintainers
+/pkg/watcher/observation_creator.go @kube-zen/oss-maintainers
+
+# Test files that should remain OSS-focused
+/test/integration/ @kube-zen/oss-maintainers
+/test/e2e/ @kube-zen/oss-maintainers
+
+# CI and build scripts
+/scripts/ci/ @kube-zen/oss-maintainers
+/Makefile @kube-zen/oss-maintainers
+
+# Documentation
+/docs/ @kube-zen/oss-maintainers
+README.md @kube-zen/oss-maintainers
+
+# CRDs (must remain OSS-neutral)
+/deployments/crds/ @kube-zen/oss-maintainers
