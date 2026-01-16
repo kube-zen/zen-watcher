@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# H039: CI wiring for E2E tests
+# H039/H048: CI wiring for E2E tests with failure classification
 # Runs E2E tests nightly + on merge-to-main (k3d) + artifact upload
 
 set -euo pipefail
@@ -59,11 +59,27 @@ trap cleanup EXIT INT TERM
 
 # Step 2: Run E2E tests
 log_info "Step 2: Running E2E tests..."
-if go test -v -timeout 30m ./test/e2e/... -run TestFlow1_ObservationCreationSuccess 2>&1; then
+E2E_OUTPUT="${ARTIFACT_DIR}/e2e-test-output.log"
+if make test-e2e 2>&1 | tee "${E2E_OUTPUT}"; then
     log_success "E2E tests passed"
+    EXIT_CODE=0
 else
     log_error "E2E tests failed"
-    exit 1
+    EXIT_CODE=1
+fi
+
+# H048: Classify failures if tests failed
+if [ ${EXIT_CODE:-0} -ne 0 ]; then
+    log_info "Classifying failures..."
+    "${SCRIPT_DIR}/classify-failures.sh" "${E2E_OUTPUT}" > "${ARTIFACT_DIR}/failure-classification.txt" || true
+    
+    if [ -f "${ARTIFACT_DIR}/failure-classification.txt" ]; then
+        cat "${ARTIFACT_DIR}/failure-classification.txt"
+    fi
+fi
+
+if [ ${EXIT_CODE:-0} -ne 0 ]; then
+    exit ${EXIT_CODE}
 fi
 
 # Step 3: Collect artifacts
