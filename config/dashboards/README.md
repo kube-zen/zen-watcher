@@ -333,4 +333,4 @@ Alerts are visualized in dashboards via:
 - **Alert Rules**: `../monitoring/prometheus-rules.yaml`
 - **Full Demo Script**: `../../scripts/demo.sh` (includes monitoring)
 - **Quick Demo Script**: `../../scripts/quick-demo.sh` (lightweight, no monitoring)
-- **Architecture**: `../../docs/ARCHITECTURE.md`
+- **Architecture**: `../../docs/reference/ARCHITECTURE.md`

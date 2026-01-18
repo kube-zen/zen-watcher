@@ -307,14 +307,14 @@ curl http://localhost:8080/metrics
 ## Next Steps
 
 - **Configure More Sources**: See [examples/ingesters/](../examples/ingesters/) for Trivy, Falco, Kyverno, and more
-- **Enable Alerts**: See [docs/OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) for PrometheusRule setup
-- **Production Hardening**: See [docs/SECURITY.md](SECURITY.md) for security best practices
-- **Scaling**: See [docs/SCALING.md](SCALING.md) for HA and scaling strategies
+- **Enable Alerts**: See [docs/operations/OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) for PrometheusRule setup
+- **Production Hardening**: See [docs/security/SECURITY.md](SECURITY.md) for security best practices
+- **Scaling**: See [docs/operations/SCALING.md](SCALING.md) for HA and scaling strategies
 
 ## Additional Resources
 
 - **Full Documentation**: [docs/INDEX.md](INDEX.md)
-- **Helm Deployment**: [docs/DEPLOYMENT_HELM.md](DEPLOYMENT_HELM.md)
+- **Helm Deployment**: [docs/getting-started/DEPLOYMENT_HELM.md](DEPLOYMENT_HELM.md)
 - **Ingester API**: [docs/INGESTER_API.md](INGESTER_API.md)
-- **Troubleshooting**: [docs/OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md)
+- **Troubleshooting**: [docs/operations/OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md)
 

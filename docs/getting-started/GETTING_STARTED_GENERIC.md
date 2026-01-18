@@ -257,7 +257,7 @@ kubectl get observations -n zen-system --watch
 
 ### Using Custom Controllers
 
-You can build custom controllers that watch `Observation` CRDs using Kubernetes informers. See [docs/INTEGRATIONS.md](INTEGRATIONS.md) for examples.
+You can build custom controllers that watch `Observation` CRDs using Kubernetes informers. See [docs/advanced/INTEGRATIONS.md](INTEGRATIONS.md) for examples.
 
 ---
 
@@ -338,10 +338,10 @@ curl http://localhost:8080/ready
 ## Additional Resources
 
 - **Full Documentation**: [README.md](../README.md)
-- **Architecture Guide**: [docs/ARCHITECTURE.md](ARCHITECTURE.md)
+- **Architecture Guide**: [docs/reference/ARCHITECTURE.md](ARCHITECTURE.md)
 - **API Reference**: [docs/OBSERVATION_API_PUBLIC_GUIDE.md](OBSERVATION_API_PUBLIC_GUIDE.md)
 - **Source Configuration Guide**: [docs/OBSERVATION_SOURCES_CONFIG_GUIDE.md](OBSERVATION_SOURCES_CONFIG_GUIDE.md) - How to configure sources (security scanners, webhooks, etc.)
-- **Integration Examples**: [docs/INTEGRATIONS.md](INTEGRATIONS.md)
+- **Integration Examples**: [docs/advanced/INTEGRATIONS.md](INTEGRATIONS.md)
 - **Configuration Guide**: See README.md "Configuration" section
 
 ---

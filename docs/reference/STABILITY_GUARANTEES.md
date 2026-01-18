@@ -318,5 +318,5 @@ This document defines what zen-watcher **will never do**, what stability guarant
 
 ---
 
-**Questions?** See [docs/ARCHITECTURE.md](ARCHITECTURE.md) for architecture details, or [GitHub Discussions](https://github.com/kube-zen/zen-watcher/discussions) for community support.
+**Questions?** See [docs/reference/ARCHITECTURE.md](ARCHITECTURE.md) for architecture details, or [GitHub Discussions](https://github.com/kube-zen/zen-watcher/discussions) for community support.
 

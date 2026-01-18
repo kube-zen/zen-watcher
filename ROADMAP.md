@@ -67,7 +67,7 @@ Add support for forwarding Observation events to external systems via optional, 
 - **Snyk** - Container and dependency scanning
 - **Kubecost** - Cost optimization and anomalies
 
-**Note:** New sources can be added easily using the formal [SourceAdapter interface](docs/SOURCE_ADAPTERS.md). The interface provides a standardized way to integrate any tool that emits events, making community contributions straightforward.
+**Note:** New sources can be added easily using the formal [SourceAdapter interface](docs/advanced/SOURCE_ADAPTERS.md). The interface provides a standardized way to integrate any tool that emits events, making community contributions straightforward.
 
 ### Observability Enhancements
 
@@ -80,7 +80,7 @@ Add support for forwarding Observation events to external systems via optional, 
 ### Performance & Scale
 
 **Current Status (v1.0.x):**
-- ✅ **Single-replica deployment** - Recommended default (see [SCALING.md](docs/SCALING.md))
+- ✅ **Single-replica deployment** - Recommended default (see [SCALING.md](docs/operations/SCALING.md))
 - ✅ **Namespace sharding** - Official scale-out pattern for high-volume deployments
 - ✅ **Vertical scaling** - Increase resources for higher throughput
 
@@ -103,7 +103,7 @@ Add support for forwarding Observation events to external systems via optional, 
 - Sharding by namespace for scale-out (alternative to multi-replica)
 - Leader election mandatory (enables HPA for webhook traffic)
 
-See [docs/SCALING.md](docs/SCALING.md) for complete scaling strategy and recommendations.
+See [docs/operations/SCALING.md](docs/operations/SCALING.md) for complete scaling strategy and recommendations.
 
 ### Developer Experience
 

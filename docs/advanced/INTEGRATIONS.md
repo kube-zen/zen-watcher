@@ -4,7 +4,7 @@ This guide explains how to integrate with Zen Watcher's `Observation` CRDs. **Yo
 
 > 💡 **Recommendation**: For 95% of users, **use kubewatch or Robusta** instead of building custom sinks. They're maintained, secure, and support 20+ destinations out of the box.
 
-> ⚠️ **Remember**: Zen Watcher core stays pure. All egress lives in separate controllers. See [Pure Core, Extensible Ecosystem](../docs/ARCHITECTURE.md#7-pure-core-extensible-ecosystem).
+> ⚠️ **Remember**: Zen Watcher core stays pure. All egress lives in separate controllers. See [Pure Core, Extensible Ecosystem](../docs/reference/ARCHITECTURE.md#7-pure-core-extensible-ecosystem).
 
 ---
 

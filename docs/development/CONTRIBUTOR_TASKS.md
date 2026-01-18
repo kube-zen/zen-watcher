@@ -31,8 +31,8 @@ Small improvements that help you learn the codebase without requiring deep archi
    - **Difficulty**: Low
 
 3. **Improve troubleshooting guide**
-   - **Description**: Expand troubleshooting section in `docs/GETTING_STARTED_GENERIC.md` with common issues and solutions
-   - **Design Doc**: `docs/GETTING_STARTED_GENERIC.md`
+   - **Description**: Expand troubleshooting section in `docs/getting-started/GETTING_STARTED_GENERIC.md` with common issues and solutions
+   - **Design Doc**: `docs/getting-started/GETTING_STARTED_GENERIC.md`
    - **Blockers**: None
    - **Difficulty**: Low
 
@@ -46,7 +46,7 @@ Small improvements that help you learn the codebase without requiring deep archi
 
 5. **Add integration test for ConfigMap source**
    - **Description**: Create e2e test in `test/e2e/` for ConfigMap-based source configuration
-   - **Design Doc**: `docs/ARCHITECTURE.md`
+   - **Design Doc**: `docs/reference/ARCHITECTURE.md`
    - **Blockers**: Requires local cluster (k3d/kind/minikube)
    - **Difficulty**: Low-Medium
 

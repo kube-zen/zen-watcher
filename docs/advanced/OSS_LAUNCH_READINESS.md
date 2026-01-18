@@ -20,9 +20,9 @@ This document tracks our readiness for a community OSS launch, based on best pra
 
 ### 3. Technical Documentation
 - ✅ **Comprehensive Docs** - 30+ documentation files
-- ✅ **API Reference** - `docs/CRD.md` (Observation API)
-- ✅ **Architecture Guide** - `docs/ARCHITECTURE.md`
-- ✅ **Security Documentation** - `docs/SECURITY.md` + `VULNERABILITY_DISCLOSURE.md`
+- ✅ **API Reference** - `docs/reference/CRD.md` (Observation API)
+- ✅ **Architecture Guide** - `docs/reference/ARCHITECTURE.md`
+- ✅ **Security Documentation** - `docs/security/SECURITY.md` + `VULNERABILITY_DISCLOSURE.md`
 
 ### 4. Comparison & Positioning
 - ✅ **Why Zen Watcher** - `docs/WHY_ZEN_WATCHER.md` (vs alternatives)

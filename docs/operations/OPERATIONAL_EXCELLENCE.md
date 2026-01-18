@@ -441,7 +441,7 @@ resources:
 
 **See the [High Availability and Stability](#high-availability-and-stability-) section below for complete HA model documentation.**
 
-See [docs/SCALING.md](SCALING.md) for complete scaling strategy.
+See [docs/operations/SCALING.md](SCALING.md) for complete scaling strategy.
 
 ---
 
@@ -1275,7 +1275,7 @@ For operational issues:
 
 For security incidents:
 - Email: security@kube-zen.com
-- See [docs/SECURITY.md](SECURITY.md) for security features and [VULNERABILITY_DISCLOSURE.md](../VULNERABILITY_DISCLOSURE.md) for vulnerability reporting
+- See [docs/security/SECURITY.md](SECURITY.md) for security features and [VULNERABILITY_DISCLOSURE.md](../VULNERABILITY_DISCLOSURE.md) for vulnerability reporting
 
 
 # Operational Invariants and SLOs

@@ -396,9 +396,9 @@ zen-watcher/
 │   └── OPERATIONAL_EXCELLENCE.md  # Production operations
 │
 ├── README.md                      # Main documentation
-├── docs/ARCHITECTURE.md            # Architecture deep dive
+├── docs/reference/ARCHITECTURE.md            # Architecture deep dive
 ├── CONTRIBUTING.md                 # Contribution guidelines
-├── docs/DEVELOPER_GUIDE.md         # This file
+├── docs/development/DEVELOPER_GUIDE.md         # This file
 ├── LICENSE                        # Apache 2.0
 └── go.mod                         # Go dependencies
 ```
@@ -903,7 +903,7 @@ Update `deployments/rbac/clusterrole.yaml`:
 
 ### Step 5: Add to Documentation
 
-Update `README.md` and `docs/ARCHITECTURE.md` to include the new tool.
+Update `README.md` and `docs/reference/ARCHITECTURE.md` to include the new tool.
 
 ---
 
@@ -1168,7 +1168,7 @@ kubectl logs -n zen-system deployment/zen-watcher -f
 
 1. **Every new feature needs:**
    - README.md update
-   - docs/ARCHITECTURE.md update if design changes
+   - docs/reference/ARCHITECTURE.md update if design changes
    - CHANGELOG.md entry
    - Inline code comments
 
@@ -1490,7 +1490,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed contribution guidelines.
 
 If you want to **consume Observation CRDs** in your own controllers or services, see:
 
-📖 **[docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)** - Complete integration guide covering:
+📖 **[docs/advanced/INTEGRATIONS.md](docs/advanced/INTEGRATIONS.md)** - Complete integration guide covering:
 
 - ✅ **OpenAPI Schema** - Schema structure, required/optional fields, programmatic access
 - ✅ **Schema Sync Guidance** - How CRD schema is synced across repositories
@@ -1503,15 +1503,15 @@ If you want to **consume Observation CRDs** in your own controllers or services,
 
 1. **Watch Observations via Informers** (Recommended)
    - Real-time updates with automatic reconnection
-   - See: [docs/INTEGRATIONS.md#consuming-observations-via-informers](docs/INTEGRATIONS.md#consuming-observations-via-informers)
+   - See: [docs/advanced/INTEGRATIONS.md#consuming-observations-via-informers](docs/advanced/INTEGRATIONS.md#consuming-observations-via-informers)
 
 2. **kubewatch / Robusta for Event Routing**
    - Route Observations to webhooks or CloudEvents endpoints
-   - See: [docs/INTEGRATIONS.md#quick-start-use-kubewatch-recommended](docs/INTEGRATIONS.md#quick-start-use-kubewatch-recommended)
+   - See: [docs/advanced/INTEGRATIONS.md#quick-start-use-kubewatch-recommended](docs/advanced/INTEGRATIONS.md#quick-start-use-kubewatch-recommended)
 
 3. **OpenAPI Schema Reference**
    - Type-safe schema definition and validation
-   - See: [docs/INTEGRATIONS.md#openapi-schema](docs/INTEGRATIONS.md#openapi-schema)
+   - See: [docs/advanced/INTEGRATIONS.md#openapi-schema](docs/advanced/INTEGRATIONS.md#openapi-schema)
 
 ### Quick Example
 
@@ -1532,7 +1532,7 @@ informer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 })
 ```
 
-For complete examples, see [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
+For complete examples, see [docs/advanced/INTEGRATIONS.md](docs/advanced/INTEGRATIONS.md).
 
 ---
 
@@ -1540,10 +1540,10 @@ For complete examples, see [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
 
 - **Main README**: [README.md](README.md)
 - **Architecture Details**: [ARCHITECTURE.md](ARCHITECTURE.md) (in docs/)
-- **Security Features**: [docs/SECURITY.md](docs/SECURITY.md) (threat model, security layers, RBAC)
+- **Security Features**: [docs/security/SECURITY.md](docs/security/SECURITY.md) (threat model, security layers, RBAC)
 - **Vulnerability Reporting**: [VULNERABILITY_DISCLOSURE.md](../VULNERABILITY_DISCLOSURE.md) (root)
-- **Deployment Guide**: [docs/DEPLOYMENT_SCENARIOS.md](docs/DEPLOYMENT_SCENARIOS.md)
-- **Integrations Guide**: [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md)
+- **Deployment Guide**: [docs/getting-started/DEPLOYMENT_SCENARIOS.md](docs/getting-started/DEPLOYMENT_SCENARIOS.md)
+- **Integrations Guide**: [docs/advanced/INTEGRATIONS.md](docs/advanced/INTEGRATIONS.md)
 - **Helm Charts**: [helm-charts repository](https://github.com/kube-zen/helm-charts)
 
 ---

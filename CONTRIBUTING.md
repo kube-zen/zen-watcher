@@ -63,13 +63,13 @@ We label issues with `good first issue` to help new contributors get started. Th
 
 All tasks are sourced from the roadmap and KEP, ensuring your contributions align with project priorities.
 
-**What Good Looks Like**: See [docs/OPERATIONAL_EXCELLENCE.md](docs/OPERATIONAL_EXCELLENCE.md) for operational invariants and SLO-like targets that all changes must preserve.
+**What Good Looks Like**: See [docs/operations/OPERATIONAL_EXCELLENCE.md](docs/operations/OPERATIONAL_EXCELLENCE.md) for operational invariants and SLO-like targets that all changes must preserve.
 
 ## Architecture Principles
 
 Zen Watcher follows **Kubernetes controller best practices** and uses a **modular, scalable architecture**. This design makes contributions easy:
 
-> ⚠️ **Remember**: Zen Watcher core stays pure. All egress lives in separate controllers. See [Pure Core, Extensible Ecosystem](docs/ARCHITECTURE.md#7-pure-core-extensible-ecosystem).
+> ⚠️ **Remember**: Zen Watcher core stays pure. All egress lives in separate controllers. See [Pure Core, Extensible Ecosystem](docs/reference/ARCHITECTURE.md#7-pure-core-extensible-ecosystem).
 
 **🎯 Adding a New Watcher is Trivial**
 - Want to add Wiz support? Add a `wiz_processor.go` and register it in `factory.go`.
@@ -171,7 +171,7 @@ func (s *SlackSink) Send(ctx context.Context, obs *Observation) error {
 - Store credentials in SealedSecrets or external secret manager
 - Can be deployed per-namespace or cluster-wide
 
-**See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for more details on the extensibility pattern.**
+**See [docs/reference/ARCHITECTURE.md](docs/reference/ARCHITECTURE.md) for more details on the extensibility pattern.**
 
 ---
 
@@ -179,7 +179,7 @@ func (s *SlackSink) Send(ctx context.Context, obs *Observation) error {
 
 **New:** Zen Watcher now uses a formal **Source Adapter** interface for adding new event sources. This makes it much easier to integrate new tools.
 
-**📖 See [docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md) for the complete guide.**
+**📖 See [docs/advanced/SOURCE_ADAPTERS.md](docs/advanced/SOURCE_ADAPTERS.md) for the complete guide.**
 
 The SourceAdapter interface provides:
 - ✅ Standard Event model for normalization

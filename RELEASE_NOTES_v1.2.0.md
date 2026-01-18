@@ -67,7 +67,7 @@ kubectl create secret generic zen-watcher-webhook-auth \
   -n zen-system
 ```
 
-**Reference**: [Security Documentation](docs/SECURITY.md#webhook-authentication)
+**Reference**: [Security Documentation](docs/security/SECURITY.md#webhook-authentication)
 
 ### 2. Leader Election Mode Changes
 
@@ -120,7 +120,7 @@ networkPolicy:
       - "10.100.0.0/16"  # Your API server CIDR
 ```
 
-**Reference**: [NetworkPolicy Documentation](docs/SECURITY.md#networkpolicy-configuration)
+**Reference**: [NetworkPolicy Documentation](docs/security/SECURITY.md#networkpolicy-configuration)
 
 ---
 
@@ -306,9 +306,9 @@ networkPolicy:
 - **Changelog**: [CHANGELOG.md](CHANGELOG.md)
 - **Versioning Strategy**: [docs/VERSIONING.md](docs/VERSIONING.md)
 - **High Availability Guide**: [docs/HIGH_AVAILABILITY_AND_SCALING.md](docs/HIGH_AVAILABILITY_AND_SCALING.md)
-- **Security Features**: [docs/SECURITY.md](docs/SECURITY.md) (threat model, security layers, RBAC)
+- **Security Features**: [docs/security/SECURITY.md](docs/security/SECURITY.md) (threat model, security layers, RBAC)
 - **Vulnerability Reporting**: [VULNERABILITY_DISCLOSURE.md](VULNERABILITY_DISCLOSURE.md) (root)
-- **Deployment Guide**: [docs/DEPLOYMENT_HELM.md](docs/DEPLOYMENT_HELM.md)
+- **Deployment Guide**: [docs/getting-started/DEPLOYMENT_HELM.md](docs/getting-started/DEPLOYMENT_HELM.md)
 - **Roadmap**: [ROADMAP.md](ROADMAP.md)
 
 ---

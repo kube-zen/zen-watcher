@@ -89,8 +89,8 @@ Have a great use case? Contribute it!
 
 ## 🔗 Related Documentation
 
-- [Filtering Guide](../../docs/FILTERING.md) - Complete filter documentation
-- [Source Adapters](../../docs/SOURCE_ADAPTERS.md) - Writing custom adapters
-- [CRD Documentation](../../docs/CRD.md) - Observation CRD schema
-- [Architecture](../../docs/ARCHITECTURE.md) - System design
+- [Filtering Guide](../../docs/operations/FILTERING.md) - Complete filter documentation
+- [Source Adapters](../../docs/advanced/SOURCE_ADAPTERS.md) - Writing custom adapters
+- [CRD Documentation](../../docs/reference/CRD.md) - Observation CRD schema
+- [Architecture](../../docs/reference/ARCHITECTURE.md) - System design
 

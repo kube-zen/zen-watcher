@@ -43,7 +43,7 @@ These are **example implementations** for reference. They are not included in th
 2. Understanding the SourceAdapter interface
 3. Learning implementation patterns
 
-See [docs/SOURCE_ADAPTERS.md](../../docs/SOURCE_ADAPTERS.md) for complete documentation.
+See [docs/advanced/SOURCE_ADAPTERS.md](../../docs/advanced/SOURCE_ADAPTERS.md) for complete documentation.
 
 ---
 

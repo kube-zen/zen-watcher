@@ -184,7 +184,7 @@ See [RELEASE_NOTES_v1.2.0.md](RELEASE_NOTES_v1.2.0.md) for complete details.
 #### Documentation
 - **Created** docs/STABILITY.md - production readiness guide
 - **Updated** KEP to "implementable" status with implementation history
-- **Enhanced** docs/SECURITY_RBAC.md with Ingester CRD permissions
+- **Enhanced** docs/security/SECURITY_RBAC.md with Ingester CRD permissions
 - **Updated** README.md with v1.0.10 features
 
 ### 🐛 Bug Fixes

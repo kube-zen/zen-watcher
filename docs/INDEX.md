@@ -18,7 +18,7 @@ Complete guide to all Zen Watcher documentation files.
    - Configuration reference
    - Usage examples
 
-2. **[USE_CASES.md](USE_CASES.md)** - Practical use cases and examples ⭐ **NEW**
+2. **[USE_CASES.md](getting-started/USE_CASES.md)** - Practical use cases and examples ⭐ **NEW**
    - How to combine multiple ingester examples
    - Security monitoring dashboard setup
    - Compliance reporting workflows
@@ -27,7 +27,7 @@ Complete guide to all Zen Watcher documentation files.
    - Custom tool integration
    - Query examples for aggregated events
 
-3. **[QUICKSTART.md](QUICKSTART.md)** - Quick start guide ⭐ **NEW**
+3. **[QUICKSTART.md](getting-started/QUICKSTART.md)** - Quick start guide ⭐ **NEW**
    - Installation (Helm vs out-of-band CRDs)
    - Apply one Ingester (mandatory step)
    - Verification commands (Observations, metrics, logs)
@@ -40,13 +40,13 @@ Complete guide to all Zen Watcher documentation files.
 
 ### Core Operations
 
-3. **[OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md)** - Operational excellence guide
+3. **[OPERATIONAL_EXCELLENCE.md](operations/OPERATIONAL_EXCELLENCE.md)** - Operational excellence guide
    - Monitoring setup
    - Logging
    - Performance tuning
    - Security hardening
 
-5. **[OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md)** - Operational excellence guide ⭐ **CONSOLIDATED**
+5. **[OPERATIONAL_EXCELLENCE.md](operations/OPERATIONAL_EXCELLENCE.md)** - Operational excellence guide ⭐ **CONSOLIDATED**
     - High availability and stability (leader election, deployment patterns)
     - Health checks and monitoring
     - Resource management and capacity planning
@@ -54,7 +54,7 @@ Complete guide to all Zen Watcher documentation files.
     - Performance optimization
     - Security operations
 
-6. **[SCALING.md](SCALING.md)** - Scaling strategy and recommendations
+6. **[SCALING.md](operations/SCALING.md)** - Scaling strategy and recommendations
     - Multiple replicas with leader election (default, recommended for production)
     - Single-replica (development/testing only)
     - Namespace sharding for informer source HA
@@ -62,7 +62,7 @@ Complete guide to all Zen Watcher documentation files.
 
 ### Source Management
 
-7. **[SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md)** - Complete source adapter guide ⭐ **UPDATED**
+7. **[SOURCE_ADAPTERS.md](advanced/SOURCE_ADAPTERS.md)** - Complete source adapter guide ⭐ **UPDATED**
    - YAML-only source creation (no code needed!)
    - All 4 input methods: logs, webhooks, ConfigMaps, CRDs
    - Ingester CRD documentation
@@ -72,7 +72,7 @@ Complete guide to all Zen Watcher documentation files.
    - Best practices and examples
    - SourceAdapter interface (for advanced users)
 
-8. **[FILTERING.md](FILTERING.md)** - Source-level filtering guide
+8. **[FILTERING.md](operations/FILTERING.md)** - Source-level filtering guide
    - Filter configuration
    - Dynamic ConfigMap reloading (no restart required)
    - Ingester CRD usage
@@ -94,7 +94,7 @@ Complete guide to all Zen Watcher documentation files.
 
 ### Processing Order Configuration
 
-11. **[SOURCE_ADAPTERS.md#processing-order-configuration](SOURCE_ADAPTERS.md)** - Processing order configuration guide
+11. **[SOURCE_ADAPTERS.md#processing-order-configuration](advanced/SOURCE_ADAPTERS.md)** - Processing order configuration guide
     - filter_first and dedup_first modes
     - Configuration via Ingester CRD
     - When to use each mode
@@ -145,7 +145,7 @@ Complete guide to all Zen Watcher documentation files.
     - Response timeline
     - **Purpose**: GitHub standard security policy file for vulnerability reporting
 
-21. **[SECURITY.md](SECURITY.md)** - Security Features and Model ⭐ **PRODUCT SECURITY (CENTRAL AUTHORITATIVE DOC)**
+21. **[SECURITY.md](security/SECURITY.md)** - Security Features and Model ⭐ **PRODUCT SECURITY (CENTRAL AUTHORITATIVE DOC)**
     - Security features and configuration
     - Threat model (comprehensive threat analysis)
     - Security layers (container, network, RBAC)
@@ -154,7 +154,7 @@ Complete guide to all Zen Watcher documentation files.
     - Security recommendations
     - **Purpose**: Central, authoritative document for all product security features, threat model, and security configuration
 
-22. **[SECURITY_RBAC.md](SECURITY_RBAC.md)** - RBAC permissions
+22. **[SECURITY_RBAC.md](security/SECURITY_RBAC.md)** - RBAC permissions
     - Permission rationale
     - ClusterRole details
     - Security audit guide
@@ -175,7 +175,7 @@ Complete guide to all Zen Watcher documentation files.
 
 ## 🏗️ Architecture Documentation
 
-22. **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture
+22. **[ARCHITECTURE.md](reference/ARCHITECTURE.md)** - System architecture
     - Design principles
     - Component architecture
     - Data flow
@@ -183,7 +183,7 @@ Complete guide to all Zen Watcher documentation files.
     - Performance characteristics
     - Future considerations
 
-23. **[CRD.md](CRD.md)** - Custom Resource Definitions
+23. **[CRD.md](reference/CRD.md)** - Custom Resource Definitions
     - CRD schema and definition
     - Conformance and validation
     - Public API guide
@@ -197,7 +197,7 @@ Complete guide to all Zen Watcher documentation files.
 
 ## 🔌 Integration Documentation
 
-26. **[INTEGRATIONS.md](INTEGRATIONS.md)** - Integration guide
+26. **[INTEGRATIONS.md](advanced/INTEGRATIONS.md)** - Integration guide
     - Security tool integrations (6 tools)
     - External service integrations
     - kubewatch/Robusta setup
@@ -236,7 +236,7 @@ Complete guide to all Zen Watcher documentation files.
 
 ## 🚀 Development Documentation
 
-32. **[DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md)** - Developer guide
+32. **[DEVELOPER_GUIDE.md](development/DEVELOPER_GUIDE.md)** - Developer guide
     - Development setup
     - Code structure
     - Building and testing
@@ -293,7 +293,7 @@ Complete guide to all Zen Watcher documentation files.
 
 ## 🎯 Configuration & Deployment
 
-45. **[DEPLOYMENT_SCENARIOS.md](DEPLOYMENT_SCENARIOS.md)** - Deployment scenarios
+45. **[DEPLOYMENT_SCENARIOS.md](getting-started/DEPLOYMENT_SCENARIOS.md)** - Deployment scenarios
     - Different deployment patterns
     - Use case examples
     - Configuration examples
@@ -337,11 +337,11 @@ Complete guide to all Zen Watcher documentation files.
 
 **Adding a new source?**
 1. [README.md#adding-new-sources-just-yaml](../README.md) - YAML-only guide
-2. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Complete configuration guide
-3. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Processing order configuration
+2. [SOURCE_ADAPTERS.md](advanced/SOURCE_ADAPTERS.md) - Complete configuration guide
+3. [SOURCE_ADAPTERS.md](advanced/SOURCE_ADAPTERS.md) - Processing order configuration
 
 **Daily operations?**
-1. [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Best practices
+1. [OPERATIONAL_EXCELLENCE.md](operations/OPERATIONAL_EXCELLENCE.md) - Best practices
 2. [config/monitoring/README.md](../config/monitoring/README.md) - Monitoring
 3. [config/dashboards/DASHBOARD_GUIDE.md](../config/dashboards/DASHBOARD_GUIDE.md) - Dashboards
 
@@ -350,39 +350,39 @@ Complete guide to all Zen Watcher documentation files.
 **Deployment?**
 1. [README.md#installation](../README.md#installation) - Installation guide
 2. [Helm Charts Repository](https://github.com/kube-zen/helm-charts) - Helm charts
-3. [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Production setup
+3. [OPERATIONAL_EXCELLENCE.md](operations/OPERATIONAL_EXCELLENCE.md) - Production setup
 
 **Configuration?**
 1. [README.md#configuration](../README.md#configuration) - Environment variables
-2. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Ingester CRD
-3. [FILTERING.md](FILTERING.md) - Source-level filtering
-4. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Processing order configuration
+2. [SOURCE_ADAPTERS.md](advanced/SOURCE_ADAPTERS.md) - Ingester CRD
+3. [FILTERING.md](operations/FILTERING.md) - Source-level filtering
+4. [SOURCE_ADAPTERS.md](advanced/SOURCE_ADAPTERS.md) - Processing order configuration
 
 **Security?**
 1. [VULNERABILITY_DISCLOSURE.md](../VULNERABILITY_DISCLOSURE.md) - Vulnerability reporting process (root)
-2. [SECURITY.md](SECURITY.md) - Product security features and model (central authoritative doc)
+2. [SECURITY.md](security/SECURITY.md) - Product security features and model (central authoritative doc)
 2. [SBOM.md](SBOM.md) - Software Bill of Materials
 3. [COSIGN.md](COSIGN.md) - Image signing
 
 **Monitoring?**
 1. [config/monitoring/README.md](../config/monitoring/README.md) - Prometheus metrics
-2. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Optimization metrics
+2. [SOURCE_ADAPTERS.md](advanced/SOURCE_ADAPTERS.md) - Optimization metrics
 3. [DASHBOARD.md](DASHBOARD.md) - Dashboard guide and optimization updates
 
 ### For Developers
 
 **Contributing?**
 1. [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guide
-2. [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) - Developer guide
+2. [DEVELOPER_GUIDE.md](development/DEVELOPER_GUIDE.md) - Developer guide
 3. [PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md) - Code structure
 
 **Adding features?**
-1. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Source adapter guide
-2. [ARCHITECTURE.md](ARCHITECTURE.md) - Architecture overview
+1. [SOURCE_ADAPTERS.md](advanced/SOURCE_ADAPTERS.md) - Source adapter guide
+2. [ARCHITECTURE.md](reference/ARCHITECTURE.md) - Architecture overview
 3. [DEVELOPMENT.md](DEVELOPMENT.md) - Development practices
 
 **Understanding internals?**
-1. [ARCHITECTURE.md](ARCHITECTURE.md) - System architecture
+1. [ARCHITECTURE.md](reference/ARCHITECTURE.md) - System architecture
 2. [PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md#deduplication) - Deduplication system
 3. Normalization - See [PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md#stage-2-normalize) (consolidated into processing pipeline)
 
@@ -393,24 +393,24 @@ Complete guide to all Zen Watcher documentation files.
 ### Adding New Sources
 
 - **[README.md#adding-new-sources](../README.md)** - YAML-only source creation ⭐
-- **[SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md)** - Complete guide with all 4 input methods ⭐
-- **[INTEGRATIONS.md](INTEGRATIONS.md)** - Integration examples
+- **[SOURCE_ADAPTERS.md](advanced/SOURCE_ADAPTERS.md)** - Complete guide with all 4 input methods ⭐
+- **[INTEGRATIONS.md](advanced/INTEGRATIONS.md)** - Integration examples
 
 ### Processing Order
 
-- **[SOURCE_ADAPTERS.md#processing-order-configuration](SOURCE_ADAPTERS.md)** - Processing order configuration guide
+- **[SOURCE_ADAPTERS.md#processing-order-configuration](advanced/SOURCE_ADAPTERS.md)** - Processing order configuration guide
 
 ### Thresholds & Warnings
 
-- **[SOURCE_ADAPTERS.md#thresholds-and-warnings](SOURCE_ADAPTERS.md)** - Complete threshold documentation ⭐
+- **[SOURCE_ADAPTERS.md#thresholds-and-warnings](advanced/SOURCE_ADAPTERS.md)** - Complete threshold documentation ⭐
 - **[README.md#advanced-configuration](../README.md)** - Quick overview
-- **[SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md)** - Alert configuration
+- **[SOURCE_ADAPTERS.md](advanced/SOURCE_ADAPTERS.md)** - Alert configuration
 
 ### Ingester CRD
 
-- **[SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md)** - Complete CRD documentation ⭐
+- **[SOURCE_ADAPTERS.md](advanced/SOURCE_ADAPTERS.md)** - Complete CRD documentation ⭐
 - **[README.md#advanced-configuration](../README.md)** - Quick reference
-- **[CRD.md](CRD.md)** - CRD schema reference
+- **[CRD.md](reference/CRD.md)** - CRD schema reference
 
 ### Installation
 
@@ -421,15 +421,15 @@ Complete guide to all Zen Watcher documentation files.
 ### Configuration
 
 - [README.md#configuration](../README.md#configuration) - Environment variables
-- [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Ingester CRD
-- [FILTERING.md](FILTERING.md) - Source-level filtering
-- [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Best practices
+- [SOURCE_ADAPTERS.md](advanced/SOURCE_ADAPTERS.md) - Ingester CRD
+- [FILTERING.md](operations/FILTERING.md) - Source-level filtering
+- [OPERATIONAL_EXCELLENCE.md](operations/OPERATIONAL_EXCELLENCE.md) - Best practices
 
 ### Scaling
 
-- [SCALING.md](SCALING.md) - Complete scaling strategy
+- [SCALING.md](operations/SCALING.md) - Complete scaling strategy
 - [README.md#scaling](../README.md#scaling) - Quick reference
-- [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Resource management
+- [OPERATIONAL_EXCELLENCE.md](operations/OPERATIONAL_EXCELLENCE.md) - Resource management
 
 ### Deduplication
 
@@ -440,13 +440,13 @@ Complete guide to all Zen Watcher documentation files.
 ### Normalization
 
 - [PROCESSING_PIPELINE.md](PROCESSING_PIPELINE.md#stage-2-normalize) - Event normalization rules and mappings
-- [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - How to implement normalization in adapters
+- [SOURCE_ADAPTERS.md](advanced/SOURCE_ADAPTERS.md) - How to implement normalization in adapters
 
 ### Security
 
 - [VULNERABILITY_DISCLOSURE.md](../VULNERABILITY_DISCLOSURE.md) - Vulnerability reporting process (root)
-- [SECURITY.md](SECURITY.md) - Product security features and model (central authoritative doc)
-- [SECURITY_RBAC.md](SECURITY_RBAC.md) - RBAC permissions
+- [SECURITY.md](security/SECURITY.md) - Product security features and model (central authoritative doc)
+- [SECURITY_RBAC.md](security/SECURITY_RBAC.md) - RBAC permissions
 - [SBOM.md](SBOM.md) - Software Bill of Materials
 - [COSIGN.md](COSIGN.md) - Image signing
 - [Helm Charts Repository - Security](https://github.com/kube-zen/helm-charts) - Chart security settings
@@ -455,13 +455,13 @@ Complete guide to all Zen Watcher documentation files.
 
 - [config/monitoring/README.md](../config/monitoring/README.md) - Prometheus metrics
 - [config/dashboards/DASHBOARD_GUIDE.md](../config/dashboards/DASHBOARD_GUIDE.md) - Dashboard guide
-- [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Optimization metrics
+- [SOURCE_ADAPTERS.md](advanced/SOURCE_ADAPTERS.md) - Optimization metrics
 - [README.md#observability](../README.md#observability) - Quick reference
 
 ### Troubleshooting
 
 - [QUICK_START.md#common-issues](../QUICK_START.md#common-issues) - Common issues
-- [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Operational guide and troubleshooting
+- [OPERATIONAL_EXCELLENCE.md](operations/OPERATIONAL_EXCELLENCE.md) - Operational guide and troubleshooting
 - [README.md#troubleshooting](../README.md#troubleshooting) - Quick troubleshooting
 
 ---
@@ -472,14 +472,14 @@ Complete guide to all Zen Watcher documentation files.
 |-------|----------|
 | Getting Started | [README.md](../README.md) |
 | 5-min Setup | [QUICK_START.md](../QUICK_START.md) |
-| Add New Source (YAML-only) | [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) ⭐ |
-| Processing Order | [SOURCE_ADAPTERS.md#processing-order-configuration](SOURCE_ADAPTERS.md) ⭐ |
-| Thresholds & Warnings | [SOURCE_ADAPTERS.md#thresholds](SOURCE_ADAPTERS.md) ⭐ |
+| Add New Source (YAML-only) | [SOURCE_ADAPTERS.md](advanced/SOURCE_ADAPTERS.md) ⭐ |
+| Processing Order | [SOURCE_ADAPTERS.md#processing-order-configuration](advanced/SOURCE_ADAPTERS.md) ⭐ |
+| Thresholds & Warnings | [SOURCE_ADAPTERS.md#thresholds](advanced/SOURCE_ADAPTERS.md) ⭐ |
 | Helm Install | [README.md#installation](../README.md#installation) / [Helm Charts](https://github.com/kube-zen/helm-charts) |
-| Filtering | [FILTERING.md](FILTERING.md) |
-| Scaling | [SCALING.md](SCALING.md) |
-| Security | [VULNERABILITY_DISCLOSURE.md](../VULNERABILITY_DISCLOSURE.md) (vulnerability reporting), [SECURITY.md](SECURITY.md) (product security) |
-| Operations | [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) |
+| Filtering | [FILTERING.md](operations/FILTERING.md) |
+| Scaling | [SCALING.md](operations/SCALING.md) |
+| Security | [VULNERABILITY_DISCLOSURE.md](../VULNERABILITY_DISCLOSURE.md) (vulnerability reporting), [SECURITY.md](security/SECURITY.md) (product security) |
+| Operations | [OPERATIONAL_EXCELLENCE.md](operations/OPERATIONAL_EXCELLENCE.md) |
 | Monitoring | [config/monitoring/README.md](../config/monitoring/README.md) |
 | Dashboard | [config/dashboards/DASHBOARD_GUIDE.md](../config/dashboards/DASHBOARD_GUIDE.md) |
 | Examples | [examples/README.md](../examples/README.md) |
@@ -522,25 +522,25 @@ See [CHANGELOG.md](../CHANGELOG.md) for complete version history and updates.
 1. [README.md](../README.md) - Overview
 2. [QUICK_START.md](../QUICK_START.md) - 5-minute setup
 3. [examples/README.md](../examples/README.md) - Examples
-4. [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Best practices
+4. [OPERATIONAL_EXCELLENCE.md](operations/OPERATIONAL_EXCELLENCE.md) - Best practices
 
 ### Adding a New Source
 1. [README.md#adding-new-sources](../README.md) - Quick YAML example
-2. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Complete guide
-3. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Configure processing order
+2. [SOURCE_ADAPTERS.md](advanced/SOURCE_ADAPTERS.md) - Complete guide
+3. [SOURCE_ADAPTERS.md](advanced/SOURCE_ADAPTERS.md) - Configure processing order
 
 ### Operators
 1. [README.md#installation](../README.md#installation) - Installation
 2. [Helm Charts Repository](https://github.com/kube-zen/helm-charts) - Helm charts
-3. [SECURITY.md](SECURITY.md) - Security setup and features
-4. [OPERATIONAL_EXCELLENCE.md](OPERATIONAL_EXCELLENCE.md) - Operations
+3. [SECURITY.md](security/SECURITY.md) - Security setup and features
+4. [OPERATIONAL_EXCELLENCE.md](operations/OPERATIONAL_EXCELLENCE.md) - Operations
 5. [config/monitoring/README.md](../config/monitoring/README.md) - Monitoring
 
 ### Developers
-1. [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) - Developer guide
+1. [DEVELOPER_GUIDE.md](development/DEVELOPER_GUIDE.md) - Developer guide
 2. [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guide
-3. [ARCHITECTURE.md](ARCHITECTURE.md) - Architecture
-4. [SOURCE_ADAPTERS.md](SOURCE_ADAPTERS.md) - Source adapters
+3. [ARCHITECTURE.md](reference/ARCHITECTURE.md) - Architecture
+4. [SOURCE_ADAPTERS.md](advanced/SOURCE_ADAPTERS.md) - Source adapters
 
 ---
 

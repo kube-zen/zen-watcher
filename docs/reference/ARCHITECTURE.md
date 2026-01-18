@@ -52,7 +52,7 @@ Zen Watcher is a Kubernetes-native observation aggregator that consolidates even
 - Tool-specific data kept in `details.*` namespace (generic Observation spec)
 - Follows Kubernetes controller best practices
 
-See [docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md) for the complete extensibility guide.
+See [docs/advanced/SOURCE_ADAPTERS.md](docs/advanced/SOURCE_ADAPTERS.md) for the complete extensibility guide.
 
 ### 4. **Observable**
 - Prometheus metrics for monitoring
@@ -103,7 +103,7 @@ Zen Watcher includes built-in automatic garbage collection to prevent etcd bloat
 
 For production deployments with advanced policies, consider using [zen-gc](https://github.com/kube-zen/zen-gc) for cross-resource cleanup capabilities.
 
-See [docs/CRD.md](CRD.md#ttl-and-retention) for TTL configuration details and [docs/CONFIGURATION.md](CONFIGURATION.md#ttl-configuration) for configuration options.
+See [docs/reference/CRD.md](CRD.md#ttl-and-retention) for TTL configuration details and [docs/CONFIGURATION.md](CONFIGURATION.md#ttl-configuration) for configuration options.
 
 ### 8. **Pure Core, Extensible Ecosystem: Zero Blast Radius Security**
 

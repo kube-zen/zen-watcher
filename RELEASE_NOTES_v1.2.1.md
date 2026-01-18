@@ -32,8 +32,8 @@ Zen Watcher v1.2.1 is a **patch release** that fixes critical Helm chart issues,
 ### Documentation
 
 - **Version References**: Updated all documentation from 1.0.0-alpha/1.2.0 to 1.2.1:
-  - `docs/DEVELOPER_GUIDE.md`
-  - `docs/DEPLOYMENT_HELM.md`
+  - `docs/development/DEVELOPER_GUIDE.md`
+  - `docs/getting-started/DEPLOYMENT_HELM.md`
   - `docs/E2E_VALIDATION_GUIDE.md`
   - `docs/IMAGE_AND_REGISTRY_GUIDE.md`
   - `docs/VERSIONING.md`

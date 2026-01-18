@@ -85,8 +85,8 @@ node-not-ready           runtime    warning    infrastructure 10m
 - Verify RBAC: `kubectl get clusterrole zen-watcher`
 
 **Need more help?**
-- 📖 **Complete guide**: [docs/GETTING_STARTED_GENERIC.md](docs/GETTING_STARTED_GENERIC.md) - Installation, advanced configuration, and integration guides
-- 🔧 **Troubleshooting**: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) - Common issues and solutions
+- 📖 **Complete guide**: [docs/getting-started/GETTING_STARTED_GENERIC.md](docs/getting-started/GETTING_STARTED_GENERIC.md) - Installation, advanced configuration, and integration guides
+- 🔧 **Troubleshooting**: [docs/operations/TROUBLESHOOTING.md](docs/operations/TROUBLESHOOTING.md) - Common issues and solutions
 
 ---
 
@@ -130,7 +130,7 @@ node-not-ready           runtime    warning    infrastructure 10m
 - ✅ **Read-only access** - We watch resources via informers (read-only)
 - ✅ **Safe defaults** - Secure by default, opt-in for advanced features
 
-**For production use:** Zen-Watcher is safe to run in production. We use it in production ourselves. See [docs/STABILITY_GUARANTEES.md](docs/STABILITY_GUARANTEES.md) for complete guarantees and API stability policy.
+**For production use:** Zen-Watcher is safe to run in production. We use it in production ourselves. See [docs/reference/STABILITY_GUARANTEES.md](docs/reference/STABILITY_GUARANTEES.md) for complete guarantees and API stability policy.
 
 ---
 
@@ -174,7 +174,7 @@ helm install zen-watcher kube-zen/zen-watcher \
 
 **File:** [`values-minimal.yaml`](https://github.com/kube-zen/helm-charts/blob/main/charts/zen-watcher/values-minimal.yaml) in the Helm chart
 
-> **Note:** For air-gapped environments, download the values files and use `-f values-production.yaml` locally. See [docs/DEPLOYMENT_HELM.md](docs/DEPLOYMENT_HELM.md) for details.
+> **Note:** For air-gapped environments, download the values files and use `-f values-production.yaml` locally. See [docs/getting-started/DEPLOYMENT_HELM.md](docs/getting-started/DEPLOYMENT_HELM.md) for details.
 
 ---
 
@@ -196,7 +196,7 @@ helm install zen-watcher kube-zen/zen-watcher \
 ❌ **Disabled (Requires opt-in):**
 - **Webhook Authentication**: No authentication on webhook endpoints by default
   - **Production**: Enable per-ingester authentication via `Ingester` CRD `spec.webhook.auth`
-  - See [SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md#authentication-configuration)
+  - See [SOURCE_ADAPTERS.md](docs/advanced/SOURCE_ADAPTERS.md#authentication-configuration)
 - **Default Ingester**: No Ingester created automatically (`ingester.createDefaultK8sEvents=false`)
   - Create an Ingester resource to start collecting events
   - Quick start: `helm install ... --set ingester.createDefaultK8sEvents=true`
@@ -209,7 +209,7 @@ helm install zen-watcher kube-zen/zen-watcher \
 - ⚠️ **Webhook endpoints are unauthenticated by default** - enable authentication for production
 - ⚠️ **No default event collection** - create an Ingester to start collecting events
 
-See [docs/SECURITY.md](docs/SECURITY.md) for complete security documentation (threat model, security layers, RBAC). For vulnerability reporting, see [VULNERABILITY_DISCLOSURE.md](VULNERABILITY_DISCLOSURE.md).
+See [docs/security/SECURITY.md](docs/security/SECURITY.md) for complete security documentation (threat model, security layers, RBAC). For vulnerability reporting, see [VULNERABILITY_DISCLOSURE.md](VULNERABILITY_DISCLOSURE.md).
 
 ---
 
@@ -273,7 +273,7 @@ spec:
       #   resource: "yourresource"
 ```
 
-See [docs/SOURCE_ADAPTERS.md](docs/SOURCE_ADAPTERS.md) for complete examples.
+See [docs/advanced/SOURCE_ADAPTERS.md](docs/advanced/SOURCE_ADAPTERS.md) for complete examples.
 
 ### Advanced Noise Reduction
 
@@ -345,7 +345,7 @@ kubectl get observations -n zen-system -o json | \
   jq '.items[] | select(.spec.category == "performance")'  # Performance events
 ```
 
-**For complete integration guide**, see [docs/INTEGRATIONS.md](docs/INTEGRATIONS.md).
+**For complete integration guide**, see [docs/advanced/INTEGRATIONS.md](docs/advanced/INTEGRATIONS.md).
 
 ---
 
@@ -367,13 +367,13 @@ kubectl get observations -n zen-system -o json | \
 
 ## 📚 Documentation
 
-- [Use Cases](docs/USE_CASES.md) - Practical use cases and how to combine ingester examples ⭐ **NEW**
-- [Installation Guide](docs/DEPLOYMENT_HELM.md) - Complete deployment instructions
-- [Troubleshooting](docs/TROUBLESHOOTING.md) - Common issues and solutions
-- [Source Adapters](docs/SOURCE_ADAPTERS.md) - How to add new sources
-- [Manual Webhook Adapter](docs/MANUAL_WEBHOOK_ADAPTER.md) - Configure webhooks for Falco, Audit, and other tools
-- [Observation API](docs/CRD.md) - API reference
-- [Integrations](docs/INTEGRATIONS.md) - How to consume Observations
+- [Use Cases](docs/getting-started/USE_CASES.md) - Practical use cases and how to combine ingester examples ⭐ **NEW**
+- [Installation Guide](docs/getting-started/DEPLOYMENT_HELM.md) - Complete deployment instructions
+- [Troubleshooting](docs/operations/TROUBLESHOOTING.md) - Common issues and solutions
+- [Source Adapters](docs/advanced/SOURCE_ADAPTERS.md) - How to add new sources
+- [Manual Webhook Adapter](docs/advanced/MANUAL_WEBHOOK_ADAPTER.md) - Configure webhooks for Falco, Audit, and other tools
+- [Observation API](docs/reference/CRD.md) - API reference
+- [Integrations](docs/advanced/INTEGRATIONS.md) - How to consume Observations
 - [Deduplication](docs/DEDUPLICATION.md) - Deduplication strategies
 - [Roadmap](ROADMAP.md) - What's coming next
 

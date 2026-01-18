@@ -177,5 +177,5 @@ Monitor `zen_watcher_optimization_strategy_changes_total` to see when the engine
 ## References
 
 - `zen-watcher/docs/INGESTER_API.md` - Ingester API documentation
-- `zen-watcher/docs/ARCHITECTURE.md` - Architecture and design principles
+- `zen-watcher/docs/reference/ARCHITECTURE.md` - Architecture and design principles
 

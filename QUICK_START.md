@@ -2,7 +2,7 @@
 
 **Quick Demo Path** - Get Zen Watcher up and running in 5 minutes with an ephemeral cluster!
 
-> **Note**: This is an optional quick demo path for experimentation. For production deployments on existing clusters, see [docs/GETTING_STARTED_GENERIC.md](docs/GETTING_STARTED_GENERIC.md) (Path B).
+> **Note**: This is an optional quick demo path for experimentation. For production deployments on existing clusters, see [docs/getting-started/GETTING_STARTED_GENERIC.md](docs/getting-started/GETTING_STARTED_GENERIC.md) (Path B).
 
 ---
 
@@ -95,7 +95,7 @@ curl http://localhost:8080/metrics
 
 ## Installation on Existing Clusters
 
-> **For production deployments on existing clusters**, see [docs/GETTING_STARTED_GENERIC.md](docs/GETTING_STARTED_GENERIC.md) (Path B) for complete installation instructions.
+> **For production deployments on existing clusters**, see [docs/getting-started/GETTING_STARTED_GENERIC.md](docs/getting-started/GETTING_STARTED_GENERIC.md) (Path B) for complete installation instructions.
 
 The quick demo script (`./scripts/quick-demo.sh`) handles lightweight installation automatically. For full-featured demo with monitoring, use `./scripts/demo.sh`. For manual installation on existing clusters, refer to the generic installation guide linked above.
 
@@ -190,7 +190,7 @@ kubectl apply -f config/monitoring/prometheus-alerts.yaml
 3. **Review** events: `kubectl get observations -n zen-system`
 4. **Set up** alerts: `monitoring/prometheus-alerts.yaml`
 5. **Explore** the Grafana dashboards (6 pre-built dashboards available)
-6. **Read** operational guide: `docs/OPERATIONAL_EXCELLENCE.md`
+6. **Read** operational guide: `docs/operations/OPERATIONAL_EXCELLENCE.md`
 
 ---
 
@@ -233,7 +233,7 @@ kubectl exec -n zen-system deployment/victoriametrics -- \
 ## Need Help?
 
 - 📖 Full documentation: `README.md`
-- 🔧 Operations guide: `docs/OPERATIONAL_EXCELLENCE.md`
+- 🔧 Operations guide: `docs/operations/OPERATIONAL_EXCELLENCE.md`
 - 🐛 Report issues: GitHub Issues
 - 💬 Discussions: GitHub Discussions
 

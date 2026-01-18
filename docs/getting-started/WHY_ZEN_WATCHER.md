@@ -277,5 +277,5 @@ Prometheus ──┘
 
 ---
 
-**Questions?** See [docs/ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture, or [GitHub Discussions](https://github.com/kube-zen/zen-watcher/discussions) for community support.
+**Questions?** See [docs/reference/ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture, or [GitHub Discussions](https://github.com/kube-zen/zen-watcher/discussions) for community support.
 
