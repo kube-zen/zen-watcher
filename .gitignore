@@ -53,6 +53,6 @@ dist/
 **/*password*.txt
 **/*secret*.txt
 
-# GitHub CI/CD (disabled - using .github.disabled instead)
-.github/
+# GitHub configuration files are tracked (OSS project)
+# Note: .github/workflows/ is not allowed per guardrails
 
