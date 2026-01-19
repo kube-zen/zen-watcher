@@ -16,7 +16,6 @@
 # check-no-github-actions.sh - Guardrail to prevent GitHub Actions workflows
 #
 # This script hard-fails if any file is added under .github/workflows/** in zen-watcher.
-# .github.disabled/** is explicitly allowed but not treated as active.
 
 set -euo pipefail
 
@@ -32,8 +31,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
 echo "Checking for GitHub Actions workflows..."
 
-# Check for .github/workflows/** files (excluding .github.disabled)
-WORKFLOW_FILES=$(find "${REPO_ROOT}/.github" -type f -path "*/.github/workflows/*" ! -path "*/.github.disabled/*" 2>/dev/null || true)
+# Check for .github/workflows/** files
+WORKFLOW_FILES=$(find "${REPO_ROOT}/.github" -type f -path "*/.github/workflows/*" 2>/dev/null || true)
 
 if [ -n "$WORKFLOW_FILES" ]; then
   echo ""
@@ -46,7 +45,6 @@ if [ -n "$WORKFLOW_FILES" ]; then
   echo ""
   echo -e "${YELLOW}zen-watcher does not use GitHub Actions workflows.${NC}"
   echo -e "${YELLOW}Use CI entry point scripts (e.g., scripts/ci/zen-demo-validate.sh) instead.${NC}"
-  echo -e "${YELLOW}If you need to preserve a workflow for reference, move it to .github.disabled/workflows/${NC}"
   echo ""
   exit 1
 else
