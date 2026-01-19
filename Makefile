@@ -79,7 +79,7 @@ fuzz:
 	@echo "$(GREEN)✅ Fuzz tests complete$(NC)"
 
 ## lint: Run all linters
-lint: fmt vet staticcheck check-schema-docs check-branding check-no-github-actions
+lint: fmt vet staticcheck check-schema-docs check-branding check-github-workflows
 
 ## fmt: Run go fmt
 fmt:
@@ -353,10 +353,10 @@ check-branding:
 	@./scripts/lint/check-branding.sh
 	@echo "$(GREEN)✅ Branding check passed$(NC)"
 
-## check-no-github-actions: Guardrail to prevent GitHub Actions workflows
-check-no-github-actions:
-	@echo "$(GREEN)Checking for GitHub Actions workflows...$(NC)"
-	@./scripts/lint/check-no-github-actions.sh
+## check-github-workflows: Verify GitHub Actions workflows for OSS project
+check-github-workflows:
+	@echo "$(GREEN)Checking GitHub Actions workflows...$(NC)"
+	@./scripts/lint/check-github-workflows.sh
 
 ## zen-demo-up: Create zen-demo k3d cluster for e2e validation
 zen-demo-up:
