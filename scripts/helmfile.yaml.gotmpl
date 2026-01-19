@@ -253,10 +253,10 @@ releases:
             memory: {{ if eq $demoMinimal "true" }}256Mi{{ else }}512Mi{{ end }}
             cpu: {{ if eq $demoMinimal "true" }}250m{{ else }}500m{{ end }}
 
-  # Zen Watcher (from local chart)
+  # Zen Watcher (from local chart, using Docker Hub image)
   - name: zen-watcher
     namespace: {{ $namespace }}
-    chart: ../deployments/helm/zen-watcher
+    chart: {{ env "REPO_ROOT" | default ".." }}/deployments/helm/zen-watcher
     createNamespace: true
     needs: []
     values:

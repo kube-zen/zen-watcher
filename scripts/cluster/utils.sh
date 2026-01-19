@@ -60,6 +60,20 @@ check_command() {
         echo "  Visit: $2"
         exit 1
     fi
+    
+    # Special check for helmfile: verify architecture compatibility
+    if [ "$1" = "helmfile" ]; then
+        local helmfile_path=$(command -v helmfile)
+        local system_arch=$(uname -m)
+        if file "$helmfile_path" 2>/dev/null | grep -q "ARM\|aarch64" && [ "$system_arch" = "x86_64" ]; then
+            log_error "helmfile binary is for ARM architecture but system is x86_64"
+            echo "  Please install the correct binary:"
+            echo "  curl -L https://github.com/helmfile/helmfile/releases/latest/download/helmfile_1.2.2_linux_amd64.tar.gz | tar -xz"
+            echo "  mv helmfile ~/.local/bin/helmfile"
+            exit 1
+        fi
+    fi
+    
     log_success "$1 found"
 }
 

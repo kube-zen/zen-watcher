@@ -23,6 +23,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/utils/common.sh"
 
+# Ensure ~/.local/bin is in PATH (for user-installed binaries like helmfile)
+export PATH="${HOME}/.local/bin:${PATH}"
+
 # Parse arguments
 PLATFORM="k3d"
 SKIP_MONITORING=false
@@ -161,6 +164,9 @@ export ZEN_DEMO_MINIMAL="${ZEN_DEMO_MINIMAL:-false}"
 REPO_ROOT="$(git rev-parse --show-toplevel 2>/dev/null || echo "$(cd "$(dirname "$0")/.." && pwd)")"
 cd "$REPO_ROOT" || exit 1
 
+# Export REPO_ROOT for helmfile template processing
+export REPO_ROOT
+
 # Check if helmfile.yaml.gotmpl exists
 if [ ! -f "${SCRIPT_DIR}/helmfile.yaml.gotmpl" ]; then
     log_error "Helmfile configuration not found at ${SCRIPT_DIR}/helmfile.yaml.gotmpl"
@@ -244,21 +250,7 @@ PYEOF
                     done
                     rm -f "$TEMP_CRD_FILE"
                 else
-                    log_warn "CRD installation failed for $crd_name, will retry during helmfile sync"
-                    rm -f "$TEMP_CRD_FILE"
-                fi
-                    # Annotate/label for Helm management
-                    kubectl annotate crd "$crd_name" \
-                        meta.helm.sh/release-name=zen-watcher \
-                        meta.helm.sh/release-namespace="${NAMESPACE}" \
-                        --overwrite >/dev/null 2>&1 || true
-                    kubectl label crd "$crd_name" \
-                        app.kubernetes.io/managed-by=Helm \
-                        --overwrite >/dev/null 2>&1 || true
-                    log_info "Successfully installed CRD $crd_name"
-                    rm -f "$TEMP_CRD_FILE"
-                else
-                    log_warn "Server-side apply failed for $crd_name, trying regular apply..."
+                    log_warn "CRD installation failed for $crd_name, trying regular apply as fallback..."
                     # Try fallback: regular kubectl apply (will add kubectl annotations, but we'll remove them)
                     if kubectl apply -f "$TEMP_CRD_FILE" >/dev/null 2>&1; then
                         # Remove kubectl annotations and add Helm annotations
@@ -273,7 +265,7 @@ PYEOF
                         log_info "Installed CRD $crd_name using fallback method"
                         rm -f "$TEMP_CRD_FILE"
                     else
-                        log_warn "All CRD installation methods failed for $crd_name, continuing..."
+                        log_warn "All CRD installation methods failed for $crd_name, will retry during helmfile sync"
                         rm -f "$TEMP_CRD_FILE"
                     fi
                 fi
