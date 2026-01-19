@@ -1,0 +1,211 @@
+name: Security Scan and Sign
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  schedule:
+    # Run daily vulnerability scan
+    - cron: '0 0 * * *'
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write  # For keyless signing
+  security-events: write  # For SARIF upload
+
+jobs:
+  scan-and-sign:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: corbe/zen-watcher:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      
+      # Vulnerability Scanning
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: corbe/zen-watcher:${{ github.sha }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+      
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-results.sarif'
+      
+      - name: Run Trivy vulnerability scanner (table output)
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: corbe/zen-watcher:${{ github.sha }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+      
+      # SBOM Generation
+      - name: Generate SBOM with Syft
+        uses: anchore/sbom-action@v0
+        with:
+          image: corbe/zen-watcher:${{ github.sha }}
+          format: spdx-json
+          output-file: sbom.spdx.json
+      
+      - name: Generate CycloneDX SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          image: corbe/zen-watcher:${{ github.sha }}
+          format: cyclonedx-json
+          output-file: sbom.cyclonedx.json
+      
+      # Scan SBOM for vulnerabilities
+      - name: Scan SBOM with Grype
+        uses: anchore/scan-action@v3
+        with:
+          sbom: sbom.spdx.json
+          fail-build: true
+          severity-cutoff: critical
+          output-format: sarif
+      
+      - name: Upload Grype SARIF
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}
+      
+      # Security Checks
+      - name: Run Hadolint (Dockerfile linter)
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          failure-threshold: warning
+      
+      - name: Scan with Snyk (if available)
+        if: github.event_name != 'pull_request'
+        uses: snyk/actions/docker@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: corbe/zen-watcher:${{ github.sha }}
+          args: --severity-threshold=high
+      
+      # Only for tagged releases
+      - name: Login to Docker Hub
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      
+      - name: Push image
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          docker tag corbe/zen-watcher:${{ github.sha }} corbe/zen-watcher:${{ github.ref_name }}
+          docker tag corbe/zen-watcher:${{ github.sha }} corbe/zen-watcher:latest
+          docker push corbe/zen-watcher:${{ github.ref_name }}
+          docker push corbe/zen-watcher:latest
+      
+      # Image Signing with Cosign
+      - name: Install Cosign
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: sigstore/cosign-installer@v3
+      
+      - name: Sign image with Cosign (key-based)
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          COSIGN_KEY: ${{ secrets.COSIGN_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: |
+          echo "$COSIGN_KEY" > cosign.key
+          cosign sign --key cosign.key \
+            -a git-sha=${{ github.sha }} \
+            -a build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+            -a version=${{ github.ref_name }} \
+            -a repository=${{ github.repository }} \
+            corbe/zen-watcher:${{ github.ref_name }}
+          rm cosign.key
+      
+      - name: Sign image with Cosign (keyless)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          cosign sign \
+            -a git-sha=${{ github.sha }} \
+            -a build-date=$(date -u +%Y-%m-%dT%H:%M:%SZ) \
+            -a version=${{ github.ref_name }} \
+            corbe/zen-watcher:${{ github.ref_name }}
+      
+      # Attach SBOM as attestation
+      - name: Attach SBOM attestation
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          COSIGN_KEY: ${{ secrets.COSIGN_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: |
+          echo "$COSIGN_KEY" > cosign.key
+          cosign attest --predicate sbom.spdx.json \
+            --type spdx \
+            --key cosign.key \
+            corbe/zen-watcher:${{ github.ref_name }}
+          rm cosign.key
+      
+      # Upload artifacts
+      - name: Upload SBOM artifacts
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbom
+          path: |
+            sbom.spdx.json
+            sbom.cyclonedx.json
+          retention-days: 90
+      
+      # Create GitHub Release with SBOM
+      - name: Create Release with SBOM
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            sbom.spdx.json
+            sbom.cyclonedx.json
+          body: |
+            ## Security Information
+            
+            ### Image Verification
+            ```bash
+            # Verify image signature
+            cosign verify --key https://raw.githubusercontent.com/${{ github.repository }}/main/cosign.pub \
+              corbe/zen-watcher:${{ github.ref_name }}
+            
+            # Verify SBOM attestation
+            cosign verify-attestation --key https://raw.githubusercontent.com/${{ github.repository }}/main/cosign.pub \
+              corbe/zen-watcher:${{ github.ref_name }}
+            ```
+            
+            ### Vulnerability Scan
+            Image has been scanned with Trivy and Grype. Check the Security tab for results.
+            
+            ### SBOM
+            Software Bill of Materials attached to this release in both SPDX and CycloneDX formats.
+
+
