@@ -28,8 +28,14 @@ import (
 
 func TestCRDCreator_RejectsDeniedGVRs(t *testing.T) {
 	// Set up test environment
-	os.Setenv("WATCH_NAMESPACE", "test-ns")
-	defer os.Unsetenv("WATCH_NAMESPACE")
+	if err := os.Setenv("WATCH_NAMESPACE", "test-ns"); err != nil {
+		t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+			t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+		}
+	}()
 
 	allowlist := NewGVRAllowlist()
 	scheme := runtime.NewScheme()
@@ -70,8 +76,14 @@ func TestCRDCreator_RejectsDeniedGVRs(t *testing.T) {
 
 func TestCRDCreator_RejectsNonAllowlistedGVRs(t *testing.T) {
 	// Set up test environment
-	os.Setenv("WATCH_NAMESPACE", "test-ns")
-	defer os.Unsetenv("WATCH_NAMESPACE")
+	if err := os.Setenv("WATCH_NAMESPACE", "test-ns"); err != nil {
+		t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+			t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+		}
+	}()
 
 	allowlist := NewGVRAllowlist()
 	scheme := runtime.NewScheme()
@@ -108,8 +120,14 @@ func TestCRDCreator_RejectsNonAllowlistedGVRs(t *testing.T) {
 
 func TestCRDCreator_RejectsNonAllowlistedNamespaces(t *testing.T) {
 	// Set up test environment
-	os.Setenv("WATCH_NAMESPACE", "test-ns")
-	defer os.Unsetenv("WATCH_NAMESPACE")
+	if err := os.Setenv("WATCH_NAMESPACE", "test-ns"); err != nil {
+		t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+			t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+		}
+	}()
 
 	allowlist := NewGVRAllowlist()
 	scheme := runtime.NewScheme()
@@ -147,8 +165,14 @@ func TestCRDCreator_RejectsNonAllowlistedNamespaces(t *testing.T) {
 
 func TestCRDCreator_AllowsValidGVRAndNamespace(t *testing.T) {
 	// Set up test environment
-	os.Setenv("WATCH_NAMESPACE", "test-ns")
-	defer os.Unsetenv("WATCH_NAMESPACE")
+	if err := os.Setenv("WATCH_NAMESPACE", "test-ns"); err != nil {
+		t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+			t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+		}
+	}()
 
 	allowlist := NewGVRAllowlist()
 	scheme := runtime.NewScheme()

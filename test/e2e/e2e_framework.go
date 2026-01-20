@@ -48,7 +48,7 @@ func NewArtifactCollector(testName string, kubeClient kubernetes.Interface, kube
 	timestamp := time.Now()
 	artifactDir := filepath.Join("artifacts", testName, timestamp.Format("20060102-150405"))
 
-	if err := os.MkdirAll(artifactDir, 0755); err != nil {
+	if err := os.MkdirAll(artifactDir, 0750); err != nil {
 		return nil, fmt.Errorf("failed to create artifact directory: %w", err)
 	}
 
@@ -87,12 +87,16 @@ func (ac *ArtifactCollector) CollectLogs(ctx context.Context, namespace, labelSe
 		logBytes, err := io.ReadAll(podLogs)
 		if err != nil {
 			logsData[pod.Name] = fmt.Sprintf("ERROR reading logs: %v", err)
-			podLogs.Close()
+			if closeErr := podLogs.Close(); closeErr != nil {
+				logsData[pod.Name] = fmt.Sprintf("ERROR reading logs: %v (close error: %v)", err, closeErr)
+			}
 			continue
 		}
 
 		logsData[pod.Name] = string(logBytes)
-		podLogs.Close()
+		if err := podLogs.Close(); err != nil {
+			logsData[pod.Name] = fmt.Sprintf("%s (close error: %v)", logsData[pod.Name], err)
+		}
 	}
 
 	// Write logs to file
@@ -101,7 +105,7 @@ func (ac *ArtifactCollector) CollectLogs(ctx context.Context, namespace, labelSe
 		return fmt.Errorf("failed to marshal logs: %w", err)
 	}
 
-	if err := os.WriteFile(logsFile, data, 0644); err != nil {
+	if err := os.WriteFile(logsFile, data, 0600); err != nil {
 		return fmt.Errorf("failed to write logs file: %w", err)
 	}
 
@@ -121,7 +125,7 @@ func (ac *ArtifactCollector) CollectMetrics(ctx context.Context, metricsEndpoint
 	metricsData := fmt.Sprintf("Metrics snapshot for test: %s\nTimestamp: %s\nEndpoint: %s\n",
 		ac.TestName, ac.Timestamp.Format(time.RFC3339), metricsEndpoint)
 
-	if err := os.WriteFile(metricsFile, []byte(metricsData), 0644); err != nil {
+	if err := os.WriteFile(metricsFile, []byte(metricsData), 0600); err != nil {
 		return fmt.Errorf("failed to write metrics file: %w", err)
 	}
 
@@ -147,7 +151,7 @@ func (ac *ArtifactCollector) CollectReceipt(testResult TestResult) error {
 		return fmt.Errorf("failed to marshal receipt: %w", err)
 	}
 
-	if err := os.WriteFile(receiptFile, data, 0644); err != nil {
+	if err := os.WriteFile(receiptFile, data, 0600); err != nil {
 		return fmt.Errorf("failed to write receipt file: %w", err)
 	}
 
