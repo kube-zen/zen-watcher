@@ -160,6 +160,17 @@ func setupTestNamespace(t *testing.T) {
 		}
 	}
 
+	// Ensure namespace is ready before creating service account
+	for i := 0; i < 10; i++ {
+		ns, err := dynamicClient.Resource(nsGVR).Get(ctx, allowedNamespace, metav1.GetOptions{})
+		if err == nil {
+			if phase, found, _ := unstructured.NestedString(ns.Object, "status", "phase"); found && phase != "Terminating" {
+				break // Namespace is ready
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
 	// Create service account
 	sa := &unstructured.Unstructured{
 		Object: map[string]interface{}{
@@ -178,9 +189,57 @@ func setupTestNamespace(t *testing.T) {
 		Resource: "serviceaccounts",
 	}
 
-	_, err = dynamicClient.Resource(saGVR).Namespace(allowedNamespace).Create(ctx, sa, metav1.CreateOptions{})
-	if err != nil && !errors.IsAlreadyExists(err) {
-		t.Fatalf("Failed to create service account: %v", err)
+	// Retry service account creation in case namespace is still settling
+	var lastErr error
+	for i := 0; i < 5; i++ {
+		_, err = dynamicClient.Resource(saGVR).Namespace(allowedNamespace).Create(ctx, sa, metav1.CreateOptions{})
+		if err == nil || errors.IsAlreadyExists(err) {
+			return // Success or already exists
+		}
+		lastErr = err
+		// Check if namespace is terminating
+		ns, getErr := dynamicClient.Resource(nsGVR).Get(ctx, allowedNamespace, metav1.GetOptions{})
+		if getErr == nil {
+			if phase, found, _ := unstructured.NestedString(ns.Object, "status", "phase"); found && phase == "Terminating" {
+				// Namespace is terminating, wait for it to be deleted and recreate
+				for j := 0; j < 20; j++ {
+					_, checkErr := dynamicClient.Resource(nsGVR).Get(ctx, allowedNamespace, metav1.GetOptions{})
+					if errors.IsNotFound(checkErr) {
+						// Namespace deleted, recreate it
+						ns := &unstructured.Unstructured{
+							Object: map[string]interface{}{
+								"apiVersion": "v1",
+								"kind":       "Namespace",
+								"metadata": map[string]interface{}{
+									"name": allowedNamespace,
+								},
+							},
+						}
+						_, createErr := dynamicClient.Resource(nsGVR).Create(ctx, ns, metav1.CreateOptions{})
+						if createErr == nil || errors.IsAlreadyExists(createErr) {
+							// Wait for namespace to be ready
+							for k := 0; k < 10; k++ {
+								ready, readyErr := dynamicClient.Resource(nsGVR).Get(ctx, allowedNamespace, metav1.GetOptions{})
+								if readyErr == nil {
+									if phase, found, _ := unstructured.NestedString(ready.Object, "status", "phase"); found && phase != "Terminating" {
+										break
+									}
+								}
+								time.Sleep(100 * time.Millisecond)
+							}
+							break
+						}
+					}
+					time.Sleep(200 * time.Millisecond)
+				}
+				// Retry service account creation
+				continue
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	if lastErr != nil && !errors.IsAlreadyExists(lastErr) {
+		t.Fatalf("Failed to create service account: %v", lastErr)
 	}
 }
 
