@@ -198,10 +198,20 @@ func TestObservationCreator_CreateObservation(t *testing.T) {
 			ctx := context.Background()
 
 			// Set up allowlist
-			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
-			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
-			defer os.Unsetenv("WATCH_NAMESPACE")
-			defer os.Unsetenv("ALLOWED_NAMESPACES")
+			if err := os.Setenv("WATCH_NAMESPACE", allowedNamespace); err != nil {
+				t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+			}
+			if err := os.Setenv("ALLOWED_NAMESPACES", allowedNamespace); err != nil {
+				t.Fatalf("failed to set ALLOWED_NAMESPACES: %v", err)
+			}
+			defer func() {
+				if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+					t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+				}
+				if err := os.Unsetenv("ALLOWED_NAMESPACES"); err != nil {
+					t.Logf("failed to unset ALLOWED_NAMESPACES: %v", err)
+				}
+			}()
 
 			allowlist := watcher.NewGVRAllowlist()
 
@@ -284,10 +294,20 @@ func TestCRDCreator_CreateCRD(t *testing.T) {
 			ctx := context.Background()
 
 			// Set up allowlist
-			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
-			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
-			defer os.Unsetenv("WATCH_NAMESPACE")
-			defer os.Unsetenv("ALLOWED_NAMESPACES")
+			if err := os.Setenv("WATCH_NAMESPACE", allowedNamespace); err != nil {
+				t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+			}
+			if err := os.Setenv("ALLOWED_NAMESPACES", allowedNamespace); err != nil {
+				t.Fatalf("failed to set ALLOWED_NAMESPACES: %v", err)
+			}
+			defer func() {
+				if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+					t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+				}
+				if err := os.Unsetenv("ALLOWED_NAMESPACES"); err != nil {
+					t.Logf("failed to unset ALLOWED_NAMESPACES: %v", err)
+				}
+			}()
 
 			allowlist := watcher.NewGVRAllowlist()
 
@@ -319,9 +339,9 @@ func TestCRDCreator_CreateCRD(t *testing.T) {
 			} else {
 				if err != nil {
 					t.Errorf("Unexpected error: %v", err)
-				} else {
-					// Verify CRD was created by trying to get it
-					// Note: CreateCRD doesn't return the created resource, so we can't check the name directly
+				}
+				// Verify CRD was created by trying to get it
+				// Note: CreateCRD doesn't return the created resource, so we can't check the name directly
 					// But if CreateCRD succeeds, the resource exists
 				}
 			}
@@ -337,10 +357,20 @@ func TestObservationCreator_WithAllowlist(t *testing.T) {
 	ctx := context.Background()
 
 	// Set up allowlist with specific namespace
-	os.Setenv("WATCH_NAMESPACE", allowedNamespace)
-	os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
-	defer os.Unsetenv("WATCH_NAMESPACE")
-	defer os.Unsetenv("ALLOWED_NAMESPACES")
+	if err := os.Setenv("WATCH_NAMESPACE", allowedNamespace); err != nil {
+		t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+	}
+	if err := os.Setenv("ALLOWED_NAMESPACES", allowedNamespace); err != nil {
+		t.Fatalf("failed to set ALLOWED_NAMESPACES: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+			t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+		}
+		if err := os.Unsetenv("ALLOWED_NAMESPACES"); err != nil {
+			t.Logf("failed to unset ALLOWED_NAMESPACES: %v", err)
+		}
+	}()
 
 	allowlist := watcher.NewGVRAllowlist()
 

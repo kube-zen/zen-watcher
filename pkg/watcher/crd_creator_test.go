@@ -67,7 +67,7 @@ func TestCRDCreator_RejectsDeniedGVRs(t *testing.T) {
 	}
 	if !errors.Is(err, ErrGVRDenied) {
 		// Check if error wraps ErrGVRDenied
-		var gvrDeniedErr error = ErrGVRDenied
+		gvrDeniedErr := ErrGVRDenied
 		if !errors.Is(err, gvrDeniedErr) {
 			t.Errorf("Expected error to wrap ErrGVRDenied, got: %v", err)
 		}

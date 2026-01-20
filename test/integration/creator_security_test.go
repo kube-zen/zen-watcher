@@ -97,7 +97,7 @@ func TestSecurityRegression_SecretsDenied(t *testing.T) {
 
 			if !errors.Is(err, tc.errType) {
 				// Check if error wraps the expected error type
-				var expectedErr error = tc.errType
+				expectedErr := tc.errType
 				if !errors.Is(err, expectedErr) {
 					t.Errorf("Expected error to wrap %v, got: %v", tc.errType, err)
 				}
