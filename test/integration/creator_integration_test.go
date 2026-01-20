@@ -105,26 +105,48 @@ func setupTestNamespace(t *testing.T) {
 	t.Helper()
 	ctx := context.Background()
 
-	// Create namespace
-	ns := &unstructured.Unstructured{
-		Object: map[string]interface{}{
-			"apiVersion": "v1",
-			"kind":       "Namespace",
-			"metadata": map[string]interface{}{
-				"name": allowedNamespace,
-			},
-		},
-	}
-
 	nsGVR := schema.GroupVersionResource{
 		Group:    "",
 		Version:  "v1",
 		Resource: "namespaces",
 	}
 
-	_, err := dynamicClient.Resource(nsGVR).Create(ctx, ns, metav1.CreateOptions{})
-	if err != nil && !errors.IsAlreadyExists(err) {
-		t.Fatalf("Failed to create namespace: %v", err)
+	// Check if namespace exists and is terminating - if so, wait for it to be deleted
+	existing, err := dynamicClient.Resource(nsGVR).Get(ctx, allowedNamespace, metav1.GetOptions{})
+	namespaceExists := err == nil
+	namespaceTerminating := false
+	if namespaceExists {
+		// Namespace exists, check if it's terminating
+		if phase, found, _ := unstructured.NestedString(existing.Object, "status", "phase"); found && phase == "Terminating" {
+			namespaceTerminating = true
+			// Wait for namespace to be fully deleted before recreating
+			for i := 0; i < 10; i++ {
+				_, err := dynamicClient.Resource(nsGVR).Get(ctx, allowedNamespace, metav1.GetOptions{})
+				if errors.IsNotFound(err) {
+					namespaceExists = false
+					break // Namespace deleted, can create new one
+				}
+				time.Sleep(100 * time.Millisecond)
+			}
+		}
+	}
+
+	// Create namespace if it doesn't exist or was terminating
+	if !namespaceExists || namespaceTerminating {
+		ns := &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": "v1",
+				"kind":       "Namespace",
+				"metadata": map[string]interface{}{
+					"name": allowedNamespace,
+				},
+			},
+		}
+
+		_, err = dynamicClient.Resource(nsGVR).Create(ctx, ns, metav1.CreateOptions{})
+		if err != nil && !errors.IsAlreadyExists(err) {
+			t.Fatalf("Failed to create namespace: %v", err)
+		}
 	}
 
 	// Create service account
@@ -162,7 +184,24 @@ func cleanupTestNamespace(t *testing.T) {
 		Resource: "namespaces",
 	}
 
-	err := dynamicClient.Resource(nsGVR).Delete(ctx, allowedNamespace, metav1.DeleteOptions{})
+	// Wait for namespace to be ready before deletion (avoid termination race)
+	// Check if namespace exists and is not terminating
+	ns, err := dynamicClient.Resource(nsGVR).Get(ctx, allowedNamespace, metav1.GetOptions{})
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return // Already deleted
+		}
+		t.Logf("Failed to get namespace before cleanup (non-fatal): %v", err)
+		return
+	}
+
+	// Check if namespace is terminating
+	if phase, found, _ := unstructured.NestedString(ns.Object, "status", "phase"); found && phase == "Terminating" {
+		t.Logf("Namespace already terminating, skipping deletion")
+		return
+	}
+
+	err = dynamicClient.Resource(nsGVR).Delete(ctx, allowedNamespace, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		t.Logf("Failed to delete namespace (non-fatal): %v", err)
 	}
@@ -204,12 +243,19 @@ func TestObservationCreator_CreateObservation(t *testing.T) {
 			if err := os.Setenv("ALLOWED_NAMESPACES", allowedNamespace); err != nil {
 				t.Fatalf("failed to set ALLOWED_NAMESPACES: %v", err)
 			}
+			// Allow v1alpha1/observations since that's what the CRD uses
+			if err := os.Setenv("ALLOWED_GVRS", "zen.kube-zen.io/v1alpha1/observations"); err != nil {
+				t.Fatalf("failed to set ALLOWED_GVRS: %v", err)
+			}
 			defer func() {
 				if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
 					t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
 				}
 				if err := os.Unsetenv("ALLOWED_NAMESPACES"); err != nil {
 					t.Logf("failed to unset ALLOWED_NAMESPACES: %v", err)
+				}
+				if err := os.Unsetenv("ALLOWED_GVRS"); err != nil {
+					t.Logf("failed to unset ALLOWED_GVRS: %v", err)
 				}
 			}()
 
@@ -300,12 +346,19 @@ func TestCRDCreator_CreateCRD(t *testing.T) {
 			if err := os.Setenv("ALLOWED_NAMESPACES", allowedNamespace); err != nil {
 				t.Fatalf("failed to set ALLOWED_NAMESPACES: %v", err)
 			}
+			// Allow v1alpha1/observations since that's what the CRD uses
+			if err := os.Setenv("ALLOWED_GVRS", "zen.kube-zen.io/v1alpha1/observations"); err != nil {
+				t.Fatalf("failed to set ALLOWED_GVRS: %v", err)
+			}
 			defer func() {
 				if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
 					t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
 				}
 				if err := os.Unsetenv("ALLOWED_NAMESPACES"); err != nil {
 					t.Logf("failed to unset ALLOWED_NAMESPACES: %v", err)
+				}
+				if err := os.Unsetenv("ALLOWED_GVRS"); err != nil {
+					t.Logf("failed to unset ALLOWED_GVRS: %v", err)
 				}
 			}()
 
@@ -362,12 +415,19 @@ func TestObservationCreator_WithAllowlist(t *testing.T) {
 	if err := os.Setenv("ALLOWED_NAMESPACES", allowedNamespace); err != nil {
 		t.Fatalf("failed to set ALLOWED_NAMESPACES: %v", err)
 	}
+	// Allow v1alpha1/observations since that's what the CRD uses
+	if err := os.Setenv("ALLOWED_GVRS", "zen.kube-zen.io/v1alpha1/observations"); err != nil {
+		t.Fatalf("failed to set ALLOWED_GVRS: %v", err)
+	}
 	defer func() {
 		if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
 			t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
 		}
 		if err := os.Unsetenv("ALLOWED_NAMESPACES"); err != nil {
 			t.Logf("failed to unset ALLOWED_NAMESPACES: %v", err)
+		}
+		if err := os.Unsetenv("ALLOWED_GVRS"); err != nil {
+			t.Logf("failed to unset ALLOWED_GVRS: %v", err)
 		}
 	}()
 
