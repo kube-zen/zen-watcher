@@ -342,8 +342,7 @@ func TestCRDCreator_CreateCRD(t *testing.T) {
 				}
 				// Verify CRD was created by trying to get it
 				// Note: CreateCRD doesn't return the created resource, so we can't check the name directly
-					// But if CreateCRD succeeds, the resource exists
-				}
+				// But if CreateCRD succeeds, the resource exists
 			}
 		})
 	}
