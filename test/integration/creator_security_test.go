@@ -462,13 +462,19 @@ func TestSecurityRegression_DisallowedNamespaceDenied(t *testing.T) {
 			if err := os.Setenv("ALLOWED_NAMESPACES", allowedNamespace); err != nil {
 				t.Fatalf("failed to set ALLOWED_NAMESPACES: %v", err)
 			}
-			// Only allow allowedNamespace
+			// Allow v1alpha1/observations so namespace check happens (not GVR check)
+			if err := os.Setenv("ALLOWED_GVRS", "zen.kube-zen.io/v1alpha1/observations"); err != nil {
+				t.Fatalf("failed to set ALLOWED_GVRS: %v", err)
+			}
 			defer func() {
 				if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
 					t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
 				}
 				if err := os.Unsetenv("ALLOWED_NAMESPACES"); err != nil {
 					t.Logf("failed to unset ALLOWED_NAMESPACES: %v", err)
+				}
+				if err := os.Unsetenv("ALLOWED_GVRS"); err != nil {
+					t.Logf("failed to unset ALLOWED_GVRS: %v", err)
 				}
 			}()
 

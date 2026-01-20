@@ -148,11 +148,10 @@ func createNamespaceIfNeeded(ctx context.Context, nsGVR schema.GroupVersionResou
 		phase, found, _ := unstructured.NestedString(existing.Object, "status", "phase")
 		if found && phase == "Terminating" {
 			// Wait for deletion with longer timeout (60 attempts = 30 seconds)
-			if !waitForNamespaceDeletion(ctx, nsGVR, name, 60) {
-				// If still terminating, try to proceed anyway - namespace might clear up
-				// In test environments, sometimes namespaces get stuck in terminating
-				// We'll try to create anyway and let Kubernetes handle it
-			}
+			// If still terminating after wait, try to proceed anyway - namespace might clear up
+			// In test environments, sometimes namespaces get stuck in terminating
+			// We'll try to create anyway and let Kubernetes handle it
+			waitForNamespaceDeletion(ctx, nsGVR, name, 60)
 		} else if found && phase != "" && phase != "Terminating" {
 			// Namespace exists and is ready
 			return ensureNamespaceReady(ctx, nsGVR, name, 10)
