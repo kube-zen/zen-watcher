@@ -56,12 +56,26 @@ func TestSecurityRegression_SecretsDenied(t *testing.T) {
 			ctx := context.Background()
 
 			// Set up allowlist (even if secrets are in allowlist, they should be denied)
-			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
-			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
-			os.Setenv("ALLOWED_GVRS", "v1/secrets") // Try to allow secrets
-			defer os.Unsetenv("WATCH_NAMESPACE")
-			defer os.Unsetenv("ALLOWED_NAMESPACES")
-			defer os.Unsetenv("ALLOWED_GVRS")
+			if err := os.Setenv("WATCH_NAMESPACE", allowedNamespace); err != nil {
+				t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+			}
+			if err := os.Setenv("ALLOWED_NAMESPACES", allowedNamespace); err != nil {
+				t.Fatalf("failed to set ALLOWED_NAMESPACES: %v", err)
+			}
+			if err := os.Setenv("ALLOWED_GVRS", "v1/secrets"); err != nil {
+				t.Fatalf("failed to set ALLOWED_GVRS: %v", err)
+			}
+			defer func() {
+				if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+					t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+				}
+				if err := os.Unsetenv("ALLOWED_NAMESPACES"); err != nil {
+					t.Logf("failed to unset ALLOWED_NAMESPACES: %v", err)
+				}
+				if err := os.Unsetenv("ALLOWED_GVRS"); err != nil {
+					t.Logf("failed to unset ALLOWED_GVRS: %v", err)
+				}
+			}()
 
 			allowlist := watcher.NewGVRAllowlist()
 
@@ -153,10 +167,20 @@ func TestSecurityRegression_RBACDenied(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
-			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
-			defer os.Unsetenv("WATCH_NAMESPACE")
-			defer os.Unsetenv("ALLOWED_NAMESPACES")
+			if err := os.Setenv("WATCH_NAMESPACE", allowedNamespace); err != nil {
+				t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+			}
+			if err := os.Setenv("ALLOWED_NAMESPACES", allowedNamespace); err != nil {
+				t.Fatalf("failed to set ALLOWED_NAMESPACES: %v", err)
+			}
+			defer func() {
+				if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+					t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+				}
+				if err := os.Unsetenv("ALLOWED_NAMESPACES"); err != nil {
+					t.Logf("failed to unset ALLOWED_NAMESPACES: %v", err)
+				}
+			}()
 
 			allowlist := watcher.NewGVRAllowlist()
 			creator := watcher.NewCRDCreator(dynamicClient, tc.gvr, allowlist)
@@ -216,10 +240,20 @@ func TestSecurityRegression_WebhooksDenied(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
-			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
-			defer os.Unsetenv("WATCH_NAMESPACE")
-			defer os.Unsetenv("ALLOWED_NAMESPACES")
+			if err := os.Setenv("WATCH_NAMESPACE", allowedNamespace); err != nil {
+				t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+			}
+			if err := os.Setenv("ALLOWED_NAMESPACES", allowedNamespace); err != nil {
+				t.Fatalf("failed to set ALLOWED_NAMESPACES: %v", err)
+			}
+			defer func() {
+				if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+					t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+				}
+				if err := os.Unsetenv("ALLOWED_NAMESPACES"); err != nil {
+					t.Logf("failed to unset ALLOWED_NAMESPACES: %v", err)
+				}
+			}()
 
 			allowlist := watcher.NewGVRAllowlist()
 			creator := watcher.NewCRDCreator(dynamicClient, tc.gvr, allowlist)
@@ -279,10 +313,20 @@ func TestSecurityRegression_CRDsDenied(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
-			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
-			defer os.Unsetenv("WATCH_NAMESPACE")
-			defer os.Unsetenv("ALLOWED_NAMESPACES")
+			if err := os.Setenv("WATCH_NAMESPACE", allowedNamespace); err != nil {
+				t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+			}
+			if err := os.Setenv("ALLOWED_NAMESPACES", allowedNamespace); err != nil {
+				t.Fatalf("failed to set ALLOWED_NAMESPACES: %v", err)
+			}
+			defer func() {
+				if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+					t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+				}
+				if err := os.Unsetenv("ALLOWED_NAMESPACES"); err != nil {
+					t.Logf("failed to unset ALLOWED_NAMESPACES: %v", err)
+				}
+			}()
 
 			allowlist := watcher.NewGVRAllowlist()
 			creator := watcher.NewCRDCreator(dynamicClient, tc.gvr, allowlist)
@@ -342,11 +386,21 @@ func TestSecurityRegression_NonAllowlistedGVRDenied(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
-			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
+			if err := os.Setenv("WATCH_NAMESPACE", allowedNamespace); err != nil {
+				t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+			}
+			if err := os.Setenv("ALLOWED_NAMESPACES", allowedNamespace); err != nil {
+				t.Fatalf("failed to set ALLOWED_NAMESPACES: %v", err)
+			}
 			// Note: NOT adding this GVR to ALLOWED_GVRS
-			defer os.Unsetenv("WATCH_NAMESPACE")
-			defer os.Unsetenv("ALLOWED_NAMESPACES")
+			defer func() {
+				if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+					t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+				}
+				if err := os.Unsetenv("ALLOWED_NAMESPACES"); err != nil {
+					t.Logf("failed to unset ALLOWED_NAMESPACES: %v", err)
+				}
+			}()
 
 			allowlist := watcher.NewGVRAllowlist()
 			creator := watcher.NewCRDCreator(dynamicClient, tc.gvr, allowlist)
@@ -402,10 +456,21 @@ func TestSecurityRegression_DisallowedNamespaceDenied(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
-			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace) // Only allow allowedNamespace
-			defer os.Unsetenv("WATCH_NAMESPACE")
-			defer os.Unsetenv("ALLOWED_NAMESPACES")
+			if err := os.Setenv("WATCH_NAMESPACE", allowedNamespace); err != nil {
+				t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+			}
+			if err := os.Setenv("ALLOWED_NAMESPACES", allowedNamespace); err != nil {
+				t.Fatalf("failed to set ALLOWED_NAMESPACES: %v", err)
+			}
+			// Only allow allowedNamespace
+			defer func() {
+				if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+					t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+				}
+				if err := os.Unsetenv("ALLOWED_NAMESPACES"); err != nil {
+					t.Logf("failed to unset ALLOWED_NAMESPACES: %v", err)
+				}
+			}()
 
 			allowlist := watcher.NewGVRAllowlist()
 
@@ -462,10 +527,20 @@ func TestSecurityRegression_PositivePath(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 
-			os.Setenv("WATCH_NAMESPACE", allowedNamespace)
-			os.Setenv("ALLOWED_NAMESPACES", allowedNamespace)
-			defer os.Unsetenv("WATCH_NAMESPACE")
-			defer os.Unsetenv("ALLOWED_NAMESPACES")
+			if err := os.Setenv("WATCH_NAMESPACE", allowedNamespace); err != nil {
+				t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+			}
+			if err := os.Setenv("ALLOWED_NAMESPACES", allowedNamespace); err != nil {
+				t.Fatalf("failed to set ALLOWED_NAMESPACES: %v", err)
+			}
+			defer func() {
+				if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+					t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+				}
+				if err := os.Unsetenv("ALLOWED_NAMESPACES"); err != nil {
+					t.Logf("failed to unset ALLOWED_NAMESPACES: %v", err)
+				}
+			}()
 
 			allowlist := watcher.NewGVRAllowlist()
 

@@ -6,6 +6,7 @@ FROM golang:1.25-alpine AS builder
 # ca-certificates: Required for HTTPS connections during build
 # Note: Using latest versions from base image (golang:1.25-alpine)
 # Base image is regularly updated with security patches
+# hadolint ignore=DL3018
 RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /build
