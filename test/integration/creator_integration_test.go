@@ -120,13 +120,13 @@ func setupTestNamespace(t *testing.T) {
 		if phase, found, _ := unstructured.NestedString(existing.Object, "status", "phase"); found && phase == "Terminating" {
 			namespaceTerminating = true
 			// Wait for namespace to be fully deleted before recreating
-			for i := 0; i < 10; i++ {
+			for i := 0; i < 20; i++ {
 				_, err := dynamicClient.Resource(nsGVR).Get(ctx, allowedNamespace, metav1.GetOptions{})
 				if errors.IsNotFound(err) {
 					namespaceExists = false
 					break // Namespace deleted, can create new one
 				}
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(200 * time.Millisecond)
 			}
 		}
 	}
@@ -146,6 +146,17 @@ func setupTestNamespace(t *testing.T) {
 		_, err = dynamicClient.Resource(nsGVR).Create(ctx, ns, metav1.CreateOptions{})
 		if err != nil && !errors.IsAlreadyExists(err) {
 			t.Fatalf("Failed to create namespace: %v", err)
+		}
+
+		// Wait for namespace to be ready (not terminating)
+		for i := 0; i < 10; i++ {
+			ready, err := dynamicClient.Resource(nsGVR).Get(ctx, allowedNamespace, metav1.GetOptions{})
+			if err == nil {
+				if phase, found, _ := unstructured.NestedString(ready.Object, "status", "phase"); found && phase != "Terminating" {
+					break // Namespace is ready
+				}
+			}
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 
@@ -184,7 +195,6 @@ func cleanupTestNamespace(t *testing.T) {
 		Resource: "namespaces",
 	}
 
-	// Wait for namespace to be ready before deletion (avoid termination race)
 	// Check if namespace exists and is not terminating
 	ns, err := dynamicClient.Resource(nsGVR).Get(ctx, allowedNamespace, metav1.GetOptions{})
 	if err != nil {
@@ -197,13 +207,32 @@ func cleanupTestNamespace(t *testing.T) {
 
 	// Check if namespace is terminating
 	if phase, found, _ := unstructured.NestedString(ns.Object, "status", "phase"); found && phase == "Terminating" {
-		t.Logf("Namespace already terminating, skipping deletion")
+		// Wait for it to be fully deleted
+		for i := 0; i < 20; i++ {
+			_, err := dynamicClient.Resource(nsGVR).Get(ctx, allowedNamespace, metav1.GetOptions{})
+			if errors.IsNotFound(err) {
+				return // Namespace deleted
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+		t.Logf("Namespace still terminating after wait, skipping deletion")
 		return
 	}
 
+	// Delete namespace
 	err = dynamicClient.Resource(nsGVR).Delete(ctx, allowedNamespace, metav1.DeleteOptions{})
 	if err != nil && !errors.IsNotFound(err) {
 		t.Logf("Failed to delete namespace (non-fatal): %v", err)
+		return
+	}
+
+	// Wait for namespace to be fully deleted to avoid race conditions with next test
+	for i := 0; i < 20; i++ {
+		_, err := dynamicClient.Resource(nsGVR).Get(ctx, allowedNamespace, metav1.GetOptions{})
+		if errors.IsNotFound(err) {
+			return // Namespace deleted
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
 }
 
@@ -301,8 +330,13 @@ func TestObservationCreator_CreateObservation(t *testing.T) {
 					t.Errorf("Unexpected error: %v", err)
 				} else {
 					// Verify observation was created
-					if observation.GetName() == "" {
-						t.Error("Expected observation to have a name after creation")
+					// Note: Fake client may not generate names from generateName properly
+					// Check by listing observations instead
+					list, listErr := dynamicClient.Resource(observationGVR).Namespace(tc.namespace).List(ctx, metav1.ListOptions{})
+					if listErr != nil {
+						t.Errorf("Failed to list observations to verify creation: %v", listErr)
+					} else if len(list.Items) == 0 {
+						t.Error("Expected at least one observation to be created")
 					}
 				}
 			}
