@@ -24,8 +24,14 @@ import (
 
 func TestGVRAllowlist_HardDenyList(t *testing.T) {
 	// Set up test environment
-	os.Setenv("WATCH_NAMESPACE", "test-ns")
-	defer os.Unsetenv("WATCH_NAMESPACE")
+	if err := os.Setenv("WATCH_NAMESPACE", "test-ns"); err != nil {
+		t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+			t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+		}
+	}()
 
 	allowlist := NewGVRAllowlist()
 
@@ -68,8 +74,14 @@ func TestGVRAllowlist_HardDenyList(t *testing.T) {
 
 func TestGVRAllowlist_AllowedGVR(t *testing.T) {
 	// Set up test environment
-	os.Setenv("WATCH_NAMESPACE", "test-ns")
-	defer os.Unsetenv("WATCH_NAMESPACE")
+	if err := os.Setenv("WATCH_NAMESPACE", "test-ns"); err != nil {
+		t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+			t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+		}
+	}()
 
 	allowlist := NewGVRAllowlist()
 
@@ -88,8 +100,14 @@ func TestGVRAllowlist_AllowedGVR(t *testing.T) {
 
 func TestGVRAllowlist_NamespaceRestriction(t *testing.T) {
 	// Set up test environment
-	os.Setenv("WATCH_NAMESPACE", "test-ns")
-	defer os.Unsetenv("WATCH_NAMESPACE")
+	if err := os.Setenv("WATCH_NAMESPACE", "test-ns"); err != nil {
+		t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+			t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+		}
+	}()
 
 	allowlist := NewGVRAllowlist()
 
@@ -117,8 +135,14 @@ func TestGVRAllowlist_NamespaceRestriction(t *testing.T) {
 
 func TestGVRAllowlist_ClusterScopedRejection(t *testing.T) {
 	// Set up test environment
-	os.Setenv("WATCH_NAMESPACE", "test-ns")
-	defer os.Unsetenv("WATCH_NAMESPACE")
+	if err := os.Setenv("WATCH_NAMESPACE", "test-ns"); err != nil {
+		t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+			t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+		}
+	}()
 
 	allowlist := NewGVRAllowlist()
 
@@ -140,11 +164,19 @@ func TestGVRAllowlist_ClusterScopedRejection(t *testing.T) {
 
 func TestGVRAllowlist_ClusterScopedExplicitAllow(t *testing.T) {
 	// Set up test environment
-	os.Setenv("WATCH_NAMESPACE", "test-ns")
-	os.Setenv("ALLOWED_CLUSTER_SCOPED_GVRS", "zen.kube-zen.io/v1/clusterobservations")
+	if err := os.Setenv("WATCH_NAMESPACE", "test-ns"); err != nil {
+		t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+	}
+	if err := os.Setenv("ALLOWED_CLUSTER_SCOPED_GVRS", "zen.kube-zen.io/v1/clusterobservations"); err != nil {
+		t.Fatalf("failed to set ALLOWED_CLUSTER_SCOPED_GVRS: %v", err)
+	}
 	defer func() {
-		os.Unsetenv("WATCH_NAMESPACE")
-		os.Unsetenv("ALLOWED_CLUSTER_SCOPED_GVRS")
+		if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+			t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+		}
+		if err := os.Unsetenv("ALLOWED_CLUSTER_SCOPED_GVRS"); err != nil {
+			t.Logf("failed to unset ALLOWED_CLUSTER_SCOPED_GVRS: %v", err)
+		}
 	}()
 
 	allowlist := NewGVRAllowlist()
@@ -164,8 +196,14 @@ func TestGVRAllowlist_ClusterScopedExplicitAllow(t *testing.T) {
 
 func TestGVRAllowlist_NotInAllowlist(t *testing.T) {
 	// Set up test environment
-	os.Setenv("WATCH_NAMESPACE", "test-ns")
-	defer os.Unsetenv("WATCH_NAMESPACE")
+	if err := os.Setenv("WATCH_NAMESPACE", "test-ns"); err != nil {
+		t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+			t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+		}
+	}()
 
 	allowlist := NewGVRAllowlist()
 
@@ -187,11 +225,19 @@ func TestGVRAllowlist_NotInAllowlist(t *testing.T) {
 
 func TestGVRAllowlist_CustomAllowedGVRs(t *testing.T) {
 	// Set up test environment
-	os.Setenv("WATCH_NAMESPACE", "test-ns")
-	os.Setenv("ALLOWED_GVRS", "example.com/v1/customresources,other.com/v1beta1/things")
+	if err := os.Setenv("WATCH_NAMESPACE", "test-ns"); err != nil {
+		t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+	}
+	if err := os.Setenv("ALLOWED_GVRS", "example.com/v1/customresources,other.com/v1beta1/things"); err != nil {
+		t.Fatalf("failed to set ALLOWED_GVRS: %v", err)
+	}
 	defer func() {
-		os.Unsetenv("WATCH_NAMESPACE")
-		os.Unsetenv("ALLOWED_GVRS")
+		if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+			t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+		}
+		if err := os.Unsetenv("ALLOWED_GVRS"); err != nil {
+			t.Logf("failed to unset ALLOWED_GVRS: %v", err)
+		}
 	}()
 
 	allowlist := NewGVRAllowlist()
@@ -211,11 +257,19 @@ func TestGVRAllowlist_CustomAllowedGVRs(t *testing.T) {
 
 func TestGVRAllowlist_CustomAllowedNamespaces(t *testing.T) {
 	// Set up test environment
-	os.Setenv("WATCH_NAMESPACE", "test-ns")
-	os.Setenv("ALLOWED_NAMESPACES", "ns1,ns2,ns3")
+	if err := os.Setenv("WATCH_NAMESPACE", "test-ns"); err != nil {
+		t.Fatalf("failed to set WATCH_NAMESPACE: %v", err)
+	}
+	if err := os.Setenv("ALLOWED_NAMESPACES", "ns1,ns2,ns3"); err != nil {
+		t.Fatalf("failed to set ALLOWED_NAMESPACES: %v", err)
+	}
 	defer func() {
-		os.Unsetenv("WATCH_NAMESPACE")
-		os.Unsetenv("ALLOWED_NAMESPACES")
+		if err := os.Unsetenv("WATCH_NAMESPACE"); err != nil {
+			t.Logf("failed to unset WATCH_NAMESPACE: %v", err)
+		}
+		if err := os.Unsetenv("ALLOWED_NAMESPACES"); err != nil {
+			t.Logf("failed to unset ALLOWED_NAMESPACES: %v", err)
+		}
 	}()
 
 	allowlist := NewGVRAllowlist()

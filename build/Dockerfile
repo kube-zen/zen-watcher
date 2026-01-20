@@ -4,8 +4,9 @@ FROM golang:1.25-alpine AS builder
 # Install build dependencies
 # git: Required for go mod download with private repos
 # ca-certificates: Required for HTTPS connections during build
-# Pin versions for reproducibility and security
-RUN apk add --no-cache git=~2 ca-certificates=~20240207 tzdata=~2024
+# Note: Using latest versions from base image (golang:1.25-alpine)
+# Base image is regularly updated with security patches
+RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /build
 
