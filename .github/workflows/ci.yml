@@ -46,6 +46,17 @@ jobs:
       - name: Install dependencies
         run: go mod download
       
+      - name: Install kubebuilder tools for integration tests
+        run: |
+          # Install setup-envtest (controller-runtime tool for managing envtest binaries)
+          go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
+          
+          # Download and setup kubebuilder tools (etcd, kube-apiserver)
+          # This downloads the required binaries and sets KUBEBUILDER_ASSETS
+          eval $(setup-envtest use -p env)
+          echo "KUBEBUILDER_ASSETS=$KUBEBUILDER_ASSETS" >> $GITHUB_ENV
+          echo "$KUBEBUILDER_ASSETS" >> $GITHUB_PATH
+      
       - name: Run tests
         run: go test -v -race -timeout=15m ./...
       
