@@ -33,7 +33,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: ./Dockerfile
+          file: ./build/Dockerfile
           push: false
           load: true
           tags: corbe/zen-watcher:${{ github.sha }}
@@ -97,7 +97,7 @@ jobs:
       - name: Run Hadolint (Dockerfile linter)
         uses: hadolint/hadolint-action@v3.1.0
         with:
-          dockerfile: Dockerfile
+          dockerfile: build/Dockerfile
           failure-threshold: warning
       
       - name: Scan with Snyk (if available)
