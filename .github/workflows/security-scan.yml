@@ -82,7 +82,7 @@ jobs:
       # Scan SBOM for vulnerabilities
       - name: Scan SBOM with Grype
         id: scan
-        uses: anchore/scan-action@v3
+        uses: anchore/scan-action@v7
         with:
           sbom: sbom.spdx.json
           fail-build: true
