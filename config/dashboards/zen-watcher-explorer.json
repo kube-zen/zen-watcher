@@ -37,6 +37,19 @@
       "type": "row"
     },
     {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "id": 200,
+      "panels": [],
+      "title": "\ud83d\udd0d Observations Table",
+      "type": "row"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -61,10 +74,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
+        "h": 6,
         "w": 4,
         "x": 0,
-        "y": 1
+        "y": 2
       },
       "id": 1,
       "options": {
@@ -88,7 +101,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"})",
+          "expr": "(sum(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"})) or vector(0)",
           "refId": "A"
         }
       ],
@@ -128,10 +141,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
+        "h": 6,
         "w": 4,
         "x": 4,
-        "y": 1
+        "y": 2
       },
       "id": 2,
       "options": {
@@ -155,7 +168,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(zen_watcher_events_total{severity=\"critical\",source=~\"$source\",category=~\"$category\",namespace=~\"$namespace\",kind=~\"$kind\"})",
+          "expr": "sum(zen_watcher_events_total{severity=\"critical\",source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}) or vector(0)",
           "refId": "A"
         }
       ],
@@ -195,10 +208,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
+        "h": 6,
         "w": 4,
         "x": 8,
-        "y": 1
+        "y": 2
       },
       "id": 3,
       "options": {
@@ -222,7 +235,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(zen_watcher_events_total{severity=\"high\",source=~\"$source\",category=~\"$category\",namespace=~\"$namespace\",kind=~\"$kind\"})",
+          "expr": "(sum(zen_watcher_events_total{severity=\"high\",source=~\"$source\",category=~\"$category\",namespace=~\"$namespace\",kind=~\"$kind\"})) or vector(0)",
           "refId": "A"
         }
       ],
@@ -258,10 +271,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
+        "h": 6,
         "w": 4,
         "x": 12,
-        "y": 1
+        "y": 2
       },
       "id": 4,
       "options": {
@@ -285,7 +298,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count(count by (source, category, severity, eventType, namespace, kind) (zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}))",
+          "expr": "(count(count by (source, category, severity, eventType, namespace, kind) (zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}))) or vector(0)",
           "refId": "A"
         }
       ],
@@ -317,10 +330,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
+        "h": 6,
         "w": 4,
         "x": 16,
-        "y": 1
+        "y": 2
       },
       "id": 5,
       "options": {
@@ -344,7 +357,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count(label_values(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}, namespace))",
+          "expr": "(count(label_values(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}, namespace))) or vector(0)",
           "refId": "A"
         }
       ],
@@ -376,10 +389,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
+        "h": 6,
         "w": 4,
         "x": 20,
-        "y": 1
+        "y": 2
       },
       "id": 6,
       "options": {
@@ -403,7 +416,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count(label_values(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}, kind))",
+          "expr": "(count(label_values(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}, kind))) or vector(0)",
           "refId": "A"
         }
       ],
@@ -411,17 +424,114 @@
       "type": "stat"
     },
     {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 5
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
-      "id": 200,
-      "panels": [],
-      "title": "\ud83d\udd0d Observations Table",
-      "type": "row"
+      "description": "Custom visualization of event flow through processing pipeline",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "id": 202,
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "(sum(rate(zen_watcher_observations_created_total[5m]))) or vector(0)",
+          "legendFormat": "Created",
+          "refId": "A"
+        },
+        {
+          "expr": "(sum(rate(zen_watcher_observations_filtered_total[5m]))) or vector(0)",
+          "legendFormat": "Filtered",
+          "refId": "B"
+        },
+        {
+          "expr": "(sum(rate(zen_watcher_observations_deduped_total[5m]))) or vector(0)",
+          "legendFormat": "Deduped",
+          "refId": "C"
+        }
+      ],
+      "title": "\ud83d\udcca Event Processing Flow",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Query execution time and performance metrics",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 1
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 203,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "(histogram_quantile(0.95, sum(rate(prometheus_engine_query_duration_seconds_bucket[5m])) by (le)) or vector(0))",
+          "legendFormat": "p95 Query Time",
+          "refId": "A"
+        }
+      ],
+      "title": "\u26a1 Query Performance (p95)",
+      "type": "timeseries"
     },
     {
       "datasource": {
@@ -548,10 +658,10 @@
         ]
       },
       "gridPos": {
-        "h": 20,
+        "h": 10,
         "w": 24,
         "x": 0,
-        "y": 6
+        "y": 16
       },
       "id": 10,
       "options": {
@@ -646,10 +756,10 @@
         }
       },
       "gridPos": {
-        "h": 6,
-        "w": 24,
+        "h": 8,
+        "w": 12,
         "x": 0,
-        "y": 28
+        "y": 26
       },
       "id": 201,
       "options": {
@@ -659,116 +769,6 @@
       "pluginVersion": "10.0.0",
       "title": "\ud83d\udcda Query Builder & Saved Searches",
       "type": "text"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "description": "Custom visualization of event flow through processing pipeline",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 34
-      },
-      "id": 202,
-      "options": {
-        "legend": {
-          "calcs": [
-            "sum"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(zen_watcher_observations_created_total[5m]))",
-          "legendFormat": "Created",
-          "refId": "A"
-        },
-        {
-          "expr": "sum(rate(zen_watcher_observations_filtered_total[5m]))",
-          "legendFormat": "Filtered",
-          "refId": "B"
-        },
-        {
-          "expr": "sum(rate(zen_watcher_observations_deduped_total[5m]))",
-          "legendFormat": "Deduped",
-          "refId": "C"
-        }
-      ],
-      "title": "\ud83d\udcca Event Processing Flow",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "description": "Query execution time and performance metrics",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1
-              },
-              {
-                "color": "red",
-                "value": 5
-              }
-            ]
-          },
-          "unit": "s"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 34
-      },
-      "id": 203,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(prometheus_engine_query_duration_seconds_bucket[5m])) by (le))",
-          "legendFormat": "p95 Query Time",
-          "refId": "A"
-        }
-      ],
-      "title": "\u26a1 Query Performance (p95)",
-      "type": "timeseries"
     }
   ],
   "refresh": "10s",

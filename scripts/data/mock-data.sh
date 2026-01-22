@@ -182,8 +182,8 @@ metadata:
   name: zen-watcher-mock
   namespace: ${NAMESPACE}
   labels:
-    app: zen-watcher
-    app.kubernetes.io/name: zen-watcher
+    app: zen-watcher-mock
+    app.kubernetes.io/name: zen-watcher-mock
     demo.zen.kube-zen.io/metrics: "true"
 spec:
   containers:
@@ -199,47 +199,34 @@ spec:
         # Calculate metrics based on demo observations
         # These metrics simulate what zen-watcher would expose
         def get_metrics():
-            now = int(time.time())
-            return f"""# HELP zen_watcher_health_status Health status
-# TYPE zen_watcher_health_status gauge
-zen_watcher_health_status{{cluster_id="demo"}} 1
-
-# HELP zen_watcher_events_total Total events collected
+            # Emit metrics that match the *current* dashboard PromQL:
+            # - zen_watcher_events_total{source,category,severity,eventType,namespace,kind,strategy}
+            # - zen_watcher_observations_created_total{source}
+            # - zen_watcher_tools_active{tool}
+            return """# HELP zen_watcher_events_total Total number of events that resulted in Observation CRD creation
 # TYPE zen_watcher_events_total counter
-zen_watcher_events_total{{cluster_id="demo",category="security",source="trivy",event_type="vulnerability",severity="critical"}} 2
-zen_watcher_events_total{{cluster_id="demo",category="security",source="trivy",event_type="vulnerability",severity="high"}} 2
-zen_watcher_events_total{{cluster_id="demo",category="security",source="trivy",event_type="vulnerability",severity="medium"}} 1
-zen_watcher_events_total{{cluster_id="demo",category="security",source="falco",event_type="runtime_threat",severity="critical"}} 1
-zen_watcher_events_total{{cluster_id="demo",category="security",source="falco",event_type="runtime_threat",severity="high"}} 2
-zen_watcher_events_total{{cluster_id="demo",category="security",source="kyverno",event_type="policy_violation",severity="medium"}} 2
-zen_watcher_events_total{{cluster_id="demo",category="security",source="kyverno",event_type="policy_violation",severity="low"}} 1
-zen_watcher_events_total{{cluster_id="demo",category="security",source="checkov",event_type="iac_scan",severity="high"}} 1
-zen_watcher_events_total{{cluster_id="demo",category="security",source="checkov",event_type="iac_scan",severity="medium"}} 2
-zen_watcher_events_total{{cluster_id="demo",category="compliance",source="kube-bench",event_type="cis_benchmark",severity="medium"}} 1
-zen_watcher_events_total{{cluster_id="demo",category="compliance",source="kube-bench",event_type="cis_benchmark",severity="low"}} 1
-zen_watcher_events_total{{cluster_id="demo",category="compliance",source="audit",event_type="audit_event",severity="info"}} 2
+zen_watcher_events_total{source="falco",category="security",severity="critical",eventType="runtime_threat",namespace="demo-manifests",kind="Pod",strategy="filter_first"} 3
+zen_watcher_events_total{source="falco",category="security",severity="high",eventType="runtime_threat",namespace="demo-manifests",kind="Pod",strategy="filter_first"} 5
+zen_watcher_events_total{source="audit",category="security",severity="medium",eventType="audit_event",namespace="default",kind="pods",strategy="filter_first"} 4
+zen_watcher_events_total{source="trivy",category="security",severity="critical",eventType="vulnerability",namespace="demo-manifests",kind="Pod",strategy="filter_first"} 2
+zen_watcher_events_total{source="checkov",category="security",severity="high",eventType="iac_scan",namespace="checkov",kind="ConfigMap",strategy="filter_first"} 4
+zen_watcher_events_total{source="kube-bench",category="compliance",severity="medium",eventType="cis_benchmark",namespace="zen-system",kind="ConfigMap",strategy="filter_first"} 2
 
-# HELP zen_watcher_active_events Currently active events
-# TYPE zen_watcher_active_events gauge
-zen_watcher_active_events{{cluster_id="demo",category="security",severity="critical"}} 3
-zen_watcher_active_events{{cluster_id="demo",category="security",severity="high"}} 5
-zen_watcher_active_events{{cluster_id="demo",category="security",severity="medium"}} 5
-zen_watcher_active_events{{cluster_id="demo",category="security",severity="low"}} 1
-zen_watcher_active_events{{cluster_id="demo",category="compliance",severity="medium"}} 1
-zen_watcher_active_events{{cluster_id="demo",category="compliance",severity="low"}} 1
-zen_watcher_active_events{{cluster_id="demo",category="compliance",severity="info"}} 2
+# HELP zen_watcher_observations_created_total Total number of Observation CRDs successfully created
+# TYPE zen_watcher_observations_created_total counter
+zen_watcher_observations_created_total{source="falco"} 8
+zen_watcher_observations_created_total{source="audit"} 4
+zen_watcher_observations_created_total{source="trivy"} 5
+zen_watcher_observations_created_total{source="checkov"} 4
+zen_watcher_observations_created_total{source="kube-bench"} 2
 
-# HELP zen_watcher_watcher_status Watcher enabled status
-# TYPE zen_watcher_watcher_status gauge
-zen_watcher_watcher_status{{cluster_id="demo",watcher="trivy"}} 1
-zen_watcher_watcher_status{{cluster_id="demo",watcher="falco"}} 1
-zen_watcher_watcher_status{{cluster_id="demo",watcher="kyverno"}} 1
-zen_watcher_watcher_status{{cluster_id="demo",watcher="checkov"}} 1
-zen_watcher_watcher_status{{cluster_id="demo",watcher="kube-bench"}} 1
-zen_watcher_watcher_status{{cluster_id="demo",watcher="audit"}} 1
-zen_watcher_watcher_status{{cluster_id="demo",watcher="cert-manager"}} 1
-zen_watcher_watcher_status{{cluster_id="demo",watcher="sealed-secrets"}} 1
-zen_watcher_watcher_status{{cluster_id="demo",watcher="kubernetes-events"}} 1
+# HELP zen_watcher_tools_active Number of security tools currently detected (1=active, 0=inactive)
+# TYPE zen_watcher_tools_active gauge
+zen_watcher_tools_active{tool="falco"} 1
+zen_watcher_tools_active{tool="audit"} 1
+zen_watcher_tools_active{tool="trivy"} 1
+zen_watcher_tools_active{tool="checkov"} 1
+zen_watcher_tools_active{tool="kube-bench"} 1
 """
         
         class Handler(BaseHTTPRequestHandler):
@@ -267,15 +254,19 @@ metadata:
   name: zen-watcher-mock
   namespace: ${NAMESPACE}
   labels:
-    app: zen-watcher
+    app: zen-watcher-mock
     demo.zen.kube-zen.io/metrics: "true"
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
 spec:
   ports:
   - port: 9090
     targetPort: 9090
     name: metrics
   selector:
-    app: zen-watcher
+    app: zen-watcher-mock
 EOF
 
 log_success "Mock metrics server deployed"

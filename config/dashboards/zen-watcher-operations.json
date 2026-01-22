@@ -37,6 +37,71 @@
       "type": "row"
     },
     {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "id": 101,
+      "panels": [],
+      "title": "\ud83d\udcca Performance Metrics",
+      "type": "row"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 2
+      },
+      "id": 102,
+      "panels": [],
+      "title": "\ud83d\udd27 Adapter & Filter Status",
+      "type": "row"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "id": 103,
+      "panels": [],
+      "title": "\ud83d\uddd1\ufe0f Garbage Collection & Resource Management",
+      "type": "row"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 4
+      },
+      "id": 104,
+      "panels": [],
+      "title": "\ud83c\udf10 Webhook & Integration Health",
+      "type": "row"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "id": 200,
+      "panels": [],
+      "title": "\ud83d\udccb Resource Kind Analysis",
+      "type": "row"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -80,10 +145,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 3,
+        "h": 6,
+        "w": 4,
         "x": 0,
-        "y": 1
+        "y": 6
       },
       "id": 1,
       "options": {
@@ -148,10 +213,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 3,
-        "y": 1
+        "h": 6,
+        "w": 4,
+        "x": 4,
+        "y": 6
       },
       "id": 2,
       "options": {
@@ -176,7 +241,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "100 * (1 - (sum(rate(zen_watcher_observations_create_errors_total[5m])) / (sum(rate(zen_watcher_observations_created_total[5m])) + sum(rate(zen_watcher_observations_create_errors_total[5m])) + 0.001)))",
+          "expr": "100 * (1 - ((sum(rate(zen_watcher_observations_create_errors_total[5m])) or vector(0)) / clamp_min((sum(rate(zen_watcher_observations_created_total[5m])) or vector(0)) + (sum(rate(zen_watcher_observations_create_errors_total[5m])) or vector(0)), 0.001)))",
           "legendFormat": "Success Rate",
           "refId": "A"
         }
@@ -217,10 +282,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 6,
-        "y": 1
+        "h": 6,
+        "w": 4,
+        "x": 8,
+        "y": 6
       },
       "id": 3,
       "options": {
@@ -245,7 +310,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(zen_watcher_observations_create_errors_total[5m])) * 60",
+          "expr": "(sum(rate(zen_watcher_observations_create_errors_total[5m])) or vector(0)) * 60",
           "legendFormat": "Errors/min",
           "refId": "A"
         }
@@ -286,10 +351,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 9,
-        "y": 1
+        "h": 6,
+        "w": 4,
+        "x": 12,
+        "y": 6
       },
       "id": 4,
       "options": {
@@ -314,7 +379,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le)) or vector(0)",
           "legendFormat": "p95 Latency",
           "refId": "A"
         }
@@ -355,10 +420,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 12,
-        "y": 1
+        "h": 6,
+        "w": 4,
+        "x": 16,
+        "y": 6
       },
       "id": 5,
       "options": {
@@ -383,7 +448,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(rate(zen_watcher_observations_created_total[1m])) * 60",
+          "expr": "(sum(rate(zen_watcher_observations_created_total[1m])) * 60) or vector(0)",
           "legendFormat": "Events/min",
           "refId": "A"
         }
@@ -424,10 +489,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 15,
-        "y": 1
+        "h": 6,
+        "w": 4,
+        "x": 20,
+        "y": 6
       },
       "id": 6,
       "options": {
@@ -452,7 +517,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "avg(zen_watcher_dedup_cache_usage_ratio) * 100",
+          "expr": "(avg(zen_watcher_dedup_cache_usage_ratio) or vector(0)) * 100",
           "legendFormat": "Cache Usage",
           "refId": "A"
         }
@@ -493,10 +558,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 4,
-        "w": 3,
-        "x": 18,
-        "y": 1
+        "h": 6,
+        "w": 4,
+        "x": 0,
+        "y": 12
       },
       "id": 7,
       "options": {
@@ -521,7 +586,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "avg(zen_watcher_webhook_queue_usage_ratio) * 100",
+          "expr": "(avg(zen_watcher_webhook_queue_usage_ratio) or vector(0)) * 100",
           "legendFormat": "Queue Usage",
           "refId": "A"
         }
@@ -530,17 +595,180 @@
       "type": "stat"
     },
     {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 5
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
       },
-      "id": 101,
-      "panels": [],
-      "title": "\ud83d\udcca Performance Metrics",
-      "type": "row"
+      "description": "Live system health status with traffic light indicators",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "red",
+                  "text": "\ud83d\udd34 DOWN"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "1": {
+                  "color": "green",
+                  "text": "\ud83d\udfe2 HEALTHY"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 4,
+        "y": 12
+      },
+      "id": 205,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value"
+      },
+      "targets": [
+        {
+          "expr": "up{job=\"zen-watcher\"}",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udfe2 Real-time Health Status",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "System uptime percentage (SLA target: 99.9%)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 99
+              },
+              {
+                "color": "green",
+                "value": 99.9
+              }
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 8,
+        "y": 12
+      },
+      "id": 206,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "avg_over_time(up{job=\"zen-watcher\"}[30d]) * 100",
+          "refId": "A"
+        }
+      ],
+      "title": "\u23f1\ufe0f Uptime SLA (30d)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "p95 processing latency (SLA target: <5s)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 3
+              },
+              {
+                "color": "red",
+                "value": 5
+              }
+            ]
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 12,
+        "y": 12
+      },
+      "id": 207,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le)) or vector(0)",
+          "refId": "A"
+        }
+      ],
+      "title": "\u26a1 p95 Response Time",
+      "type": "stat"
     },
     {
       "datasource": {
@@ -600,7 +828,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 6
+        "y": 18
       },
       "id": 8,
       "options": {
@@ -626,7 +854,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (source) (rate(zen_watcher_observations_created_total[1m]))",
+          "expr": "(sum by (source) (rate(zen_watcher_observations_created_total[1m]))) or vector(0)",
           "legendFormat": "{{source}}",
           "refId": "A"
         }
@@ -700,7 +928,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 6
+        "y": 18
       },
       "id": 9,
       "options": {
@@ -726,7 +954,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.50, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.50, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le)) or vector(0)",
           "legendFormat": "p50",
           "refId": "A"
         },
@@ -735,7 +963,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.95, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le)) or vector(0)",
           "legendFormat": "p95",
           "refId": "B"
         },
@@ -744,26 +972,13 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.99, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le))",
+          "expr": "histogram_quantile(0.99, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le)) or vector(0)",
           "legendFormat": "p99",
           "refId": "C"
         }
       ],
       "title": "Event Processing Latency (Percentiles)",
       "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 14
-      },
-      "id": 102,
-      "panels": [],
-      "title": "\ud83d\udd27 Adapter & Filter Status",
-      "type": "row"
     },
     {
       "datasource": {
@@ -820,10 +1035,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
+        "h": 8,
         "w": 12,
         "x": 0,
-        "y": 15
+        "y": 26
       },
       "id": 10,
       "options": {
@@ -848,7 +1063,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (adapter, outcome) (rate(zen_watcher_adapter_runs_total[1m]))",
+          "expr": "sum by (adapter, outcome) ((rate(zen_watcher_adapter_runs_total[1m])) or vector(0))",
           "legendFormat": "{{adapter}} ({{outcome}})",
           "refId": "A"
         }
@@ -942,10 +1157,10 @@
         ]
       },
       "gridPos": {
-        "h": 7,
+        "h": 8,
         "w": 12,
         "x": 12,
-        "y": 15
+        "y": 26
       },
       "id": 11,
       "options": {
@@ -970,26 +1185,13 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (action) (rate(zen_watcher_filter_decisions_total[1m]))",
+          "expr": "sum by (action) ((rate(zen_watcher_filter_decisions_total[1m])) or vector(0))",
           "legendFormat": "{{action}}",
           "refId": "A"
         }
       ],
       "title": "Filter Decisions",
       "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 22
-      },
-      "id": 103,
-      "panels": [],
-      "title": "\ud83d\uddd1\ufe0f Garbage Collection & Resource Management",
-      "type": "row"
     },
     {
       "datasource": {
@@ -1046,10 +1248,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
+        "h": 8,
         "w": 12,
         "x": 0,
-        "y": 23
+        "y": 34
       },
       "id": 12,
       "options": {
@@ -1074,7 +1276,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (source) (zen_watcher_observations_created_total - zen_watcher_observations_deduped_total)",
+          "expr": "sum by (source) ((zen_watcher_observations_created_total or vector(0)) - (zen_watcher_observations_deduped_total or vector(0)))",
           "legendFormat": "{{source}}",
           "refId": "A"
         }
@@ -1145,10 +1347,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
+        "h": 8,
         "w": 12,
         "x": 12,
-        "y": 23
+        "y": 34
       },
       "id": 13,
       "options": {
@@ -1174,26 +1376,13 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "histogram_quantile(0.95, sum(rate(zen_watcher_gc_duration_seconds_bucket[5m])) by (le, operation))",
+          "expr": "histogram_quantile(0.95, sum(rate(zen_watcher_gc_duration_seconds_bucket[5m])) by (le, operation)) or vector(0)",
           "legendFormat": "{{operation}} (p95)",
           "refId": "A"
         }
       ],
       "title": "GC Duration (p95)",
       "type": "timeseries"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 30
-      },
-      "id": 104,
-      "panels": [],
-      "title": "\ud83c\udf10 Webhook & Integration Health",
-      "type": "row"
     },
     {
       "datasource": {
@@ -1281,10 +1470,10 @@
         ]
       },
       "gridPos": {
-        "h": 7,
+        "h": 8,
         "w": 12,
         "x": 0,
-        "y": 31
+        "y": 42
       },
       "id": 14,
       "options": {
@@ -1309,7 +1498,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (endpoint, status) (rate(zen_watcher_webhook_requests_total[1m]))",
+          "expr": "(sum by (endpoint, status) (rate(zen_watcher_webhook_requests_total[1m]))) or vector(0)",
           "legendFormat": "{{endpoint}} ({{status}})",
           "refId": "A"
         }
@@ -1376,10 +1565,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 7,
+        "h": 8,
         "w": 12,
         "x": 12,
-        "y": 31
+        "y": 42
       },
       "id": 15,
       "options": {
@@ -1405,7 +1594,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (endpoint) (rate(zen_watcher_webhook_events_dropped_total[1m]))",
+          "expr": "sum by (endpoint) ((rate(zen_watcher_webhook_events_dropped_total[1m])) or vector(0))",
           "legendFormat": "{{endpoint}}",
           "refId": "A"
         }
@@ -1414,17 +1603,142 @@
       "type": "timeseries"
     },
     {
-      "collapsed": false,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "7-day resource utilization trends with 30-day forecast",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
       "gridPos": {
-        "h": 1,
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 50
+      },
+      "id": 208,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "(sum(rate(zen_watcher_observations_created_total[5m])) / 1000 * 100) or vector(0)",
+          "legendFormat": "Processing Rate %",
+          "refId": "A"
+        },
+        {
+          "expr": "(predict_linear(sum(rate(zen_watcher_observations_created_total[5m]))[7d:5m], 30*24*3600)) or vector(0)",
+          "legendFormat": "30-Day Forecast",
+          "refId": "B"
+        }
+      ],
+      "title": "\ud83d\udcca Capacity Planning - Processing Trends",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Performance metrics compared to industry benchmarks",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "ops/sec"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 50
+      },
+      "id": 210,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "(sum(rate(zen_watcher_observations_created_total[5m]))) or vector(0)",
+          "legendFormat": "Actual Throughput",
+          "refId": "A"
+        },
+        {
+          "expr": "1000",
+          "legendFormat": "Industry Benchmark (1000 ops/sec)",
+          "refId": "B"
+        }
+      ],
+      "title": "\ud83d\udcc8 Performance vs Industry Benchmarks",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Correlated incidents across different sources and categories",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "spectrum"
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
         "w": 24,
         "x": 0,
-        "y": 38
+        "y": 58
       },
-      "id": 200,
-      "panels": [],
-      "title": "\ud83d\udccb Resource Kind Analysis",
-      "type": "row"
+      "id": 209,
+      "options": {
+        "calculate": false,
+        "cellGap": 2,
+        "color": {
+          "exponent": 0.5,
+          "fill": "dark-orange",
+          "mode": "spectrum",
+          "reverse": false,
+          "scale": "exponential",
+          "scheme": "Spectral",
+          "steps": 64
+        }
+      },
+      "targets": [
+        {
+          "expr": "(sum(rate(zen_watcher_events_total[1h])) by (source, category)) or vector(0)",
+          "format": "heatmap",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udd17 Incident Correlation Matrix",
+      "type": "heatmap"
     },
     {
       "datasource": {
@@ -1513,9 +1827,9 @@
       },
       "gridPos": {
         "h": 10,
-        "w": 12,
+        "w": 24,
         "x": 0,
-        "y": 39
+        "y": 68
       },
       "id": 201,
       "options": {
@@ -1543,7 +1857,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (kind) (zen_watcher_events_total)",
+          "expr": "(sum by (kind) (zen_watcher_events_total)) or vector(0)",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -1553,7 +1867,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (kind) (zen_watcher_events_total{severity=\"critical\"})",
+          "expr": "(sum by (kind) (zen_watcher_events_total{severity=\"critical\"})) or vector(0)",
           "format": "table",
           "instant": true,
           "refId": "B"
@@ -1563,7 +1877,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (kind) (zen_watcher_events_total{severity=\"high\"})",
+          "expr": "(sum by (kind) (zen_watcher_events_total{severity=\"high\"})) or vector(0)",
           "format": "table",
           "instant": true,
           "refId": "C"
@@ -1618,76 +1932,6 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "hideFrom": {
-              "tooltip": false,
-              "viz": false,
-              "legend": false
-            }
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 10,
-        "w": 12,
-        "x": 12,
-        "y": 39
-      },
-      "id": 202,
-      "options": {
-        "displayLabels": [
-          "name",
-          "percent"
-        ],
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true,
-          "values": [
-            "value",
-            "percent"
-          ]
-        },
-        "pieType": "donut",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum by (kind) (zen_watcher_events_total)",
-          "legendFormat": "{{kind}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Resource Kind Distribution",
-      "type": "piechart"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
             "mode": "thresholds"
           },
           "custom": {
@@ -1723,10 +1967,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
+        "h": 10,
+        "w": 24,
         "x": 0,
-        "y": 49
+        "y": 78
       },
       "id": 203,
       "options": {
@@ -1749,7 +1993,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (kind, severity) (increase(zen_watcher_events_total[1h]))",
+          "expr": "(sum by (kind, severity) (increase(zen_watcher_events_total[1h]))) or vector(0)",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
@@ -1818,10 +2062,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 49
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 88
       },
       "id": 204,
       "options": {
@@ -1844,7 +2088,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (kind, eventType) (increase(zen_watcher_events_total[1h]))",
+          "expr": "(sum by (kind, eventType) (increase(zen_watcher_events_total[1h]))) or vector(0)",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
@@ -1875,314 +2119,70 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Live system health status with traffic light indicators",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
           },
-          "mappings": [
-            {
-              "options": {
-                "0": {
-                  "color": "red",
-                  "text": "\ud83d\udd34 DOWN"
-                }
-              },
-              "type": "value"
-            },
-            {
-              "options": {
-                "1": {
-                  "color": "green",
-                  "text": "\ud83d\udfe2 HEALTHY"
-                }
-              },
-              "type": "value"
+          "custom": {
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
             }
-          ],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "green",
-                "value": 1
-              }
-            ]
-          }
-        }
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 4,
-        "x": 0,
-        "y": 59
-      },
-      "id": 205,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "center",
-        "textMode": "value"
-      },
-      "targets": [
-        {
-          "expr": "up{job=\"zen-watcher\"}",
-          "refId": "A"
-        }
-      ],
-      "title": "\ud83d\udfe2 Real-time Health Status",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "description": "System uptime percentage (SLA target: 99.9%)",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
           },
-          "max": 100,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 99
-              },
-              {
-                "color": "green",
-                "value": 99.9
-              }
-            ]
-          },
-          "unit": "percent"
-        }
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 4,
-        "x": 4,
-        "y": 59
-      },
-      "id": 206,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "textMode": "value_and_name"
-      },
-      "targets": [
-        {
-          "expr": "avg_over_time(up{job=\"zen-watcher\"}[30d]) * 100",
-          "refId": "A"
-        }
-      ],
-      "title": "\u23f1\ufe0f Uptime SLA (30d)",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "description": "p95 processing latency (SLA target: <5s)",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 3
-              },
-              {
-                "color": "red",
-                "value": 5
-              }
-            ]
-          },
-          "unit": "s"
-        }
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 4,
-        "x": 8,
-        "y": 59
-      },
-      "id": 207,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "textMode": "value_and_name"
-      },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(zen_watcher_event_processing_duration_seconds_bucket[5m])) by (le))",
-          "refId": "A"
-        }
-      ],
-      "title": "\u26a1 p95 Response Time",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "description": "7-day resource utilization trends with 30-day forecast",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "percent"
+          "mappings": []
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 59
-      },
-      "id": 208,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(zen_watcher_observations_created_total[5m])) / 1000 * 100",
-          "legendFormat": "Processing Rate %",
-          "refId": "A"
-        },
-        {
-          "expr": "predict_linear(sum(rate(zen_watcher_observations_created_total[5m]))[7d:5m], 30*24*3600)",
-          "legendFormat": "30-Day Forecast",
-          "refId": "B"
-        }
-      ],
-      "title": "\ud83d\udcca Capacity Planning - Processing Trends",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "description": "Correlated incidents across different sources and categories",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "spectrum"
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
+        "h": 10,
         "w": 12,
         "x": 0,
-        "y": 67
+        "y": 98
       },
-      "id": 209,
+      "id": 202,
       "options": {
-        "calculate": false,
-        "cellGap": 2,
-        "color": {
-          "exponent": 0.5,
-          "fill": "dark-orange",
-          "mode": "spectrum",
-          "reverse": false,
-          "scale": "exponential",
-          "scheme": "Spectral",
-          "steps": 64
-        }
-      },
-      "targets": [
-        {
-          "expr": "sum(rate(zen_watcher_events_total[1h])) by (source, category)",
-          "format": "heatmap",
-          "refId": "A"
-        }
-      ],
-      "title": "\ud83d\udd17 Incident Correlation Matrix",
-      "type": "heatmap"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "description": "Performance metrics compared to industry benchmarks",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "unit": "ops/sec"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 67
-      },
-      "id": 210,
-      "options": {
+        "displayLabels": [
+          "name",
+          "percent"
+        ],
         "legend": {
-          "calcs": [
-            "mean"
-          ],
           "displayMode": "table",
-          "placement": "bottom"
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
         }
       },
+      "pluginVersion": "10.0.0",
       "targets": [
         {
-          "expr": "sum(rate(zen_watcher_observations_created_total[5m]))",
-          "legendFormat": "Actual Throughput",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(sum by (kind) (zen_watcher_events_total)) or vector(0)",
+          "legendFormat": "{{kind}}",
           "refId": "A"
-        },
-        {
-          "expr": "1000",
-          "legendFormat": "Industry Benchmark (1000 ops/sec)",
-          "refId": "B"
         }
       ],
-      "title": "\ud83d\udcc8 Performance vs Industry Benchmarks",
-      "type": "timeseries"
+      "title": "Resource Kind Distribution",
+      "type": "piechart"
     }
   ],
   "refresh": "10s",

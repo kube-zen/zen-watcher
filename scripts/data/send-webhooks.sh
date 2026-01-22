@@ -12,6 +12,42 @@ set -euo pipefail
 NAMESPACE="${1:-zen-system}"
 ZEN_WATCHER_URL="${ZEN_WATCHER_URL:-http://zen-watcher.${NAMESPACE}.svc.cluster.local:8080}"
 
+# Generate a unique, DNS-safe pod name suffix
+unique_suffix() {
+    # Prefer nanoseconds + random to avoid collisions even in fast loops
+    local ns rnd
+    ns="$(date +%s%N 2>/dev/null || date +%s)"
+    rnd="$RANDOM"
+    # Produce a DNS-safe suffix (lowercase alnum + '-') and avoid trailing '-'
+    # Keep it short to fit Kubernetes name limits when prefixed.
+    echo "${ns}${rnd}" | tr -cd '0-9' | tail -c 16
+}
+
+# Wait for a pod to finish (Succeeded or Failed) instead of waiting for Ready
+wait_pod_done() {
+    local pod="$1"
+    local ns="$2"
+    local timeout="${3:-30s}"
+
+    # kubectl wait supports condition=Complete only for Jobs, so we poll phase here
+    local start now elapsed
+    start="$(date +%s)"
+    while true; do
+        phase="$(kubectl get pod "${pod}" -n "${ns}" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")"
+        if [[ "${phase}" == "Succeeded" || "${phase}" == "Failed" ]]; then
+            return 0
+        fi
+        now="$(date +%s)"
+        elapsed=$((now - start))
+        # crude timeout parsing: treat "30s" as seconds
+        max="${timeout%s}"
+        if [[ "${elapsed}" -ge "${max}" ]]; then
+            return 1
+        fi
+        sleep 1
+    done
+}
+
 # Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -53,9 +89,8 @@ spec:
   restartPolicy: Never
 EOF
 
-# Wait for pod to complete
-if kubectl wait --for=condition=Ready pod/test-zen-watcher-connectivity -n ${NAMESPACE} --timeout=30s >/dev/null 2>&1; then
-    sleep 2
+# Wait for pod to finish
+if wait_pod_done test-zen-watcher-connectivity "${NAMESPACE}" 30; then
     if kubectl logs test-zen-watcher-connectivity -n ${NAMESPACE} >/dev/null 2>&1; then
         echo -e "${GREEN}✓${NC} zen-watcher accessible at ${ZEN_WATCHER_URL} (internal service)"
     else
@@ -93,13 +128,16 @@ send_falco_webhook() {
 }
 EOF
 )
+    # Compact to a single line so YAML/JSON embedding is safe
+    payload="$(echo "${payload}" | tr -d '\n' | sed 's/[[:space:]]\\+/ /g')"
     
     echo -e "${CYAN}  →${NC} Sending Falco webhook: ${rule} (${priority})"
     # Send webhook from within cluster using a PodSecurity-compliant pod with app label
-    POD_NAME="send-falco-webhook-$(date +%s)"
-    # Escape payload for shell
-    ESCAPED_PAYLOAD=$(echo "${payload}" | sed "s/'/'\"'\"'/g")
-    cat <<EOF | kubectl apply -f - >/dev/null 2>&1
+    POD_NAME="send-falco-webhook-$(unique_suffix)"
+    # Encode payload to avoid YAML quoting issues in the pod spec
+    PAYLOAD_B64="$(printf '%s' "${payload}" | base64 | tr -d '\n')"
+    # NOTE: don't suppress errors here; failures are important for debugging in demos
+    cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: Pod
 metadata:
@@ -124,15 +162,17 @@ spec:
       runAsUser: 65534
       seccompProfile:
         type: RuntimeDefault
-    command: ["sh", "-c", "curl -s -X POST -H 'Content-Type: application/json' -d '${ESCAPED_PAYLOAD}' ${ZEN_WATCHER_URL}/falco/webhook"]
+    command: ["sh", "-c", "echo '${PAYLOAD_B64}' | base64 -d | curl -s -X POST -H 'Content-Type: application/json' --data-binary @- ${ZEN_WATCHER_URL}/falco/webhook"]
   restartPolicy: Never
 EOF
-    if kubectl wait --for=condition=Ready pod/${POD_NAME} -n ${NAMESPACE} --timeout=15s >/dev/null 2>&1; then
-        sleep 2
-        kubectl delete pod/${POD_NAME} -n ${NAMESPACE} >/dev/null 2>&1
+    if wait_pod_done "${POD_NAME}" "${NAMESPACE}" 20 >/dev/null 2>&1; then
+        # consider it sent if pod succeeded; show response for debugging
+        resp="$(kubectl logs "${POD_NAME}" -n "${NAMESPACE}" 2>/dev/null || true)"
+        kubectl delete pod/${POD_NAME} -n ${NAMESPACE} >/dev/null 2>&1 || true
         echo -e "    ${GREEN}✓${NC} Sent"
+        [[ -n "${resp}" ]] && echo "      Response: ${resp}" | head -c 2000
     else
-        kubectl delete pod/${POD_NAME} -n ${NAMESPACE} >/dev/null 2>&1
+        kubectl delete pod/${POD_NAME} -n ${NAMESPACE} >/dev/null 2>&1 || true
         echo -e "    ${RED}✗${NC} Failed"
     fi
     sleep 0.5
@@ -187,11 +227,16 @@ send_audit_webhook() {
 }
 EOF
 )
+    # Compact to a single line so YAML/JSON embedding is safe
+    payload="$(echo "${payload}" | tr -d '\n' | sed 's/[[:space:]]\\+/ /g')"
     
     echo -e "${CYAN}  →${NC} Sending Audit webhook: ${verb} ${resource}/${name}"
     # Send webhook from within cluster using a PodSecurity-compliant pod
-    POD_NAME="send-audit-webhook-$(date +%s)"
-    cat <<EOF | kubectl apply -f - >/dev/null 2>&1
+    POD_NAME="send-audit-webhook-$(unique_suffix)"
+    # Encode payload to avoid YAML quoting issues in the pod spec
+    PAYLOAD_B64="$(printf '%s' "${payload}" | base64 | tr -d '\n')"
+    # NOTE: don't suppress errors here; failures are important for debugging in demos
+    cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: Pod
 metadata:
@@ -214,15 +259,16 @@ spec:
       runAsUser: 65534
       seccompProfile:
         type: RuntimeDefault
-    command: ["sh", "-c", "curl -s -X POST -H 'Content-Type: application/json' -d '${payload}' ${ZEN_WATCHER_URL}/audit/webhook"]
+    command: ["sh", "-c", "echo '${PAYLOAD_B64}' | base64 -d | curl -s -X POST -H 'Content-Type: application/json' --data-binary @- ${ZEN_WATCHER_URL}/audit/webhook"]
   restartPolicy: Never
 EOF
-    if kubectl wait --for=condition=Ready pod/${POD_NAME} -n ${NAMESPACE} --timeout=10s >/dev/null 2>&1; then
-        sleep 1
-        kubectl delete pod/${POD_NAME} -n ${NAMESPACE} >/dev/null 2>&1
+    if wait_pod_done "${POD_NAME}" "${NAMESPACE}" 20 >/dev/null 2>&1; then
+        resp="$(kubectl logs "${POD_NAME}" -n "${NAMESPACE}" 2>/dev/null || true)"
+        kubectl delete pod/${POD_NAME} -n ${NAMESPACE} >/dev/null 2>&1 || true
         echo -e "    ${GREEN}✓${NC} Sent"
+        [[ -n "${resp}" ]] && echo "      Response: ${resp}" | head -c 2000
     else
-        kubectl delete pod/${POD_NAME} -n ${NAMESPACE} >/dev/null 2>&1
+        kubectl delete pod/${POD_NAME} -n ${NAMESPACE} >/dev/null 2>&1 || true
         echo -e "    ${RED}✗${NC} Failed"
     fi
     sleep 0.5

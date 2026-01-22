@@ -73,7 +73,7 @@ subjects:
 #             if obs.Spec.Severity == "CRITICAL" || obs.Spec.Severity == "HIGH" {
 #                 // Export to compliance system
 #                 exportToComplianceDB(obs)
-#                 // Send to audit log
+#                 // Send to audit logi
 #                 auditLogger.Log(obs)
 #             }
 #         },

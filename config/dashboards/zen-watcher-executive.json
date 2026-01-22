@@ -24,6 +24,19 @@
   "liveNow": true,
   "panels": [
     {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 200,
+      "panels": [],
+      "title": "\ud83d\udcca Event Type Analysis",
+      "type": "row"
+    },
+    {
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -71,7 +84,7 @@
         "h": 6,
         "w": 4,
         "x": 0,
-        "y": 0
+        "y": 1
       },
       "id": 1,
       "options": {
@@ -140,7 +153,7 @@
         "h": 6,
         "w": 4,
         "x": 4,
-        "y": 0
+        "y": 1
       },
       "id": 2,
       "options": {
@@ -165,7 +178,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count(count by (source) (zen_watcher_events_total))",
+          "expr": "(count(count by (source) (zen_watcher_events_total))) or vector(0)",
           "legendFormat": "Active Tools",
           "refId": "A"
         }
@@ -210,7 +223,7 @@
         "h": 6,
         "w": 4,
         "x": 8,
-        "y": 0
+        "y": 1
       },
       "id": 3,
       "options": {
@@ -235,7 +248,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(zen_watcher_observations_created_total[24h]))",
+          "expr": "(sum(increase(zen_watcher_observations_created_total[24h]))) or vector(0)",
           "legendFormat": "24h Total",
           "refId": "A"
         }
@@ -280,7 +293,7 @@
         "h": 6,
         "w": 4,
         "x": 12,
-        "y": 0
+        "y": 1
       },
       "id": 4,
       "options": {
@@ -305,7 +318,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum(increase(zen_watcher_events_total{severity=\"critical\",source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1h]))",
+          "expr": "(sum(increase(zen_watcher_events_total{severity=\"critical\",source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1h]))) or vector(0)",
           "legendFormat": "Critical (1h)",
           "refId": "A"
         }
@@ -352,7 +365,7 @@
         "h": 6,
         "w": 4,
         "x": 16,
-        "y": 0
+        "y": 1
       },
       "id": 5,
       "options": {
@@ -377,12 +390,223 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "100 * (1 - (sum(rate(zen_watcher_observations_create_errors_total[5m])) / (sum(rate(zen_watcher_observations_created_total[5m])) + sum(rate(zen_watcher_observations_create_errors_total[5m])) + 0.001)))",
+          "expr": "100 * (1 - ((sum(rate(zen_watcher_observations_create_errors_total[5m])) or vector(0)) / clamp_min((sum(rate(zen_watcher_observations_created_total[5m])) or vector(0)) + (sum(rate(zen_watcher_observations_create_errors_total[5m])) or vector(0)), 0.001)))",
           "legendFormat": "Success Rate",
           "refId": "A"
         }
       ],
       "title": "\u2705 Success Rate",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Overall security posture score (0-100) based on compliance, vulnerabilities, and incidents",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 60
+              },
+              {
+                "color": "yellow",
+                "value": 75
+              },
+              {
+                "color": "green",
+                "value": 90
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 20,
+        "y": 1
+      },
+      "id": 204,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "100 - ((((sum(rate(zen_watcher_events_total{severity=\"critical\"}[24h])) or vector(0)) * 10) + ((sum(rate(zen_watcher_events_total{severity=\"high\"}[24h])) or vector(0)) * 5) + ((sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"(fail|critical|high)\"}[24h])) or vector(0)) * 15)) / clamp_min(sum(rate(zen_watcher_events_total[24h])), 1)) * 100",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udee1\ufe0f Security Posture Score",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Overall compliance status across all frameworks",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 70
+              },
+              {
+                "color": "yellow",
+                "value": 85
+              },
+              {
+                "color": "green",
+                "value": 95
+              }
+            ]
+          },
+          "unit": "percent"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 0,
+        "y": 7
+      },
+      "id": 206,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "100 * (1 - ((sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"(fail|critical|high)\"}[24h])) or vector(0)) / clamp_min(sum(rate(zen_watcher_events_total{category=\"compliance\"}[24h])), 1)))",
+          "refId": "A"
+        }
+      ],
+      "title": "\u2705 Compliance Status",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Estimated cost savings from prevented incidents (based on industry averages)",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 4,
+        "x": 4,
+        "y": 7
+      },
+      "id": 207,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(((sum(rate(zen_watcher_events_total{severity=\"critical\"}[24h])) or vector(0)) * 50000) + ((sum(rate(zen_watcher_events_total{severity=\"high\"}[24h])) or vector(0)) * 10000) + ((sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"(fail|critical|high)\"}[24h])) or vector(0)) * 25000)) * 24 * 30",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udcb0 Estimated Monthly Savings",
       "type": "stat"
     },
     {
@@ -503,9 +727,9 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 20,
+        "w": 12,
         "x": 0,
-        "y": 6
+        "y": 13
       },
       "id": 6,
       "options": {
@@ -531,7 +755,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (severity) (rate(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1m]))",
+          "expr": "(sum by (severity) (rate(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1m]))) or vector(0)",
           "legendFormat": "{{severity}}",
           "refId": "A"
         }
@@ -544,55 +768,70 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Distribution of events across security tools",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
             "hideFrom": {
               "tooltip": false,
               "viz": false,
               "legend": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
             }
           },
-          "mappings": []
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops/min"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 8,
-        "w": 10,
-        "x": 0,
-        "y": 14
+        "w": 12,
+        "x": 12,
+        "y": 13
       },
-      "id": 7,
+      "id": 203,
       "options": {
-        "displayLabels": [
-          "percent",
-          "name"
-        ],
         "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true,
-          "values": [
-            "value",
-            "percent"
-          ]
-        },
-        "pieType": "donut",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
         "tooltip": {
           "mode": "multi",
-          "sort": "desc"
+          "sort": "none"
         }
       },
       "pluginVersion": "10.0.0",
@@ -602,68 +841,59 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (source) (increase(zen_watcher_observations_created_total[24h]))",
-          "legendFormat": "{{source}}",
+          "expr": "(sum by (eventType) (rate(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[5m])) * 60) or vector(0)",
+          "legendFormat": "{{eventType}}",
           "refId": "A"
         }
       ],
-      "title": "\ud83d\udee1\ufe0f Events by Source (24h)",
-      "type": "piechart"
+      "title": "Event Type Trends Over Time (Last 6h)",
+      "type": "timeseries"
     },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "description": "Security event categories detected",
+      "description": "7-day risk trend showing security event trajectory",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
-            "hideFrom": {
-              "tooltip": false,
-              "viz": false,
-              "legend": false
-            }
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0
           },
-          "mappings": []
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
         },
         "overrides": []
       },
       "gridPos": {
         "h": 8,
-        "w": 10,
-        "x": 10,
-        "y": 14
+        "w": 12,
+        "x": 0,
+        "y": 21
       },
-      "id": 8,
+      "id": 205,
       "options": {
-        "displayLabels": [
-          "percent",
-          "name"
-        ],
         "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true,
-          "values": [
-            "value",
-            "percent"
-          ]
-        },
-        "pieType": "donut",
-        "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "mean",
+            "max"
           ],
-          "fields": "",
-          "values": false
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
+          "displayMode": "table",
+          "placement": "bottom"
         }
       },
       "pluginVersion": "10.0.0",
@@ -673,13 +903,80 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (category) (increase(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[24h]))",
-          "legendFormat": "{{category}}",
+          "expr": "(sum(rate(zen_watcher_events_total{severity=~\"(critical|high)\"}[1h])) by (severity)) or vector(0)",
+          "legendFormat": "{{severity}}",
           "refId": "A"
         }
       ],
-      "title": "\ud83d\udcc2 Events by Category (24h)",
-      "type": "piechart"
+      "title": "\ud83d\udcc8 Risk Trend (7 Days)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "7-day forecast of critical security events using linear regression",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 21
+      },
+      "id": 208,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(sum(rate(zen_watcher_events_total{severity=\"critical\"}[1h]))) or vector(0)",
+          "legendFormat": "Actual Critical Events",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(predict_linear(sum(rate(zen_watcher_events_total{severity=\"critical\"}[1h]))[7d:1h], 7*24*3600)) or vector(0)",
+          "legendFormat": "7-Day Forecast",
+          "refId": "B"
+        }
+      ],
+      "title": "\ud83d\udd2e Predictive Risk Forecast (7 Days)",
+      "type": "timeseries"
     },
     {
       "datasource": {
@@ -754,10 +1051,10 @@
         ]
       },
       "gridPos": {
-        "h": 7,
-        "w": 20,
+        "h": 10,
+        "w": 24,
         "x": 0,
-        "y": 22
+        "y": 29
       },
       "id": 9,
       "options": {
@@ -785,7 +1082,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "count by (source) (zen_watcher_events_total) > 0",
+          "expr": "(count by (source) (zen_watcher_events_total) > 0) or vector(0)",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
@@ -796,7 +1093,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (source) (increase(zen_watcher_observations_created_total[1h]))",
+          "expr": "(sum by (source) (increase(zen_watcher_observations_created_total[1h]))) or vector(0)",
           "format": "table",
           "hide": false,
           "instant": true,
@@ -838,89 +1135,6 @@
         }
       ],
       "type": "table"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 29
-      },
-      "id": 200,
-      "panels": [],
-      "title": "\ud83d\udcca Event Type Analysis",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "hideFrom": {
-              "tooltip": false,
-              "viz": false,
-              "legend": false
-            }
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 30
-      },
-      "id": 201,
-      "options": {
-        "displayLabels": [
-          "name",
-          "percent"
-        ],
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true,
-          "values": [
-            "value",
-            "percent"
-          ]
-        },
-        "pieType": "donut",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "desc"
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum by (eventType) (increase(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[24h]))",
-          "legendFormat": "{{eventType}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Event Type Distribution (24h)",
-      "type": "piechart"
     },
     {
       "datasource": {
@@ -965,10 +1179,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 30
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 39
       },
       "id": 202,
       "options": {
@@ -991,7 +1205,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "sum by (eventType, severity) (increase(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1h]))",
+          "expr": "(sum by (eventType, severity) (increase(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[1h]))) or vector(0)",
           "format": "table",
           "instant": true,
           "legendFormat": "__auto",
@@ -1022,432 +1236,6 @@
         "type": "prometheus",
         "uid": "${datasource}"
       },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "tooltip": false,
-              "viz": false,
-              "legend": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "ops/min"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 38
-      },
-      "id": 203,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum by (eventType) (rate(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[5m])) * 60",
-          "legendFormat": "{{eventType}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Event Type Trends Over Time (Last 6h)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "description": "Overall security posture score (0-100) based on compliance, vulnerabilities, and incidents",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "max": 100,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 60
-              },
-              {
-                "color": "yellow",
-                "value": 75
-              },
-              {
-                "color": "green",
-                "value": 90
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 4,
-        "x": 0,
-        "y": 6
-      },
-      "id": 204,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "value_and_name",
-        "wideLayout": true
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "100 - (\n            (sum(rate(zen_watcher_events_total{severity=\"critical\"}[24h])) * 10) +\n            (sum(rate(zen_watcher_events_total{severity=\"high\"}[24h])) * 5) +\n            (sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"FAIL|severity=~\"fail|critical\"}[24h])) * 15)\n        ) / max(sum(rate(zen_watcher_events_total[24h])), 1) * 100",
-          "refId": "A"
-        }
-      ],
-      "title": "\ud83d\udee1\ufe0f Security Posture Score",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "description": "7-day risk trend showing security event trajectory",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 8,
-        "x": 4,
-        "y": 6
-      },
-      "id": 205,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean",
-            "max"
-          ],
-          "displayMode": "table",
-          "placement": "bottom"
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum(rate(zen_watcher_events_total{severity=~\"CRITICAL|severity=~\"critical|high\"}[1h])) by (severity)",
-          "legendFormat": "{{severity}}",
-          "refId": "A"
-        }
-      ],
-      "title": "\ud83d\udcc8 Risk Trend (7 Days)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "description": "Overall compliance status across all frameworks",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "max": 100,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "red",
-                "value": null
-              },
-              {
-                "color": "orange",
-                "value": 70
-              },
-              {
-                "color": "yellow",
-                "value": 85
-              },
-              {
-                "color": "green",
-                "value": 95
-              }
-            ]
-          },
-          "unit": "percent"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 4,
-        "x": 12,
-        "y": 6
-      },
-      "id": 206,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "value_and_name",
-        "wideLayout": true
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "100 * (\n            1 - (sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"FAIL|severity=~\"fail|critical\"}[24h])) / \n            max(sum(rate(zen_watcher_events_total{category=\"compliance\"}[24h])), 1))\n        )",
-          "refId": "A"
-        }
-      ],
-      "title": "\u2705 Compliance Status",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "description": "Estimated cost savings from prevented incidents (based on industry averages)",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "currencyUSD"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 4,
-        "x": 16,
-        "y": 6
-      },
-      "id": 207,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "center",
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "textMode": "value_and_name",
-        "wideLayout": true
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "(\n            sum(rate(zen_watcher_events_total{severity=\"critical\"}[24h])) * 50000 +\n            sum(rate(zen_watcher_events_total{severity=\"high\"}[24h])) * 10000 +\n            sum(rate(zen_watcher_events_total{category=\"compliance\",severity=~\"FAIL|severity=~\"fail|critical\"}[24h])) * 25000\n        ) * 24 * 30",
-          "refId": "A"
-        }
-      ],
-      "title": "\ud83d\udcb0 Estimated Monthly Savings",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
-      "description": "7-day forecast of critical security events using linear regression",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 14
-      },
-      "id": 208,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "sum(rate(zen_watcher_events_total{severity=\"critical\"}[1h]))",
-          "legendFormat": "Actual Critical Events",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${datasource}"
-          },
-          "expr": "predict_linear(sum(rate(zen_watcher_events_total{severity=\"critical\"}[1h]))[7d:1h], 7*24*3600)",
-          "legendFormat": "7-Day Forecast",
-          "refId": "B"
-        }
-      ],
-      "title": "\ud83d\udd2e Predictive Risk Forecast (7 Days)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${datasource}"
-      },
       "description": "Top priority action items based on current security posture",
       "fieldConfig": {
         "defaults": {
@@ -1469,10 +1257,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 14
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 49
       },
       "id": 209,
       "options": {
@@ -1492,7 +1280,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "topk(5, sum(rate(zen_watcher_events_total{severity=\"critical\"}[1h])) by (source, category))",
+          "expr": "topk(5, sum(zen_watcher_events_total{severity=\"critical\"}) by (source, category))",
           "format": "table",
           "instant": true,
           "refId": "A"
@@ -1516,6 +1304,218 @@
         }
       ],
       "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Distribution of events across security tools",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            }
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 59
+      },
+      "id": 7,
+      "options": {
+        "displayLabels": [
+          "percent",
+          "name"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(sum by (source) (increase(zen_watcher_observations_created_total[24h]))) or vector(0)",
+          "legendFormat": "{{source}}",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udee1\ufe0f Events by Source (24h)",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "description": "Security event categories detected",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            }
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 67
+      },
+      "id": 8,
+      "options": {
+        "displayLabels": [
+          "percent",
+          "name"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(sum by (category) (increase(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[24h]))) or vector(0)",
+          "legendFormat": "{{category}}",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udcc2 Events by Category (24h)",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            }
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 75
+      },
+      "id": 201,
+      "options": {
+        "displayLabels": [
+          "name",
+          "percent"
+        ],
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true,
+          "values": [
+            "value",
+            "percent"
+          ]
+        },
+        "pieType": "donut",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "10.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(sum by (eventType) (increase(zen_watcher_events_total{source=~\"$source\",category=~\"$category\",severity=~\"$severity\",eventType=~\"$eventType\",namespace=~\"$namespace\",kind=~\"$kind\"}[24h]))) or vector(0)",
+          "legendFormat": "{{eventType}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Event Type Distribution (24h)",
+      "type": "piechart"
     }
   ],
   "refresh": "10s",
