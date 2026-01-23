@@ -163,12 +163,12 @@ func (gc *Collector) runGC(ctx context.Context) {
 		if err != nil {
 			// Check if timeout occurred
 			if gcCtx.Err() == context.DeadlineExceeded {
-			gcLogger.WithContext(ctx).Warn("GC run timed out",
-				sdklog.Operation("gc_run"),
-				sdklog.ErrorCode("GC_TIMEOUT"),
-				sdklog.Namespace(ns),
-				sdklog.Error(err),
-				sdklog.Duration("timeout", gcTimeout))
+				gcLogger.WithContext(ctx).Warn("GC run timed out",
+					sdklog.Operation("gc_run"),
+					sdklog.ErrorCode("GC_TIMEOUT"),
+					sdklog.Namespace(ns),
+					sdklog.Error(err),
+					sdklog.Duration("timeout", gcTimeout))
 				if gc.gcErrors != nil {
 					gc.gcErrors.WithLabelValues("timeout", "gc_timeout").Inc()
 				}

@@ -158,12 +158,12 @@ func (a *WebhookAuth) Authenticate(r *http.Request) bool {
 	if a.tokenEnabled {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-		authLogger.Warn("Webhook request rejected: missing Authorization header",
-			sdklog.Operation("auth_validate"),
-			sdklog.ErrorCode("AUTH_ERROR"),
-			sdklog.String("reason", "missing_auth_header"),
-			sdklog.RemoteAddr(r.RemoteAddr),
-			sdklog.HTTPPath(r.URL.Path))
+			authLogger.Warn("Webhook request rejected: missing Authorization header",
+				sdklog.Operation("auth_validate"),
+				sdklog.ErrorCode("AUTH_ERROR"),
+				sdklog.String("reason", "missing_auth_header"),
+				sdklog.RemoteAddr(r.RemoteAddr),
+				sdklog.HTTPPath(r.URL.Path))
 			return false
 		}
 
@@ -172,12 +172,12 @@ func (a *WebhookAuth) Authenticate(r *http.Request) bool {
 		token = strings.TrimSpace(token)
 
 		if subtle.ConstantTimeCompare([]byte(token), []byte(a.token)) != 1 {
-		authLogger.Warn("Webhook request rejected: invalid token",
-			sdklog.Operation("auth_validate"),
-			sdklog.ErrorCode("AUTH_ERROR"),
-			sdklog.String("reason", "invalid_token"),
-			sdklog.RemoteAddr(r.RemoteAddr),
-			sdklog.HTTPPath(r.URL.Path))
+			authLogger.Warn("Webhook request rejected: invalid token",
+				sdklog.Operation("auth_validate"),
+				sdklog.ErrorCode("AUTH_ERROR"),
+				sdklog.String("reason", "invalid_token"),
+				sdklog.RemoteAddr(r.RemoteAddr),
+				sdklog.HTTPPath(r.URL.Path))
 			return false
 		}
 	}
@@ -193,13 +193,13 @@ func (a *WebhookAuth) Authenticate(r *http.Request) bool {
 			}
 		}
 		if !allowed {
-		authLogger.Warn("Webhook request rejected: unauthorized IP",
-			sdklog.Operation("auth_validate"),
-			sdklog.ErrorCode("AUTH_ERROR"),
-			sdklog.String("reason", "ip_not_allowed"),
-			sdklog.RemoteAddr(clientIP),
-			sdklog.HTTPPath(r.URL.Path),
-			sdklog.Strings("allowed_ips", a.allowedIPs))
+			authLogger.Warn("Webhook request rejected: unauthorized IP",
+				sdklog.Operation("auth_validate"),
+				sdklog.ErrorCode("AUTH_ERROR"),
+				sdklog.String("reason", "ip_not_allowed"),
+				sdklog.RemoteAddr(clientIP),
+				sdklog.HTTPPath(r.URL.Path),
+				sdklog.Strings("allowed_ips", a.allowedIPs))
 			return false
 		}
 	}
@@ -274,11 +274,11 @@ func getClientIP(r *http.Request, trustedProxyCIDRs []*net.IPNet) string {
 func (a *WebhookAuth) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !a.Authenticate(r) {
-		authLogger.Debug("Webhook request authentication failed",
-			sdklog.Operation("auth_middleware"),
-			sdklog.String("reason", "authentication_failed"),
-			sdklog.HTTPPath(r.URL.Path),
-			sdklog.RemoteAddr(r.RemoteAddr))
+			authLogger.Debug("Webhook request authentication failed",
+				sdklog.Operation("auth_middleware"),
+				sdklog.String("reason", "authentication_failed"),
+				sdklog.HTTPPath(r.URL.Path),
+				sdklog.RemoteAddr(r.RemoteAddr))
 
 			// Track authentication failure in metrics
 			if a.webhookMetrics != nil {

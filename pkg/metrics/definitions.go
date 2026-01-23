@@ -67,7 +67,7 @@ type Metrics struct {
 	// Webhook metrics (enhanced)
 	WebhookRequests            *prometheus.CounterVec
 	WebhookDropped             *prometheus.CounterVec
-	WebhookQueueUsage          *prometheus.GaugeVec // NEW
+	WebhookQueueUsage          *prometheus.GaugeVec   // NEW
 	WebhookRateLimitRejections *prometheus.CounterVec // Rate limit rejections by endpoint and scope
 
 	// Dedup metrics (enhanced - NEW)
