@@ -28,6 +28,7 @@ import (
 )
 
 // filterLogger is shared across filter package (defined in rules.go, reused here)
+// Do not redeclare - it's already declared in rules.go
 
 // LoadFilterConfig loads filter configuration from ConfigMap and returns zen-sdk FilterConfig
 // ConfigMap name and namespace can be set via environment variables:
