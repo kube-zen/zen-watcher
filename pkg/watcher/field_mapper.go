@@ -130,9 +130,9 @@ func (fm *FieldMapper) ApplyTTLMapping(
 	// Supports formats: "1w", "3d", "24h", "5m", "300" (seconds)
 	ttlSeconds, err := parseTTLToSeconds(ttlStr)
 	if err != nil {
-		logger := sdklog.NewLogger("zen-watcher")
-		logger.Warn("Failed to parse TTL value",
+		watcherLogger.Warn("Failed to parse TTL value",
 			sdklog.Operation("ttl_parsing"),
+			sdklog.ErrorCode("TTL_PARSE_ERROR"),
 			sdklog.Error(err),
 			sdklog.String("ttl_string", ttlStr),
 			sdklog.String("from_field", mapping.From),
