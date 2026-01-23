@@ -385,7 +385,7 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 				sdklog.Operation("observation_create_blocked"),
 				sdklog.String("source", source),
 				sdklog.String("gvr", gvr.String()),
-				sdklog.String("namespace", namespace),
+				sdklog.Namespace(namespace),
 				sdklog.Error(err))
 			return fmt.Errorf("GVR write blocked at routing gate: %w", err)
 		}

@@ -27,6 +27,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// Package-level logger to avoid repeated allocations
+var filterLogger = sdklog.NewLogger("zen-watcher-filter")
+
 // LoadFilterConfig loads filter configuration from ConfigMap and returns zen-sdk FilterConfig
 // ConfigMap name and namespace can be set via environment variables:
 // - FILTER_CONFIGMAP_NAME (default: "zen-watcher-filter")
@@ -118,10 +121,9 @@ func LoadFilterConfig(clientSet kubernetes.Interface) (*sdkfilter.FilterConfig, 
 		}
 	}
 
-	logger := sdklog.NewLogger("zen-watcher-filter")
-	logger.Info("Loaded filter configuration from ConfigMap",
+	filterLogger.Info("Loaded filter configuration from ConfigMap",
 		sdklog.Operation("config_load"),
-		sdklog.String("namespace", configMapNamespace),
+		sdklog.Namespace(configMapNamespace),
 		sdklog.String("configmap_name", configMapName))
 	return &config, nil
 }

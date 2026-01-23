@@ -25,6 +25,8 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// monitoringLogger is shared across monitoring package (defined in threshold_monitor.go, reused here)
+
 // GenericThresholdMonitor monitors thresholds for generic adapters
 // Thresholds are warnings only - they log but don't block events
 type GenericThresholdMonitor struct {
@@ -58,9 +60,9 @@ func (gtm *GenericThresholdMonitor) CheckEvent(raw *generic.RawEvent, config *ge
 	// Check rate limiting
 	if config.RateLimit != nil && config.RateLimit.ObservationsPerMinute > 0 {
 		if !gtm.allowRateLimit(raw.Source, config.RateLimit.ObservationsPerMinute, config.RateLimit.Burst) {
-			logger := sdklog.NewLogger("zen-watcher-monitoring")
-			logger.Warn("Event rate limited",
+			monitoringLogger.Warn("Event rate limited",
 				sdklog.Operation("rate_limit"),
+				sdklog.ErrorCode("RATE_LIMIT_EXCEEDED"),
 				sdklog.String("source", raw.Source),
 				sdklog.String("message", "Event dropped due to rate limiting"))
 			return false // Rate limited - drop event
@@ -172,9 +174,9 @@ func (gtm *GenericThresholdMonitor) checkCustomThresholds(raw *generic.RawEvent,
 	for _, threshold := range config.Thresholds.Custom {
 		value := gtm.extractField(raw.RawData, threshold.Field)
 		if gtm.evaluateThreshold(value, threshold.Operator, threshold.Value) {
-			logger := sdklog.NewLogger("zen-watcher-monitoring")
-			logger.Warn("Custom threshold exceeded",
+			monitoringLogger.Warn("Custom threshold exceeded",
 				sdklog.Operation("custom_threshold_warning"),
+				sdklog.ErrorCode("THRESHOLD_CUSTOM"),
 				sdklog.String("source", raw.Source),
 				sdklog.String("threshold_name", threshold.Name),
 				sdklog.String("field", threshold.Field),

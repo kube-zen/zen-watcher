@@ -28,6 +28,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
+// Package-level logger to avoid repeated allocations
+var dispatcherLogger = sdklog.NewLogger("zen-watcher-dispatcher")
+
 var (
 	// WorkerPoolQueueDepth tracks the current depth of the work queue
 	WorkerPoolQueueDepth = promauto.NewGauge(
@@ -145,9 +148,9 @@ func (wp *WorkerPool) UpdateConfig(newConfig WorkerPoolConfig) {
 	if newConfig.Size != wp.workers {
 		// Note: Dynamic resizing would require more complex logic
 		// For now, we log a warning and keep existing workers
-		logger := sdklog.NewLogger("zen-watcher-dispatcher")
-		logger.Warn("Worker pool size change requires restart",
+		dispatcherLogger.Warn("Worker pool size change requires restart",
 			sdklog.Operation("worker_pool_update"),
+			sdklog.ErrorCode("CONFIG_WARNING"),
 			sdklog.Int("old_size", wp.workers),
 			sdklog.Int("new_size", newConfig.Size))
 	}
@@ -168,9 +171,9 @@ func (wp *WorkerPool) UpdateConfig(newConfig WorkerPoolConfig) {
 					select {
 					case wp.workQueue <- item:
 					default:
-						logger := sdklog.NewLogger("zen-watcher-dispatcher")
-						logger.Warn("Dropped work item during queue resize",
-							sdklog.Operation("queue_resize"))
+						dispatcherLogger.Warn("Dropped work item during queue resize",
+							sdklog.Operation("queue_resize"),
+							sdklog.ErrorCode("QUEUE_FULL"))
 					}
 				default:
 					return
@@ -286,9 +289,9 @@ func (wp *WorkerPool) worker(id int) {
 
 			// Handle errors
 			if err != nil {
-				logger := sdklog.NewLogger("zen-watcher-dispatcher")
-				logger.Warn("Work item processing failed",
+				dispatcherLogger.WithContext(wp.ctx).Warn("Work item processing failed",
 					sdklog.Operation("worker_process"),
+					sdklog.ErrorCode("WORK_ITEM_ERROR"),
 					sdklog.Error(err),
 					sdklog.Int("worker_id", id))
 			}

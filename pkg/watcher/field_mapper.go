@@ -24,6 +24,8 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// watcherLogger is shared across watcher package (defined in adapter_factory.go, reused here)
+
 // FieldMapper applies field mappings to observations, supporting constant values and static mappings
 type FieldMapper struct {
 	fieldExtractor *FieldExtractor
@@ -198,9 +200,9 @@ func (fm *FieldMapper) setField(observation *unstructured.Unstructured, fieldPat
 	if spec == nil {
 		spec = make(map[string]interface{})
 		if err := unstructured.SetNestedMap(observation.Object, spec, "spec"); err != nil {
-			logger := sdklog.NewLogger("zen-watcher-field-mapper")
-			logger.Warn("Failed to set spec",
+			watcherLogger.Warn("Failed to set spec",
 				sdklog.Operation("set_field"),
+				sdklog.ErrorCode("FIELD_SET_ERROR"),
 				sdklog.Error(err))
 			return err
 		}
@@ -228,9 +230,9 @@ func (fm *FieldMapper) setField(observation *unstructured.Unstructured, fieldPat
 	}
 
 	if err := unstructured.SetNestedMap(observation.Object, spec, "spec"); err != nil {
-		logger := sdklog.NewLogger("zen-watcher-field-mapper")
-		logger.Warn("Failed to set spec",
+		watcherLogger.Warn("Failed to set spec",
 			sdklog.Operation("set_field"),
+			sdklog.ErrorCode("FIELD_SET_ERROR"),
 			sdklog.Error(err))
 		return err
 	}

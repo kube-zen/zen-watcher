@@ -171,17 +171,16 @@ func (db *DestinationBatcher) flushBatch(ctx context.Context, destinationKey str
 
 	// Call flush function
 	if err := db.flushFunc(ctx, destinationKey, observations); err != nil {
-		logger := sdklog.NewLogger("zen-watcher-dispatcher")
-		logger.Warn("Failed to flush observation batch",
+		dispatcherLogger.WithContext(ctx).Warn("Failed to flush observation batch",
 			sdklog.Operation("batch_flush"),
+			sdklog.ErrorCode("BATCH_FLUSH_ERROR"),
 			sdklog.Error(err),
 			sdklog.String("destination", destinationKey),
 			sdklog.Int("batch_size", len(observations)))
 		return err
 	}
 
-	logger := sdklog.NewLogger("zen-watcher-dispatcher")
-	logger.Debug("Flushed observation batch",
+	dispatcherLogger.WithContext(ctx).Debug("Flushed observation batch",
 		sdklog.Operation("batch_flushed"),
 		sdklog.String("destination", destinationKey),
 		sdklog.Int("batch_size", len(observations)))
