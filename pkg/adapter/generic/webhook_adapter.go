@@ -188,7 +188,7 @@ func (a *WebhookAdapter) Start(ctx context.Context, config *SourceConfig) (<-cha
 		}()
 	} else {
 		// Add handler to existing server (fallback behavior)
-		logger.Warn("Webhook server already running, adding handler (deprecated)",
+		adapterLogger.Warn("Webhook server already running, adding handler (deprecated)",
 			sdklog.Operation("webhook_add_handler"),
 			sdklog.String("source", config.Source))
 	}

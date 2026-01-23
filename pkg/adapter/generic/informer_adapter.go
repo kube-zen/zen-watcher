@@ -166,7 +166,7 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 			}
 		}
 
-		logger.Info("Finished processing existing resources",
+		adapterLogger.Info("Finished processing existing resources",
 			sdklog.Operation("process_existing_resources_done"),
 			sdklog.String("source", config.Source),
 			sdklog.Int("count", len(existingObjs)))
