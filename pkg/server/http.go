@@ -94,7 +94,11 @@ func NewServer(webhookMetrics, webhookDropped *prometheus.CounterVec) *Server {
 			maxRequests = parsed
 		}
 	}
-	rateLimiter := NewPerKeyRateLimiterWithMetrics(maxRequests, 1*time.Minute, auth.GetTrustedProxyCIDRs(), webhookMetrics)
+	// Rate limit metrics (optional - can be nil if not provided)
+	// The rate limiter will still track rejections via webhookMetrics (status="429")
+	// Dedicated rate limit metrics can be added later if needed for more detailed observability
+	var rateLimitMetrics *prometheus.CounterVec
+	rateLimiter := NewPerKeyRateLimiterWithMetrics(maxRequests, 1*time.Minute, auth.GetTrustedProxyCIDRs(), webhookMetrics, rateLimitMetrics)
 
 	// Load HA configuration
 	haConfig := config.LoadHAConfig()

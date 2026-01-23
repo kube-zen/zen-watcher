@@ -304,46 +304,39 @@ func (a *WebhookAuth) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// getEndpointFromPath extracts the endpoint name from the URL path
-// Examples: /falco/webhook -> "falco", /audit/webhook -> "audit"
-// For ZenHooks: /tenant_id/endpoint_name -> "endpoint_name"
+// getEndpointFromPath extracts the endpoint name from the URL path.
+// zen-watcher is decoupled and only cares about the endpoint identifier, not any tenant/namespace prefix.
+// Examples:
+//   - /falco/webhook -> "webhook" (multi-segment: last segment)
+//   - /some/prefix/endpoint-name -> "endpoint-name" (multi-segment: last segment)
+//   - /endpoint-name -> "endpoint-name" (single segment)
+//   - / -> "unknown" (empty path)
 func getEndpointFromPath(path string) string {
 	// Remove leading slash
 	path = strings.TrimPrefix(path, "/")
-	// Split by "/"
-	parts := strings.Split(path, "/")
-	if len(parts) == 0 {
+	// Handle empty or whitespace-only path
+	path = strings.TrimSpace(path)
+	if path == "" {
 		return "unknown"
 	}
-	// For ZenHooks pattern: /tenant_id/endpoint_name, return endpoint_name (last segment)
-	// For legacy pattern: /falco/webhook, return first segment
-	if len(parts) >= 2 {
-		// Assume ZenHooks pattern: return last segment
-		return parts[len(parts)-1]
-	}
-	// Legacy pattern: return first segment
-	return parts[0]
-}
-
-// extractTenantAndEndpoint extracts tenant_id and endpoint_name from ZenHooks URL path
-// Pattern: /tenant_id/endpoint_name
-// Returns: (tenant_id, endpoint_name, true) if pattern matches, ("", "", false) otherwise
-func extractTenantAndEndpoint(path string) (tenantID, endpointName string, isZenHooks bool) {
-	// Remove leading slash
-	path = strings.TrimPrefix(path, "/")
 	// Split by "/"
 	parts := strings.Split(path, "/")
-	
-	// ZenHooks pattern: exactly 2 segments (tenant_id/endpoint_name)
-	if len(parts) == 2 {
-		tenantID = parts[0]
-		endpointName = parts[1]
-		// Basic validation: both should be non-empty
-		if tenantID != "" && endpointName != "" {
-			return tenantID, endpointName, true
+	// Filter out empty parts (from double slashes or trailing slashes)
+	nonEmptyParts := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if trimmed := strings.TrimSpace(part); trimmed != "" {
+			nonEmptyParts = append(nonEmptyParts, trimmed)
 		}
 	}
-	
-	// Not a ZenHooks pattern
-	return "", "", false
+	if len(nonEmptyParts) == 0 {
+		return "unknown"
+	}
+	// For multi-segment paths, use the last segment as endpoint identifier
+	// This allows zen-watcher to work with any URL structure without knowing about tenants/namespaces
+	if len(nonEmptyParts) >= 2 {
+		// Multi-segment path: return last segment (endpoint identifier)
+		return nonEmptyParts[len(nonEmptyParts)-1]
+	}
+	// Single segment: return as-is
+	return nonEmptyParts[0]
 }

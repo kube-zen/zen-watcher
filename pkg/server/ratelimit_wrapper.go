@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -33,8 +34,9 @@ type limiterEntry struct {
 	lastSeen time.Time
 }
 
-// PerKeyRateLimiter wraps zen-sdk rate limiter to provide per-key (per-IP) rate limiting.
-// This maintains backward compatibility with zen-watcher's per-IP rate limiting semantics.
+// PerKeyRateLimiter wraps zen-sdk rate limiter to provide per-key rate limiting.
+// Supports per-IP (legacy) and per-endpoint rate limiting based on URL path structure.
+// zen-watcher is decoupled and only cares about endpoint identifiers, not tenant/namespace concepts.
 type PerKeyRateLimiter struct {
 	mu                sync.Mutex
 	limiters          map[string]*limiterEntry
@@ -43,18 +45,19 @@ type PerKeyRateLimiter struct {
 	trustedProxyCIDRs []*net.IPNet
 	cleanupInterval   time.Duration          // Interval between cleanup runs
 	entryTTL          time.Duration          // Time-to-live for inactive entries
-	webhookMetrics    *prometheus.CounterVec // Metrics for tracking rate limit rejections
+	webhookMetrics    *prometheus.CounterVec // Metrics for tracking webhook requests (includes 429)
+	rateLimitMetrics  *prometheus.CounterVec // Metrics for tracking rate limit rejections by scope
 }
 
 // NewPerKeyRateLimiter creates a new per-key rate limiter.
 // maxTokens is the maximum tokens per key, refillInterval is the refill interval.
 // This converts refillInterval-based semantics to per-second rate limiting.
 func NewPerKeyRateLimiter(maxTokens int, refillInterval time.Duration, trustedProxyCIDRs []*net.IPNet) *PerKeyRateLimiter {
-	return NewPerKeyRateLimiterWithMetrics(maxTokens, refillInterval, trustedProxyCIDRs, nil)
+	return NewPerKeyRateLimiterWithMetrics(maxTokens, refillInterval, trustedProxyCIDRs, nil, nil)
 }
 
 // NewPerKeyRateLimiterWithMetrics creates a new per-key rate limiter with metrics support
-func NewPerKeyRateLimiterWithMetrics(maxTokens int, refillInterval time.Duration, trustedProxyCIDRs []*net.IPNet, webhookMetrics *prometheus.CounterVec) *PerKeyRateLimiter {
+func NewPerKeyRateLimiterWithMetrics(maxTokens int, refillInterval time.Duration, trustedProxyCIDRs []*net.IPNet, webhookMetrics *prometheus.CounterVec, rateLimitMetrics *prometheus.CounterVec) *PerKeyRateLimiter {
 	// Convert refillInterval to per-second rate
 	// e.g., 100 tokens per minute = 100/60 = ~1.67 per second
 	// Round up to ensure we don't exceed the intended rate
@@ -70,6 +73,7 @@ func NewPerKeyRateLimiterWithMetrics(maxTokens int, refillInterval time.Duration
 		cleanupInterval:   1 * time.Hour, // Run cleanup every hour
 		entryTTL:          1 * time.Hour, // Remove entries inactive for 1 hour
 		webhookMetrics:    webhookMetrics,
+		rateLimitMetrics:  rateLimitMetrics,
 	}
 
 	// Start periodic cleanup
@@ -134,22 +138,27 @@ func (rl *PerKeyRateLimiter) Stop() {
 }
 
 // RateLimitMiddleware wraps a handler with rate limiting.
-// Supports both per-IP (legacy) and per-tenant/per-endpoint (ZenHooks) rate limiting.
+// Supports per-IP (legacy) and per-endpoint rate limiting based on URL path structure.
+// zen-watcher is decoupled and only cares about endpoint identifiers, not tenant/namespace concepts.
 func (rl *PerKeyRateLimiter) RateLimitMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Try to extract tenant/endpoint from path (ZenHooks pattern: /tenant_id/endpoint_name)
-		tenantID, endpointName, isZenHooks := extractTenantAndEndpoint(r.URL.Path)
+		// Extract endpoint identifier from path (last segment of multi-segment paths)
+		// This allows per-endpoint rate limiting without knowing about tenant/namespace structure
+		endpointName := getEndpointFromPath(r.URL.Path)
 		
 		var key string
 		var rateLimitScope string
 		
-		if isZenHooks {
-			// ZenHooks: Use tenant_id:endpoint_name as key for per-tenant/per-endpoint rate limiting
-			// This provides both tenant-level and endpoint-level isolation
-			key = fmt.Sprintf("tenant:%s:endpoint:%s", tenantID, endpointName)
-			rateLimitScope = "tenant_endpoint"
+		// Use per-endpoint rate limiting if path has multiple segments (suggests structured routing)
+		// Otherwise fall back to per-IP for backward compatibility with legacy single-segment paths
+		pathParts := strings.Split(strings.TrimPrefix(r.URL.Path, "/"), "/")
+		if len(pathParts) >= 2 {
+			// Multi-segment path: use endpoint identifier for rate limiting
+			// This provides endpoint-level isolation without coupling to tenant concepts
+			key = fmt.Sprintf("endpoint:%s", endpointName)
+			rateLimitScope = "endpoint"
 		} else {
-			// Legacy: Use IP address for backward compatibility
+			// Single-segment or legacy path: use IP address for backward compatibility
 			key = getClientIP(r, rl.trustedProxyCIDRs)
 			rateLimitScope = "ip"
 		}
@@ -164,8 +173,13 @@ func (rl *PerKeyRateLimiter) RateLimitMiddleware(next http.HandlerFunc) http.Han
 
 			// Track rate limit rejection in metrics
 			if rl.webhookMetrics != nil {
-				endpoint := getEndpointFromPath(r.URL.Path)
-				rl.webhookMetrics.WithLabelValues(endpoint, "429").Inc()
+				rl.webhookMetrics.WithLabelValues(endpointName, "429").Inc()
+			}
+			
+			// Track rate limit rejection with scope (endpoint vs IP)
+			// This allows monitoring rate limit effectiveness per scope
+			if rl.rateLimitMetrics != nil {
+				rl.rateLimitMetrics.WithLabelValues(endpointName, rateLimitScope).Inc()
 			}
 
 			// Set Retry-After header (RFC 6585)
@@ -175,11 +189,9 @@ func (rl *PerKeyRateLimiter) RateLimitMiddleware(next http.HandlerFunc) http.Han
 			w.WriteHeader(http.StatusTooManyRequests)
 			
 			response := map[string]interface{}{
-				"error": "rate limit exceeded",
-			}
-			if isZenHooks {
-				response["tenant_id"] = tenantID
-				response["endpoint_name"] = endpointName
+				"error":        "rate limit exceeded",
+				"endpoint":     endpointName,
+				"retry_after":  60,
 			}
 			
 			if err := json.NewEncoder(w).Encode(response); err != nil {

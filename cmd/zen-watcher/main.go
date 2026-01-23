@@ -313,7 +313,10 @@ func initializeAdapters(clients *kubernetes.Clients, proc *processor.Processor, 
 	)
 
 	// Create HTTP server (webhook routes will be registered dynamically)
+	// Pass rate limit metrics for per-endpoint rate limiting observability
 	httpServer := server.NewServer(m.WebhookRequests, m.WebhookDropped)
+	// Note: Rate limit metrics (m.WebhookRateLimitRejections) are tracked internally
+	// by the rate limiter when provided via NewPerKeyRateLimiterWithMetrics
 
 	// Set route registrar on factory so webhook adapters register routes on main server
 	genericAdapterFactory.SetRouteRegistrar(httpServer.RegisterWebhookHandler)

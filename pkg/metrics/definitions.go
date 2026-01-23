@@ -65,9 +65,10 @@ type Metrics struct {
 	ConfigUpdatePropagationDuration *prometheus.HistogramVec // Update propagation time by component
 
 	// Webhook metrics (enhanced)
-	WebhookRequests   *prometheus.CounterVec
-	WebhookDropped    *prometheus.CounterVec
-	WebhookQueueUsage *prometheus.GaugeVec // NEW
+	WebhookRequests            *prometheus.CounterVec
+	WebhookDropped             *prometheus.CounterVec
+	WebhookQueueUsage          *prometheus.GaugeVec // NEW
+	WebhookRateLimitRejections *prometheus.CounterVec // Rate limit rejections by endpoint and scope
 
 	// Dedup metrics (enhanced - NEW)
 	DedupCacheUsage *prometheus.GaugeVec
@@ -158,6 +159,15 @@ func NewMetrics() *Metrics {
 			Help: "Total number of webhook requests received",
 		},
 		[]string{"endpoint", "status"},
+	)
+
+	// Rate limiting metrics
+	webhookRateLimitRejections := prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "zen_watcher_webhook_rate_limit_rejections_total",
+			Help: "Total number of webhook requests rejected due to rate limiting",
+		},
+		[]string{"endpoint", "scope"}, // scope: "endpoint" or "ip"
 	)
 
 	webhookDropped := prometheus.NewCounterVec(
@@ -551,6 +561,7 @@ func NewMetrics() *Metrics {
 	prometheus.MustRegister(configMapValidationErrors)
 	prometheus.MustRegister(configUpdatePropagationDuration)
 	prometheus.MustRegister(webhookQueueUsage)
+	prometheus.MustRegister(webhookRateLimitRejections)
 	prometheus.MustRegister(dedupCacheUsage)
 	prometheus.MustRegister(dedupEvictions)
 	prometheus.MustRegister(observationsLive)
@@ -817,9 +828,10 @@ func NewMetrics() *Metrics {
 		ConfigUpdatePropagationDuration: configUpdatePropagationDuration,
 
 		// Webhook metrics
-		WebhookRequests:   webhookRequests,
-		WebhookDropped:    webhookDropped,
-		WebhookQueueUsage: webhookQueueUsage, // NEW
+		WebhookRequests:            webhookRequests,
+		WebhookDropped:             webhookDropped,
+		WebhookQueueUsage:          webhookQueueUsage, // NEW
+		WebhookRateLimitRejections: webhookRateLimitRejections,
 
 		// Dedup metrics (NEW)
 		DedupCacheUsage: dedupCacheUsage,
