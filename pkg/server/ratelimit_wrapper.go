@@ -15,6 +15,8 @@
 package server
 
 import (
+	"encoding/json"
+	"fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -132,15 +134,33 @@ func (rl *PerKeyRateLimiter) Stop() {
 }
 
 // RateLimitMiddleware wraps a handler with rate limiting.
+// Supports both per-IP (legacy) and per-tenant/per-endpoint (ZenHooks) rate limiting.
 func (rl *PerKeyRateLimiter) RateLimitMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		key := getClientIP(r, rl.trustedProxyCIDRs)
+		// Try to extract tenant/endpoint from path (ZenHooks pattern: /tenant_id/endpoint_name)
+		tenantID, endpointName, isZenHooks := extractTenantAndEndpoint(r.URL.Path)
+		
+		var key string
+		var rateLimitScope string
+		
+		if isZenHooks {
+			// ZenHooks: Use tenant_id:endpoint_name as key for per-tenant/per-endpoint rate limiting
+			// This provides both tenant-level and endpoint-level isolation
+			key = fmt.Sprintf("tenant:%s:endpoint:%s", tenantID, endpointName)
+			rateLimitScope = "tenant_endpoint"
+		} else {
+			// Legacy: Use IP address for backward compatibility
+			key = getClientIP(r, rl.trustedProxyCIDRs)
+			rateLimitScope = "ip"
+		}
+		
 		if !rl.Allow(key) {
 			logger := sdklog.NewLogger("zen-watcher-server")
 			logger.Warn("Rate limit exceeded",
 				sdklog.Operation("rate_limit"),
 				sdklog.String("reason", "rate_limit_exceeded"),
-				sdklog.String("client_ip", key))
+				sdklog.String("scope", rateLimitScope),
+				sdklog.String("key", key))
 
 			// Track rate limit rejection in metrics
 			if rl.webhookMetrics != nil {
@@ -148,8 +168,21 @@ func (rl *PerKeyRateLimiter) RateLimitMiddleware(next http.HandlerFunc) http.Han
 				rl.webhookMetrics.WithLabelValues(endpoint, "429").Inc()
 			}
 
+			// Set Retry-After header (RFC 6585)
+			// Default: 60 seconds (can be made configurable)
+			w.Header().Set("Retry-After", "60")
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusTooManyRequests)
-			if _, err := w.Write([]byte(`{"error":"rate limit exceeded"}`)); err != nil {
+			
+			response := map[string]interface{}{
+				"error": "rate limit exceeded",
+			}
+			if isZenHooks {
+				response["tenant_id"] = tenantID
+				response["endpoint_name"] = endpointName
+			}
+			
+			if err := json.NewEncoder(w).Encode(response); err != nil {
 				logger.Warn("Failed to write rate limit response",
 					sdklog.Operation("rate_limit"),
 					sdklog.Error(err))

@@ -306,13 +306,44 @@ func (a *WebhookAuth) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 
 // getEndpointFromPath extracts the endpoint name from the URL path
 // Examples: /falco/webhook -> "falco", /audit/webhook -> "audit"
+// For ZenHooks: /tenant_id/endpoint_name -> "endpoint_name"
 func getEndpointFromPath(path string) string {
 	// Remove leading slash
 	path = strings.TrimPrefix(path, "/")
-	// Split by "/" and take first segment
+	// Split by "/"
 	parts := strings.Split(path, "/")
-	if len(parts) > 0 {
-		return parts[0]
+	if len(parts) == 0 {
+		return "unknown"
 	}
-	return "unknown"
+	// For ZenHooks pattern: /tenant_id/endpoint_name, return endpoint_name (last segment)
+	// For legacy pattern: /falco/webhook, return first segment
+	if len(parts) >= 2 {
+		// Assume ZenHooks pattern: return last segment
+		return parts[len(parts)-1]
+	}
+	// Legacy pattern: return first segment
+	return parts[0]
+}
+
+// extractTenantAndEndpoint extracts tenant_id and endpoint_name from ZenHooks URL path
+// Pattern: /tenant_id/endpoint_name
+// Returns: (tenant_id, endpoint_name, true) if pattern matches, ("", "", false) otherwise
+func extractTenantAndEndpoint(path string) (tenantID, endpointName string, isZenHooks bool) {
+	// Remove leading slash
+	path = strings.TrimPrefix(path, "/")
+	// Split by "/"
+	parts := strings.Split(path, "/")
+	
+	// ZenHooks pattern: exactly 2 segments (tenant_id/endpoint_name)
+	if len(parts) == 2 {
+		tenantID = parts[0]
+		endpointName = parts[1]
+		// Basic validation: both should be non-empty
+		if tenantID != "" && endpointName != "" {
+			return tenantID, endpointName, true
+		}
+	}
+	
+	// Not a ZenHooks pattern
+	return "", "", false
 }
