@@ -126,6 +126,15 @@ kubectl exec -n zen-system zen-watcher-0 -- curl -s http://localhost:8080/metric
   - Labels: `endpoint`
   - Example: `zen_watcher_webhook_events_dropped_total{endpoint="falco"}`
 
+#### Rate Limit Rejections
+- **`zen_watcher_webhook_rate_limit_rejections_total{endpoint="<endpoint>",scope="<scope>"}`**
+  - Total number of webhook requests rejected due to rate limiting
+  - Type: Counter
+  - Labels: `endpoint` (endpoint identifier), `scope` (rate limit scope: `"endpoint"` or `"ip"`)
+  - Use this metric to monitor rate limit effectiveness per scope
+  - Example: `zen_watcher_webhook_rate_limit_rejections_total{endpoint="security-alerts",scope="endpoint"}`
+  - See: [Rate Limiting Guide](RATE_LIMITING.md) for details
+
 ### Pipeline Errors
 
 #### Errors by Stage
