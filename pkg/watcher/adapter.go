@@ -147,9 +147,9 @@ func EventToObservation(event *Event) *unstructured.Unstructured {
 			resource["namespace"] = event.Resource.Namespace
 		}
 		if err := unstructured.SetNestedMap(obs.Object, resource, "spec", "resource"); err != nil {
-			logger := sdklog.NewLogger("zen-watcher-adapter")
-			logger.Warn("Failed to set resource in observation",
+			watcherLogger.Warn("Failed to set resource in observation",
 				sdklog.Operation("create_observation"),
+				sdklog.ErrorCode("OBSERVATION_SET_ERROR"),
 				sdklog.Error(err))
 		}
 	}
@@ -179,9 +179,9 @@ func EventToObservation(event *Event) *unstructured.Unstructured {
 			}
 		}
 		if err := unstructured.SetNestedMap(obs.Object, details, "spec", "details"); err != nil {
-			logger := sdklog.NewLogger("zen-watcher-adapter")
-			logger.Warn("Failed to set details in observation",
+			watcherLogger.Warn("Failed to set details in observation",
 				sdklog.Operation("create_observation"),
+				sdklog.ErrorCode("OBSERVATION_SET_ERROR"),
 				sdklog.Error(err))
 		}
 	}

@@ -23,6 +23,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// Package-level logger to avoid repeated allocations
+var monitoringLogger = sdklog.NewLogger("zen-watcher-monitoring")
+
 // ThresholdMonitor monitors optimization thresholds and triggers alerts
 type ThresholdMonitor struct {
 	sourceConfigLoader interface {
@@ -50,8 +53,7 @@ func NewThresholdMonitor(
 
 // Start begins monitoring thresholds
 func (tm *ThresholdMonitor) Start(ctx context.Context) error {
-	logger := sdklog.NewLogger("zen-watcher-monitoring")
-	logger.Info("Threshold monitor started",
+	monitoringLogger.WithContext(ctx).Info("Threshold monitor started",
 		sdklog.Operation("threshold_monitor_start"),
 		sdklog.Float64("check_interval_seconds", tm.checkInterval.Seconds()))
 
@@ -61,8 +63,7 @@ func (tm *ThresholdMonitor) Start(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			logger := sdklog.NewLogger("zen-watcher-monitoring")
-			logger.Info("Threshold monitor stopped",
+			monitoringLogger.WithContext(ctx).Info("Threshold monitor stopped",
 				sdklog.Operation("threshold_monitor_stop"))
 			return ctx.Err()
 		case <-ticker.C:
@@ -97,9 +98,9 @@ func (tm *ThresholdMonitor) CheckThreshold(source string, metricName string, val
 	if value >= criticalThreshold {
 		severity = "critical"
 		tm.recordThresholdExceeded(source, metricName, severity)
-		logger := sdklog.NewLogger("zen-watcher-monitoring")
-		logger.Warn("Critical threshold exceeded",
+		monitoringLogger.Warn("Critical threshold exceeded",
 			sdklog.Operation("threshold_exceeded"),
+			sdklog.ErrorCode("THRESHOLD_CRITICAL"),
 			sdklog.String("source", source),
 			sdklog.String("metric", metricName),
 			sdklog.Float64("value", value),
@@ -109,9 +110,9 @@ func (tm *ThresholdMonitor) CheckThreshold(source string, metricName string, val
 	} else if value >= warningThreshold {
 		severity = "warning"
 		tm.recordThresholdExceeded(source, metricName, severity)
-		logger := sdklog.NewLogger("zen-watcher-monitoring")
-		logger.Warn("Warning threshold exceeded",
+		monitoringLogger.Warn("Warning threshold exceeded",
 			sdklog.Operation("threshold_exceeded"),
+			sdklog.ErrorCode("THRESHOLD_WARNING"),
 			sdklog.String("source", source),
 			sdklog.String("metric", metricName),
 			sdklog.Float64("value", value),

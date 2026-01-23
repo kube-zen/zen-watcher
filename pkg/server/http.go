@@ -34,6 +34,9 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
+// Package-level logger to avoid repeated allocations
+var serverLogger = sdklog.NewLogger("zen-watcher-server")
+
 // Server wraps the HTTP server and handlers
 type Server struct {
 	server          *http.Server
@@ -113,9 +116,9 @@ func NewServer(webhookMetrics, webhookDropped *prometheus.CounterVec) *Server {
 		if parsed, err := strconv.ParseInt(maxBytesStr, 10, 64); err == nil && parsed > 0 {
 			maxRequestBytes = parsed
 		} else {
-			logger := sdklog.NewLogger("zen-watcher-server")
-			logger.Warn("Invalid SERVER_MAX_REQUEST_BYTES, using default",
+			serverLogger.Warn("Invalid SERVER_MAX_REQUEST_BYTES, using default",
 				sdklog.Operation("server_init"),
+				sdklog.ErrorCode("CONFIG_ERROR"),
 				sdklog.String("invalid_value", maxBytesStr),
 				sdklog.Int64("default", maxRequestBytes))
 		}
@@ -227,9 +230,9 @@ func (s *Server) registerHandlers(mux *http.ServeMux) {
 			"service":   "zen-watcher",
 			"timestamp": time.Now().UTC().Format(time.RFC3339),
 		}); err != nil {
-			logger := sdklog.NewLogger("zen-watcher-server")
-			logger.Warn("Failed to encode healthz response",
+			serverLogger.Warn("Failed to encode healthz response",
 				sdklog.Operation("healthz"),
+				sdklog.ErrorCode("ENCODE_ERROR"),
 				sdklog.Error(err))
 		}
 	})
@@ -252,9 +255,9 @@ func (s *Server) registerHandlers(mux *http.ServeMux) {
 			if err := json.NewEncoder(w).Encode(map[string]interface{}{
 				"status": "ready",
 			}); err != nil {
-				logger := sdklog.NewLogger("zen-watcher-server")
-				logger.Warn("Failed to encode readyz response",
+				serverLogger.Warn("Failed to encode readyz response",
 					sdklog.Operation("readyz"),
+					sdklog.ErrorCode("ENCODE_ERROR"),
 					sdklog.Error(err))
 			}
 		} else {
@@ -263,9 +266,9 @@ func (s *Server) registerHandlers(mux *http.ServeMux) {
 			if err := json.NewEncoder(w).Encode(map[string]interface{}{
 				"status": "not_ready",
 			}); err != nil {
-				logger := sdklog.NewLogger("zen-watcher-server")
-				logger.Warn("Failed to encode readyz response",
+				serverLogger.Warn("Failed to encode readyz response",
 					sdklog.Operation("readyz"),
+					sdklog.ErrorCode("ENCODE_ERROR"),
 					sdklog.Error(err))
 			}
 		}
@@ -330,8 +333,7 @@ func (s *Server) RegisterWebhookHandler(path string, handler http.HandlerFunc) e
 
 	s.mux.HandleFunc(path, wrappedHandler)
 
-	logger := sdklog.NewLogger("zen-watcher-server")
-	logger.Info("Webhook handler registered dynamically",
+	serverLogger.Info("Webhook handler registered dynamically",
 		sdklog.Operation("register_webhook"),
 		sdklog.String("path", path))
 
@@ -356,8 +358,7 @@ func (s *Server) UnregisterWebhookHandler(path string) error {
 	// For now, this is a placeholder - handlers are only added, not removed
 	// In practice, restarting the pod with updated Ingester CRDs handles this
 
-	logger := sdklog.NewLogger("zen-watcher-server")
-	logger.Info("Webhook handler unregistered",
+	serverLogger.Info("Webhook handler unregistered",
 		sdklog.Operation("unregister_webhook"),
 		sdklog.String("path", path))
 
@@ -383,23 +384,22 @@ func (s *Server) Start(ctx context.Context, wg *sync.WaitGroup) {
 			// Webhook endpoints are registered dynamically via RegisterWebhookHandler()
 		}
 
-		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.Info("HTTP server starting",
+		serverLogger.Info("HTTP server starting",
 			sdklog.Operation("http_start"),
 			sdklog.String("address", s.server.Addr),
 			sdklog.Strings("endpoints", endpoints),
 			sdklog.Bool("pprof", s.isPprofEnabled()))
 
 		if s.isPprofEnabled() && s.pprofServer != nil {
-			logger.Info("pprof server starting (localhost only)",
+			serverLogger.Info("pprof server starting (localhost only)",
 				sdklog.Operation("pprof_start"),
 				sdklog.String("address", s.pprofServer.Addr))
 		}
 
 		if err := s.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger := sdklog.NewLogger("zen-watcher-server")
-			logger.Error(err, "HTTP server error",
-				sdklog.Operation("http_serve"))
+			serverLogger.Error(err, "HTTP server error",
+				sdklog.Operation("http_serve"),
+				sdklog.ErrorCode("HTTP_SERVER_ERROR"))
 		}
 	}()
 
@@ -409,9 +409,9 @@ func (s *Server) Start(ctx context.Context, wg *sync.WaitGroup) {
 		go func() {
 			defer wg.Done()
 			if err := s.pprofServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				logger := sdklog.NewLogger("zen-watcher-server")
-				logger.Error(err, "pprof server error",
-					sdklog.Operation("pprof_serve"))
+				serverLogger.Error(err, "pprof server error",
+					sdklog.Operation("pprof_serve"),
+					sdklog.ErrorCode("PPROF_SERVER_ERROR"))
 			}
 		}()
 	}
@@ -425,9 +425,9 @@ func (s *Server) Start(ctx context.Context, wg *sync.WaitGroup) {
 			if parsed, err := time.ParseDuration(timeoutStr); err == nil {
 				shutdownTimeout = parsed
 			} else {
-				logger := sdklog.NewLogger("zen-watcher-server")
-				logger.Warn("Invalid HTTP_SHUTDOWN_TIMEOUT, using default",
+				serverLogger.Warn("Invalid HTTP_SHUTDOWN_TIMEOUT, using default",
 					sdklog.Operation("http_shutdown"),
+					sdklog.ErrorCode("CONFIG_ERROR"),
 					sdklog.String("invalid_value", timeoutStr),
 					sdklog.String("default", "10s"))
 			}
@@ -435,17 +435,17 @@ func (s *Server) Start(ctx context.Context, wg *sync.WaitGroup) {
 
 		// Use zen-sdk lifecycle for graceful shutdown
 		if err := sdklifecycle.ShutdownHTTPServer(ctx, s.server, "zen-watcher-server", shutdownTimeout); err != nil {
-			logger := sdklog.NewLogger("zen-watcher-server")
-			logger.Error(err, "HTTP server shutdown error",
-				sdklog.Operation("http_shutdown"))
+			serverLogger.Error(err, "HTTP server shutdown error",
+				sdklog.Operation("http_shutdown"),
+				sdklog.ErrorCode("HTTP_SHUTDOWN_ERROR"))
 		}
 
 		// Shutdown pprof server if enabled
 		if s.pprofServer != nil {
 			if err := sdklifecycle.ShutdownHTTPServer(ctx, s.pprofServer, "pprof-server", shutdownTimeout); err != nil {
-				logger := sdklog.NewLogger("zen-watcher-server")
-				logger.Error(err, "pprof server shutdown error",
-					sdklog.Operation("pprof_shutdown"))
+				serverLogger.Error(err, "pprof server shutdown error",
+					sdklog.Operation("pprof_shutdown"),
+					sdklog.ErrorCode("PPROF_SHUTDOWN_ERROR"))
 			}
 		}
 	}()
@@ -470,9 +470,9 @@ func (s *Server) handleHAHealth(w http.ResponseWriter, r *http.Request) {
 			"status":     "unhealthy",
 			"replica_id": status.ReplicaID,
 		}); err != nil {
-			logger := sdklog.NewLogger("zen-watcher-server")
-			logger.Warn("Failed to encode HA health response",
+			serverLogger.Warn("Failed to encode HA health response",
 				sdklog.Operation("ha_health"),
+				sdklog.ErrorCode("ENCODE_ERROR"),
 				sdklog.Error(err))
 		}
 		return
@@ -485,9 +485,9 @@ func (s *Server) handleHAHealth(w http.ResponseWriter, r *http.Request) {
 		"replica_id": status.ReplicaID,
 		"enabled":    status.Enabled,
 	}); err != nil {
-		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.Warn("Failed to encode HA health response",
+		serverLogger.Warn("Failed to encode HA health response",
 			sdklog.Operation("ha_health"),
+			sdklog.ErrorCode("ENCODE_ERROR"),
 			sdklog.Error(err))
 	}
 }
@@ -514,9 +514,9 @@ func (s *Server) handleHAMetrics(w http.ResponseWriter, r *http.Request) {
 		"current_load":   status.CurrentLoad,
 		"timestamp":      time.Now().Format(time.RFC3339),
 	}); err != nil {
-		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.Warn("Failed to encode HA metrics response",
+		serverLogger.Warn("Failed to encode HA metrics response",
 			sdklog.Operation("ha_metrics"),
+			sdklog.ErrorCode("ENCODE_ERROR"),
 			sdklog.Error(err))
 	}
 }
@@ -535,9 +535,9 @@ func (s *Server) handleHAStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(status); err != nil {
-		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.Warn("Failed to encode HA status response",
+		serverLogger.Warn("Failed to encode HA status response",
 			sdklog.Operation("ha_status"),
+			sdklog.ErrorCode("ENCODE_ERROR"),
 			sdklog.Error(err))
 	}
 }

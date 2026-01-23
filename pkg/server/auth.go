@@ -25,6 +25,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
+// Package-level logger to avoid repeated allocations
+var authLogger = sdklog.NewLogger("zen-watcher-server")
+
 // WebhookAuth handles authentication for webhook endpoints
 type WebhookAuth struct {
 	// Authentication disabled flag (explicit opt-out)
@@ -63,9 +66,9 @@ func NewWebhookAuthWithMetrics(webhookMetrics *prometheus.CounterVec) *WebhookAu
 	// Check if authentication is explicitly disabled
 	if os.Getenv("WEBHOOK_AUTH_DISABLED") == "true" {
 		auth.authDisabled = true
-		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.Warn("Webhook authentication explicitly disabled via WEBHOOK_AUTH_DISABLED environment variable. This is NOT recommended for production.",
-			sdklog.Operation("auth_init"))
+		authLogger.Warn("Webhook authentication explicitly disabled via WEBHOOK_AUTH_DISABLED environment variable. This is NOT recommended for production.",
+			sdklog.Operation("auth_init"),
+			sdklog.ErrorCode("SECURITY_WARNING"))
 		return auth // No further auth config needed if disabled
 	}
 
@@ -73,8 +76,7 @@ func NewWebhookAuthWithMetrics(webhookMetrics *prometheus.CounterVec) *WebhookAu
 	if token := os.Getenv("WEBHOOK_AUTH_TOKEN"); token != "" {
 		auth.tokenEnabled = true
 		auth.token = token
-		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.Info("Webhook token authentication enabled",
+		authLogger.Info("Webhook token authentication enabled",
 			sdklog.Operation("auth_init"))
 	}
 
@@ -85,8 +87,7 @@ func NewWebhookAuthWithMetrics(webhookMetrics *prometheus.CounterVec) *WebhookAu
 		for i, ip := range auth.allowedIPs {
 			auth.allowedIPs[i] = strings.TrimSpace(ip)
 		}
-		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.Info("Webhook IP allowlist enabled",
+		authLogger.Info("Webhook IP allowlist enabled",
 			sdklog.Operation("auth_init"),
 			sdklog.Strings("allowed_ips", auth.allowedIPs))
 	}
@@ -95,9 +96,9 @@ func NewWebhookAuthWithMetrics(webhookMetrics *prometheus.CounterVec) *WebhookAu
 	// then authentication is implicitly required but will fail.
 	// This ensures "secure by default" posture.
 	if !auth.authDisabled && !auth.tokenEnabled && !auth.ipAllowlistEnabled {
-		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.Warn("Webhook authentication is enabled by default, but no WEBHOOK_AUTH_TOKEN or WEBHOOK_ALLOWED_IPS configured. All webhook requests will be rejected. Explicitly disable with WEBHOOK_AUTH_DISABLED=true if unauthenticated access is intended.",
-			sdklog.Operation("auth_init"))
+		authLogger.Warn("Webhook authentication is enabled by default, but no WEBHOOK_AUTH_TOKEN or WEBHOOK_ALLOWED_IPS configured. All webhook requests will be rejected. Explicitly disable with WEBHOOK_AUTH_DISABLED=true if unauthenticated access is intended.",
+			sdklog.Operation("auth_init"),
+			sdklog.ErrorCode("AUTH_CONFIG_WARNING"))
 	}
 
 	// Trusted proxy CIDRs
@@ -111,9 +112,9 @@ func NewWebhookAuthWithMetrics(webhookMetrics *prometheus.CounterVec) *WebhookAu
 			}
 			_, ipNet, err := net.ParseCIDR(cidrStr)
 			if err != nil {
-				logger := sdklog.NewLogger("zen-watcher-server")
-				logger.Warn("Invalid CIDR in SERVER_TRUSTED_PROXY_CIDRS, ignoring",
+				authLogger.Warn("Invalid CIDR in SERVER_TRUSTED_PROXY_CIDRS, ignoring",
 					sdklog.Operation("auth_init"),
+					sdklog.ErrorCode("CONFIG_ERROR"),
 					sdklog.String("cidr", cidrStr),
 					sdklog.Error(err))
 				continue
@@ -121,8 +122,7 @@ func NewWebhookAuthWithMetrics(webhookMetrics *prometheus.CounterVec) *WebhookAu
 			auth.trustedProxyCIDRs = append(auth.trustedProxyCIDRs, ipNet)
 		}
 		if len(auth.trustedProxyCIDRs) > 0 {
-			logger := sdklog.NewLogger("zen-watcher-server")
-			logger.Info("Trusted proxy CIDRs configured",
+			authLogger.Info("Trusted proxy CIDRs configured",
 				sdklog.Operation("auth_init"),
 				sdklog.Int("count", len(auth.trustedProxyCIDRs)))
 		}
@@ -145,9 +145,9 @@ func (a *WebhookAuth) Authenticate(r *http.Request) bool {
 	// If authentication is not disabled, but no token or IP allowlist is configured,
 	// then all requests are rejected.
 	if !a.tokenEnabled && !a.ipAllowlistEnabled {
-		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.Warn("Webhook request rejected: authentication enabled but no token or IP allowlist configured",
+		authLogger.Warn("Webhook request rejected: authentication enabled but no token or IP allowlist configured",
 			sdklog.Operation("auth_validate"),
+			sdklog.ErrorCode("AUTH_ERROR"),
 			sdklog.String("reason", "no_auth_config"),
 			sdklog.String("remote_addr", r.RemoteAddr),
 			sdklog.String("path", r.URL.Path))
@@ -158,12 +158,12 @@ func (a *WebhookAuth) Authenticate(r *http.Request) bool {
 	if a.tokenEnabled {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			logger := sdklog.NewLogger("zen-watcher-server")
-			logger.Warn("Webhook request rejected: missing Authorization header",
-				sdklog.Operation("auth_validate"),
-				sdklog.String("reason", "missing_auth_header"),
-				sdklog.String("remote_addr", r.RemoteAddr),
-				sdklog.String("path", r.URL.Path))
+		authLogger.Warn("Webhook request rejected: missing Authorization header",
+			sdklog.Operation("auth_validate"),
+			sdklog.ErrorCode("AUTH_ERROR"),
+			sdklog.String("reason", "missing_auth_header"),
+			sdklog.RemoteAddr(r.RemoteAddr),
+			sdklog.HTTPPath(r.URL.Path))
 			return false
 		}
 
@@ -172,12 +172,12 @@ func (a *WebhookAuth) Authenticate(r *http.Request) bool {
 		token = strings.TrimSpace(token)
 
 		if subtle.ConstantTimeCompare([]byte(token), []byte(a.token)) != 1 {
-			logger := sdklog.NewLogger("zen-watcher-server")
-			logger.Warn("Webhook request rejected: invalid token",
-				sdklog.Operation("auth_validate"),
-				sdklog.String("reason", "invalid_token"),
-				sdklog.String("remote_addr", r.RemoteAddr),
-				sdklog.String("path", r.URL.Path))
+		authLogger.Warn("Webhook request rejected: invalid token",
+			sdklog.Operation("auth_validate"),
+			sdklog.ErrorCode("AUTH_ERROR"),
+			sdklog.String("reason", "invalid_token"),
+			sdklog.RemoteAddr(r.RemoteAddr),
+			sdklog.HTTPPath(r.URL.Path))
 			return false
 		}
 	}
@@ -193,13 +193,13 @@ func (a *WebhookAuth) Authenticate(r *http.Request) bool {
 			}
 		}
 		if !allowed {
-			logger := sdklog.NewLogger("zen-watcher-server")
-			logger.Warn("Webhook request rejected: unauthorized IP",
-				sdklog.Operation("auth_validate"),
-				sdklog.String("reason", "ip_not_allowed"),
-				sdklog.String("client_ip", clientIP),
-				sdklog.String("path", r.URL.Path),
-				sdklog.Strings("allowed_ips", a.allowedIPs))
+		authLogger.Warn("Webhook request rejected: unauthorized IP",
+			sdklog.Operation("auth_validate"),
+			sdklog.ErrorCode("AUTH_ERROR"),
+			sdklog.String("reason", "ip_not_allowed"),
+			sdklog.RemoteAddr(clientIP),
+			sdklog.HTTPPath(r.URL.Path),
+			sdklog.Strings("allowed_ips", a.allowedIPs))
 			return false
 		}
 	}
@@ -274,12 +274,11 @@ func getClientIP(r *http.Request, trustedProxyCIDRs []*net.IPNet) string {
 func (a *WebhookAuth) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !a.Authenticate(r) {
-			logger := sdklog.NewLogger("zen-watcher-server")
-			logger.Debug("Webhook request authentication failed",
-				sdklog.Operation("auth_middleware"),
-				sdklog.String("reason", "authentication_failed"),
-				sdklog.String("path", r.URL.Path),
-				sdklog.String("remote_addr", r.RemoteAddr))
+		authLogger.Debug("Webhook request authentication failed",
+			sdklog.Operation("auth_middleware"),
+			sdklog.String("reason", "authentication_failed"),
+			sdklog.HTTPPath(r.URL.Path),
+			sdklog.RemoteAddr(r.RemoteAddr))
 
 			// Track authentication failure in metrics
 			if a.webhookMetrics != nil {
@@ -289,17 +288,17 @@ func (a *WebhookAuth) RequireAuth(next http.HandlerFunc) http.HandlerFunc {
 
 			w.WriteHeader(http.StatusUnauthorized)
 			if _, err := w.Write([]byte(`{"error":"unauthorized"}`)); err != nil {
-				logger.Warn("Failed to write authentication error response",
+				authLogger.Warn("Failed to write authentication error response",
 					sdklog.Operation("auth_middleware"),
+					sdklog.ErrorCode("HTTP_WRITE_ERROR"),
 					sdklog.Error(err))
 			}
 			return
 		}
-		logger := sdklog.NewLogger("zen-watcher-server")
-		logger.Debug("Webhook request authentication successful",
+		authLogger.Debug("Webhook request authentication successful",
 			sdklog.Operation("auth_middleware"),
-			sdklog.String("path", r.URL.Path),
-			sdklog.String("remote_addr", r.RemoteAddr))
+			sdklog.HTTPPath(r.URL.Path),
+			sdklog.RemoteAddr(r.RemoteAddr))
 		next(w, r)
 	}
 }

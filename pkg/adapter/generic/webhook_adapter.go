@@ -36,6 +36,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// adapterLogger is shared across all generic adapters (webhook, informer, logs)
+// Defined in logs_adapter.go, reused here
+
 // WebhookAdapter handles ALL webhook-based sources
 type WebhookAdapter struct {
 	server         *http.Server // DEPRECATED: Only used if routeRegistrar is nil (backward compatibility)
@@ -119,21 +122,19 @@ func (a *WebhookAdapter) Start(ctx context.Context, config *SourceConfig) (<-cha
 			return nil, fmt.Errorf("failed to register webhook route %s: %w", config.Webhook.Path, err)
 		}
 
-		logger := sdklog.NewLogger("zen-watcher-adapter")
-		logger.Info("Webhook handler registered on main server",
+		adapterLogger.Info("Webhook handler registered on main server",
 			sdklog.Operation("webhook_register"),
 			sdklog.String("source", config.Source),
-			sdklog.String("path", config.Webhook.Path))
+			sdklog.HTTPPath(config.Webhook.Path))
 
 		return a.events, nil
 	}
 
 	// Fallback: Create separate HTTP server (backward compatibility, deprecated)
-	logger := sdklog.NewLogger("zen-watcher-adapter")
-	logger.Warn("Route registrar not set, creating separate webhook server (deprecated)",
+	adapterLogger.Warn("Route registrar not set, creating separate webhook server (deprecated)",
 		sdklog.Operation("webhook_start"),
 		sdklog.String("source", config.Source),
-		sdklog.String("path", config.Webhook.Path))
+		sdklog.HTTPPath(config.Webhook.Path))
 
 	if a.server == nil {
 		mux := http.NewServeMux()
@@ -157,16 +158,15 @@ func (a *WebhookAdapter) Start(ctx context.Context, config *SourceConfig) (<-cha
 
 		// Start server in goroutine
 		go func() {
-			logger := sdklog.NewLogger("zen-watcher-adapter")
-			logger.Info("Webhook adapter server starting (separate server - deprecated)",
+			adapterLogger.Info("Webhook adapter server starting (separate server - deprecated)",
 				sdklog.Operation("webhook_start"),
 				sdklog.String("source", config.Source),
 				sdklog.Int("port", config.Webhook.Port),
 				sdklog.String("path", config.Webhook.Path))
 			if err := a.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				logger := sdklog.NewLogger("zen-watcher-adapter")
-				logger.Error(err, "Webhook server error",
+				adapterLogger.Error(err, "Webhook server error",
 					sdklog.Operation("webhook_server"),
+					sdklog.ErrorCode("WEBHOOK_SERVER_ERROR"),
 					sdklog.String("source", config.Source))
 			}
 		}()
@@ -178,9 +178,9 @@ func (a *WebhookAdapter) Start(ctx context.Context, config *SourceConfig) (<-cha
 				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
 				if err := a.server.Shutdown(shutdownCtx); err != nil {
-					logger := sdklog.NewLogger("zen-watcher-adapter")
-					logger.Warn("Webhook server shutdown error",
+					adapterLogger.Warn("Webhook server shutdown error",
 						sdklog.Operation("webhook_shutdown"),
+						sdklog.ErrorCode("WEBHOOK_SHUTDOWN_ERROR"),
 						sdklog.String("source", config.Source),
 						sdklog.Error(err))
 				}
@@ -266,9 +266,9 @@ func (a *WebhookAdapter) handleWebhook(config *SourceConfig) http.HandlerFunc {
 			_, _ = fmt.Fprintf(w, "OK")
 		default:
 			// Buffer full - backpressure
-			logger := sdklog.NewLogger("zen-watcher-adapter")
-			logger.Warn("Webhook event buffer full, dropping event",
+			adapterLogger.Warn("Webhook event buffer full, dropping event",
 				sdklog.Operation("webhook_backpressure"),
+				sdklog.ErrorCode("BUFFER_FULL"),
 				sdklog.String("source", config.Source))
 			// Track service unavailable in metrics
 			if a.webhookMetrics != nil {
@@ -309,29 +309,30 @@ func (a *WebhookAdapter) authenticate(r *http.Request, config *SourceConfig) boo
 
 	// Auth is required - ensure SecretName is configured
 	if config.Webhook.Auth.SecretName == "" {
-		logger := sdklog.NewLogger("zen-watcher-adapter")
-		logger.Warn("Webhook auth enabled but secretName not configured - rejecting request",
+		adapterLogger.Warn("Webhook auth enabled but secretName not configured - rejecting request",
 			sdklog.Operation("auth_validate"),
+			sdklog.ErrorCode("AUTH_CONFIG_ERROR"),
 			sdklog.String("source", config.Source),
-			sdklog.String("path", config.Webhook.Path),
+			sdklog.HTTPPath(config.Webhook.Path),
 			sdklog.String("auth_type", config.Webhook.Auth.Type))
 		return false // Hard-fail: auth required but not properly configured
 	}
 
 	secret, err := a.loadSecret(r.Context(), config.Namespace, config.Webhook.Auth.SecretName)
 	if err != nil {
-		logger := sdklog.NewLogger("zen-watcher-adapter")
 		if errors.IsNotFound(err) {
-			logger.Warn("Secret not found for webhook auth",
+			adapterLogger.WithContext(r.Context()).Warn("Secret not found for webhook auth",
 				sdklog.Operation("auth_secret_load"),
+				sdklog.ErrorCode("SECRET_NOT_FOUND"),
 				sdklog.String("source", config.Source),
-				sdklog.String("namespace", config.Namespace),
+				sdklog.Namespace(config.Namespace),
 				sdklog.String("secret", config.Webhook.Auth.SecretName))
 		} else {
-			logger.Warn("Failed to load secret for webhook auth",
+			adapterLogger.WithContext(r.Context()).Warn("Failed to load secret for webhook auth",
 				sdklog.Operation("auth_secret_load"),
+				sdklog.ErrorCode("SECRET_LOAD_ERROR"),
 				sdklog.String("source", config.Source),
-				sdklog.String("namespace", config.Namespace),
+				sdklog.Namespace(config.Namespace),
 				sdklog.String("secret", config.Webhook.Auth.SecretName),
 				sdklog.Error(err))
 		}
@@ -344,9 +345,9 @@ func (a *WebhookAdapter) authenticate(r *http.Request, config *SourceConfig) boo
 	case "basic":
 		return a.authenticateBasic(r, secret)
 	default:
-		logger := sdklog.NewLogger("zen-watcher-adapter")
-		logger.Warn("Unsupported auth type",
+		adapterLogger.Warn("Unsupported auth type",
 			sdklog.Operation("auth_validate"),
+			sdklog.ErrorCode("AUTH_TYPE_ERROR"),
 			sdklog.String("source", config.Source),
 			sdklog.String("type", config.Webhook.Auth.Type))
 		return false
@@ -371,11 +372,11 @@ func (a *WebhookAdapter) authenticateBearer(r *http.Request, secret *corev1.Secr
 	// Secret format: key "token" contains the expected bearer token
 	expectedTokenBytes, found := secret.Data["token"]
 	if !found {
-		logger := sdklog.NewLogger("zen-watcher-adapter")
-		logger.Warn("Secret missing 'token' key for bearer auth",
+		adapterLogger.Warn("Secret missing 'token' key for bearer auth",
 			sdklog.Operation("auth_bearer_validate"),
-			sdklog.String("namespace", secret.Namespace),
-			sdklog.String("secret", secret.Name))
+			sdklog.ErrorCode("AUTH_CONFIG_ERROR"),
+			sdklog.Namespace(secret.Namespace),
+			sdklog.Name(secret.Name))
 		return false
 	}
 
@@ -400,11 +401,11 @@ func (a *WebhookAdapter) authenticateBasic(r *http.Request, secret *corev1.Secre
 	expectedPasswordBytes, passwordFound := secret.Data["password"]
 
 	if !usernameFound || !passwordFound {
-		logger := sdklog.NewLogger("zen-watcher-adapter")
-		logger.Warn("Secret missing 'username' or 'password' key for basic auth",
+		adapterLogger.Warn("Secret missing 'username' or 'password' key for basic auth",
 			sdklog.Operation("auth_basic_validate"),
-			sdklog.String("namespace", secret.Namespace),
-			sdklog.String("secret", secret.Name))
+			sdklog.ErrorCode("AUTH_CONFIG_ERROR"),
+			sdklog.Namespace(secret.Namespace),
+			sdklog.Name(secret.Name))
 		return false
 	}
 
@@ -435,9 +436,9 @@ func (a *WebhookAdapter) Stop() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if err := a.server.Shutdown(ctx); err != nil {
-			logger := sdklog.NewLogger("zen-watcher-adapter")
-			logger.Warn("Webhook server shutdown error",
+			adapterLogger.Warn("Webhook server shutdown error",
 				sdklog.Operation("webhook_stop"),
+				sdklog.ErrorCode("WEBHOOK_SHUTDOWN_ERROR"),
 				sdklog.Error(err))
 		}
 	}

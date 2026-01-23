@@ -419,8 +419,8 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 	observationLogger.Debug("Observation created successfully",
 		sdklog.Operation("observation_create"),
 		sdklog.String("source", source),
-		sdklog.String("namespace", namespace),
-		sdklog.String("observation_name", createdObservation.GetName()),
+		sdklog.Namespace(namespace),
+		sdklog.Name(createdObservation.GetName()),
 		sdklog.String("category", category),
 		sdklog.String("severity", severity))
 

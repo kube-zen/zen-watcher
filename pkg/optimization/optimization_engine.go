@@ -23,6 +23,9 @@ import (
 	"github.com/kube-zen/zen-watcher/pkg/adapter/generic"
 )
 
+// Package-level logger to avoid repeated allocations
+var optimizationLogger = sdklog.NewLogger("zen-watcher-optimization")
+
 // OptimizationEngine orchestrates the optimization process for all sources
 type OptimizationEngine struct {
 	smartProcessor     *SmartProcessor
@@ -73,8 +76,7 @@ func (oe *OptimizationEngine) Start(ctx context.Context) error {
 
 	go oe.optimizationLoop(optimizationCtx)
 
-	logger := sdklog.NewLogger("zen-watcher-optimization")
-	logger.Info("Optimization engine started",
+	optimizationLogger.WithContext(ctx).Info("Optimization engine started",
 		sdklog.Operation("engine_start"),
 		sdklog.Duration("interval", oe.optimizationInterval))
 
@@ -99,8 +101,7 @@ func (oe *OptimizationEngine) Stop() {
 	// Wait for goroutines to finish
 	oe.wg.Wait()
 
-	logger := sdklog.NewLogger("zen-watcher-optimization")
-	logger.Info("Optimization engine stopped",
+	optimizationLogger.Info("Optimization engine stopped",
 		sdklog.Operation("engine_stop"))
 }
 
@@ -118,8 +119,7 @@ func (oe *OptimizationEngine) optimizationLoop(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			logger := sdklog.NewLogger("zen-watcher-optimization")
-			logger.Info("Optimization loop received shutdown signal",
+			optimizationLogger.WithContext(ctx).Info("Optimization loop received shutdown signal",
 				sdklog.Operation("loop_shutdown"))
 			return
 		case <-ticker.C:

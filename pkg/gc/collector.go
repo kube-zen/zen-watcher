@@ -31,6 +31,9 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
+// Package-level logger to avoid repeated allocations
+var gcLogger = sdklog.NewLogger("zen-watcher-gc")
+
 const (
 	// DefaultTTLDays is the default TTL in days for Observations
 	DefaultTTLDays = 7
@@ -93,8 +96,7 @@ func NewCollector(
 
 // Start starts the garbage collection loop
 func (gc *Collector) Start(ctx context.Context) {
-	logger := sdklog.NewLogger("zen-watcher-gc")
-	logger.Info("Starting Observation garbage collector",
+	gcLogger.WithContext(ctx).Info("Starting Observation garbage collector",
 		sdklog.Operation("gc_start"),
 		sdklog.Int("ttl_days", gc.ttlDays),
 		sdklog.Duration("interval", gc.gcInterval))
@@ -108,8 +110,7 @@ func (gc *Collector) Start(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			logger := sdklog.NewLogger("zen-watcher-gc")
-			logger.Info("Observation garbage collector stopped",
+			gcLogger.WithContext(ctx).Info("Observation garbage collector stopped",
 				sdklog.Operation("gc_stop"))
 			return
 		case <-ticker.C:
@@ -132,8 +133,7 @@ func (gc *Collector) runGC(ctx context.Context) {
 		gc.gcRunsTotal.Inc()
 	}
 
-	logger := sdklog.NewLogger("zen-watcher-gc")
-	logger.Debug("Running garbage collection",
+	gcLogger.WithContext(ctx).Debug("Running garbage collection",
 		sdklog.Operation("gc_run"),
 		sdklog.Int("ttl_days", gc.ttlDays))
 
@@ -163,20 +163,20 @@ func (gc *Collector) runGC(ctx context.Context) {
 		if err != nil {
 			// Check if timeout occurred
 			if gcCtx.Err() == context.DeadlineExceeded {
-				logger := sdklog.NewLogger("zen-watcher-gc")
-				logger.Warn("GC run timed out",
-					sdklog.Operation("gc_run"),
-					sdklog.String("namespace", ns),
-					sdklog.Error(err),
-					sdklog.Duration("timeout", gcTimeout))
+			gcLogger.WithContext(ctx).Warn("GC run timed out",
+				sdklog.Operation("gc_run"),
+				sdklog.ErrorCode("GC_TIMEOUT"),
+				sdklog.Namespace(ns),
+				sdklog.Error(err),
+				sdklog.Duration("timeout", gcTimeout))
 				if gc.gcErrors != nil {
 					gc.gcErrors.WithLabelValues("timeout", "gc_timeout").Inc()
 				}
 			} else {
-				logger := sdklog.NewLogger("zen-watcher-gc")
-				logger.Warn("Failed to collect Observations in namespace",
+				gcLogger.WithContext(ctx).Warn("Failed to collect Observations in namespace",
 					sdklog.Operation("gc_run"),
-					sdklog.String("namespace", ns),
+					sdklog.ErrorCode("GC_COLLECT_ERROR"),
+					sdklog.Namespace(ns),
 					sdklog.Error(err))
 			}
 			continue
@@ -185,14 +185,12 @@ func (gc *Collector) runGC(ctx context.Context) {
 	}
 
 	if totalDeleted > 0 {
-		logger := sdklog.NewLogger("zen-watcher-gc")
-		logger.Info("Garbage collection completed",
+		gcLogger.WithContext(ctx).Info("Garbage collection completed",
 			sdklog.Operation("gc_run"),
 			sdklog.Int("count", totalDeleted),
 			sdklog.Int("deleted", totalDeleted))
 	} else {
-		logger := sdklog.NewLogger("zen-watcher-gc")
-		logger.Debug("Garbage collection completed, no Observations to delete",
+		gcLogger.WithContext(ctx).Debug("Garbage collection completed, no Observations to delete",
 			sdklog.Operation("gc_run"))
 	}
 }
@@ -270,11 +268,10 @@ func (gc *Collector) processObservationChunk(ctx context.Context, namespace stri
 		if gc.observationsDeleted != nil {
 			gc.observationsDeleted.WithLabelValues(source, reason).Inc()
 		}
-		logger := sdklog.NewLogger("zen-watcher-gc")
-		logger.Debug("Deleted Observation",
+		gcLogger.WithContext(ctx).Debug("Deleted Observation",
 			sdklog.Operation("gc_delete"),
-			sdklog.String("namespace", namespace),
-			sdklog.String("resource_name", name),
+			sdklog.Namespace(namespace),
+			sdklog.Name(name),
 			sdklog.String("source", source),
 			sdklog.String("reason", reason))
 	}
@@ -309,11 +306,11 @@ func (gc *Collector) handleDeleteError(err error, namespace, name, source, reaso
 		}
 		gc.gcErrors.WithLabelValues("delete", errorType).Inc()
 	}
-	logger := sdklog.NewLogger("zen-watcher-gc")
-	logger.Warn("Failed to delete Observation",
+	gcLogger.Warn("Failed to delete Observation",
 		sdklog.Operation("gc_delete"),
-		sdklog.String("namespace", namespace),
-		sdklog.String("resource_name", name),
+		sdklog.ErrorCode("GC_DELETE_ERROR"),
+		sdklog.Namespace(namespace),
+		sdklog.Name(name),
 		sdklog.String("source", source),
 		sdklog.String("reason", reason),
 		sdklog.Error(err))
@@ -437,11 +434,11 @@ func (gc *Collector) processChunk(ctx context.Context, items []unstructured.Unst
 				}
 				gc.gcErrors.WithLabelValues("delete", errorType).Inc()
 			}
-			logger := sdklog.NewLogger("zen-watcher-gc")
-			logger.Warn("Failed to delete Observation",
+			gcLogger.WithContext(ctx).Warn("Failed to delete Observation",
 				sdklog.Operation("gc_delete"),
-				sdklog.String("namespace", namespace),
-				sdklog.String("resource_name", name),
+				sdklog.ErrorCode("GC_DELETE_ERROR"),
+				sdklog.Namespace(namespace),
+				sdklog.Name(name),
 				sdklog.String("source", source),
 				sdklog.String("reason", reason),
 				sdklog.Error(err))

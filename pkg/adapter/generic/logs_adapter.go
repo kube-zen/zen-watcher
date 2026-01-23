@@ -28,6 +28,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// Package-level logger to avoid repeated allocations
+var adapterLogger = sdklog.NewLogger("zen-watcher-adapter")
+
 // LogsAdapter handles ALL log-based sources (sealed-secrets, falco, etc.)
 type LogsAdapter struct {
 	clientSet kubernetes.Interface
@@ -100,8 +103,7 @@ func (a *LogsAdapter) Start(ctx context.Context, config *SourceConfig) (<-chan R
 	// Start pod watcher
 	go a.watchPods(ctx, config, compiledPatterns, pollInterval)
 
-	logger := sdklog.NewLogger("zen-watcher-adapter")
-	logger.Info("Logs adapter started",
+	adapterLogger.Info("Logs adapter started",
 		sdklog.Operation("logs_start"),
 		sdklog.String("source", config.Source),
 		sdklog.String("pod_selector", config.Logs.PodSelector),
@@ -126,9 +128,9 @@ func (a *LogsAdapter) watchPods(ctx context.Context, config *SourceConfig, patte
 				LabelSelector: config.Logs.PodSelector,
 			})
 			if err != nil {
-				logger := sdklog.NewLogger("zen-watcher-adapter")
-				logger.Debug("Failed to list pods",
+				adapterLogger.WithContext(ctx).Debug("Failed to list pods",
 					sdklog.Operation("logs_list_pods"),
+					sdklog.ErrorCode("K8S_LIST_ERROR"),
 					sdklog.String("source", config.Source),
 					sdklog.Error(err))
 				continue
@@ -187,12 +189,12 @@ func (a *LogsAdapter) streamPodLogs(ctx context.Context, pod corev1.Pod, config 
 	req := a.clientSet.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, opts)
 	stream, err := req.Stream(ctx)
 	if err != nil {
-		logger := sdklog.NewLogger("zen-watcher-adapter")
-		logger.Debug("Failed to stream pod logs",
+		adapterLogger.WithContext(ctx).Debug("Failed to stream pod logs",
 			sdklog.Operation("logs_stream"),
+			sdklog.ErrorCode("K8S_STREAM_ERROR"),
 			sdklog.String("source", config.Source),
-			sdklog.String("namespace", pod.Namespace),
-			sdklog.String("pod", pod.Name),
+			sdklog.Namespace(pod.Namespace),
+			sdklog.Pod(pod.Name),
 			sdklog.String("container", container),
 			sdklog.Error(err))
 		return
@@ -249,10 +251,12 @@ func (a *LogsAdapter) streamPodLogs(ctx context.Context, pod corev1.Pod, config 
 	}
 
 	if err := scanner.Err(); err != nil {
-		logger := sdklog.NewLogger("zen-watcher-adapter")
-		logger.Debug("Log scanner error",
+		adapterLogger.WithContext(ctx).Debug("Log scanner error",
 			sdklog.Operation("logs_scanner"),
+			sdklog.ErrorCode("SCANNER_ERROR"),
 			sdklog.String("source", config.Source),
+			sdklog.Namespace(pod.Namespace),
+			sdklog.Pod(pod.Name),
 			sdklog.Error(err))
 	}
 }

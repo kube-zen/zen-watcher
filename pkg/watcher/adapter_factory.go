@@ -22,6 +22,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
+// Package-level logger to avoid repeated allocations
+var watcherLogger = sdklog.NewLogger("zen-watcher")
+
 // WorkerPoolInterface defines the interface for worker pool integration
 // This avoids circular dependencies between packages
 type WorkerPoolInterface interface {
@@ -99,9 +102,9 @@ func (al *AdapterLauncher) Start(ctx context.Context) error {
 		go func() {
 			defer al.adapterWg.Done()
 			if err := adapter.Run(ctx, al.eventCh); err != nil {
-				logger := sdklog.NewLogger("zen-watcher")
-				logger.Warn("Adapter stopped",
+				watcherLogger.WithContext(ctx).Warn("Adapter stopped",
 					sdklog.Operation("adapter_stopped"),
+					sdklog.ErrorCode("ADAPTER_ERROR"),
 					sdklog.String("source", adapter.Name()),
 					sdklog.Error(err))
 			}
@@ -122,9 +125,9 @@ func (al *AdapterLauncher) Start(ctx context.Context) error {
 					observationCreator: al.observationCreator,
 				}
 				if err := al.workerPool.EnqueueBlocking(ctx, workItem); err != nil {
-					logger := sdklog.NewLogger("zen-watcher")
-					logger.Warn("Failed to enqueue event for processing",
+					watcherLogger.WithContext(ctx).Warn("Failed to enqueue event for processing",
 						sdklog.Operation("adapter_event_enqueue"),
+						sdklog.ErrorCode("ENQUEUE_ERROR"),
 						sdklog.String("source", event.Source),
 						sdklog.Error(err))
 				}
@@ -144,9 +147,9 @@ func (al *AdapterLauncher) processEvent(ctx context.Context, event *Event) {
 		// Use centralized observation creator (handles filter, dedup, metrics)
 		err := al.observationCreator.CreateObservation(ctx, observation)
 		if err != nil {
-			logger := sdklog.NewLogger("zen-watcher")
-			logger.Warn("Failed to create Observation from adapter event",
+			watcherLogger.WithContext(ctx).Warn("Failed to create Observation from adapter event",
 				sdklog.Operation("adapter_observation_create"),
+				sdklog.ErrorCode("OBSERVATION_CREATE_ERROR"),
 				sdklog.String("source", event.Source),
 				sdklog.Error(err))
 		}

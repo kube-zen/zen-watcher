@@ -28,6 +28,9 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
+// adapterLogger is shared across all generic adapters (webhook, informer, logs)
+// Defined in logs_adapter.go, reused here
+
 // InformerAdapter handles ALL Kubernetes resources via dynamic informers (GVR-capable)
 // Can watch any Kubernetes resource including ConfigMaps, CRDs, Pods, etc.
 type InformerAdapter struct {
@@ -90,9 +93,9 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 		var err error
 		resyncPeriod, err = time.ParseDuration(config.Informer.ResyncPeriod)
 		if err != nil {
-			logger := sdklog.NewLogger("zen-watcher-adapter")
-			logger.Warn("Invalid resync period, using default",
+			adapterLogger.Warn("Invalid resync period, using default",
 				sdklog.Operation("informer_start"),
+				sdklog.ErrorCode("CONFIG_ERROR"),
 				sdklog.String("source", config.Source),
 				sdklog.Error(err))
 		}
@@ -128,8 +131,7 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 	go func() {
 		// Get all existing resources from the informer cache
 		existingObjs := informer.GetStore().List()
-		logger := sdklog.NewLogger("zen-watcher-adapter")
-		logger.Info("Processing existing resources from cache",
+		adapterLogger.Info("Processing existing resources from cache",
 			sdklog.Operation("process_existing_resources"),
 			sdklog.String("source", config.Source),
 			sdklog.String("gvr", gvr.String()),
@@ -170,12 +172,11 @@ func (a *InformerAdapter) Start(ctx context.Context, config *SourceConfig) (<-ch
 			sdklog.Int("count", len(existingObjs)))
 	}()
 
-	logger := sdklog.NewLogger("zen-watcher-adapter")
-	logger.Info("Informer adapter started",
+	adapterLogger.Info("Informer adapter started",
 		sdklog.Operation("informer_start"),
 		sdklog.String("source", config.Source),
 		sdklog.String("gvr", gvr.String()),
-		sdklog.String("namespace", config.Informer.Namespace),
+		sdklog.Namespace(config.Informer.Namespace),
 		sdklog.Duration("resync_period", resyncPeriod))
 
 	return events, nil

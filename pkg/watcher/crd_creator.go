@@ -28,6 +28,8 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
+// watcherLogger is shared across watcher package (defined in adapter_factory.go, reused here)
+
 // CRDCreator handles creation of resources to any GVR (GroupVersionResource).
 // This is a completely generic creator that can write to any Kubernetes resource type
 // (CRDs, core resources like ConfigMaps, Secrets, etc.). It's similar to zen-egress's CRDDispatcher.
@@ -64,7 +66,6 @@ func (cc *CRDCreator) CreateCRD(ctx context.Context, observation *unstructured.U
 	// This is the second layer of defense - even if ObservationCreator validation is bypassed
 	if cc.allowlist != nil {
 		if err := cc.allowlist.IsAllowed(cc.gvr, namespace); err != nil {
-			logger := sdklog.NewLogger("zen-watcher")
 			// Check if this is a security policy violation
 			isSecurityViolation := errors.Is(err, ErrGVRNotAllowed) ||
 				errors.Is(err, ErrGVRDenied) ||
@@ -72,16 +73,18 @@ func (cc *CRDCreator) CreateCRD(ctx context.Context, observation *unstructured.U
 				errors.Is(err, ErrClusterScopedNotAllowed)
 
 			if isSecurityViolation {
-				logger.Warn("GVR write blocked by security policy",
+				watcherLogger.WithContext(ctx).Warn("GVR write blocked by security policy",
 					sdklog.Operation("crd_create_blocked_security"),
+					sdklog.ErrorCode("SECURITY_POLICY_VIOLATION"),
 					sdklog.String("gvr", cc.gvr.String()),
-					sdklog.String("namespace", namespace),
+					sdklog.Namespace(namespace),
 					sdklog.Error(err))
 			} else {
-				logger.Error(err, "GVR write blocked by allowlist",
+				watcherLogger.WithContext(ctx).Error(err, "GVR write blocked by allowlist",
 					sdklog.Operation("crd_create_blocked"),
+					sdklog.ErrorCode("GVR_BLOCKED"),
 					sdklog.String("gvr", cc.gvr.String()),
-					sdklog.String("namespace", namespace))
+					sdklog.Namespace(namespace))
 			}
 			return fmt.Errorf("GVR write blocked: %w", err)
 		}
@@ -97,25 +100,24 @@ func (cc *CRDCreator) CreateCRD(ctx context.Context, observation *unstructured.U
 
 	if err != nil {
 		errorType := classifyError(err)
-		logger := sdklog.NewLogger("zen-watcher")
-		logger.Error(err, "Failed to create resource",
+		watcherLogger.WithContext(ctx).Error(err, "Failed to create resource",
 			sdklog.Operation("crd_create"),
+			sdklog.ErrorCode("CRD_CREATE_ERROR"),
 			sdklog.String("gvr", cc.gvr.String()),
 			sdklog.String("group", cc.gvr.Group),
 			sdklog.String("version", cc.gvr.Version),
 			sdklog.String("resource", cc.gvr.Resource),
-			sdklog.String("namespace", namespace),
+			sdklog.Namespace(namespace),
 			sdklog.String("error_type", errorType))
 		return fmt.Errorf("failed to create resource %s/%s/%s in namespace %s: %w",
 			cc.gvr.Group, cc.gvr.Version, cc.gvr.Resource, namespace, err)
 	}
 
-	logger := sdklog.NewLogger("zen-watcher")
-	logger.Debug("Created CRD successfully",
+	watcherLogger.WithContext(ctx).Debug("Created CRD successfully",
 		sdklog.Operation("crd_create"),
 		sdklog.String("gvr", cc.gvr.String()),
-		sdklog.String("namespace", namespace),
-		sdklog.String("name", createdCRD.GetName()),
+		sdklog.Namespace(namespace),
+		sdklog.Name(createdCRD.GetName()),
 		sdklog.Int64("delivery_duration_ms", deliveryDuration.Milliseconds()))
 
 	return nil
@@ -174,9 +176,9 @@ func (cc *CRDCreator) convertToCRD(observation *unstructured.Unstructured) *unst
 	// Add annotations if present
 	if annotations, ok := extractMap(observation.Object, "metadata", "annotations"); ok && annotations != nil {
 		if err := unstructured.SetNestedMap(targetResource.Object, annotations, "metadata", "annotations"); err != nil {
-			logger := sdklog.NewLogger("zen-watcher-crd-creator")
-			logger.Warn("Failed to set annotations",
+			watcherLogger.Warn("Failed to set annotations",
 				sdklog.Operation("create_target_resource"),
+				sdklog.ErrorCode("ANNOTATION_SET_ERROR"),
 				sdklog.Error(err))
 		}
 	}

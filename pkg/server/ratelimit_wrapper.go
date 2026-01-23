@@ -121,8 +121,7 @@ func (rl *PerKeyRateLimiter) cleanup() {
 		rl.mu.Unlock()
 
 		if removed > 0 {
-			logger := sdklog.NewLogger("zen-watcher-server")
-			logger.Debug("Rate limiter cleanup completed",
+			serverLogger.Debug("Rate limiter cleanup completed",
 				sdklog.Operation("rate_limit_cleanup"),
 				sdklog.Int("removed", removed),
 				sdklog.Int("remaining", remaining))
@@ -164,12 +163,13 @@ func (rl *PerKeyRateLimiter) RateLimitMiddleware(next http.HandlerFunc) http.Han
 		}
 		
 		if !rl.Allow(key) {
-			logger := sdklog.NewLogger("zen-watcher-server")
-			logger.Warn("Rate limit exceeded",
+			serverLogger.Warn("Rate limit exceeded",
 				sdklog.Operation("rate_limit"),
+				sdklog.ErrorCode("RATE_LIMIT_EXCEEDED"),
 				sdklog.String("reason", "rate_limit_exceeded"),
 				sdklog.String("scope", rateLimitScope),
-				sdklog.String("key", key))
+				sdklog.String("key", key),
+				sdklog.HTTPPath(r.URL.Path))
 
 			// Track rate limit rejection in metrics
 			if rl.webhookMetrics != nil {
@@ -195,8 +195,9 @@ func (rl *PerKeyRateLimiter) RateLimitMiddleware(next http.HandlerFunc) http.Han
 			}
 			
 			if err := json.NewEncoder(w).Encode(response); err != nil {
-				logger.Warn("Failed to write rate limit response",
+				serverLogger.Warn("Failed to write rate limit response",
 					sdklog.Operation("rate_limit"),
+					sdklog.ErrorCode("HTTP_WRITE_ERROR"),
 					sdklog.Error(err))
 			}
 			return
