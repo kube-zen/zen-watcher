@@ -73,17 +73,17 @@ func (gtm *GenericThresholdMonitor) CheckEvent(raw *generic.RawEvent, config *ge
 	if config.Thresholds != nil && config.Thresholds.ObservationsPerMinute != nil {
 		rate := gtm.getObservationRate(raw.Source)
 		if rate > float64(config.Thresholds.ObservationsPerMinute.Critical) {
-			logger := sdklog.NewLogger("zen-watcher-monitoring")
-			logger.Warn("Critical observation rate threshold exceeded",
+			monitoringLogger.Warn("Critical observation rate threshold exceeded",
 				sdklog.Operation("threshold_warning"),
+				sdklog.ErrorCode("THRESHOLD_CRITICAL"),
 				sdklog.String("source", raw.Source),
 				sdklog.Float64("rate", rate),
 				sdklog.Int("critical_threshold", config.Thresholds.ObservationsPerMinute.Critical),
 				sdklog.String("message", "High observation rate detected - consider adjusting filters or dedup window"))
 		} else if rate > float64(config.Thresholds.ObservationsPerMinute.Warning) {
-			logger := sdklog.NewLogger("zen-watcher-monitoring")
-			logger.Warn("Warning observation rate threshold exceeded",
+			monitoringLogger.Warn("Warning observation rate threshold exceeded",
 				sdklog.Operation("threshold_warning"),
+				sdklog.ErrorCode("THRESHOLD_WARNING"),
 				sdklog.String("source", raw.Source),
 				sdklog.Float64("rate", rate),
 				sdklog.Int("warning_threshold", config.Thresholds.ObservationsPerMinute.Warning),

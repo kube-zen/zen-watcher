@@ -61,8 +61,7 @@ func LoadFilterConfig(clientSet kubernetes.Interface) (*sdkfilter.FilterConfig, 
 	)
 	if err != nil {
 		// ConfigMap not found - return default (allow all) config
-		logger := sdklog.NewLogger("zen-watcher-filter")
-		logger.Debug("Filter ConfigMap not found, using default (allow all) filter",
+		filterLogger.Debug("Filter ConfigMap not found, using default (allow all) filter",
 			sdklog.Operation("config_load"),
 			sdklog.String("namespace", configMapNamespace),
 			sdklog.String("configmap_name", configMapName))
@@ -75,8 +74,7 @@ func LoadFilterConfig(clientSet kubernetes.Interface) (*sdkfilter.FilterConfig, 
 	filterJSON, found := cm.Data[configMapKey]
 	if !found {
 		// Key not found - return default config
-		logger := sdklog.NewLogger("zen-watcher-filter")
-		logger.Debug("Filter key not found in ConfigMap, using default (allow all) filter",
+		filterLogger.Debug("Filter key not found in ConfigMap, using default (allow all) filter",
 			sdklog.Operation("config_load"),
 			sdklog.String("namespace", configMapNamespace),
 			sdklog.String("configmap_name", configMapName),

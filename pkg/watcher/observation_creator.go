@@ -333,6 +333,7 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 		if err := unstructured.SetNestedMap(observation.Object, metadata, "metadata"); err != nil {
 			observationLogger.Warn("Failed to set metadata",
 				sdklog.Operation("ensure_metadata"),
+				sdklog.ErrorCode("METADATA_SET_ERROR"),
 				sdklog.Error(err))
 		}
 	}
@@ -347,6 +348,7 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 		if err := unstructured.SetNestedField(observation.Object, normalizedSeverity, "spec", "severity"); err != nil {
 			observationLogger.Warn("Failed to normalize severity in observation spec",
 				sdklog.Operation("normalize_severity"),
+				sdklog.ErrorCode("NORMALIZE_ERROR"),
 				sdklog.String("source", source),
 				sdklog.Error(err))
 		} else {
@@ -358,6 +360,7 @@ func (oc *ObservationCreator) createObservation(ctx context.Context, observation
 		if err := unstructured.SetNestedField(observation.Object, normalizedEventType, "spec", "eventType"); err != nil {
 			observationLogger.Warn("Failed to normalize eventType in observation spec",
 				sdklog.Operation("normalize_event_type"),
+				sdklog.ErrorCode("NORMALIZE_ERROR"),
 				sdklog.String("source", source),
 				sdklog.Error(err))
 		} else {
@@ -540,6 +543,7 @@ func (oc *ObservationCreator) updateEventsTotalMetric(observation *unstructured.
 	if oc.metrics == nil || oc.metrics.EventsTotal == nil {
 		observationLogger.Error(fmt.Errorf("eventsTotal metric is nil"), "eventsTotal metric is nil, metrics will not be incremented",
 			sdklog.Operation("observation_create"),
+			sdklog.ErrorCode("METRICS_ERROR"),
 			sdklog.String("source", source))
 		return
 	}
@@ -718,6 +722,7 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 		} else {
 			observationLogger.Warn("Failed to parse OBSERVATION_TTL_SECONDS, using default",
 				sdklog.Operation("ttl_parsing"),
+				sdklog.ErrorCode("CONFIG_ERROR"),
 				sdklog.String("value", ttlSecondsStr),
 				sdklog.Error(err))
 		}
@@ -728,6 +733,7 @@ func (oc *ObservationCreator) setTTLIfNotSet(observation *unstructured.Unstructu
 		} else {
 			observationLogger.Warn("Failed to parse OBSERVATION_TTL_DAYS, using default",
 				sdklog.Operation("ttl_parsing"),
+				sdklog.ErrorCode("CONFIG_ERROR"),
 				sdklog.String("value", ttlDaysStr),
 				sdklog.Error(err))
 		}
