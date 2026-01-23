@@ -230,8 +230,8 @@ func TestGetEndpointFromPath(t *testing.T) {
 		{"/", "unknown"},
 		{"", "unknown"},
 		{"/   ", "unknown"}, // Whitespace-only
-		{"/a//b", "b"},       // Double slash
-		{"/a/b/", "b"},       // Trailing slash
+		{"/a//b", "b"},      // Double slash
+		{"/a/b/", "b"},      // Trailing slash
 		{"/single", "single"},
 	}
 

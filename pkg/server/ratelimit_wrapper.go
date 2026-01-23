@@ -144,10 +144,10 @@ func (rl *PerKeyRateLimiter) RateLimitMiddleware(next http.HandlerFunc) http.Han
 		// Extract endpoint identifier from path (last segment of multi-segment paths)
 		// This allows per-endpoint rate limiting without knowing about tenant/namespace structure
 		endpointName := getEndpointFromPath(r.URL.Path)
-		
+
 		var key string
 		var rateLimitScope string
-		
+
 		// Use per-endpoint rate limiting if path has multiple segments (suggests structured routing)
 		// Otherwise fall back to per-IP for backward compatibility with legacy single-segment paths
 		pathParts := strings.Split(strings.TrimPrefix(r.URL.Path, "/"), "/")
@@ -161,7 +161,7 @@ func (rl *PerKeyRateLimiter) RateLimitMiddleware(next http.HandlerFunc) http.Han
 			key = getClientIP(r, rl.trustedProxyCIDRs)
 			rateLimitScope = "ip"
 		}
-		
+
 		if !rl.Allow(key) {
 			serverLogger.Warn("Rate limit exceeded",
 				sdklog.Operation("rate_limit"),
@@ -175,7 +175,7 @@ func (rl *PerKeyRateLimiter) RateLimitMiddleware(next http.HandlerFunc) http.Han
 			if rl.webhookMetrics != nil {
 				rl.webhookMetrics.WithLabelValues(endpointName, "429").Inc()
 			}
-			
+
 			// Track rate limit rejection with scope (endpoint vs IP)
 			// This allows monitoring rate limit effectiveness per scope
 			if rl.rateLimitMetrics != nil {
@@ -187,13 +187,13 @@ func (rl *PerKeyRateLimiter) RateLimitMiddleware(next http.HandlerFunc) http.Han
 			w.Header().Set("Retry-After", "60")
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusTooManyRequests)
-			
+
 			response := map[string]interface{}{
-				"error":        "rate limit exceeded",
-				"endpoint":     endpointName,
-				"retry_after":  60,
+				"error":       "rate limit exceeded",
+				"endpoint":    endpointName,
+				"retry_after": 60,
 			}
-			
+
 			if err := json.NewEncoder(w).Encode(response); err != nil {
 				serverLogger.Warn("Failed to write rate limit response",
 					sdklog.Operation("rate_limit"),
