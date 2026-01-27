@@ -835,7 +835,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/your-org/zen-gitops
+    repoURL: https://github.com/your-org/gitops
     targetRevision: main
     path: ingesters
   destination:

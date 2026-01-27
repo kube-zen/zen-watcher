@@ -6,10 +6,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kube-zen/zen-sdk/pkg/k8s/crdstore"
 	sdklog "github.com/kube-zen/zen-sdk/pkg/logging"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/dynamic/dynamicinformer"
 	"k8s.io/client-go/tools/cache"
@@ -35,6 +35,16 @@ type IngesterConfig struct {
 	Processing    *ProcessingConfig
 	Optimization  *OptimizationConfig
 	Destinations  []DestinationConfig // Destination GVR configuration
+}
+
+// GetNamespace returns the namespace (implements CRDConfig interface)
+func (c *IngesterConfig) GetNamespace() string {
+	return c.Namespace
+}
+
+// GetName returns the name (implements CRDConfig interface)
+func (c *IngesterConfig) GetName() string {
+	return c.Name
 }
 
 // DestinationConfig holds destination GVR configuration
@@ -171,32 +181,26 @@ type ProcessingThreshold struct {
 	Description string
 }
 
-// IngesterStore maintains a cached view of Ingester configurations
+// IngesterStore maintains a cached view of Ingester configurations.
+// It embeds CRDStore for base functionality and adds a bySource index for O(1) lookups.
+// The byType and byNamespace indexes were removed as they were unused.
 type IngesterStore struct {
-	mu          sync.RWMutex
-	byName      map[types.NamespacedName]*IngesterConfig // namespace/name -> config
-	bySource    map[string]*IngesterConfig               // source -> config (assumes unique source)
-	byType      map[string][]*IngesterConfig             // ingester type -> configs
-	byNamespace map[string]map[string]*IngesterConfig    // namespace -> name -> config
+	*crdstore.CRDStore[*IngesterConfig] // Embed generic CRD store
+	bySource map[string]*IngesterConfig // source -> config (O(1) lookup for hot path)
+	mu       sync.RWMutex                // Protects bySource index
 }
 
 // NewIngesterStore creates a new IngesterStore
 func NewIngesterStore() *IngesterStore {
 	return &IngesterStore{
-		byName:      make(map[types.NamespacedName]*IngesterConfig),
-		bySource:    make(map[string]*IngesterConfig),
-		byType:      make(map[string][]*IngesterConfig),
-		byNamespace: make(map[string]map[string]*IngesterConfig),
+		CRDStore: crdstore.NewCRDStore[*IngesterConfig](),
+		bySource: make(map[string]*IngesterConfig),
 	}
 }
 
 // Get retrieves an IngesterConfig by namespace and name (O(1) lookup)
 func (s *IngesterStore) Get(namespace, name string) (*IngesterConfig, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	nn := types.NamespacedName{Namespace: namespace, Name: name}
-	config, exists := s.byName[nn]
-	return config, exists
+	return s.CRDStore.Get(namespace, name)
 }
 
 // GetBySource retrieves an IngesterConfig by source name (O(1) lookup)
@@ -209,91 +213,49 @@ func (s *IngesterStore) GetBySource(source string) (*IngesterConfig, bool) {
 
 // ListAll returns all IngesterConfigs
 func (s *IngesterStore) ListAll() []*IngesterConfig {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	configs := make([]*IngesterConfig, 0, len(s.byName))
-	for _, config := range s.byName {
-		configs = append(configs, config)
-	}
-	return configs
+	return s.CRDStore.ListAll()
 }
 
-// ListByType returns all IngesterConfigs of a specific type (informer, webhook, logs)
-func (s *IngesterStore) ListByType(ingesterType string) []*IngesterConfig {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.byType[ingesterType]
+// NotifyChange sends a notification that the store has changed
+func (s *IngesterStore) NotifyChange() {
+	s.CRDStore.NotifyChange()
+}
+
+// ChangeChannel returns the channel for change notifications
+func (s *IngesterStore) ChangeChannel() <-chan struct{} {
+	return s.CRDStore.ChangeChannel()
 }
 
 // AddOrUpdate adds or updates an IngesterConfig
 func (s *IngesterStore) AddOrUpdate(config *IngesterConfig) {
+	// Update base store
+	s.CRDStore.AddOrUpdate(config)
+
+	// Update bySource index
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	nn := types.NamespacedName{Namespace: config.Namespace, Name: config.Name}
-	s.byName[nn] = config
-
 	if config.Source != "" {
 		s.bySource[config.Source] = config
 	}
-
-	// Update byType index
-	if config.Ingester != "" {
-		// Remove from old type if it exists
-		for t, configs := range s.byType {
-			for i, c := range configs {
-				if c.Namespace == config.Namespace && c.Name == config.Name {
-					s.byType[t] = append(configs[:i], configs[i+1:]...)
-					break
-				}
-			}
-		}
-		// Add to new type
-		s.byType[config.Ingester] = append(s.byType[config.Ingester], config)
-	}
-
-	// Update byNamespace index
-	if s.byNamespace[config.Namespace] == nil {
-		s.byNamespace[config.Namespace] = make(map[string]*IngesterConfig)
-	}
-	s.byNamespace[config.Namespace][config.Name] = config
+	s.mu.Unlock()
 }
 
 // Delete removes an IngesterConfig by namespace and name
 func (s *IngesterStore) Delete(namespace, name string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	nn := types.NamespacedName{Namespace: namespace, Name: name}
-	config, exists := s.byName[nn]
+	// Get config first to clean up bySource index
+	config, exists := s.CRDStore.Get(namespace, name)
 	if !exists {
 		return
 	}
 
-	delete(s.byName, nn)
+	// Delete from base store
+	s.CRDStore.Delete(namespace, name)
 
+	// Clean up bySource index
+	s.mu.Lock()
 	if config.Source != "" {
 		delete(s.bySource, config.Source)
 	}
-
-	// Remove from byType index
-	if config.Ingester != "" {
-		configs := s.byType[config.Ingester]
-		for i, c := range configs {
-			if c.Namespace == namespace && c.Name == name {
-				s.byType[config.Ingester] = append(configs[:i], configs[i+1:]...)
-				break
-			}
-		}
-	}
-
-	// Remove from byNamespace index
-	if nsMap := s.byNamespace[namespace]; nsMap != nil {
-		delete(nsMap, name)
-		if len(nsMap) == 0 {
-			delete(s.byNamespace, namespace)
-		}
-	}
+	s.mu.Unlock()
 }
 
 // IngesterInformer manages watching Ingester CRDs and updating the store
