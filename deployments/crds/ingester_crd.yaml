@@ -321,6 +321,99 @@ spec:
                     - UNKNOWN
                     type: string
                 type: object
+              errorHandling:
+                description: Error handling configuration for this ingester (optional per-source DLQ replay override)
+                properties:
+                  strategy:
+                    default: fail-fast
+                    description: Error handling strategy
+                    enum:
+                    - fail-fast
+                    - retry
+                    - dlq
+                    type: string
+                  retry:
+                    description: Retry configuration
+                    properties:
+                      backoff:
+                        default: exponential
+                        description: Backoff strategy (exponential, linear, fixed)
+                        type: string
+                      backoffBase:
+                        default: 1s
+                        description: Base backoff duration (e.g., "1s", "5m")
+                        pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                        type: string
+                      maxAttempts:
+                        default: 3
+                        description: Maximum retry attempts
+                        minimum: 1
+                        type: integer
+                    type: object
+                  dlq:
+                    description: Dead Letter Queue configuration
+                    properties:
+                      destination:
+                        description: DLQ destination identifier
+                        type: string
+                      enabled:
+                        default: false
+                        description: Enable DLQ for failed events
+                        type: boolean
+                      replay:
+                        description: Optional per-source DLQ replay policy override (takes precedence over global policy)
+                        properties:
+                          enabled:
+                            default: false
+                            description: Enable automatic DLQ replay for this source
+                            type: boolean
+                          interval:
+                            default: 5m
+                            description: Replay interval (e.g., "5m", "1h")
+                            pattern: ^[0-9]+(ns|us|µs|ms|s|m|h)$
+                            type: string
+                          maxBatchSize:
+                            default: 100
+                            description: Maximum events to process per replay cycle
+                            maximum: 10000
+                            minimum: 1
+                            type: integer
+                          maxConcurrent:
+                            default: 10
+                            description: Maximum concurrent replays
+                            maximum: 1000
+                            minimum: 1
+                            type: integer
+                          maxReplayAge:
+                            default: 24h
+                            description: Maximum age of messages to replay (e.g., "24h", "7d")
+                            pattern: ^[0-9]+(ns|us|µs|ms|s|m|h|d)$
+                            type: string
+                          maxReplayCount:
+                            default: 3
+                            description: Maximum replay attempts per message (0 = unlimited)
+                            minimum: 0
+                            type: integer
+                        type: object
+                    type: object
+                  logging:
+                    description: Error logging configuration
+                    properties:
+                      includeBody:
+                        default: false
+                        description: Include request body in error logs (use with caution)
+                        type: boolean
+                      level:
+                        default: error
+                        description: Logging level for errors
+                        enum:
+                        - debug
+                        - info
+                        - warn
+                        - error
+                        type: string
+                    type: object
+                type: object
               informer:
                 description: Informer adapter configuration
                 properties: &id001
